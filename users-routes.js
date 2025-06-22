@@ -34,24 +34,14 @@ router.get('/', async (req, res) => {
       let plexLibraries = {};
       
       // Safe JSON parsing for tags
-      if (user.tags) {
-        try {
-          tags = JSON.parse(user.tags);
-        } catch (e) {
-          console.error('Error parsing tags for user', user.id, ':', e.message);
-          tags = [];
-        }
-      }
+if (user.tags) {
+  tags = Array.isArray(user.tags) ? user.tags : [];  // ✅ It's already parsed
+}
       
       // Safe JSON parsing for plex_libraries
-      if (user.plex_libraries) {
-        try {
-          plexLibraries = JSON.parse(user.plex_libraries);
-        } catch (e) {
-          console.error('Error parsing plex_libraries for user', user.id, ':', e.message);
-          plexLibraries = {};
-        }
-      }
+if (user.plex_libraries) {
+  plexLibraries = typeof user.plex_libraries === 'object' ? user.plex_libraries : {};  // ✅ Already parsed
+}
       
       const subscriptions = {};
       if (user.subscriptions) {

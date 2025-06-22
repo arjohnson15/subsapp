@@ -757,12 +757,8 @@
                         <label>Optional Details:</label>
                         <div class="form-grid">
                             <div class="form-group">
-                                <label for="plexUsername">Plex Username:</label>
-                                <input type="text" id="plexUsername" name="plex_username">
-                            </div>
-                            <div class="form-group">
-                                <label for="plexPassword">Plex Password:</label>
-                                <input type="text" id="plexPassword" name="plex_password">
+                                <label for="plexEmail">Plex Email:</label>
+                                <input type="email" id="plexEmail" name="plex_email">
                             </div>
                             <div class="form-group">
                                 <label for="iptvUsername">IPTV Username:</label>
@@ -877,8 +873,7 @@
                         <span class="field-tag" onclick="insertField('{{renewal_price}}')">{{renewal_price}}</span>
                         <span class="field-tag" onclick="insertField('{{owner_name}}')">{{owner_name}}</span>
                         <span class="field-tag" onclick="insertField('{{owner_email}}')">{{owner_email}}</span>
-                        <span class="field-tag" onclick="insertField('{{plex_username}}')">{{plex_username}}</span>
-                        <span class="field-tag" onclick="insertField('{{plex_password}}')">{{plex_password}}</span>
+                        <span class="field-tag" onclick="insertField('{{plex_email}}')">{{plex_email}}</span>
                         <span class="field-tag" onclick="insertField('{{iptv_username}}')">{{iptv_username}}</span>
                         <span class="field-tag" onclick="insertField('{{iptv_password}}')">{{iptv_password}}</span>
                         <span class="field-tag" onclick="insertField('{{implayer_code}}')">{{implayer_code}}</span>
@@ -1209,8 +1204,7 @@
                 document.getElementById('userName').value = user.name;
                 document.getElementById('userEmail').value = user.email;
                 document.getElementById('userOwner').value = user.owner_id || '';
-                document.getElementById('plexUsername').value = user.plex_username || '';
-                document.getElementById('plexPassword').value = user.plex_password || '';
+                document.getElementById('plexEmail').value = user.plex_email || '';
                 document.getElementById('iptvUsername').value = user.iptv_username || '';
                 document.getElementById('iptvPassword').value = user.iptv_password || '';
                 document.getElementById('implayerCode').value = user.implayer_code || '';
