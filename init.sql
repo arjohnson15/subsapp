@@ -1,6 +1,6 @@
 -- JohnsonFlix Database Schema
-CREATE DATABASE IF NOT EXISTS johnsonflix_db;
-USE johnsonflix_db;
+CREATE DATABASE IF NOT EXISTS subsapp_db;
+USE subsapp_db;
 
 -- Owners table
 CREATE TABLE owners (
@@ -24,18 +24,17 @@ CREATE TABLE subscription_types (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Users table
+-- Users table (updated field names)
 CREATE TABLE users (
   id INT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL UNIQUE,
   owner_id INT,
-  plex_username VARCHAR(255),
-  plex_password VARCHAR(255),
+  plex_email VARCHAR(255),
   iptv_username VARCHAR(255),
   iptv_password VARCHAR(255),
   implayer_code VARCHAR(255),
-  device_count INT DEFAULT 1,
+  device_count INT DEFAULT 1 COMMENT 'iMPlayer device count limit',
   bcc_owner_renewal BOOLEAN DEFAULT FALSE,
   tags JSON,
   plex_libraries JSON,
@@ -119,15 +118,14 @@ INSERT INTO subscription_types (name, type, duration_months, streams, price) VAL
 ('IPTV 6 Month - 1 Stream', 'iptv', 6, 1, 45.00),
 ('IPTV 3 Month - 5 Streams', 'iptv', 3, 5, 75.00);
 
--- Insert default email templates
+-- Insert default email templates (updated field names)
 INSERT INTO email_templates (name, subject, body, template_type) VALUES
 ('Welcome Email', 'Welcome to {{subscription_type}}!', 
 '<h2 style="color: #8e24aa;">Welcome {{name}}!</h2>
 <p>Thank you for subscribing to our {{subscription_type}} service. Your account has been activated.</p>
 <p><strong>Account Details:</strong></p>
 <ul>
-<li><strong>Plex Username:</strong> {{plex_username}}</li>
-<li><strong>Plex Password:</strong> {{plex_password}}</li>
+<li><strong>Plex Email:</strong> {{plex_email}}</li>
 <li><strong>IPTV Username:</strong> {{iptv_username}}</li>
 <li><strong>IPTV Password:</strong> {{iptv_password}}</li>
 <li><strong>iMPlayer Code:</strong> {{implayer_code}}</li>
@@ -168,14 +166,14 @@ INSERT INTO settings (setting_key, setting_value, setting_type) VALUES
 ('secondary_color', '#3f51b5', 'string'),
 ('accent_color', '#4fc3f7', 'string');
 
--- Insert sample users
-INSERT INTO users (name, email, owner_id, plex_username, plex_password, iptv_username, iptv_password, implayer_code, device_count, bcc_owner_renewal, tags) VALUES
-('Andrew', 'arjohnson15@gmail.com', 1, 'andrew_plex', 'plex123', 'andrew_iptv', 'iptv456', 'ABC123', 2, true, '["Plex 1", "Plex 2", "IPTV"]'),
-('Aaron Fleuren', 'afleuren@yahoo.com', 1, 'aaron_plex', 'aaron123', '', '', '', 1, false, '["Plex 1"]'),
-('Ashley Henderson', 'ahenderson421@gmail.com', 1, 'ashley_plex', 'ashley123', '', '', '', 1, true, '["Plex 1"]'),
-('Adam Kiepe', 'akiepe@gmail.com', 1, 'adam_plex', 'adam123', '', '', '', 1, false, '["Plex 1"]'),
-('Chase Usler', 'chaseusler@gmail.com', 1, 'chase_plex', 'chase123', '', '', '', 1, true, '["Plex 1"]'),
-('Brian Cerny', 'briancerny@yahoo.com', 1, 'brian_plex', 'brian123', 'brian_iptv', 'brian456', 'DEF456', 2, true, '["Plex 1", "IPTV"]');
+-- Insert sample users (updated field names and realistic data)
+INSERT INTO users (name, email, owner_id, plex_email, iptv_username, iptv_password, implayer_code, device_count, bcc_owner_renewal, tags) VALUES
+('Andrew', 'arjohnson15@gmail.com', 1, 'andrew@example.com', 'andrew_iptv', 'iptv456', 'ABC123', 2, true, '["Plex 1", "Plex 2", "IPTV"]'),
+('Aaron Fleuren', 'afleuren@yahoo.com', 1, 'aaron.fleuren@example.com', '', '', '', 1, false, '["Plex 1"]'),
+('Ashley Henderson', 'ahenderson421@gmail.com', 1, 'ashley.henderson@example.com', '', '', '', 1, true, '["Plex 1"]'),
+('Adam Kiepe', 'akiepe@gmail.com', 1, 'adam.kiepe@example.com', '', '', '', 1, false, '["Plex 1"]'),
+('Chase Usler', 'chaseusler@gmail.com', 1, 'chase.usler@example.com', '', '', '', 1, true, '["Plex 1"]'),
+('Brian Cerny', 'briancerny@yahoo.com', 1, 'brian.cerny@example.com', 'brian_iptv', 'brian456', 'DEF456', 2, true, '["Plex 1", "IPTV"]');
 
 -- Insert sample subscriptions
 INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status) VALUES

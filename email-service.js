@@ -11,7 +11,7 @@ class EmailService {
     try {
       const settings = await this.getEmailSettings();
       
-      this.transporter = nodemailer.createTransporter({
+      this.transporter = nodemailer.createTransport({
         host: settings.smtp_host || process.env.SMTP_HOST,
         port: parseInt(settings.smtp_port) || parseInt(process.env.SMTP_PORT) || 587,
         secure: false,
@@ -111,9 +111,8 @@ class EmailService {
       let processedBody = templateBody
         .replace(/\{\{name\}\}/g, userData.name || '')
         .replace(/\{\{email\}\}/g, userData.email || '')
-        .replace(/\{\{username\}\}/g, userData.plex_username || userData.iptv_username || '')
-        .replace(/\{\{plex_username\}\}/g, userData.plex_username || '')
-        .replace(/\{\{plex_password\}\}/g, userData.plex_password || '')
+        .replace(/\{\{username\}\}/g, userData.plex_email || userData.iptv_username || '')
+        .replace(/\{\{plex_email\}\}/g, userData.plex_email || '')
         .replace(/\{\{iptv_username\}\}/g, userData.iptv_username || '')
         .replace(/\{\{iptv_password\}\}/g, userData.iptv_password || '')
         .replace(/\{\{implayer_code\}\}/g, userData.implayer_code || '')

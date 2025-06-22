@@ -28,8 +28,31 @@ router.get('/', async (req, res) => {
       ORDER BY u.name
     `);
 
-    // Process subscriptions data
+    // Process subscriptions data with safe JSON parsing
     const processedUsers = users.map(user => {
+      let tags = [];
+      let plexLibraries = {};
+      
+      // Safe JSON parsing for tags
+      if (user.tags) {
+        try {
+          tags = JSON.parse(user.tags);
+        } catch (e) {
+          console.error('Error parsing tags for user', user.id, ':', e.message);
+          tags = [];
+        }
+      }
+      
+      // Safe JSON parsing for plex_libraries
+      if (user.plex_libraries) {
+        try {
+          plexLibraries = JSON.parse(user.plex_libraries);
+        } catch (e) {
+          console.error('Error parsing plex_libraries for user', user.id, ':', e.message);
+          plexLibraries = {};
+        }
+      }
+      
       const subscriptions = {};
       if (user.subscriptions) {
         user.subscriptions.split('|').forEach(sub => {
@@ -40,8 +63,8 @@ router.get('/', async (req, res) => {
       
       return {
         ...user,
-        tags: user.tags ? JSON.parse(user.tags) : [],
-        plex_libraries: user.plex_libraries ? JSON.parse(user.plex_libraries) : {},
+        tags: tags,
+        plex_libraries: plexLibraries,
         plex_expiration: subscriptions.plex || 'N/A',
         iptv_expiration: subscriptions.iptv || 'N/A'
       };
@@ -90,14 +113,13 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create new user
+// Create new user (updated field names)
 router.post('/', [
   body('name').notEmpty().trim().escape(),
   body('email').isEmail().normalizeEmail(),
   body('owner_id').optional().isInt(),
   body('tags').optional().isArray(),
-  body('plex_username').optional().trim(),
-  body('iptv_username').optional().trim()
+  body('plex_email').optional().isEmail()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -106,7 +128,7 @@ router.post('/', [
     }
 
     const {
-      name, email, owner_id, plex_username, plex_password,
+      name, email, owner_id, plex_email,
       iptv_username, iptv_password, implayer_code, device_count,
       bcc_owner_renewal, tags, plex_libraries
     } = req.body;
@@ -119,12 +141,12 @@ router.post('/', [
 
     const result = await db.query(`
       INSERT INTO users (
-        name, email, owner_id, plex_username, plex_password,
+        name, email, owner_id, plex_email,
         iptv_username, iptv_password, implayer_code, device_count,
         bcc_owner_renewal, tags, plex_libraries
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      name, email, owner_id || null, plex_username, plex_password,
+      name, email, owner_id || null, plex_email,
       iptv_username, iptv_password, implayer_code, device_count || 1,
       bcc_owner_renewal || false, JSON.stringify(tags || []), JSON.stringify(plex_libraries || {})
     ]);
@@ -139,12 +161,13 @@ router.post('/', [
   }
 });
 
-// Update user
+// Update user (updated field names)
 router.put('/:id', [
   body('name').notEmpty().trim().escape(),
   body('email').isEmail().normalizeEmail(),
   body('owner_id').optional().isInt(),
-  body('tags').optional().isArray()
+  body('tags').optional().isArray(),
+  body('plex_email').optional().isEmail()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -153,7 +176,7 @@ router.put('/:id', [
     }
 
     const {
-      name, email, owner_id, plex_username, plex_password,
+      name, email, owner_id, plex_email,
       iptv_username, iptv_password, implayer_code, device_count,
       bcc_owner_renewal, tags, plex_libraries
     } = req.body;
@@ -166,12 +189,12 @@ router.put('/:id', [
 
     await db.query(`
       UPDATE users SET 
-        name = ?, email = ?, owner_id = ?, plex_username = ?, plex_password = ?,
+        name = ?, email = ?, owner_id = ?, plex_email = ?,
         iptv_username = ?, iptv_password = ?, implayer_code = ?, device_count = ?,
         bcc_owner_renewal = ?, tags = ?, plex_libraries = ?
       WHERE id = ?
     `, [
-      name, email, owner_id || null, plex_username, plex_password,
+      name, email, owner_id || null, plex_email,
       iptv_username, iptv_password, implayer_code, device_count || 1,
       bcc_owner_renewal || false, JSON.stringify(tags || []), JSON.stringify(plex_libraries || {}),
       req.params.id
