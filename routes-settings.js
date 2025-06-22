@@ -1,5 +1,5 @@
 const express = require('express');
-const db = require('../config/database');
+const db = require('./database-config');
 const router = express.Router();
 
 // Get all settings

@@ -1,5 +1,5 @@
 const axios = require('axios');
-const db = require('../config/database');
+const db = require('./database-config');
 
 class PlexService {
   constructor() {

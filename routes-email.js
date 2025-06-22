@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const emailService = require('../services/emailService');
-const db = require('../config/database');
+const emailService = require('./email-service');
+const db = require('./database-config');
 const router = express.Router();
 
 // Send email

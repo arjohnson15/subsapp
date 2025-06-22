@@ -1,5 +1,5 @@
 const express = require('express');
-const plexService = require('../services/plexService');
+const plexService = require('./plex-service');
 const router = express.Router();
 
 // Get all servers

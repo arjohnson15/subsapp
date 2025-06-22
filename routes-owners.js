@@ -1,6 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const db = require('../config/database');
+const db = require('./database-config');
 const router = express.Router();
 
 // Get all owners
