@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  johnsonflix:
+    build: .
+    container_name: johnsonflix-manager
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=db
+      - DB_USER=johnsonflix
+      - DB_PASSWORD=secure_password_change_me
+      - DB_NAME=johnsonflix_db
+      - JWT_SECRET=your_jwt_secret_change_me
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USER=your-email@gmail.com
+      - SMTP_PASS=your-app-password
+    depends_on:
+      - db
+    volumes:
+      - ./data:/app/data
+      - ./backups:/app/backups
+    networks:
+      - johnsonflix-network
+
+  db:
+    image: mysql:8.0
+    container_name: johnsonflix-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password_change_me
+      MYSQL_DATABASE: johnsonflix_db
+      MYSQL_USER: johnsonflix
+      MYSQL_PASSWORD: secure_password_change_me
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - johnsonflix-network
+
+volumes:
+  mysql_data:
+
+networks:
+  johnsonflix-network:
+    driver: bridge
