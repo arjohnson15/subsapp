@@ -6,7 +6,7 @@ const path = require('path');
 const cron = require('node-cron');
 require('dotenv').config();
 
-const db = require('./config/database');
+const db = require('./database-config');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const subscriptionRoutes = require('./routes/subscriptions');
