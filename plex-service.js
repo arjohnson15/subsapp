@@ -1,7 +1,6 @@
 const axios = require('axios');
 const xml2js = require('xml2js');
 const db = require('./database-config');
-const plexConfig = require('./plex-config');
 
 class PlexService {
   constructor() {
@@ -20,37 +19,96 @@ class PlexService {
     setInterval(() => {
       console.log('Running scheduled Plex library sync...');
       this.syncAllLibraries();
-    }, plexConfig.syncInterval);
+    }, 60 * 60 * 1000); // 1 hour
   }
 
-  // Make authenticated request to Plex server DIRECTLY using individual server URLs
-  async makeRequest(serverConfig, path = '') {
+  // Server configuration mapping (matches your Python config)
+  getServerConfig() {
+    return {
+      'plex1': {
+        regular: {
+          name: 'Plex 1',
+          serverId: '3ad72e19d4509a15d9f8253666a03efa78baac44',
+          token: 'sxuautpKvoH2aZKG-j95',
+          url: 'http://192.168.10.90:32400'
+        },
+        fourk: {
+          name: 'Plex 1 4K',
+          serverId: '90244d9a956da3afad32f85d6b24a9c24649d681',
+          token: 'sxuautpKvoH2aZKG-j95',
+          url: 'http://192.168.10.92:32400',
+          // Hardcoded 4K libraries
+          libraries: [{ id: '1', title: '4K Movies', type: 'movie' }]
+        }
+      },
+      'plex2': {
+        regular: {
+          name: 'Plex 2',
+          serverId: '3ad72e19d4509a15d9f8253666a03efa78baac44',
+          token: 'B1QhFRA-Q2pSm15uxmMA',
+          url: 'http://192.168.10.94:32400'
+        },
+        fourk: {
+          name: 'Plex 2 4K',
+          serverId: 'c6448117a95874f18274f31495ff5118fd291089',
+          token: 'B1QhFRA-Q2pSm15uxmMA',
+          url: 'http://192.168.10.92:32700',
+          // Hardcoded 4K libraries
+          libraries: [{ id: '1', title: '4K Movies', type: 'movie' }]
+        }
+      }
+    };
+  }
+
+  // Make request to Plex.tv API (like your Python code)
+  async makePlexTvRequest(serverId, token, path = '') {
     try {
-      // Use the individual server's URL from config
-      const url = `${serverConfig.url}${path}`;
+      const url = `https://plex.tv/api/servers/${serverId}${path}?X-Plex-Token=${token}`;
       
-      console.log(`Making request to: ${url}`);
+      console.log(`Making Plex.tv API request: ${url}`);
       
       const response = await axios.get(url, {
         headers: {
-          'X-Plex-Token': serverConfig.token,
           'Accept': 'application/xml'
         },
-        timeout: plexConfig.timeout || 10000
+        timeout: 10000
       });
+      
       return response.data;
     } catch (error) {
-      console.error(`Plex server request failed for ${serverConfig.url}${path}:`, error.message);
+      console.error(`Plex.tv API request failed for server ${serverId}:`, error.message);
       throw error;
     }
   }
 
-  // Get libraries from a specific Plex server
+  // Make request to direct server (for libraries)
+  async makeDirectServerRequest(serverUrl, token, path = '') {
+    try {
+      const url = `${serverUrl}${path}`;
+      
+      console.log(`Making direct server request: ${url}`);
+      
+      const response = await axios.get(url, {
+        headers: {
+          'X-Plex-Token': token,
+          'Accept': 'application/xml'
+        },
+        timeout: 10000
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error(`Direct server request failed for ${serverUrl}:`, error.message);
+      throw error;
+    }
+  }
+
+  // Get libraries from a specific server (using direct server API)
   async getServerLibraries(serverConfig) {
     try {
       console.log(`Fetching libraries from ${serverConfig.name} at ${serverConfig.url}`);
       
-      const xmlData = await this.makeRequest(serverConfig, '/library/sections');
+      const xmlData = await this.makeDirectServerRequest(serverConfig.url, serverConfig.token, '/library/sections');
       const result = await this.parser.parseStringPromise(xmlData);
       
       if (!result.MediaContainer || !result.MediaContainer.Directory) {
@@ -77,16 +135,16 @@ class PlexService {
     }
   }
 
-  // Get user's current library access for a server
-  async getUserLibraryAccess(userEmail, serverConfig) {
+  // Get user's shared libraries using Plex.tv API (like your Python code)
+  async getUserSharedLibraries(userEmail, serverConfig) {
     try {
-      console.log(`🔍 Checking access for ${userEmail} on ${serverConfig.name}`);
+      console.log(`?? Checking shared libraries for ${userEmail} on ${serverConfig.name} (Server ID: ${serverConfig.serverId})`);
       
-      const xmlData = await this.makeRequest(serverConfig, '/myplex/shared_servers');
+      const xmlData = await this.makePlexTvRequest(serverConfig.serverId, serverConfig.token, '/shared_servers');
       const result = await this.parser.parseStringPromise(xmlData);
       
       if (!result.MediaContainer || !result.MediaContainer.SharedServer) {
-        console.log(`No shared servers found on ${serverConfig.name}`);
+        console.log(`No shared servers found for ${serverConfig.name}`);
         return [];
       }
 
@@ -94,17 +152,25 @@ class PlexService {
         ? result.MediaContainer.SharedServer
         : [result.MediaContainer.SharedServer];
 
-      const userServer = sharedServers.find(server => server.$.email === userEmail);
-      if (!userServer || !userServer.Section) {
-        console.log(`User ${userEmail} not found or has no sections on ${serverConfig.name}`);
+      // Find the shared server for this user by email
+      const userSharedServer = sharedServers.find(server => server.$.email === userEmail);
+      
+      if (!userSharedServer) {
+        console.log(`No shared libraries found for ${userEmail} on ${serverConfig.name}`);
         return [];
       }
 
-      const sections = Array.isArray(userServer.Section) 
-        ? userServer.Section 
-        : [userServer.Section];
+      if (!userSharedServer.Section) {
+        console.log(`User ${userEmail} has no sections on ${serverConfig.name}`);
+        return [];
+      }
 
-      const accessibleLibraries = sections
+      const sections = Array.isArray(userSharedServer.Section) 
+        ? userSharedServer.Section 
+        : [userSharedServer.Section];
+
+      // Only get sections that are shared
+      const sharedLibraries = sections
         .filter(section => section.$.shared === '1')
         .map(section => ({
           id: section.$.id,
@@ -112,173 +178,65 @@ class PlexService {
           type: section.$.type
         }));
       
-      console.log(`✅ User ${userEmail} has access to ${accessibleLibraries.length} libraries on ${serverConfig.name}:`, 
-        accessibleLibraries.map(l => l.title));
+      console.log(`? User ${userEmail} has access to ${sharedLibraries.length} libraries on ${serverConfig.name}:`, 
+        sharedLibraries.map(l => l.title));
       
-      return accessibleLibraries;
+      return sharedLibraries;
     } catch (error) {
-      console.error(`Failed to get user access for ${userEmail} on ${serverConfig.name}:`, error.message);
+      console.error(`Failed to get shared libraries for ${userEmail} on ${serverConfig.name}:`, error.message);
       return [];
     }
   }
 
-  // Share libraries with a user
-  async shareLibrariesWithUser(userEmail, serverGroup, libraryIds) {
+  // Get user's current access across all servers
+  async getUserCurrentAccess(userEmail) {
     try {
-      const results = [];
-      const config = plexConfig.servers[serverGroup];
+      console.log(`?? Getting current access for user: ${userEmail}`);
       
-      if (!config) {
-        throw new Error(`Invalid server group: ${serverGroup}`);
-      }
-
-      // Handle regular server libraries
-      if (libraryIds.regular && libraryIds.regular.length > 0) {
-        const shareResult = await this.shareLibrariesOnServer(
-          userEmail, 
-          config.regular, 
-          libraryIds.regular
-        );
-        results.push({ server: config.regular.name, ...shareResult });
-      }
-
-      // Handle 4K server libraries
-      if (libraryIds.fourk && libraryIds.fourk.length > 0) {
-        const shareResult = await this.shareLibrariesOnServer(
-          userEmail, 
-          config.fourk, 
-          libraryIds.fourk
-        );
-        results.push({ server: config.fourk.name, ...shareResult });
-      }
-
-      return { success: true, results };
-    } catch (error) {
-      console.error('Error sharing libraries:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Share libraries on a specific server
-  async shareLibrariesOnServer(userEmail, serverConfig, libraryIds) {
-    try {
-      // First, check if user already has access
-      const currentAccess = await this.getUserLibraryAccess(userEmail, serverConfig);
-      const currentLibraryIds = currentAccess.map(lib => lib.id);
+      const serverConfigs = this.getServerConfig();
+      const access = {};
       
-      // Combine current access with new libraries (avoid duplicates)
-      const allLibraryIds = [...new Set([...currentLibraryIds, ...libraryIds])];
-      
-      console.log(`📤 Sharing libraries on ${serverConfig.name} with ${userEmail}:`, 
-        { current: currentLibraryIds, new: libraryIds, all: allLibraryIds });
-      
-      // Build the share URL for direct server connection
-      const libraryParams = allLibraryIds.map(id => `librarySectionID=${id}`).join('&');
-      const path = `/myplex/shared_servers?${libraryParams}`;
-      
-      // Make the share request to server directly
-      const postData = `invited_email=${encodeURIComponent(userEmail)}&settings[allowSync]=1&settings[allowCameraUpload]=0&settings[allowChannels]=0`;
-      
-      const response = await axios.post(`${serverConfig.url}${path}`, postData, {
-        headers: {
-          'X-Plex-Token': serverConfig.token,
-          'Content-Type': 'application/x-www-form-urlencoded'
+      for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
+        console.log(`?? Checking ${groupName} access for ${userEmail}...`);
+        
+        // Get access for regular server
+        const regularAccess = await this.getUserSharedLibraries(userEmail, groupConfig.regular);
+        
+        // Get access for 4K server (if it has real libraries)
+        let fourkAccess = [];
+        if (groupConfig.fourk.libraries) {
+          // For hardcoded 4K libraries, check if user has any access to that server
+          try {
+            const fourkSharedLibraries = await this.getUserSharedLibraries(userEmail, groupConfig.fourk);
+            // If user has any access to 4K server, give them the hardcoded libraries
+            fourkAccess = fourkSharedLibraries.length > 0 ? groupConfig.fourk.libraries.map(lib => lib.id) : [];
+          } catch (error) {
+            console.log(`No 4K access found for ${userEmail} on ${groupName}`);
+            fourkAccess = [];
+          }
         }
-      });
-
-      console.log(`✅ Successfully shared libraries with ${userEmail} on ${serverConfig.name}`);
-
-      return { 
-        success: true, 
-        message: `Libraries shared with ${userEmail}`,
-        librariesShared: allLibraryIds.length,
-        newLibrariesAdded: allLibraryIds.length - currentLibraryIds.length
-      };
-    } catch (error) {
-      console.error(`Error sharing libraries on ${serverConfig.name}:`, error.message);
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Remove user access from servers
-  async removeUserAccess(userEmail, serverGroups) {
-    try {
-      const results = [];
+        
+        access[groupName] = {
+          regular: regularAccess.map(lib => lib.id),
+          fourk: fourkAccess
+        };
+        
+        console.log(`?? ${groupName} access for ${userEmail}:`, access[groupName]);
+      }
       
-      for (const serverGroup of serverGroups) {
-        const config = plexConfig.servers[serverGroup];
-        if (!config) continue;
-
-        // Remove from regular server
-        const regularResult = await this.removeUserFromServer(userEmail, config.regular);
-        results.push({ server: config.regular.name, ...regularResult });
-
-        // Remove from 4K server
-        const fourkResult = await this.removeUserFromServer(userEmail, config.fourk);
-        results.push({ server: config.fourk.name, ...fourkResult });
-      }
-
-      return { success: true, results };
+      return access;
     } catch (error) {
-      console.error('Error removing user access:', error);
-      return { success: false, error: error.message };
+      console.error('Error getting user current access:', error);
+      return {};
     }
   }
 
-  // Remove user from a specific server
-  async removeUserFromServer(userEmail, serverConfig) {
-    try {
-      // Get current shared servers to find the user
-      const xmlData = await this.makeRequest(serverConfig, '/myplex/shared_servers');
-      const result = await this.parser.parseStringPromise(xmlData);
-      
-      if (!result.MediaContainer || !result.MediaContainer.SharedServer) {
-        return { success: true, message: 'User not found on server' };
-      }
-
-      const sharedServers = Array.isArray(result.MediaContainer.SharedServer)
-        ? result.MediaContainer.SharedServer
-        : [result.MediaContainer.SharedServer];
-
-      const userServer = sharedServers.find(server => server.$.email === userEmail);
-      if (!userServer) {
-        return { success: true, message: 'User not found on server' };
-      }
-
-      // Remove the user using direct server connection
-      const removeUrl = `${serverConfig.url}/myplex/shared_servers/${userServer.$.id}`;
-      await axios.delete(removeUrl, {
-        headers: { 'X-Plex-Token': serverConfig.token }
-      });
-
-      return { success: true, message: 'User removed successfully' };
-    } catch (error) {
-      console.error(`Error removing user from ${serverConfig.name}:`, error.message);
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Update the last sync timestamp in database
-  async updateSyncTimestamp() {
-    try {
-      const now = new Date().toISOString();
-      await db.query(`
-        INSERT INTO settings (setting_key, setting_value, setting_type)
-        VALUES ('last_plex_sync', ?, 'string')
-        ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = NOW()
-      `, [now, now]);
-      console.log('✅ Updated last sync timestamp:', now);
-    } catch (error) {
-      console.error('❌ Error updating sync timestamp:', error);
-    }
-  }
-
-  // NEW: Comprehensive user library access sync
+  // Sync user library access with current Plex state
   async syncUserLibraryAccess() {
     try {
-      console.log('🔄 Syncing user library access with Plex servers...');
+      console.log('?? Syncing user library access with Plex servers...');
       
-      // Get all users with Plex emails and tags
+      // Get all users with Plex emails
       const users = await db.query(`
         SELECT id, name, email, plex_email, tags, plex_libraries
         FROM users 
@@ -289,45 +247,29 @@ class PlexService {
       
       for (const user of users) {
         try {
-          console.log(`\n🔍 Syncing access for user: ${user.name} (${user.plex_email})`);
+          console.log(`\n?? Syncing access for user: ${user.name} (${user.plex_email})`);
           
           // Parse user tags to determine which servers they should have access to
           let userTags = [];
           try {
-            userTags = JSON.parse(user.tags || '[]');
+            if (user.tags) {
+              // Handle both JSON array format and comma-separated string format
+              if (user.tags.startsWith('[')) {
+                userTags = JSON.parse(user.tags);
+              } else {
+                // Handle comma-separated string format
+                userTags = user.tags.split(',').map(tag => tag.trim());
+              }
+            }
           } catch (e) {
-            console.log(`⚠️  Could not parse tags for ${user.name}, skipping`);
+            console.log(`??  Could not parse tags for ${user.name}: "${user.tags}", skipping`);
             continue;
           }
           
-          console.log(`👤 User ${user.name} has tags:`, userTags);
+          console.log(`?? User ${user.name} has tags:`, userTags);
           
-          const currentAccess = {};
-          
-          // Check access for each server group based on user's tags
-          for (const [groupName, groupConfig] of Object.entries(plexConfig.servers)) {
-            const hasAccess = userTags.includes(`Plex 1`) && groupName === 'plex1' ||
-                            userTags.includes(`Plex 2`) && groupName === 'plex2';
-            
-            if (hasAccess) {
-              console.log(`📡 Checking ${groupName} access for ${user.name}...`);
-              
-              // Get access for regular server
-              const regularAccess = await this.getUserLibraryAccess(user.plex_email, groupConfig.regular);
-              
-              // Get access for 4K server 
-              const fourkAccess = await this.getUserLibraryAccess(user.plex_email, groupConfig.fourk);
-              
-              currentAccess[groupName] = {
-                regular: regularAccess.map(lib => lib.id),
-                fourk: fourkAccess.map(lib => lib.id)
-              };
-              
-              console.log(`📊 Current ${groupName} access:`, currentAccess[groupName]);
-            } else {
-              console.log(`⏭️  User ${user.name} doesn't have ${groupName} tag, skipping`);
-            }
-          }
+          // Get current access from Plex
+          const currentAccess = await this.getUserCurrentAccess(user.plex_email);
           
           // Update user's plex_libraries in database with their current access
           await db.query(`
@@ -336,56 +278,58 @@ class PlexService {
             WHERE id = ?
           `, [JSON.stringify(currentAccess), user.id]);
           
-          console.log(`✅ Updated cached library access for ${user.name}`);
+          console.log(`? Updated cached library access for ${user.name}`);
           
           // Log summary
           const totalLibraries = Object.values(currentAccess).reduce((total, group) => {
             return total + (group.regular?.length || 0) + (group.fourk?.length || 0);
           }, 0);
           
-          console.log(`📋 ${user.name} has access to ${totalLibraries} total libraries across ${Object.keys(currentAccess).length} server groups`);
+          console.log(`?? ${user.name} has access to ${totalLibraries} total libraries across ${Object.keys(currentAccess).length} server groups`);
           
         } catch (userError) {
-          console.error(`❌ Error syncing access for user ${user.name}:`, userError.message);
+          console.error(`? Error syncing access for user ${user.name}:`, userError.message);
         }
       }
       
-      console.log('\n✅ User library access sync completed successfully!');
+      console.log('\n? User library access sync completed successfully!');
     } catch (error) {
-      console.error('❌ Error syncing user library access:', error);
+      console.error('? Error syncing user library access:', error);
     }
   }
 
   // Sync all libraries and store in database
   async syncAllLibraries() {
     try {
-      console.log('🔄 Syncing Plex libraries using direct server connections...');
+      console.log('?? Syncing Plex libraries using Plex.tv API...');
       
-      for (const [groupName, groupConfig] of Object.entries(plexConfig.servers)) {
-        console.log(`🔄 Syncing group: ${groupName}`);
+      const serverConfigs = this.getServerConfig();
+      
+      for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
+        console.log(`?? Syncing group: ${groupName}`);
         
         // Sync regular server libraries
         const regularLibs = await this.getServerLibraries(groupConfig.regular);
         await this.updateLibrariesInDatabase(groupName, 'regular', regularLibs);
-        console.log(`✅ Synced ${regularLibs.length} regular libraries for ${groupName}`);
+        console.log(`? Synced ${regularLibs.length} regular libraries for ${groupName}`);
         
-        // Use hardcoded 4K libraries instead of syncing them
+        // Use hardcoded 4K libraries
         const fourkLibs = groupConfig.fourk.libraries || [];
         await this.updateLibrariesInDatabase(groupName, 'fourk', fourkLibs);
-        console.log(`✅ Using ${fourkLibs.length} hardcoded 4K libraries for ${groupName}`);
+        console.log(`? Using ${fourkLibs.length} hardcoded 4K libraries for ${groupName}`);
       }
       
-      // IMPORTANT: After syncing libraries, sync user access to match current state
-      console.log('\n🔄 Now syncing user library access...');
+      // Sync user access to match current state
+      console.log('\n?? Now syncing user library access...');
       await this.syncUserLibraryAccess();
       
       // Update the last sync timestamp
       await this.updateSyncTimestamp();
       
-      console.log('\n✅ Complete Plex sync finished successfully!');
+      console.log('\n? Complete Plex sync finished successfully!');
       return { success: true, timestamp: new Date().toISOString() };
     } catch (error) {
-      console.error('❌ Error syncing libraries:', error);
+      console.error('? Error syncing libraries:', error);
       return { success: false, error: error.message };
     }
   }
@@ -410,7 +354,9 @@ class PlexService {
   // Get libraries from database for frontend
   async getLibrariesForGroup(serverGroup) {
     try {
-      const config = plexConfig.servers[serverGroup];
+      const serverConfigs = this.getServerConfig();
+      const config = serverConfigs[serverGroup];
+      
       if (!config) {
         throw new Error(`Invalid server group: ${serverGroup}`);
       }
@@ -449,52 +395,57 @@ class PlexService {
     }
   }
 
-  // Get user's current access across all servers
-  async getUserCurrentAccess(userEmail) {
-    try {
-      const access = {};
-      
-      for (const [groupName, groupConfig] of Object.entries(plexConfig.servers)) {
-        // Get access for regular server
-        const regularAccess = await this.getUserLibraryAccess(userEmail, groupConfig.regular);
-        
-        // Get access for 4K server
-        const fourkAccess = await this.getUserLibraryAccess(userEmail, groupConfig.fourk);
-        
-        access[groupName] = {
-          regular: regularAccess.map(lib => lib.id),
-          fourk: fourkAccess.map(lib => lib.id)
-        };
-      }
-      
-      return access;
-    } catch (error) {
-      console.error('Error getting user current access:', error);
-      return {};
-    }
-  }
-
-  // Test server connection
+  // Test server connection using Plex.tv API
   async testConnection(serverGroup) {
     try {
-      const config = plexConfig.servers[serverGroup];
+      const serverConfigs = this.getServerConfig();
+      const config = serverConfigs[serverGroup];
+      
       if (!config) {
         throw new Error(`Invalid server group: ${serverGroup}`);
       }
 
-      // Test regular server
-      await this.makeRequest(config.regular, '/');
-      console.log(`✅ Regular server connection successful: ${config.regular.url}`);
+      // Test regular server via Plex.tv API
+      await this.makePlexTvRequest(config.regular.serverId, config.regular.token, '');
+      console.log(`? Regular server connection successful: ${config.regular.name}`);
 
-      // Test 4K server
-      await this.makeRequest(config.fourk, '/');
-      console.log(`✅ 4K server connection successful: ${config.fourk.url}`);
+      // Test 4K server via Plex.tv API
+      await this.makePlexTvRequest(config.fourk.serverId, config.fourk.token, '');
+      console.log(`? 4K server connection successful: ${config.fourk.name}`);
 
       return { success: true, message: `Connection successful for ${serverGroup}` };
     } catch (error) {
-      console.error(`❌ Connection test failed for ${serverGroup}:`, error.message);
+      console.error(`? Connection test failed for ${serverGroup}:`, error.message);
       return { success: false, error: error.message };
     }
+  }
+
+  // Update the last sync timestamp in database
+  async updateSyncTimestamp() {
+    try {
+      const now = new Date().toISOString();
+      await db.query(`
+        INSERT INTO settings (setting_key, setting_value, setting_type)
+        VALUES ('last_plex_sync', ?, 'string')
+        ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = NOW()
+      `, [now, now]);
+      console.log('? Updated last sync timestamp:', now);
+    } catch (error) {
+      console.error('? Error updating sync timestamp:', error);
+    }
+  }
+
+  // Placeholder methods for sharing/removing (to be implemented later)
+  async shareLibrariesWithUser(userEmail, serverGroup, libraryIds) {
+    // TODO: Implement using Plex.tv API like your Python code
+    console.log(`TODO: Share libraries with ${userEmail} on ${serverGroup}`, libraryIds);
+    return { success: true, message: 'Sharing not implemented yet' };
+  }
+
+  async removeUserAccess(userEmail, serverGroups) {
+    // TODO: Implement using Plex.tv API like your Python code
+    console.log(`TODO: Remove access for ${userEmail} from`, serverGroups);
+    return { success: true, message: 'Remove access not implemented yet' };
   }
 }
 
