@@ -3,6 +3,18 @@ const { body, validationResult } = require('express-validator');
 const db = require('./database-config');
 const router = express.Router();
 
+// Helper function to safely parse JSON fields
+function safeJsonParse(jsonString, defaultValue = null) {
+  if (!jsonString) return defaultValue;
+  if (typeof jsonString === 'object') return jsonString; // Already parsed
+  try {
+    return JSON.parse(jsonString);
+  } catch (error) {
+    console.error('JSON parse error:', error, 'for string:', jsonString);
+    return defaultValue;
+  }
+}
+
 // Get all users with their subscriptions
 router.get('/', async (req, res) => {
   try {
@@ -30,18 +42,8 @@ router.get('/', async (req, res) => {
 
     // Process subscriptions data with safe JSON parsing
     const processedUsers = users.map(user => {
-      let tags = [];
-      let plexLibraries = {};
-      
-      // Safe JSON parsing for tags
-if (user.tags) {
-  tags = Array.isArray(user.tags) ? user.tags : [];  // ✅ It's already parsed
-}
-      
-      // Safe JSON parsing for plex_libraries
-if (user.plex_libraries) {
-  plexLibraries = typeof user.plex_libraries === 'object' ? user.plex_libraries : {};  // ✅ Already parsed
-}
+      const tags = safeJsonParse(user.tags, []);
+      const plexLibraries = safeJsonParse(user.plex_libraries, {});
       
       const subscriptions = {};
       if (user.subscriptions) {
@@ -92,8 +94,9 @@ router.get('/:id', async (req, res) => {
       WHERE s.user_id = ? AND s.status = 'active'
     `, [req.params.id]);
 
-    user.tags = Array.isArray(user.tags) ? user.tags : [];
-	user.plex_libraries = typeof user.plex_libraries === 'object' ? user.plex_libraries : {};
+    // Safe JSON parsing
+    user.tags = safeJsonParse(user.tags, []);
+    user.plex_libraries = safeJsonParse(user.plex_libraries, {});
     user.subscriptions = subscriptions;
 
     res.json(user);

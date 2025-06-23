@@ -6,18 +6,21 @@ const path = require('path');
 const cron = require('node-cron');
 require('dotenv').config();
 
-const db = require('./database-config'); // Updated path
-const authRoutes = require('./routes-auth'); // Updated path
-const userRoutes = require('./users-routes'); // Updated path
-const subscriptionRoutes = require('./routes-subscriptions'); // Updated path
-const emailRoutes = require('./routes-email'); // Updated path
-const plexRoutes = require('./routes-plex'); // Updated path
-const settingsRoutes = require('./routes-settings'); // Updated path
-const ownerRoutes = require('./routes-owners'); // Updated path
-const { sendRenewalReminders } = require('./email-service'); // Updated path
+const db = require('./database-config');
+const authRoutes = require('./routes-auth');
+const userRoutes = require('./users-routes');
+const subscriptionRoutes = require('./routes-subscriptions');
+const emailRoutes = require('./routes-email');
+const plexRoutes = require('./routes-plex');
+const settingsRoutes = require('./routes-settings');
+const ownerRoutes = require('./routes-owners');
+const emailService = require('./email-service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Trust proxy - fix for rate limiter warning
+app.set('trust proxy', 1);
 
 // Security middleware
 app.use(helmet({
@@ -84,7 +87,7 @@ async function initializeApp() {
     // Schedule renewal reminders to run daily at 9 AM
     cron.schedule('0 9 * * *', () => {
       console.log('Running scheduled renewal reminders...');
-      sendRenewalReminders();
+      emailService.sendRenewalReminders();
     });
 
   } catch (error) {
