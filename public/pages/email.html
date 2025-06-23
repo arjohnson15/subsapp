@@ -1,0 +1,85 @@
+<h2 style="color: #4fc3f7; margin-bottom: 30px;">Email Manager</h2>
+
+<div class="form-container">
+    <div class="form-group">
+        <label for="emailTemplate">Load Template:</label>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <select id="emailTemplate" style="flex: 1;">
+                <option value="">-- Select a Template --</option>
+            </select>
+            <button class="btn" type="button" onclick="loadTemplate()">Load</button>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="emailRecipient">Recipient:</label>
+        <input type="email" id="emailRecipient" placeholder="user@example.com">
+    </div>
+
+    <div class="form-group">
+        <label for="emailCC">CC:</label>
+        <input type="text" id="emailCC" placeholder="cc1@example.com, cc2@example.com">
+    </div>
+
+    <div class="form-group">
+        <label for="emailSubject">Subject:</label>
+        <input type="text" id="emailSubject" placeholder="Email subject line">
+    </div>
+
+    <div class="dynamic-fields">
+        <h4>Dynamic Fields - Click to Insert</h4>
+        <div>
+            <span class="field-tag" onclick="insertField('{{name}}')">{{name}}</span>
+            <span class="field-tag" onclick="insertField('{{email}}')">{{email}}</span>
+            <span class="field-tag" onclick="insertField('{{username}}')">{{username}}</span>
+            <span class="field-tag" onclick="insertField('{{plex_expiration}}')">{{plex_expiration}}</span>
+            <span class="field-tag" onclick="insertField('{{iptv_expiration}}')">{{iptv_expiration}}</span>
+            <span class="field-tag" onclick="insertField('{{subscription_type}}')">{{subscription_type}}</span>
+            <span class="field-tag" onclick="insertField('{{days_until_expiration}}')">{{days_until_expiration}}</span>
+            <span class="field-tag" onclick="insertField('{{renewal_price}}')">{{renewal_price}}</span>
+            <span class="field-tag" onclick="insertField('{{owner_name}}')">{{owner_name}}</span>
+            <span class="field-tag" onclick="insertField('{{owner_email}}')">{{owner_email}}</span>
+            <span class="field-tag" onclick="insertField('{{plex_email}}')">{{plex_email}}</span>
+            <span class="field-tag" onclick="insertField('{{iptv_username}}')">{{iptv_username}}</span>
+            <span class="field-tag" onclick="insertField('{{iptv_password}}')">{{iptv_password}}</span>
+            <span class="field-tag" onclick="insertField('{{implayer_code}}')">{{implayer_code}}</span>
+            <span class="field-tag" onclick="insertField('{{device_count}}')">{{device_count}}</span>
+            <span class="field-tag" onclick="insertField('{{paypal_link}}')">{{paypal_link}}</span>
+            <span class="field-tag" onclick="insertField('{{venmo_link}}')">{{venmo_link}}</span>
+            <span class="field-tag" onclick="insertField('{{cashapp_link}}')">{{cashapp_link}}</span>
+        </div>
+    </div>
+
+    <div class="template-editor">
+        <div>
+            <label for="emailBody">Email Body (HTML):</label>
+            <textarea id="emailBody" placeholder="Start typing HTML to see the preview..." style="resize: vertical; font-family: 'Courier New', monospace;">
+<h2 style="color: #8e24aa;">Hello {{name}}!</h2>
+<p>This is a reminder that your {{subscription_type}} subscription will expire in {{days_until_expiration}} days.</p>
+<p><strong>Expiration Date:</strong> {{plex_expiration}}</p>
+<p>To renew your subscription, please visit our payment portal or contact us directly.</p>
+<p>Thank you for being a valued customer!</p>
+<br>
+<p>Best regards,<br>JohnsonFlix Team</p>
+            </textarea>
+        </div>
+        <div>
+            <h4 style="color: #4fc3f7; margin-bottom: 10px;">Preview:</h4>
+            <div class="template-preview" id="emailPreview">
+                <h2 style="color: #8e24aa;">Hello John Doe!</h2>
+                <p>This is a reminder that your Plex subscription will expire in 7 days.</p>
+                <p><strong>Expiration Date:</strong> Jun 28, 2025</p>
+                <p>To renew your subscription, please visit our payment portal or contact us directly.</p>
+                <p>Thank you for being a valued customer!</p>
+                <br>
+                <p>Best regards,<br>JohnsonFlix Team</p>
+            </div>
+        </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 30px; display: flex; gap: 15px; justify-content: center;">
+        <button class="btn" onclick="saveTemplate()">Save as Template</button>
+        <button class="btn btn-secondary" onclick="deleteTemplate()">Delete Template</button>
+        <button class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a);" onclick="sendEmail()">Send Email</button>
+    </div>
+</div>

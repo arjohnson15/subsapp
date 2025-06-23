@@ -1,0 +1,46 @@
+<div class="dashboard-grid">
+    <div class="card">
+        <h3>Total Users</h3>
+        <div class="stat-number" id="totalUsers">0</div>
+        <p>Active subscribers across all services</p>
+    </div>
+    <div class="card">
+        <h3>Plex Users</h3>
+        <div class="stat-number" id="plexUsers">0</div>
+        <p id="plexBreakdown">Loading...</p>
+    </div>
+    <div class="card">
+        <h3>IPTV Users</h3>
+        <div class="stat-number" id="iptvUsers">0</div>
+        <p>Active IPTV subscriptions</p>
+    </div>
+    <div class="card">
+        <h3>Monthly Revenue</h3>
+        <div class="stat-number" id="monthlyRevenue">$0</div>
+        <p>Current month projection</p>
+    </div>
+</div>
+
+<div class="quick-actions">
+    <a href="#" class="quick-action" onclick="showPage('users')">
+        <h4>Add New User</h4>
+        <p>Create a new subscription</p>
+    </a>
+    <a href="#" class="quick-action" onclick="showPage('email')">
+        <h4>Send Bulk Email</h4>
+        <p>Email all subscribers</p>
+    </a>
+    <a href="#" class="quick-action" onclick="showPage('subscriptions')">
+        <h4>Manage Plans</h4>
+        <p>Edit subscription options</p>
+    </a>
+    <a href="#" class="quick-action" onclick="showPage('settings')">
+        <h4>System Settings</h4>
+        <p>Configure the application</p>
+    </a>
+</div>
+
+<div class="expiring-soon">
+    <h4>Expiring This Week</h4>
+    <div id="expiringUsers">Loading...</div>
+</div>

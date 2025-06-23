@@ -1,0 +1,114 @@
+<h2 style="color: #4fc3f7; margin-bottom: 30px;">System Settings</h2>
+
+<!-- Plex Configuration -->
+<div class="settings-section">
+    <h3>Plex Configuration</h3>
+    <p style="color: #4fc3f7; margin-bottom: 20px;">Test connections and sync library information from Plex servers.</p>
+    
+    <div class="form-grid">
+        <div class="form-group">
+            <label>Plex 1 Status:</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="plex1ServerStatus" class="connection-status">Click Test Connection</span>
+                <button type="button" class="btn btn-test" onclick="testPlexConnection('plex1')">Test Connection</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Plex 2 Status:</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="plex2ServerStatus" class="connection-status">Click Test Connection</span>
+                <button type="button" class="btn btn-test" onclick="testPlexConnection('plex2')">Test Connection</button>
+            </div>
+        </div>
+    </div>
+    
+    <div style="margin-top: 20px;">
+        <button class="btn btn-sync" onclick="syncAllPlexLibraries()">Sync All Libraries</button>
+        <small style="color: #4fc3f7; margin-left: 15px;">Last sync: <span id="lastSyncTime">Never</span></small>
+    </div>
+</div>
+
+<!-- Owner Management -->
+<div class="settings-section">
+    <h3>Owner Management</h3>
+    <p style="color: #4fc3f7; margin-bottom: 20px;">Owners are responsible for renewing subscriptions and can receive BCC notifications.</p>
+    
+    <div class="form-grid" style="margin-bottom: 20px;">
+        <div class="form-group">
+            <label for="ownerName">Owner Name:</label>
+            <input type="text" id="ownerName" placeholder="Owner's full name">
+        </div>
+        <div class="form-group">
+            <label for="ownerEmail">Owner Email:</label>
+            <input type="email" id="ownerEmail" placeholder="owner@example.com">
+        </div>
+    </div>
+    <div style="margin-bottom: 20px;">
+        <button class="btn" onclick="addOwner()">Add Owner</button>
+    </div>
+
+    <div class="table-container" style="margin-bottom: 0;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Owner Name</th>
+                    <th>Email Address</th>
+                    <th>User Count</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="ownersTableBody">
+                <tr><td colspan="4" style="text-align: center;">Loading owners...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Email Configuration -->
+<div class="settings-section">
+    <h3>Email Configuration</h3>
+    <div class="form-grid">
+        <div class="form-group">
+            <label for="smtpHost">SMTP Host:</label>
+            <input type="text" id="smtpHost" value="smtp.gmail.com">
+        </div>
+        <div class="form-group">
+            <label for="smtpPort">SMTP Port:</label>
+            <input type="number" id="smtpPort" value="587">
+        </div>
+        <div class="form-group">
+            <label for="smtpUser">Email Address:</label>
+            <input type="email" id="smtpUser" placeholder="your-email@gmail.com">
+        </div>
+        <div class="form-group">
+            <label for="smtpPass">App Password:</label>
+            <input type="password" id="smtpPass" placeholder="Your Gmail app password">
+        </div>
+    </div>
+    <div style="margin-top: 15px;">
+        <button class="btn" onclick="testEmailConnection()">Send Test Email</button>
+    </div>
+</div>
+
+<!-- Payment Settings -->
+<div class="settings-section">
+    <h3>Payment & Links</h3>
+    <div class="form-grid">
+        <div class="form-group">
+            <label for="paypalLink">PayPal Payment Link:</label>
+            <input type="url" id="paypalLink" placeholder="https://paypal.me/yourusername">
+        </div>
+        <div class="form-group">
+            <label for="venmoLink">Venmo Payment Link:</label>
+            <input type="url" id="venmoLink" placeholder="https://venmo.com/yourusername">
+        </div>
+        <div class="form-group">
+            <label for="cashappLink">CashApp Payment Link:</label>
+            <input type="url" id="cashappLink" placeholder="https://cash.app/$yourusername">
+        </div>
+    </div>
+</div>
+
+<div style="text-align: center; margin-top: 40px;">
+    <button class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a); font-size: 1.1rem; padding: 15px 30px;" onclick="saveSettings()">Save All Settings</button>
+</div>

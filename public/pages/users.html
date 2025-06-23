@@ -1,0 +1,25 @@
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h2 style="color: #4fc3f7;">Manage Users</h2>
+    <button class="btn" onclick="showPage('user-form')">Create New User</button>
+</div>
+
+<input type="text" class="search-bar" id="userSearch" placeholder="Search by name or email..." onkeyup="Users.filterUsers()">
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th onclick="Users.sortUsers('name')">Name ▼</th>
+                <th onclick="Users.sortUsers('email')">Email ▼</th>
+                <th>Owner</th>
+                <th>Tags</th>
+                <th onclick="Users.sortUsers('plex_expiration')">Plex Expiration ▼</th>
+                <th onclick="Users.sortUsers('iptv_expiration')">IPTV Expiration ▼</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="usersTableBody">
+            <tr><td colspan="7" style="text-align: center;">Loading users...</td></tr>
+        </tbody>
+    </table>
+</div>
