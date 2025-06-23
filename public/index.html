@@ -658,8 +658,8 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="username">Username:</label>
-                            <input type="text" id="username" name="plex_username">
+                            <label for="plexEmail">Plex Email:</label>
+                            <input type="email" id="plexEmail" name="plex_email">
                         </div>
                     </div>
 
@@ -756,10 +756,6 @@
                     <div class="form-group">
                         <label>Optional Details:</label>
                         <div class="form-grid">
-                            <div class="form-group">
-                                <label for="plexEmail">Plex Email:</label>
-                                <input type="email" id="plexEmail" name="plex_email">
-                            </div>
                             <div class="form-group">
                                 <label for="iptvUsername">IPTV Username:</label>
                                 <input type="text" id="iptvUsername" name="iptv_username">
@@ -1009,6 +1005,14 @@
             </div>
         </div>
 
+        <!-- Subscriptions Page -->
+        <div id="subscriptions" class="page fade-in">
+            <h2 style="color: #4fc3f7; margin-bottom: 30px;">Manage Subscriptions</h2>
+            <div class="form-container">
+                <p>Subscription management features will be implemented here.</p>
+            </div>
+        </div>
+
         <!-- View User Modal -->
         <div id="viewUserModal" class="modal">
             <div class="modal-content">
@@ -1044,9 +1048,38 @@
         let currentTemplate = '';
         let editingUserId = null;
 
+        // Page navigation with hash routing
+        function showPage(pageId) {
+            const pages = document.querySelectorAll('.page');
+            pages.forEach(page => page.classList.remove('active'));
+            
+            const targetPage = document.getElementById(pageId);
+            if (targetPage) {
+                targetPage.classList.add('active');
+                
+                // Update URL hash
+                window.location.hash = pageId;
+                
+                // Load page-specific data
+                if (pageId === 'dashboard') loadDashboard();
+                if (pageId === 'users') loadUsers();
+                if (pageId === 'settings') loadSettings();
+            }
+        }
+
+        // Load page from URL hash on page load
+        function loadPageFromHash() {
+            const hash = window.location.hash.substring(1); // Remove #
+            if (hash && document.getElementById(hash)) {
+                showPage(hash);
+            } else {
+                showPage('dashboard'); // Default
+            }
+        }
+
         // Initialize application
         document.addEventListener('DOMContentLoaded', function() {
-            loadDashboard();
+            loadPageFromHash(); // Load page from URL hash
             loadUsers();
             loadOwners();
             loadSubscriptionTypes();
@@ -1055,6 +1088,9 @@
             document.getElementById('emailBody').addEventListener('input', updateEmailPreview);
             updateEmailPreview();
         });
+
+        // Handle browser back/forward
+        window.addEventListener('hashchange', loadPageFromHash);
 
         // API Functions
         async function apiCall(endpoint, options = {}) {
@@ -1076,22 +1112,6 @@
                 console.error('API call failed:', error);
                 alert('Error: ' + error.message);
                 throw error;
-            }
-        }
-
-        // Page navigation
-        function showPage(pageId) {
-            const pages = document.querySelectorAll('.page');
-            pages.forEach(page => page.classList.remove('active'));
-            
-            const targetPage = document.getElementById(pageId);
-            if (targetPage) {
-                targetPage.classList.add('active');
-                
-                // Load page-specific data
-                if (pageId === 'dashboard') loadDashboard();
-                if (pageId === 'users') loadUsers();
-                if (pageId === 'settings') loadSettings();
             }
         }
 
@@ -1181,7 +1201,7 @@
                     <div class="info-item"><div class="info-label">Email</div><div class="info-value">${user.email}</div></div>
                     <div class="info-item"><div class="info-label">Owner</div><div class="info-value">${user.owner_name || 'N/A'}</div></div>
                     <div class="info-item"><div class="info-label">Tags</div><div class="info-value">${user.tags.join(', ')}</div></div>
-                    <div class="info-item"><div class="info-label">Plex Username</div><div class="info-value">${user.plex_username || 'N/A'}</div></div>
+                    <div class="info-item"><div class="info-label">Plex Email</div><div class="info-value">${user.plex_email || 'N/A'}</div></div>
                     <div class="info-item"><div class="info-label">IPTV Username</div><div class="info-value">${user.iptv_username || 'N/A'}</div></div>
                     <div class="info-item"><div class="info-label">iMPlayer Code</div><div class="info-value">${user.implayer_code || 'N/A'}</div></div>
                     <div class="info-item"><div class="info-label">Device Count</div><div class="info-value">${user.device_count || 'N/A'}</div></div>
@@ -1194,8 +1214,6 @@
         }
 
         async function editUser(userId) {
-            // For now, redirect to user form with pre-filled data
-            // In the full implementation, this would open a modal
             try {
                 const user = await apiCall(`/users/${userId}`);
                 editingUserId = userId;
@@ -1303,8 +1321,7 @@
                 .replace(/\{\{renewal_price\}\}/g, '$120.00')
                 .replace(/\{\{owner_name\}\}/g, 'Andrew')
                 .replace(/\{\{owner_email\}\}/g, 'arjohnson15@gmail.com')
-                .replace(/\{\{plex_username\}\}/g, 'johndoe_plex')
-                .replace(/\{\{plex_password\}\}/g, 'password123')
+                .replace(/\{\{plex_email\}\}/g, 'johndoe@example.com')
                 .replace(/\{\{iptv_username\}\}/g, 'johndoe_iptv')
                 .replace(/\{\{iptv_password\}\}/g, 'iptv456')
                 .replace(/\{\{implayer_code\}\}/g, 'ABC123DEF')
@@ -1440,24 +1457,22 @@
         }
 
         function clearNewAutoCalculation(type) {
-            // Called when user manually changes date
             console.log(`Manual date entered for ${type}`);
         }
 
         // Placeholder functions for remaining features
-        function loadTemplate() { /* Implement template loading */ }
-        function saveTemplate() { /* Implement template saving */ }
-        function deleteTemplate() { /* Implement template deletion */ }
-        function sendEmail() { /* Implement email sending */ }
-        function loadSettings() { /* Implement settings loading */ }
-        function saveSettings() { /* Implement settings saving */ }
-        function testEmailConnection() { /* Implement email test */ }
-        function toggleLibraryCheckboxes(server) { /* Implement library management */ }
-        function filterUsers() { /* Implement user filtering */ }
-        function sortUsers(column) { /* Implement user sorting */ }
-        function editOwner(id) { /* Implement owner editing */ }
-        function deleteOwner(id) { /* Implement owner deletion */ }
+        function loadTemplate() { console.log('Load template functionality will be implemented'); }
+        function saveTemplate() { console.log('Save template functionality will be implemented'); }
+        function deleteTemplate() { console.log('Delete template functionality will be implemented'); }
+        function sendEmail() { console.log('Send email functionality will be implemented'); }
+        function loadSettings() { console.log('Load settings functionality will be implemented'); }
+        function saveSettings() { console.log('Save settings functionality will be implemented'); }
+        function testEmailConnection() { console.log('Test email functionality will be implemented'); }
+        function toggleLibraryCheckboxes(server) { console.log('Library management functionality will be implemented'); }
+        function filterUsers() { console.log('User filtering functionality will be implemented'); }
+        function sortUsers(column) { console.log('User sorting functionality will be implemented'); }
+        function editOwner(id) { console.log('Edit owner functionality will be implemented'); }
+        function deleteOwner(id) { console.log('Delete owner functionality will be implemented'); }
     </script>
 </body>
 </html>
-                    

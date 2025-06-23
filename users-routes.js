@@ -92,8 +92,8 @@ router.get('/:id', async (req, res) => {
       WHERE s.user_id = ? AND s.status = 'active'
     `, [req.params.id]);
 
-    user.tags = user.tags ? JSON.parse(user.tags) : [];
-    user.plex_libraries = user.plex_libraries ? JSON.parse(user.plex_libraries) : {};
+    user.tags = Array.isArray(user.tags) ? user.tags : [];
+	user.plex_libraries = typeof user.plex_libraries === 'object' ? user.plex_libraries : {};
     user.subscriptions = subscriptions;
 
     res.json(user);
