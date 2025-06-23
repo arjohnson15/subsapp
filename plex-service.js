@@ -1,378 +1,358 @@
 const axios = require('axios');
+const xml2js = require('xml2js');
 const db = require('./database-config');
+const plexConfig = require('./plex-config');
 
 class PlexService {
   constructor() {
-    this.servers = new Map();
-    this.initializeServers();
+    this.parser = new xml2js.Parser({ explicitArray: false });
+    this.initializeSync();
   }
 
-  async initializeServers() {
-    try {
-      const servers = await db.query('SELECT * FROM plex_servers WHERE active = TRUE');
-      servers.forEach(server => {
-        this.servers.set(server.name, {
-          url: server.url,
-          token: server.token,
-          libraries: server.libraries ? JSON.parse(server.libraries) : []
-        });
-      });
-      console.log(`Initialized ${servers.length} Plex servers`);
-    } catch (error) {
-      console.error('Error initializing Plex servers:', error);
-    }
+  // Initialize periodic library sync
+  initializeSync() {
+    console.log('Starting Plex library sync service...');
+    
+    // Sync immediately on startup
+    this.syncAllLibraries();
+    
+    // Set up hourly sync
+    setInterval(() => {
+      console.log('Running scheduled Plex library sync...');
+      this.syncAllLibraries();
+    }, plexConfig.syncInterval);
   }
 
-  async makeRequest(serverName, endpoint, method = 'GET', data = null) {
+  // Make authenticated request to Plex API
+  async makeRequest(url, token) {
     try {
-      const server = this.servers.get(serverName);
-      if (!server) {
-        throw new Error(`Server ${serverName} not found`);
-      }
-
-      const config = {
-        method,
-        url: `${server.url}${endpoint}`,
+      const response = await axios.get(url, {
         headers: {
-          'X-Plex-Token': server.token,
-          'Accept': 'application/json'
-        }
-      };
-
-      if (data) {
-        config.data = data;
-      }
-
-      const response = await axios(config);
+          'X-Plex-Token': token,
+          'Accept': 'application/xml'
+        },
+        timeout: 10000
+      });
       return response.data;
     } catch (error) {
-      console.error(`Plex API error for ${serverName}:`, error.response?.data || error.message);
+      console.error('Plex API request failed:', error.message);
       throw error;
     }
   }
 
-  async testConnection(serverName) {
+  // Get libraries from a specific Plex server
+  async getServerLibraries(serverConfig) {
     try {
-      const response = await this.makeRequest(serverName, '/');
-      return {
-        success: true,
-        serverName: response.MediaContainer?.friendlyName || 'Unknown',
-        version: response.MediaContainer?.version || 'Unknown'
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
-
-  async getLibraries(serverName) {
-    try {
-      const response = await this.makeRequest(serverName, '/library/sections');
-      const libraries = response.MediaContainer?.Directory || [];
+      const url = `${plexConfig.apiBase}/servers/${serverConfig.id}/library/sections`;
+      const xmlData = await this.makeRequest(url, serverConfig.token);
+      const result = await this.parser.parseStringPromise(xmlData);
       
-      const formattedLibraries = libraries.map(lib => ({
-        id: lib.key,
-        title: lib.title,
-        type: lib.type,
-        agent: lib.agent,
-        language: lib.language
-      }));
-
-      // Update database with latest libraries
-      await db.query(
-        'UPDATE plex_servers SET libraries = ?, last_sync = NOW() WHERE name = ?',
-        [JSON.stringify(formattedLibraries), serverName]
-      );
-
-      // Update in-memory cache
-      if (this.servers.has(serverName)) {
-        this.servers.get(serverName).libraries = formattedLibraries;
+      if (!result.MediaContainer || !result.MediaContainer.Directory) {
+        return [];
       }
 
-      return formattedLibraries;
-    } catch (error) {
-      console.error(`Error fetching libraries for ${serverName}:`, error);
-      throw error;
-    }
-  }
+      const directories = Array.isArray(result.MediaContainer.Directory) 
+        ? result.MediaContainer.Directory 
+        : [result.MediaContainer.Directory];
 
-  async getUsers(serverName) {
-    try {
-      const response = await this.makeRequest(serverName, '/accounts');
-      const users = response.MediaContainer?.Account || [];
-      
-      return users.map(user => ({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        title: user.title,
-        thumb: user.thumb
+      return directories.map(dir => ({
+        id: dir.$.key || dir.$.id,
+        title: dir.$.title,
+        type: dir.$.type,
+        agent: dir.$.agent
       }));
     } catch (error) {
-      console.error(`Error fetching users for ${serverName}:`, error);
-      throw error;
+      console.error(`Failed to get libraries for ${serverConfig.name}:`, error.message);
+      return [];
     }
   }
 
-  async createUser(serverName, userData) {
+  // Get user's current library access for a server
+  async getUserLibraryAccess(userEmail, serverConfig) {
     try {
-      const { name, email, libraries } = userData;
+      const url = `${plexConfig.apiBase}/servers/${serverConfig.id}/shared_servers`;
+      const xmlData = await this.makeRequest(url, serverConfig.token);
+      const result = await this.parser.parseStringPromise(xmlData);
       
-      // Create user invitation
-      const inviteResponse = await this.makeRequest(
-        serverName,
-        '/api/v2/shared_servers',
-        'POST',
-        {
-          invited_email: email,
-          settings: {
-            allowSync: false,
-            allowCameraUpload: false,
-            allowChannels: false,
-            filterMovies: '',
-            filterTelevision: '',
-            filterMusic: ''
-          }
+      if (!result.MediaContainer || !result.MediaContainer.SharedServer) {
+        return [];
+      }
+
+      const sharedServers = Array.isArray(result.MediaContainer.SharedServer)
+        ? result.MediaContainer.SharedServer
+        : [result.MediaContainer.SharedServer];
+
+      const userServer = sharedServers.find(server => server.$.email === userEmail);
+      if (!userServer || !userServer.Section) {
+        return [];
+      }
+
+      const sections = Array.isArray(userServer.Section) 
+        ? userServer.Section 
+        : [userServer.Section];
+
+      return sections
+        .filter(section => section.$.shared === '1')
+        .map(section => ({
+          id: section.$.id,
+          title: section.$.title,
+          type: section.$.type
+        }));
+    } catch (error) {
+      console.error(`Failed to get user access for ${userEmail} on ${serverConfig.name}:`, error.message);
+      return [];
+    }
+  }
+
+  // Share libraries with a user
+  async shareLibrariesWithUser(userEmail, serverGroup, libraryIds) {
+    try {
+      const results = [];
+      const config = plexConfig.servers[serverGroup];
+      
+      if (!config) {
+        throw new Error(`Invalid server group: ${serverGroup}`);
+      }
+
+      // Handle regular server libraries
+      if (libraryIds.regular && libraryIds.regular.length > 0) {
+        const shareResult = await this.shareLibrariesOnServer(
+          userEmail, 
+          config.regular, 
+          libraryIds.regular
+        );
+        results.push({ server: config.regular.name, ...shareResult });
+      }
+
+      // Handle 4K server libraries
+      if (libraryIds.fourk && libraryIds.fourk.length > 0) {
+        const shareResult = await this.shareLibrariesOnServer(
+          userEmail, 
+          config.fourk, 
+          libraryIds.fourk
+        );
+        results.push({ server: config.fourk.name, ...shareResult });
+      }
+
+      return { success: true, results };
+    } catch (error) {
+      console.error('Error sharing libraries:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Share libraries on a specific server
+  async shareLibrariesOnServer(userEmail, serverConfig, libraryIds) {
+    try {
+      // First, check if user already has access
+      const currentAccess = await this.getUserLibraryAccess(userEmail, serverConfig);
+      const currentLibraryIds = currentAccess.map(lib => lib.id);
+      
+      // Combine current access with new libraries (avoid duplicates)
+      const allLibraryIds = [...new Set([...currentLibraryIds, ...libraryIds])];
+      
+      // Build the share URL
+      const libraryParams = allLibraryIds.map(id => `librarySectionID=${id}`).join('&');
+      const url = `${plexConfig.apiBase}/servers/${serverConfig.id}/shared_servers?${libraryParams}`;
+      
+      // Make the share request
+      const postData = `invited_email=${encodeURIComponent(userEmail)}&settings[allowSync]=1&settings[allowCameraUpload]=0&settings[allowChannels]=0`;
+      
+      const response = await axios.post(url, postData, {
+        headers: {
+          'X-Plex-Token': serverConfig.token,
+          'Content-Type': 'application/x-www-form-urlencoded'
         }
-      );
+      });
 
-      if (libraries && libraries.length > 0) {
-        // Set library access
-        await this.setUserLibraryAccess(serverName, inviteResponse.id, libraries);
-      }
-
-      return {
-        success: true,
-        userId: inviteResponse.id,
-        message: 'User created and invited successfully'
+      return { 
+        success: true, 
+        message: `Libraries shared with ${userEmail}`,
+        librariesShared: allLibraryIds.length
       };
     } catch (error) {
-      console.error(`Error creating user on ${serverName}:`, error);
-      throw error;
+      console.error(`Error sharing libraries on ${serverConfig.name}:`, error.message);
+      return { success: false, error: error.message };
     }
   }
 
-  async setUserLibraryAccess(serverName, userId, libraryIds) {
+  // Remove user access from servers
+  async removeUserAccess(userEmail, serverGroups) {
     try {
-      const libraryParams = libraryIds.map(id => `librarySectionID=${id}`).join('&');
+      const results = [];
       
-      await this.makeRequest(
-        serverName,
-        `/accounts/${userId}?${libraryParams}`,
-        'PUT'
-      );
+      for (const serverGroup of serverGroups) {
+        const config = plexConfig.servers[serverGroup];
+        if (!config) continue;
 
-      return { success: true, message: 'Library access updated' };
+        // Remove from regular server
+        const regularResult = await this.removeUserFromServer(userEmail, config.regular);
+        results.push({ server: config.regular.name, ...regularResult });
+
+        // Remove from 4K server
+        const fourkResult = await this.removeUserFromServer(userEmail, config.fourk);
+        results.push({ server: config.fourk.name, ...fourkResult });
+      }
+
+      return { success: true, results };
     } catch (error) {
-      console.error(`Error setting library access for user ${userId}:`, error);
-      throw error;
+      console.error('Error removing user access:', error);
+      return { success: false, error: error.message };
     }
   }
 
-  async removeUser(serverName, userId) {
+  // Remove user from a specific server
+  async removeUserFromServer(userEmail, serverConfig) {
     try {
-      await this.makeRequest(serverName, `/accounts/${userId}`, 'DELETE');
+      const url = `${plexConfig.apiBase}/servers/${serverConfig.id}/shared_servers`;
+      
+      // Get current shared servers to find the user
+      const xmlData = await this.makeRequest(url, serverConfig.token);
+      const result = await this.parser.parseStringPromise(xmlData);
+      
+      if (!result.MediaContainer || !result.MediaContainer.SharedServer) {
+        return { success: true, message: 'User not found on server' };
+      }
+
+      const sharedServers = Array.isArray(result.MediaContainer.SharedServer)
+        ? result.MediaContainer.SharedServer
+        : [result.MediaContainer.SharedServer];
+
+      const userServer = sharedServers.find(server => server.$.email === userEmail);
+      if (!userServer) {
+        return { success: true, message: 'User not found on server' };
+      }
+
+      // Remove the user
+      const removeUrl = `${url}/${userServer.$.id}`;
+      await axios.delete(removeUrl, {
+        headers: { 'X-Plex-Token': serverConfig.token }
+      });
+
       return { success: true, message: 'User removed successfully' };
     } catch (error) {
-      console.error(`Error removing user ${userId} from ${serverName}:`, error);
-      throw error;
+      console.error(`Error removing user from ${serverConfig.name}:`, error.message);
+      return { success: false, error: error.message };
     }
   }
 
-  async getUserLibraryAccess(serverName, userId) {
-    try {
-      const response = await this.makeRequest(serverName, `/accounts/${userId}`);
-      const user = response.MediaContainer?.Account?.[0];
-      
-      if (!user) {
-        throw new Error('User not found');
-      }
-
-      return {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        libraries: user.Server?.[0]?.Section || []
-      };
-    } catch (error) {
-      console.error(`Error fetching library access for user ${userId}:`, error);
-      throw error;
-    }
-  }
-
+  // Sync all libraries and store in database
   async syncAllLibraries() {
     try {
-      const results = {};
+      console.log('Syncing Plex libraries...');
       
-      for (const [serverName] of this.servers) {
-        try {
-          results[serverName] = await this.getLibraries(serverName);
-        } catch (error) {
-          results[serverName] = { error: error.message };
-        }
+      for (const [groupName, groupConfig] of Object.entries(plexConfig.servers)) {
+        // Sync regular server libraries
+        const regularLibs = await this.getServerLibraries(groupConfig.regular);
+        await this.updateLibrariesInDatabase(groupName, 'regular', regularLibs);
+        
+        console.log(`Synced ${regularLibs.length} libraries for ${groupConfig.regular.name}`);
       }
-
-      return results;
+      
+      console.log('Plex library sync completed');
+      return { success: true };
     } catch (error) {
-      console.error('Error syncing all libraries:', error);
+      console.error('Error syncing libraries:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Update libraries in database
+  async updateLibrariesInDatabase(serverGroup, serverType, libraries) {
+    try {
+      const settingKey = `plex_libraries_${serverGroup}_${serverType}`;
+      const settingValue = JSON.stringify(libraries);
+      
+      await db.query(`
+        INSERT INTO settings (setting_key, setting_value, setting_type)
+        VALUES (?, ?, 'json')
+        ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = NOW()
+      `, [settingKey, settingValue, settingValue]);
+    } catch (error) {
+      console.error('Error updating libraries in database:', error);
       throw error;
     }
   }
 
-  async getServerStats(serverName) {
+  // Get libraries from database for frontend
+  async getLibrariesForGroup(serverGroup) {
     try {
-      const [statusResponse, librariesResponse] = await Promise.all([
-        this.makeRequest(serverName, '/'),
-        this.makeRequest(serverName, '/library/sections')
-      ]);
-
-      const status = statusResponse.MediaContainer;
-      const libraries = librariesResponse.MediaContainer?.Directory || [];
-
-      return {
-        serverName: status.friendlyName,
-        version: status.version,
-        platform: status.platform,
-        platformVersion: status.platformVersion,
-        libraryCount: libraries.length,
-        libraries: libraries.map(lib => ({
-          title: lib.title,
-          type: lib.type
-        }))
-      };
-    } catch (error) {
-      console.error(`Error fetching stats for ${serverName}:`, error);
-      throw error;
-    }
-  }
-
-  async addServer(name, url, token) {
-    try {
-      // Test connection first
-      const tempServer = { url, token };
-      this.servers.set('temp', tempServer);
-      
-      const testResult = await this.testConnection('temp');
-      this.servers.delete('temp');
-      
-      if (!testResult.success) {
-        throw new Error('Connection test failed: ' + testResult.error);
+      const config = plexConfig.servers[serverGroup];
+      if (!config) {
+        throw new Error(`Invalid server group: ${serverGroup}`);
       }
 
-      // Add to database
-      await db.query(
-        'INSERT INTO plex_servers (name, url, token, active) VALUES (?, ?, ?, TRUE)',
-        [name, url, token]
+      // Get regular server libraries from database
+      const [regularLibsSetting] = await db.query(
+        'SELECT setting_value FROM settings WHERE setting_key = ?',
+        [`plex_libraries_${serverGroup}_regular`]
       );
 
-      // Add to memory
-      this.servers.set(name, { url, token, libraries: [] });
+      const regularLibs = regularLibsSetting 
+        ? JSON.parse(regularLibsSetting.setting_value) 
+        : [];
 
-      // Sync libraries
-      await this.getLibraries(name);
+      // Get hardcoded 4K libraries
+      const fourkLibs = config.fourk.libraries || [];
 
-      return { success: true, message: 'Server added successfully' };
+      return {
+        regular: regularLibs,
+        fourk: fourkLibs,
+        serverNames: {
+          regular: config.regular.name,
+          fourk: config.fourk.name
+        }
+      };
     } catch (error) {
-      console.error('Error adding server:', error);
+      console.error('Error getting libraries for group:', error);
       throw error;
     }
   }
 
-  async removeServer(name) {
+  // Get user's current access across all servers
+  async getUserCurrentAccess(userEmail) {
     try {
-      await db.query('DELETE FROM plex_servers WHERE name = ?', [name]);
-      this.servers.delete(name);
+      const access = {};
       
-      return { success: true, message: 'Server removed successfully' };
-    } catch (error) {
-      console.error('Error removing server:', error);
-      throw error;
-    }
-  }
-
-  async updateServer(name, updates) {
-    try {
-      const { url, token, active } = updates;
-      
-      if (url || token) {
-        // Test new connection if URL or token changed
-        const testServer = {
-          url: url || this.servers.get(name)?.url,
-          token: token || this.servers.get(name)?.token
+      for (const [groupName, groupConfig] of Object.entries(plexConfig.servers)) {
+        // Get access for regular server
+        const regularAccess = await this.getUserLibraryAccess(userEmail, groupConfig.regular);
+        
+        // Get access for 4K server
+        const fourkAccess = await this.getUserLibraryAccess(userEmail, groupConfig.fourk);
+        
+        access[groupName] = {
+          regular: regularAccess.map(lib => lib.id),
+          fourk: fourkAccess.map(lib => lib.id)
         };
-        
-        this.servers.set('temp', testServer);
-        const testResult = await this.testConnection('temp');
-        this.servers.delete('temp');
-        
-        if (!testResult.success) {
-          throw new Error('Connection test failed: ' + testResult.error);
-        }
-      }
-
-      // Update database
-      const updateFields = [];
-      const updateValues = [];
-      
-      if (url) {
-        updateFields.push('url = ?');
-        updateValues.push(url);
-      }
-      if (token) {
-        updateFields.push('token = ?');
-        updateValues.push(token);
-      }
-      if (typeof active === 'boolean') {
-        updateFields.push('active = ?');
-        updateValues.push(active);
       }
       
-      updateValues.push(name);
-      
-      await db.query(
-        `UPDATE plex_servers SET ${updateFields.join(', ')} WHERE name = ?`,
-        updateValues
-      );
-
-      // Update memory
-      if (this.servers.has(name)) {
-        const server = this.servers.get(name);
-        if (url) server.url = url;
-        if (token) server.token = token;
-      }
-
-      // Re-sync libraries if connection details changed
-      if (url || token) {
-        await this.getLibraries(name);
-      }
-
-      return { success: true, message: 'Server updated successfully' };
+      return access;
     } catch (error) {
-      console.error('Error updating server:', error);
-      throw error;
+      console.error('Error getting user current access:', error);
+      return {};
     }
   }
 
-  getServerList() {
-    return Array.from(this.servers.keys());
-  }
-
-  async getServerInfo(name) {
+  // Test server connection
+  async testConnection(serverGroup) {
     try {
-      const [serverData] = await db.query('SELECT * FROM plex_servers WHERE name = ?', [name]);
-      if (!serverData) {
-        throw new Error('Server not found');
+      const config = plexConfig.servers[serverGroup];
+      if (!config) {
+        throw new Error(`Invalid server group: ${serverGroup}`);
       }
 
-      return {
-        ...serverData,
-        libraries: serverData.libraries ? JSON.parse(serverData.libraries) : []
-      };
+      // Test regular server
+      const regularUrl = `${plexConfig.apiBase}/servers/${config.regular.id}`;
+      await this.makeRequest(regularUrl, config.regular.token);
+
+      // Test 4K server
+      const fourkUrl = `${plexConfig.apiBase}/servers/${config.fourk.id}`;
+      await this.makeRequest(fourkUrl, config.fourk.token);
+
+      return { success: true, message: `Connection successful for ${serverGroup}` };
     } catch (error) {
-      console.error(`Error fetching server info for ${name}:`, error);
-      throw error;
+      return { success: false, error: error.message };
     }
   }
 }

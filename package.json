@@ -26,7 +26,8 @@
     "express-validator": "^7.0.1",
     "node-cron": "^3.0.3",
     "moment": "^2.29.4",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "xml2js": "^0.6.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
