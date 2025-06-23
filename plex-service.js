@@ -236,23 +236,47 @@ class PlexService {
     }
   }
 
+  // Update the last sync timestamp in database
+  async updateSyncTimestamp() {
+    try {
+      const now = new Date().toISOString();
+      await db.query(`
+        INSERT INTO settings (setting_key, setting_value, setting_type)
+        VALUES ('last_plex_sync', ?, 'string')
+        ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = NOW()
+      `, [now, now]);
+      console.log('✅ Updated last sync timestamp:', now);
+    } catch (error) {
+      console.error('❌ Error updating sync timestamp:', error);
+    }
+  }
+
   // Sync all libraries and store in database
   async syncAllLibraries() {
     try {
-      console.log('Syncing Plex libraries...');
+      console.log('🔄 Syncing Plex libraries using working API endpoints...');
       
       for (const [groupName, groupConfig] of Object.entries(plexConfig.servers)) {
+        console.log(`🔄 Syncing group: ${groupName}`);
+        
         // Sync regular server libraries
         const regularLibs = await this.getServerLibraries(groupConfig.regular);
         await this.updateLibrariesInDatabase(groupName, 'regular', regularLibs);
+        console.log(`✅ Synced ${regularLibs.length} regular libraries for ${groupName}`);
         
-        console.log(`Synced ${regularLibs.length} libraries for ${groupConfig.regular.name}`);
+        // Sync 4K server libraries  
+        const fourkLibs = await this.getServerLibraries(groupConfig.fourk);
+        await this.updateLibrariesInDatabase(groupName, 'fourk', fourkLibs);
+        console.log(`✅ Synced ${fourkLibs.length} 4K libraries for ${groupName}`);
       }
       
-      console.log('Plex library sync completed');
-      return { success: true };
+      // Update the last sync timestamp
+      await this.updateSyncTimestamp();
+      
+      console.log('✅ Plex library sync completed successfully!');
+      return { success: true, timestamp: new Date().toISOString() };
     } catch (error) {
-      console.error('Error syncing libraries:', error);
+      console.error('❌ Error syncing libraries:', error);
       return { success: false, error: error.message };
     }
   }

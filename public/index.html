@@ -746,11 +746,11 @@
                         <label>Tags:</label>
                         <div class="checkbox-group">
                             <div class="checkbox-item">
-                                <input type="checkbox" id="tag-plex1" name="tags" value="Plex 1">
+                                <input type="checkbox" id="tag-plex1" name="tags" value="Plex 1" onchange="togglePlexLibrariesByTag('plex1', this.checked)">
                                 <label for="tag-plex1">Plex 1</label>
                             </div>
                             <div class="checkbox-item">
-                                <input type="checkbox" id="tag-plex2" name="tags" value="Plex 2">
+                                <input type="checkbox" id="tag-plex2" name="tags" value="Plex 2" onchange="togglePlexLibrariesByTag('plex2', this.checked)">
                                 <label for="tag-plex2">Plex 2</label>
                             </div>
                             <div class="checkbox-item">
@@ -765,23 +765,21 @@
                         <label>Plex Library Access:</label>
                         
                         <!-- Plex 1 Libraries -->
-                        <div class="library-group">
+                        <div class="library-group" id="plex1LibraryGroup" style="display: none;">
                             <div style="display: flex; align-items: center; justify-content: space-between;">
                                 <h5>Plex 1 Libraries</h5>
                                 <div class="plex-actions">
                                     <button type="button" class="btn btn-test" onclick="testPlexConnection('plex1')">Test Connection</button>
                                     <button type="button" class="btn btn-sync" onclick="refreshPlexLibraries('plex1')">Refresh Libraries</button>
+                                    <button type="button" class="btn" style="background: linear-gradient(45deg, #9c27b0, #e91e63);" onclick="debugPlexLibraries('plex1')">Debug API</button>
                                 </div>
                             </div>
                             <div style="margin-bottom: 15px;">
-                                <select id="plex1LibrariesSelect" onchange="toggleLibraryCheckboxes('plex1')">
-                                    <option value="">-- No Plex 1 Access --</option>
-                                    <option value="all">All Libraries</option>
-                                    <option value="custom">Custom Selection</option>
-                                </select>
-                                <span id="plex1Status" class="connection-status">Checking...</span>
+                                <span id="plex1Status" class="connection-status">Click Test Connection</span>
+                                <button type="button" class="btn" style="margin-left: 10px; padding: 4px 12px; font-size: 0.8rem;" onclick="selectAllPlex1Libraries()">Select All</button>
+                                <button type="button" class="btn btn-secondary" style="margin-left: 5px; padding: 4px 12px; font-size: 0.8rem;" onclick="clearAllPlex1Libraries()">Clear All</button>
                             </div>
-                            <div id="plex1LibraryCheckboxes" class="library-checkboxes" style="display: none;">
+                            <div class="library-checkboxes">
                                 <div class="library-group">
                                     <h5>Regular Libraries</h5>
                                     <div id="plex1RegularLibrariesList" class="library-list">
@@ -798,23 +796,21 @@
                         </div>
 
                         <!-- Plex 2 Libraries -->
-                        <div class="library-group">
+                        <div class="library-group" id="plex2LibraryGroup" style="display: none;">
                             <div style="display: flex; align-items: center; justify-content: space-between;">
                                 <h5>Plex 2 Libraries</h5>
                                 <div class="plex-actions">
                                     <button type="button" class="btn btn-test" onclick="testPlexConnection('plex2')">Test Connection</button>
                                     <button type="button" class="btn btn-sync" onclick="refreshPlexLibraries('plex2')">Refresh Libraries</button>
+                                    <button type="button" class="btn" style="background: linear-gradient(45deg, #9c27b0, #e91e63);" onclick="debugPlexLibraries('plex2')">Debug API</button>
                                 </div>
                             </div>
                             <div style="margin-bottom: 15px;">
-                                <select id="plex2LibrariesSelect" onchange="toggleLibraryCheckboxes('plex2')">
-                                    <option value="">-- No Plex 2 Access --</option>
-                                    <option value="all">All Libraries</option>
-                                    <option value="custom">Custom Selection</option>
-                                </select>
-                                <span id="plex2Status" class="connection-status">Checking...</span>
+                                <span id="plex2Status" class="connection-status">Click Test Connection</span>
+                                <button type="button" class="btn" style="margin-left: 10px; padding: 4px 12px; font-size: 0.8rem;" onclick="selectAllPlex2Libraries()">Select All</button>
+                                <button type="button" class="btn btn-secondary" style="margin-left: 5px; padding: 4px 12px; font-size: 0.8rem;" onclick="clearAllPlex2Libraries()">Clear All</button>
                             </div>
-                            <div id="plex2LibraryCheckboxes" class="library-checkboxes" style="display: none;">
+                            <div class="library-checkboxes">
                                 <div class="library-group">
                                     <h5>Regular Libraries</h5>
                                     <div id="plex2RegularLibrariesList" class="library-list">
@@ -904,6 +900,7 @@
                     <div style="text-align: center; margin-top: 30px;">
                         <button type="submit" class="btn">Save User</button>
                         <button type="button" class="btn btn-secondary" onclick="showPage('users')">Cancel</button>
+                        <button type="button" class="btn" style="background: linear-gradient(45deg, #9c27b0, #e91e63);" onclick="forceLoadLibraries()">Force Load Libraries</button>
                     </div>
                 </form>
             </div>
@@ -1243,6 +1240,7 @@
                     loadPlexStatus();
                 }
                 if (pageId === 'userForm') {
+                    console.log('📋 User form loaded - loading Plex libraries...');
                     loadPlexLibraries();
                 }
             }
@@ -1300,13 +1298,20 @@
         function showUserForm() {
             editingUserId = null;
             document.getElementById('userFormData').reset();
+            
             // Clear all tag checkboxes
-            document.querySelectorAll('input[name="tags"]').forEach(cb => cb.checked = false);
-            // Clear library selections
-            document.getElementById('plex1LibrariesSelect').value = '';
-            document.getElementById('plex2LibrariesSelect').value = '';
-            document.getElementById('plex1LibraryCheckboxes').style.display = 'none';
-            document.getElementById('plex2LibraryCheckboxes').style.display = 'none';
+            document.querySelectorAll('input[name="tags"]').forEach(cb => {
+                cb.checked = false;
+            });
+            
+            // Hide library groups initially
+            document.getElementById('plex1LibraryGroup').style.display = 'none';
+            document.getElementById('plex2LibraryGroup').style.display = 'none';
+            
+            // Force load Plex libraries when showing the form
+            console.log('🔄 Loading Plex libraries for user form...');
+            loadPlexLibraries();
+            
             showPage('userForm');
         }
 
@@ -1552,72 +1557,96 @@
             }
         }
 
-        async function saveUser(event) {
-            event.preventDefault();
-            
-            try {
-                const formData = new FormData(event.target);
-                const userData = {};
-                
-                // Convert form data to object
-                for (let [key, value] of formData.entries()) {
-                    if (key === 'tags') {
-                        if (!userData.tags) userData.tags = [];
-                        userData.tags.push(value);
-                    } else {
-                        userData[key] = value;
-                    }
-                }
-                
-                // Collect Plex library selections
-                userData.plex_libraries = collectPlexLibrarySelections();
-                
-                const method = editingUserId ? 'PUT' : 'POST';
-                const endpoint = editingUserId ? `/users/${editingUserId}` : '/users';
-                
-                await apiCall(endpoint, {
-                    method,
-                    body: JSON.stringify(userData)
-                });
-                
-                // Handle Plex library sharing if user has Plex email and selected libraries
-                if (userData.plex_email && (userData.plex_libraries.plex1 || userData.plex_libraries.plex2)) {
-                    await sharePlexLibrariesWithUser(userData.plex_email, userData.plex_libraries);
-                }
-                
-                alert('User saved successfully');
-                showPage('users');
-                await loadUsers();
-            } catch (error) {
-                console.error('Error saving user:', error);
+async function saveUser(event) {
+    event.preventDefault();
+    
+    try {
+        const formData = new FormData(event.target);
+        const userData = {};
+        
+        // Convert form data to object with proper data types
+        for (let [key, value] of formData.entries()) {
+            if (key === 'tags') {
+                if (!userData.tags) userData.tags = [];
+                userData.tags.push(value);
+            } else {
+                userData[key] = value;
             }
         }
+        
+        // Handle checkboxes properly - convert 'on' to boolean true, missing checkboxes to false
+        userData.bcc_owner_renewal = document.getElementById('bccOwnerRenewal').checked;
+        
+        // Convert device_count to number
+        if (userData.device_count) {
+            userData.device_count = parseInt(userData.device_count);
+        }
+        
+        // Ensure tags is always an array
+        if (!userData.tags) userData.tags = [];
+        
+        // Collect Plex library selections
+        userData.plex_libraries = collectPlexLibrarySelections();
+        
+        console.log('Saving user data:', userData); // Debug log
+        
+        const method = editingUserId ? 'PUT' : 'POST';
+        const endpoint = editingUserId ? `/users/${editingUserId}` : '/users';
+        
+        await apiCall(endpoint, {
+            method,
+            body: JSON.stringify(userData)
+        });
+        
+        // Handle Plex library sharing if user has Plex email and selected libraries
+        if (userData.plex_email && (userData.plex_libraries.plex1 || userData.plex_libraries.plex2)) {
+            try {
+                await sharePlexLibrariesWithUser(userData.plex_email, userData.plex_libraries);
+            } catch (shareError) {
+                console.error('Error sharing Plex libraries:', shareError);
+                alert('User saved but there was an error sharing Plex libraries: ' + shareError.message);
+            }
+        }
+        
+        alert(editingUserId ? 'User updated successfully' : 'User created successfully');
+        showPage('users');
+        await loadUsers();
+    } catch (error) {
+        console.error('Error saving user:', error);
+        alert('Error saving user: ' + error.message);
+    }
+}
 
         function collectPlexLibrarySelections() {
             const plexLibraries = {};
             
-            // Collect Plex 1 selections
-            const plex1Select = document.getElementById('plex1LibrariesSelect').value;
-            if (plex1Select === 'all') {
-                plexLibraries.plex1 = { all: true };
-            } else if (plex1Select === 'custom') {
-                plexLibraries.plex1 = {
-                    regular: Array.from(document.querySelectorAll('input[name="plex1_regular"]:checked')).map(cb => cb.value),
-                    fourk: Array.from(document.querySelectorAll('input[name="plex1_fourk"]:checked')).map(cb => cb.value)
-                };
+            // Check if Plex 1 tag is selected
+            if (document.getElementById('tag-plex1').checked) {
+                const regularChecked = Array.from(document.querySelectorAll('input[name="plex1_regular"]:checked')).map(cb => cb.value);
+                const fourkChecked = Array.from(document.querySelectorAll('input[name="plex1_fourk"]:checked')).map(cb => cb.value);
+                
+                if (regularChecked.length > 0 || fourkChecked.length > 0) {
+                    plexLibraries.plex1 = {
+                        regular: regularChecked,
+                        fourk: fourkChecked
+                    };
+                }
             }
             
-            // Collect Plex 2 selections
-            const plex2Select = document.getElementById('plex2LibrariesSelect').value;
-            if (plex2Select === 'all') {
-                plexLibraries.plex2 = { all: true };
-            } else if (plex2Select === 'custom') {
-                plexLibraries.plex2 = {
-                    regular: Array.from(document.querySelectorAll('input[name="plex2_regular"]:checked')).map(cb => cb.value),
-                    fourk: Array.from(document.querySelectorAll('input[name="plex2_fourk"]:checked')).map(cb => cb.value)
-                };
+            // Check if Plex 2 tag is selected
+            if (document.getElementById('tag-plex2').checked) {
+                const regularChecked = Array.from(document.querySelectorAll('input[name="plex2_regular"]:checked')).map(cb => cb.value);
+                const fourkChecked = Array.from(document.querySelectorAll('input[name="plex2_fourk"]:checked')).map(cb => cb.value);
+                
+                if (regularChecked.length > 0 || fourkChecked.length > 0) {
+                    plexLibraries.plex2 = {
+                        regular: regularChecked,
+                        fourk: fourkChecked
+                    };
+                }
             }
             
+            console.log('📋 Collected library selections:', plexLibraries);
             return plexLibraries;
         }
 
@@ -1675,27 +1704,66 @@
         // Plex library management functions
         async function loadPlexLibraries() {
             try {
+                console.log('🔍 Loading Plex libraries from API...');
+                
                 // Load Plex 1 libraries
                 const plex1Data = await apiCall('/plex/libraries/plex1');
+                console.log('📚 Plex 1 data received:', plex1Data);
                 plexLibraries.plex1 = plex1Data;
                 renderPlexLibraries('plex1', plex1Data);
                 
                 // Load Plex 2 libraries
                 const plex2Data = await apiCall('/plex/libraries/plex2');
+                console.log('📚 Plex 2 data received:', plex2Data);
                 plexLibraries.plex2 = plex2Data;
                 renderPlexLibraries('plex2', plex2Data);
                 
+                console.log('✅ All Plex libraries loaded successfully');
             } catch (error) {
-                console.error('Error loading Plex libraries:', error);
+                console.error('❌ Error loading Plex libraries:', error);
             }
         }
+		
+		async function forceLoadLibraries() {
+    try {
+        console.log('🚀 Force loading all Plex libraries...');
+        
+        // First trigger a sync on the backend
+        const syncResult = await apiCall('/plex/sync', { method: 'POST' });
+        console.log('📡 Sync result:', syncResult);
+        
+        // Then reload libraries in frontend
+        await loadPlexLibraries();
+        
+        // Show/test both library groups
+        document.getElementById('plex1LibraryGroup').style.display = 'block';
+        document.getElementById('plex2LibraryGroup').style.display = 'block';
+        
+        // Test connections
+        testPlexConnection('plex1');
+        testPlexConnection('plex2');
+        
+        alert('Libraries force loaded!\n\nPlex 1: ' + (plexLibraries.plex1?.regular?.length || 0) + ' regular + ' + (plexLibraries.plex1?.fourk?.length || 0) + ' 4K\nPlex 2: ' + (plexLibraries.plex2?.regular?.length || 0) + ' regular + ' + (plexLibraries.plex2?.fourk?.length || 0) + ' 4K');
+    } catch (error) {
+        console.error('❌ Error force loading libraries:', error);
+        alert('Error force loading libraries: ' + error.message);
+    }
+}
 
         function renderPlexLibraries(serverGroup, libraryData) {
+            console.log(`🎨 Rendering libraries for ${serverGroup}:`, libraryData);
+            
             const regularList = document.getElementById(`${serverGroup}RegularLibrariesList`);
             const fourkList = document.getElementById(`${serverGroup}FourkLibrariesList`);
             
+            if (!regularList || !fourkList) {
+                console.error(`❌ Could not find library elements for ${serverGroup}`);
+                return;
+            }
+            
             // Render regular libraries
             if (libraryData.regular && libraryData.regular.length > 0) {
+                console.log(`📖 Rendering ${libraryData.regular.length} regular libraries`);
                 regularList.innerHTML = libraryData.regular.map(lib => `
                     <div class="library-item">
                         <input type="checkbox" id="${serverGroup}_regular_${lib.id}" name="${serverGroup}_regular" value="${lib.id}">
@@ -1703,11 +1771,13 @@
                     </div>
                 `).join('');
             } else {
+                console.log('❌ No regular libraries found');
                 regularList.innerHTML = '<div>No libraries available</div>';
             }
             
             // Render 4K libraries
             if (libraryData.fourk && libraryData.fourk.length > 0) {
+                console.log(`📖 Rendering ${libraryData.fourk.length} 4K libraries`);
                 fourkList.innerHTML = libraryData.fourk.map(lib => `
                     <div class="library-item">
                         <input type="checkbox" id="${serverGroup}_fourk_${lib.id}" name="${serverGroup}_fourk" value="${lib.id}">
@@ -1715,55 +1785,133 @@
                     </div>
                 `).join('');
             } else {
+                console.log('❌ No 4K libraries found');
                 fourkList.innerHTML = '<div>No 4K libraries available</div>';
             }
+            
+            console.log(`✅ Finished rendering libraries for ${serverGroup}`);
         }
 
-        function toggleLibraryCheckboxes(serverGroup) {
-            const select = document.getElementById(`${serverGroup}LibrariesSelect`);
-            const checkboxContainer = document.getElementById(`${serverGroup}LibraryCheckboxes`);
+        // Toggle Plex library sections based on tag selection
+        function togglePlexLibrariesByTag(serverGroup, isChecked) {
+            const libraryGroup = document.getElementById(`${serverGroup}LibraryGroup`);
             
-            if (select.value === 'custom') {
-                checkboxContainer.style.display = 'block';
+            if (isChecked) {
+                console.log(`✅ ${serverGroup} tag checked - showing libraries`);
+                libraryGroup.style.display = 'block';
+                
+                // Auto-load libraries if not already loaded
+                if (!plexLibraries[serverGroup] || !plexLibraries[serverGroup].regular) {
+                    console.log(`🔄 Auto-loading libraries for ${serverGroup}`);
+                    loadPlexLibrariesForGroup(serverGroup);
+                }
+                
+                // Auto-test connection
+                testPlexConnection(serverGroup);
             } else {
-                checkboxContainer.style.display = 'none';
-                // Clear all checkboxes when hiding
-                checkboxContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+                console.log(`❌ ${serverGroup} tag unchecked - hiding libraries`);
+                libraryGroup.style.display = 'none';
+                
+                // Clear all selections when hiding
+                clearAllLibrariesForGroup(serverGroup);
             }
         }
 
-        async function testPlexConnection(serverGroup) {
-            const statusElement = document.getElementById(`${serverGroup}Status`) || document.getElementById(`${serverGroup}ServerStatus`);
-            
-            if (statusElement) {
-                statusElement.textContent = 'Testing...';
-                statusElement.className = 'connection-status';
-            }
-            
+        // Load libraries for a specific group
+        async function loadPlexLibrariesForGroup(serverGroup) {
             try {
-                const result = await apiCall(`/plex/test/${serverGroup}`, { method: 'POST' });
+                console.log(`📚 Loading libraries specifically for ${serverGroup}`);
+                const data = await apiCall(`/plex/libraries/${serverGroup}`);
+                console.log(`📊 Data loaded for ${serverGroup}:`, data);
                 
-                if (statusElement) {
-                    if (result.success) {
-                        statusElement.textContent = 'Connected';
-                        statusElement.className = 'connection-status status-connected';
-                    } else {
-                        statusElement.textContent = 'Failed';
-                        statusElement.className = 'connection-status status-disconnected';
-                    }
-                }
-                
-                if (!result.success) {
-                    alert(`Plex ${serverGroup} connection failed: ${result.error}`);
-                }
+                plexLibraries[serverGroup] = data;
+                renderPlexLibraries(serverGroup, data);
             } catch (error) {
-                console.error(`Error testing ${serverGroup} connection:`, error);
-                if (statusElement) {
-                    statusElement.textContent = 'Error';
-                    statusElement.className = 'connection-status status-disconnected';
-                }
+                console.error(`❌ Error loading libraries for ${serverGroup}:`, error);
             }
         }
+
+        // Select all libraries for a server group
+        function selectAllPlex1Libraries() {
+            selectAllLibrariesForGroup('plex1');
+        }
+
+        function selectAllPlex2Libraries() {
+            selectAllLibrariesForGroup('plex2');
+        }
+
+        function selectAllLibrariesForGroup(serverGroup) {
+            console.log(`✅ Selecting all libraries for ${serverGroup}`);
+            
+            // Select all regular libraries
+            document.querySelectorAll(`input[name="${serverGroup}_regular"]`).forEach(cb => {
+                cb.checked = true;
+            });
+            
+            // Select all 4K libraries
+            document.querySelectorAll(`input[name="${serverGroup}_fourk"]`).forEach(cb => {
+                cb.checked = true;
+            });
+        }
+
+        // Clear all libraries for a server group
+        function clearAllPlex1Libraries() {
+            clearAllLibrariesForGroup('plex1');
+        }
+
+        function clearAllPlex2Libraries() {
+            clearAllLibrariesForGroup('plex2');
+        }
+
+        function clearAllLibrariesForGroup(serverGroup) {
+            console.log(`❌ Clearing all libraries for ${serverGroup}`);
+            
+            // Clear all regular libraries
+            document.querySelectorAll(`input[name="${serverGroup}_regular"]`).forEach(cb => {
+                cb.checked = false;
+            });
+            
+            // Clear all 4K libraries
+            document.querySelectorAll(`input[name="${serverGroup}_fourk"]`).forEach(cb => {
+                cb.checked = false;
+            });
+        }
+
+async function testPlexConnection(serverGroup) {
+    const statusElement = document.getElementById(`${serverGroup}Status`) || document.getElementById(`${serverGroup}ServerStatus`);
+    
+    if (statusElement) {
+        statusElement.textContent = 'Testing...';
+        statusElement.className = 'connection-status';
+    }
+    
+    try {
+        const result = await apiCall(`/plex/test/${serverGroup}`, { method: 'POST' });
+        
+        if (statusElement) {
+            if (result.success) {
+                statusElement.textContent = 'Connected';
+                statusElement.className = 'connection-status status-connected';
+            } else {
+                statusElement.textContent = 'Failed';
+                statusElement.className = 'connection-status status-disconnected';
+            }
+        }
+        
+        if (result.success) {
+            alert(`${serverGroup.toUpperCase()} connection successful!`);
+        } else {
+            alert(`${serverGroup.toUpperCase()} connection failed: ${result.error}`);
+        }
+    } catch (error) {
+        console.error(`Error testing ${serverGroup} connection:`, error);
+        if (statusElement) {
+            statusElement.textContent = 'Error';
+            statusElement.className = 'connection-status status-disconnected';
+        }
+        alert(`Connection test failed: ${error.message}`);
+    }
+}
 
         async function refreshPlexLibraries(serverGroup) {
             try {
@@ -1772,18 +1920,22 @@
                 button.textContent = 'Refreshing...';
                 button.disabled = true;
                 
-                // Trigger library sync
-                await apiCall('/plex/sync', { method: 'POST' });
+                console.log(`🔄 Manually refreshing libraries for ${serverGroup}`);
                 
-                // Reload libraries for this server group
+                // Force reload from API
                 const libraryData = await apiCall(`/plex/libraries/${serverGroup}`);
+                console.log(`📚 Fresh data for ${serverGroup}:`, libraryData);
+                
+                // Update global state
                 plexLibraries[serverGroup] = libraryData;
+                
+                // Re-render
                 renderPlexLibraries(serverGroup, libraryData);
                 
                 button.textContent = originalText;
                 button.disabled = false;
                 
-                alert(`${serverGroup} libraries refreshed successfully`);
+                alert(`${serverGroup} libraries refreshed successfully!\n\nRegular: ${libraryData.regular?.length || 0} libraries\n4K: ${libraryData.fourk?.length || 0} libraries`);
             } catch (error) {
                 console.error('Error refreshing libraries:', error);
                 button.textContent = originalText;
@@ -1791,33 +1943,82 @@
                 alert('Error refreshing libraries: ' + error.message);
             }
         }
-
-        async function syncAllPlexLibraries() {
-            try {
-                const button = event.target;
-                const originalText = button.textContent;
-                button.textContent = 'Syncing...';
-                button.disabled = true;
-                
-                await apiCall('/plex/sync', { method: 'POST' });
-                
-                // Reload all libraries
-                await loadPlexLibraries();
-                
-                button.textContent = originalText;
-                button.disabled = false;
-                
-                // Update last sync time
-                document.getElementById('lastSyncTime').textContent = new Date().toLocaleString();
-                
-                alert('All Plex libraries synced successfully');
-            } catch (error) {
-                console.error('Error syncing libraries:', error);
-                button.textContent = originalText;
-                button.disabled = false;
-                alert('Error syncing libraries: ' + error.message);
-            }
+		
+		async function loadLastSyncTime() {
+    try {
+        const settings = await apiCall('/settings');
+        const lastSync = settings.last_plex_sync;
+        
+        if (lastSync) {
+            const syncDate = new Date(lastSync);
+            document.getElementById('lastSyncTime').textContent = syncDate.toLocaleString();
+        } else {
+            document.getElementById('lastSyncTime').textContent = 'Never';
         }
+    } catch (error) {
+        console.error('Error loading last sync time:', error);
+        document.getElementById('lastSyncTime').textContent = 'Error loading';
+    }
+}
+
+async function syncAllPlexLibraries() {
+    try {
+        const button = event.target;
+        const originalText = button.textContent;
+        button.textContent = 'Syncing...';
+        button.disabled = true;
+        
+        const result = await apiCall('/plex/sync', { method: 'POST' });
+        
+        // Reload all libraries
+        await loadPlexLibraries();
+        
+        button.textContent = originalText;
+        button.disabled = false;
+        
+        if (result.success) {
+            // Update last sync time display
+            if (result.timestamp) {
+                const syncDate = new Date(result.timestamp);
+                document.getElementById('lastSyncTime').textContent = syncDate.toLocaleString();
+            }
+            alert('All Plex libraries synced successfully');
+        } else {
+            alert('Error syncing libraries: ' + (result.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error syncing libraries:', error);
+        const button = event.target;
+        button.textContent = 'Sync All Libraries';
+        button.disabled = false;
+        alert('Error syncing libraries: ' + error.message);
+    }
+}
+
+async function loadSettings() {
+    try {
+        const settings = await apiCall('/settings');
+        
+        // Load existing settings
+        document.getElementById('smtpHost').value = settings.smtp_host || 'smtp.gmail.com';
+        document.getElementById('smtpPort').value = settings.smtp_port || '587';
+        document.getElementById('smtpUser').value = settings.smtp_user || '';
+        document.getElementById('smtpPass').value = settings.smtp_pass || '';
+        document.getElementById('paypalLink').value = settings.paypal_link || '';
+        document.getElementById('venmoLink').value = settings.venmo_link || '';
+        document.getElementById('cashappLink').value = settings.cashapp_link || '';
+        
+        // Load last sync time
+        if (settings.last_plex_sync) {
+            const syncDate = new Date(settings.last_plex_sync);
+            document.getElementById('lastSyncTime').textContent = syncDate.toLocaleString();
+        } else {
+            document.getElementById('lastSyncTime').textContent = 'Never';
+        }
+    } catch (error) {
+        console.error('Error loading settings:', error);
+    }
+}
 
         async function loadPlexStatus() {
             // Test connections for both server groups
@@ -2026,16 +2227,57 @@
             console.log(`Sorting by ${column} - functionality to be implemented`);
         }
 
-        // Placeholder functions for remaining features
-        function loadTemplate() { console.log('Load template functionality will be implemented'); }
-        function saveTemplate() { console.log('Save template functionality will be implemented'); }
-        function deleteTemplate() { console.log('Delete template functionality will be implemented'); }
-        function sendEmail() { console.log('Send email functionality will be implemented'); }
-        function loadSettings() { console.log('Load settings functionality will be implemented'); }
-        function saveSettings() { console.log('Save settings functionality will be implemented'); }
-        function testEmailConnection() { console.log('Test email functionality will be implemented'); }
-        function editOwner(id) { console.log('Edit owner functionality will be implemented'); }
-        function deleteOwner(id) { console.log('Delete owner functionality will be implemented'); }
+        async function debugPlexLibraries(serverGroup) {
+            try {
+                console.log(`🐛 Starting debug for ${serverGroup}...`);
+                
+                // Test direct API call
+                console.log(`📞 Making API call to /api/plex/libraries/${serverGroup}`);
+                const response = await fetch(`/api/plex/libraries/${serverGroup}`);
+                const data = await response.json();
+                
+                console.log(`📊 Raw API response for ${serverGroup}:`, data);
+                console.log(`📋 Regular libraries:`, data.regular);
+                console.log(`📋 4K libraries:`, data.fourk);
+                
+                // Check if DOM elements exist
+                const dropdown = document.getElementById(`${serverGroup}LibrariesSelect`);
+                const regularList = document.getElementById(`${serverGroup}RegularLibrariesList`);
+                const fourkList = document.getElementById(`${serverGroup}FourkLibrariesList`);
+                
+                console.log(`🔍 DOM Elements check:`, {
+                    dropdown: !!dropdown,
+                    regularList: !!regularList,
+                    fourkList: !!fourkList
+                });
+                
+                if (dropdown) {
+                    console.log(`📝 Current dropdown HTML:`, dropdown.innerHTML);
+                    console.log(`🎯 Manually updating dropdown...`);
+                    
+                    // Force update dropdown
+                    dropdown.innerHTML = `
+                        <option value="">-- No ${serverGroup.toUpperCase()} Access --</option>
+                        <option value="all">All Libraries</option>
+                        <option value="custom">Custom Selection</option>
+                    `;
+                    
+                    console.log(`📝 New dropdown HTML:`, dropdown.innerHTML);
+                }
+                
+                // Try to render manually
+                console.log(`🎨 Calling renderPlexLibraries manually...`);
+                renderPlexLibraries(serverGroup, data);
+                
+                // Update global state
+                plexLibraries[serverGroup] = data;
+                
+                alert(`Debug complete for ${serverGroup}!\n\nAPI Response:\nRegular: ${data.regular?.length || 0} libraries\n4K: ${data.fourk?.length || 0} libraries\n\nCheck console for detailed logs.`);
+            } catch (error) {
+                console.error(`❌ Debug failed for ${serverGroup}:`, error);
+                alert(`Debug failed: ${error.message}`);
+            }
+        }
     </script>
 </body>
 </html>
