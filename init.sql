@@ -169,11 +169,10 @@ INSERT INTO settings (setting_key, setting_value, setting_type) VALUES
 -- Insert sample users (updated field names and realistic data)
 INSERT INTO users (name, email, owner_id, plex_email, iptv_username, iptv_password, implayer_code, device_count, bcc_owner_renewal, tags) VALUES
 ('Andrew', 'arjohnson15@gmail.com', 1, 'arjohnson15@gmail.com', 'andrew_iptv', 'iptv456', 'ABC123', 2, true, '["Plex 1", "Plex 2", "IPTV"]'),
-('Aaron Fleuren', 'afleuren@yahoo.com', 1, 'afleuren@yahoo.com', '', '', '', 1, false, '["Plex 1"]'),
-
+('Aaron Fleuren', 'afleuren@yahoo.com', 1, 'afleuren@yahoo.com', '', '', '', 1, false, '["Plex 1"]');
 
 -- Insert sample subscriptions
 INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status) VALUES
 (1, 1, CURDATE(), NULL, true, 'active'), -- Andrew - Free Plex
 (1, 2, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY), false, 'active'), -- Andrew - IPTV expiring soon
-(2, 1, '2024-04-15', '2025-04-15', false, 'active'), -- Aaron - Paid Plex
+(2, 1, '2024-04-15', '2025-04-15', false, 'active'); -- Aaron - Paid Plex
