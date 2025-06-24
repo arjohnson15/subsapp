@@ -4,7 +4,7 @@ const config = {
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'johnsonflix',
   password: process.env.DB_PASSWORD || 'password',
-  database: process.env.DB_NAME || 'johnsonflix_db',
+  database: process.env.DB_NAME || 'subsapp_db',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
