@@ -226,7 +226,298 @@ class PlexService {
     }
   }
 
-  // Enhanced sharing method with proper library management
+  // FIXED: Actual Plex API sharing implementation
+  async shareLibrariesWithUser(userEmail, serverGroup, libraries, action = 'add') {
+    try {
+      console.log(`🤝 ${action.toUpperCase()} libraries for ${userEmail} on ${serverGroup}`);
+      
+      const serverConfigs = this.getServerConfig();
+      const config = serverConfigs[serverGroup];
+      
+      if (!config) {
+        throw new Error(`Invalid server group: ${serverGroup}`);
+      }
+      
+      const results = [];
+      
+      // Handle regular libraries
+      if (libraries.regular && libraries.regular.length > 0) {
+        console.log(`📚 ${action} regular libraries:`, libraries.regular);
+        
+        for (const libraryId of libraries.regular) {
+          try {
+            if (action === 'add') {
+              await this.inviteUserToLibrary(userEmail, config.regular, libraryId);
+            } else {
+              await this.removeUserFromLibrary(userEmail, config.regular, libraryId);
+            }
+            results.push(`${action}ed regular library ${libraryId}`);
+          } catch (error) {
+            console.error(`Error ${action}ing regular library ${libraryId}:`, error.message);
+            results.push(`Failed to ${action} regular library ${libraryId}: ${error.message}`);
+          }
+        }
+      }
+      
+      // Handle 4K libraries
+      if (libraries.fourk && libraries.fourk.length > 0) {
+        console.log(`📚 ${action} 4K libraries:`, libraries.fourk);
+        
+        for (const libraryId of libraries.fourk) {
+          try {
+            if (action === 'add') {
+              await this.inviteUserToLibrary(userEmail, config.fourk, libraryId);
+            } else {
+              await this.removeUserFromLibrary(userEmail, config.fourk, libraryId);
+            }
+            results.push(`${action}ed 4K library ${libraryId}`);
+          } catch (error) {
+            console.error(`Error ${action}ing 4K library ${libraryId}:`, error.message);
+            results.push(`Failed to ${action} 4K library ${libraryId}: ${error.message}`);
+          }
+        }
+      }
+      
+      return {
+        success: true,
+        message: `Successfully processed ${libraries.regular?.length || 0} regular + ${libraries.fourk?.length || 0} 4K libraries`,
+        details: results
+      };
+      
+    } catch (error) {
+      console.error(`❌ Error ${action}ing libraries:`, error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // NEW: Invite user to specific library
+  async inviteUserToLibrary(userEmail, serverConfig, libraryId) {
+    try {
+      console.log(`📧 Inviting ${userEmail} to library ${libraryId} on ${serverConfig.name}`);
+      
+      // Step 1: Make sure user is invited to server
+      await this.ensureUserInvitedToServer(userEmail, serverConfig);
+      
+      // Step 2: Share the specific library
+      await this.shareSpecificLibraryWithUser(userEmail, serverConfig, libraryId);
+      
+      console.log(`✅ Successfully invited ${userEmail} to library ${libraryId}`);
+      
+    } catch (error) {
+      console.error(`❌ Error inviting user to library:`, error);
+      throw error;
+    }
+  }
+
+  // NEW: Ensure user is invited to server
+  async ensureUserInvitedToServer(userEmail, serverConfig) {
+    try {
+      console.log(`🔍 Checking if ${userEmail} is invited to ${serverConfig.name}`);
+      
+      // Check if user is already invited
+      const existingUsers = await this.getAllSharedUsersFromServer(serverConfig);
+      const userExists = existingUsers.find(user => user.email.toLowerCase() === userEmail.toLowerCase());
+      
+      if (userExists) {
+        console.log(`✅ User ${userEmail} already invited to ${serverConfig.name}`);
+        return;
+      }
+      
+      // Invite user to server
+      console.log(`📧 Inviting ${userEmail} to ${serverConfig.name}`);
+      
+      const inviteUrl = `https://plex.tv/api/servers/${serverConfig.serverId}/shared_servers`;
+      
+      const formData = new URLSearchParams();
+      formData.append('server_id', serverConfig.serverId);
+      formData.append('shared_server[invited_email]', userEmail);
+      formData.append('shared_server[settings][allowChannels]', '1');
+      formData.append('shared_server[settings][allowSync]', '1');
+      formData.append('shared_server[settings][allowCameraUpload]', '0');
+      formData.append('shared_server[settings][filterMovies]', '');
+      formData.append('shared_server[settings][filterTelevision]', '');
+      formData.append('shared_server[settings][filterMusic]', '');
+      
+      const response = await axios.post(inviteUrl, formData, {
+        headers: {
+          'X-Plex-Token': serverConfig.token,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        timeout: 15000
+      });
+      
+      console.log(`✅ User ${userEmail} invited to ${serverConfig.name}`);
+      return response.data;
+      
+    } catch (error) {
+      if (error.response && error.response.status === 422) {
+        // User already invited - this is okay
+        console.log(`ℹ️ User ${userEmail} already invited to ${serverConfig.name}`);
+        return;
+      }
+      
+      console.error(`❌ Error inviting user to server:`, error.message);
+      throw error;
+    }
+  }
+
+  // NEW: Share specific library with user
+  async shareSpecificLibraryWithUser(userEmail, serverConfig, libraryId) {
+    try {
+      console.log(`📚 Sharing library ${libraryId} with ${userEmail} on ${serverConfig.name}`);
+      
+      // Get the user's shared server ID
+      const sharedServerId = await this.getSharedServerId(userEmail, serverConfig);
+      
+      if (!sharedServerId) {
+        throw new Error(`Could not find shared server for ${userEmail} on ${serverConfig.name}`);
+      }
+      
+      // Get user's current libraries
+      const currentLibraries = await this.getUserLibrariesOnServer(userEmail, serverConfig);
+      
+      // Add the new library if not already there
+      if (!currentLibraries.includes(libraryId)) {
+        currentLibraries.push(libraryId);
+      }
+      
+      // Update user's library access
+      const shareUrl = `https://plex.tv/api/servers/${serverConfig.serverId}/shared_servers/${sharedServerId}`;
+      
+      const formData = new URLSearchParams();
+      currentLibraries.forEach(id => {
+        formData.append(`shared_server[librarySectionIds][]`, id);
+      });
+      
+      const response = await axios.put(shareUrl, formData, {
+        headers: {
+          'X-Plex-Token': serverConfig.token,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        timeout: 15000
+      });
+      
+      console.log(`✅ Library ${libraryId} shared with ${userEmail}`);
+      return response.data;
+      
+    } catch (error) {
+      console.error(`❌ Error sharing library:`, error.message);
+      throw error;
+    }
+  }
+
+  // NEW: Get shared server ID for a user
+  async getSharedServerId(userEmail, serverConfig) {
+    try {
+      const xmlData = await this.makePlexTvRequest(serverConfig.serverId, serverConfig.token, '/shared_servers');
+      const result = await this.parser.parseStringPromise(xmlData);
+      
+      if (!result.MediaContainer || !result.MediaContainer.SharedServer) {
+        return null;
+      }
+      
+      const sharedServers = Array.isArray(result.MediaContainer.SharedServer)
+        ? result.MediaContainer.SharedServer
+        : [result.MediaContainer.SharedServer];
+      
+      const userServer = sharedServers.find(server => 
+        server.$.email.toLowerCase() === userEmail.toLowerCase()
+      );
+      
+      return userServer ? userServer.$.id : null;
+      
+    } catch (error) {
+      console.error('Error getting shared server ID:', error);
+      return null;
+    }
+  }
+
+  // NEW: Get user's current libraries on a server
+  async getUserLibrariesOnServer(userEmail, serverConfig) {
+    try {
+      const allUsers = await this.getAllSharedUsersFromServer(serverConfig);
+      const user = allUsers.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+      
+      return user ? user.libraries.map(lib => lib.id) : [];
+      
+    } catch (error) {
+      console.error('Error getting user libraries:', error);
+      return [];
+    }
+  }
+
+  // NEW: Remove user from specific library
+  async removeUserFromLibrary(userEmail, serverConfig, libraryId) {
+    try {
+      console.log(`🗑️ Removing ${userEmail} from library ${libraryId} on ${serverConfig.name}`);
+      
+      const sharedServerId = await this.getSharedServerId(userEmail, serverConfig);
+      
+      if (!sharedServerId) {
+        console.log(`ℹ️ User ${userEmail} not found on ${serverConfig.name}`);
+        return;
+      }
+      
+      // Get current libraries and remove the specified one
+      const currentLibraries = await this.getUserLibrariesOnServer(userEmail, serverConfig);
+      const newLibraries = currentLibraries.filter(id => id !== libraryId);
+      
+      // Update with new library list
+      const shareUrl = `https://plex.tv/api/servers/${serverConfig.serverId}/shared_servers/${sharedServerId}`;
+      
+      const formData = new URLSearchParams();
+      newLibraries.forEach(id => {
+        formData.append(`shared_server[librarySectionIds][]`, id);
+      });
+      
+      const response = await axios.put(shareUrl, formData, {
+        headers: {
+          'X-Plex-Token': serverConfig.token,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        timeout: 15000
+      });
+      
+      console.log(`✅ Library ${libraryId} removed from ${userEmail}`);
+      return response.data;
+      
+    } catch (error) {
+      console.error(`❌ Error removing library:`, error.message);
+      throw error;
+    }
+  }
+
+  // NEW: Remove user from server entirely
+  async removeUserFromServer(userEmail, serverConfig) {
+    try {
+      const sharedServerId = await this.getSharedServerId(userEmail, serverConfig);
+      
+      if (!sharedServerId) {
+        console.log(`User ${userEmail} not found on ${serverConfig.name}`);
+        return;
+      }
+      
+      const removeUrl = `https://plex.tv/api/servers/${serverConfig.serverId}/shared_servers/${sharedServerId}`;
+      
+      await axios.delete(removeUrl, {
+        headers: {
+          'X-Plex-Token': serverConfig.token
+        },
+        timeout: 15000
+      });
+      
+      console.log(`✅ Removed ${userEmail} from ${serverConfig.name}`);
+      
+    } catch (error) {
+      console.error(`Error removing user from server:`, error);
+      throw error;
+    }
+  }
+
+  // FIXED: Enhanced sharing method with real API calls
   async shareLibrariesWithUserEnhanced(userEmail, serverGroup, newLibraries) {
     try {
       console.log(`🔄 Enhanced library sharing for ${userEmail} on ${serverGroup}`);
@@ -255,17 +546,32 @@ class PlexService {
       console.log(`📋 Libraries to ADD:`, librariesToAdd);
       console.log(`📋 Libraries to REMOVE:`, librariesToRemove);
       
-      // Step 3: For now, we'll update the database and return a success message
-      // TODO: Implement actual Plex.tv API calls for sharing/removing libraries
-      // This would require implementing the equivalent of your Python inviteFriend and removeFriend calls
-      
+      // Step 3: Actually make the Plex API calls
       const hasChanges = (librariesToAdd.regular.length > 0 || librariesToAdd.fourk.length > 0 ||
                          librariesToRemove.regular.length > 0 || librariesToRemove.fourk.length > 0);
       
       if (hasChanges) {
-        console.log(`🤝 Would make changes to ${userEmail}'s library access...`);
+        console.log(`🤝 Making actual changes to ${userEmail}'s library access...`);
         
-        // Update user's library access in database to reflect the desired state
+        // Add new libraries
+        if (librariesToAdd.regular.length > 0 || librariesToAdd.fourk.length > 0) {
+          const addResult = await this.shareLibrariesWithUser(userEmail, serverGroup, librariesToAdd, 'add');
+          if (!addResult.success) {
+            throw new Error(`Failed to add libraries: ${addResult.error}`);
+          }
+          console.log(`✅ Added libraries:`, addResult.details);
+        }
+        
+        // Remove libraries
+        if (librariesToRemove.regular.length > 0 || librariesToRemove.fourk.length > 0) {
+          const removeResult = await this.shareLibrariesWithUser(userEmail, serverGroup, librariesToRemove, 'remove');
+          if (!removeResult.success) {
+            throw new Error(`Failed to remove libraries: ${removeResult.error}`);
+          }
+          console.log(`✅ Removed libraries:`, removeResult.details);
+        }
+        
+        // Update database
         const updatedAccess = { ...currentAccess };
         updatedAccess[serverGroup] = {
           regular: requestedRegular,
@@ -276,11 +582,10 @@ class PlexService {
         
         return {
           success: true,
-          message: `Library access updated for ${userEmail} (Note: Actual Plex API sharing needs to be implemented)`,
+          message: `Library access updated successfully for ${userEmail} - Changes applied to Plex servers`,
           addedLibraries: librariesToAdd,
           removedLibraries: librariesToRemove,
-          currentAccess: updatedAccess[serverGroup],
-          note: 'Database updated - Plex.tv API integration needed for actual sharing'
+          currentAccess: updatedAccess[serverGroup]
         };
       } else {
         console.log(`ℹ️ No changes needed for ${userEmail} on ${serverGroup}`);
@@ -293,6 +598,48 @@ class PlexService {
       
     } catch (error) {
       console.error(`❌ Error in enhanced library sharing:`, error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // FIXED: Remove user access with real API calls
+  async removeUserAccess(userEmail, serverGroups) {
+    try {
+      console.log(`🗑️ Removing ${userEmail} from server groups:`, serverGroups);
+      
+      const serverConfigs = this.getServerConfig();
+      const results = [];
+      
+      for (const serverGroup of serverGroups) {
+        const config = serverConfigs[serverGroup];
+        if (!config) continue;
+        
+        try {
+          // Remove from regular server
+          await this.removeUserFromServer(userEmail, config.regular);
+          results.push(`Removed from ${config.regular.name}`);
+          
+          // Remove from 4K server  
+          await this.removeUserFromServer(userEmail, config.fourk);
+          results.push(`Removed from ${config.fourk.name}`);
+          
+        } catch (error) {
+          console.error(`Error removing user from ${serverGroup}:`, error);
+          results.push(`Failed to remove from ${serverGroup}: ${error.message}`);
+        }
+      }
+      
+      return {
+        success: true,
+        message: `Processed removal from ${serverGroups.length} server groups`,
+        details: results
+      };
+      
+    } catch (error) {
+      console.error('Error removing user access:', error);
       return {
         success: false,
         error: error.message
@@ -671,25 +1018,6 @@ class PlexService {
     } catch (error) {
       console.error('❌ Error updating sync timestamp:', error);
     }
-  }
-
-  // Placeholder methods for actual Plex API sharing (to be implemented)
-  async shareLibrariesWithUser(userEmail, serverGroup, libraryIds) {
-    console.log(`🔧 TODO: Implement actual Plex.tv API sharing for ${userEmail} on ${serverGroup}`, libraryIds);
-    return { 
-      success: true, 
-      message: 'Sharing placeholder - needs Plex.tv API implementation',
-      note: 'This would use Plex.tv API to actually invite user and share libraries'
-    };
-  }
-
-  async removeUserAccess(userEmail, serverGroups) {
-    console.log(`🔧 TODO: Implement actual Plex.tv API removal for ${userEmail} from`, serverGroups);
-    return { 
-      success: true, 
-      message: 'Remove access placeholder - needs Plex.tv API implementation',
-      note: 'This would use Plex.tv API to actually remove user from servers'
-    };
   }
 }
 

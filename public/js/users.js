@@ -9,11 +9,6 @@ window.Users = {
         this.setupEventListeners();
     },
     
-    async initForm() {
-        await this.loadFormData();
-        this.setupFormEventListeners();
-    },
-    
     setupEventListeners() {
         // Setup search with debounce
         const searchInput = document.getElementById('userSearch');
@@ -22,63 +17,12 @@ window.Users = {
         }
     },
     
-    setupFormEventListeners() {
-        // Setup tag change listeners
-        const tagCheckboxes = document.querySelectorAll('input[name="tags"]');
-        tagCheckboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', (e) => {
-                if (e.target.value === 'Plex 1') {
-                    this.togglePlexLibrariesByTag('plex1', e.target.checked);
-                } else if (e.target.value === 'Plex 2') {
-                    this.togglePlexLibrariesByTag('plex2', e.target.checked);
-                }
-            });
-        });
-    },
-    
     async loadUsers() {
         try {
             window.AppState.users = await API.User.getAll();
             this.renderUsersTable();
         } catch (error) {
             Utils.handleError(error, 'Loading users');
-        }
-    },
-    
-    async loadFormData() {
-        try {
-            // Load owners for dropdown
-            const owners = await API.Owner.getAll();
-            const subscriptions = await API.Subscription.getAll();
-            
-            this.updateOwnerDropdown(owners);
-            this.updateSubscriptionDropdowns(subscriptions);
-            
-            // Load Plex libraries
-            await window.Plex.loadLibraries();
-            
-        } catch (error) {
-            Utils.handleError(error, 'Loading form data');
-        }
-    },
-    
-    updateOwnerDropdown(owners) {
-        const ownerSelect = document.getElementById('userOwner');
-        if (ownerSelect) {
-            ownerSelect.innerHTML = '<option value="">-- No Owner --</option>' +
-                owners.map(owner => `<option value="${owner.id}">${owner.name}</option>`).join('');
-        }
-    },
-    
-    updateSubscriptionDropdowns(subscriptions) {
-        const iptvSelect = document.getElementById('iptvSubscription');
-        if (iptvSelect) {
-            const iptvOptions = subscriptions
-                .filter(sub => sub.type === 'iptv')
-                .map(sub => `<option value="${sub.id}">${sub.name} - $${sub.price}</option>`)
-                .join('');
-            
-            iptvSelect.innerHTML = '<option value="">-- No IPTV Selected --</option>' + iptvOptions;
         }
     },
     
@@ -212,184 +156,33 @@ window.Users = {
         }
     },
     
+    // FIXED: Proper edit user initialization
     async editUser(userId) {
         try {
             console.log(`📝 Starting edit for user ID: ${userId}`);
             
-            // Set editing state BEFORE loading the page
+            // Set editing state FIRST
             window.AppState.editingUserId = userId;
             
             // Load the user data
             const user = await API.User.getById(userId);
             console.log(`📊 Loaded user for editing:`, user);
             
-            // Store user data globally for form population
+            // Store user data globally
             window.AppState.currentUserData = user;
             
             // Navigate to user form
             await showPage('user-form');
             
-            // Wait a bit longer for the page to fully load, then populate
+            // Wait for page to fully load, then populate
             setTimeout(() => {
                 console.log(`🔧 Populating form for editing user: ${user.name}`);
-                this.populateUserFormForEditing(user);
-            }, 1000); // Increased timeout to ensure page is ready
+                populateFormForEditing(user);
+            }, 1200);
             
         } catch (error) {
             Utils.handleError(error, 'Loading user for editing');
         }
-    },
-    
-    // Enhanced form population that actually persists state
-    populateUserFormForEditing(user) {
-        console.log(`📝 Populating form with user data:`, user);
-        
-        // Fill basic fields
-        const fieldMappings = {
-            'userName': user.name,
-            'userEmail': user.email,
-            'userOwner': user.owner_id || '',
-            'plexEmail': user.plex_email || '',
-            'iptvUsername': user.iptv_username || '',
-            'iptvPassword': user.iptv_password || '',
-            'implayerCode': user.implayer_code || '',
-            'deviceCount': user.device_count || '1'
-        };
-        
-        Object.keys(fieldMappings).forEach(fieldId => {
-            const element = document.getElementById(fieldId);
-            if (element) {
-                element.value = fieldMappings[fieldId];
-                console.log(`📝 Set ${fieldId} = ${fieldMappings[fieldId]}`);
-            } else {
-                console.warn(`⚠️ Element not found: ${fieldId}`);
-            }
-        });
-        
-        // Handle checkbox
-        const bccCheckbox = document.getElementById('bccOwnerRenewal');
-        if (bccCheckbox) {
-            bccCheckbox.checked = user.bcc_owner_renewal || false;
-        }
-        
-        // Handle tags and show corresponding library sections
-        console.log(`🏷️ Setting tags:`, user.tags);
-        document.querySelectorAll('input[name="tags"]').forEach(cb => cb.checked = false);
-        
-        if (user.tags && Array.isArray(user.tags)) {
-            user.tags.forEach(tag => {
-                const checkbox = document.querySelector(`input[name="tags"][value="${tag}"]`);
-                if (checkbox) {
-                    checkbox.checked = true;
-                    console.log(`✅ Checked tag: ${tag}`);
-                    
-                    // Show library sections for checked tags
-                    if (tag === 'Plex 1') {
-                        console.log(`📚 Showing Plex 1 libraries...`);
-                        this.togglePlexLibrariesByTag('plex1', true);
-                        
-                        // Pre-select user's current libraries after libraries are loaded
-                        setTimeout(() => {
-                            this.preSelectUserLibraries(user, 'plex1');
-                        }, 2000); // Wait for libraries to load
-                    }
-                    
-                    if (tag === 'Plex 2') {
-                        console.log(`📚 Showing Plex 2 libraries...`);
-                        this.togglePlexLibrariesByTag('plex2', true);
-                        
-                        // Pre-select user's current libraries after libraries are loaded
-                        setTimeout(() => {
-                            this.preSelectUserLibraries(user, 'plex2');
-                        }, 2000); // Wait for libraries to load
-                    }
-                } else {
-                    console.warn(`⚠️ Tag checkbox not found: ${tag}`);
-                }
-            });
-        }
-        
-        console.log(`✅ Form population completed for ${user.name}`);
-    },
-    
-    // Pre-select user's current library access based on database
-    preSelectUserLibraries(user, serverGroup) {
-        console.log(`🔧 Pre-selecting libraries for ${serverGroup}:`, user.plex_libraries);
-        
-        if (!user.plex_libraries || !user.plex_libraries[serverGroup]) {
-            console.log(`ℹ️ No cached library data for ${serverGroup} - user may have no access yet`);
-            return;
-        }
-        
-        const userLibraries = user.plex_libraries[serverGroup];
-        let selectedCount = 0;
-        
-        // Select regular libraries
-        if (userLibraries.regular && Array.isArray(userLibraries.regular)) {
-            userLibraries.regular.forEach(libId => {
-                const checkbox = document.querySelector(`input[name="${serverGroup}_regular"][value="${libId}"]`);
-                if (checkbox) {
-                    checkbox.checked = true;
-                    selectedCount++;
-                    console.log(`✅ Pre-selected regular library: ${libId}`);
-                } else {
-                    console.log(`⚠️ Regular library checkbox not found: ${libId} (library may no longer exist)`);
-                }
-            });
-        }
-        
-        // Select 4K libraries
-        if (userLibraries.fourk && Array.isArray(userLibraries.fourk)) {
-            userLibraries.fourk.forEach(libId => {
-                const checkbox = document.querySelector(`input[name="${serverGroup}_fourk"][value="${libId}"]`);
-                if (checkbox) {
-                    checkbox.checked = true;
-                    selectedCount++;
-                    console.log(`✅ Pre-selected 4K library: ${libId}`);
-                } else {
-                    console.log(`⚠️ 4K library checkbox not found: ${libId} (library may no longer exist)`);
-                }
-            });
-        }
-        
-        console.log(`📊 Pre-selected ${selectedCount} libraries for ${serverGroup}`);
-    },
-    
-    togglePlexLibrariesByTag(serverGroup, isChecked) {
-        const libraryGroup = document.getElementById(`${serverGroup}LibraryGroup`);
-        
-        if (libraryGroup) {
-            if (isChecked) {
-                console.log(`📚 Showing ${serverGroup} library section`);
-                libraryGroup.style.display = 'block';
-                
-                // Load libraries for this group if not already loaded
-                if (window.Plex) {
-                    window.Plex.loadLibrariesForGroup(serverGroup);
-                }
-            } else {
-                console.log(`📚 Hiding ${serverGroup} library section`);
-                libraryGroup.style.display = 'none';
-                // Clear all selections when hiding
-                this.clearAllLibrariesForGroup(serverGroup);
-            }
-        } else {
-            console.warn(`⚠️ Library group element not found: ${serverGroup}LibraryGroup`);
-        }
-    },
-    
-    clearAllLibrariesForGroup(serverGroup) {
-        console.log(`🗑️ Clearing all library selections for ${serverGroup}`);
-        
-        // Clear all regular libraries
-        document.querySelectorAll(`input[name="${serverGroup}_regular"]`).forEach(cb => {
-            cb.checked = false;
-        });
-        
-        // Clear all 4K libraries
-        document.querySelectorAll(`input[name="${serverGroup}_fourk"]`).forEach(cb => {
-            cb.checked = false;
-        });
     },
     
     emailUser(userName, userEmail) {
@@ -448,17 +241,21 @@ window.Users = {
                 isEditing: isEditing
             });
             
-            // Step 1: Save user to database first
+            // Step 1: Save user to database
             console.log('💾 Step 1: Saving user to database...');
+            let savedUserId;
+            
             if (isEditing) {
                 await API.User.update(window.AppState.editingUserId, formData);
+                savedUserId = window.AppState.editingUserId;
                 console.log('✅ User updated in database');
             } else {
-                await API.User.create(formData);
+                const result = await API.User.create(formData);
+                savedUserId = result.userId || result.id;
                 console.log('✅ User created in database');
             }
             
-            // Step 2: Handle Plex library sharing if user has Plex email and selected libraries
+            // Step 2: Handle Plex library sharing if applicable
             if (formData.plex_email && this.hasPlexLibrariesSelected(plexLibraries)) {
                 console.log('🤝 Step 2: Processing Plex library sharing...');
                 
@@ -472,20 +269,20 @@ window.Users = {
                     if (shareResult.success) {
                         console.log('✅ Plex sharing completed successfully');
                         Utils.showNotification(
-                            `User ${isEditing ? 'updated' : 'created'} successfully! ${shareResult.message}`,
+                            `User ${isEditing ? 'updated' : 'created'} successfully! Plex libraries shared.`,
                             'success'
                         );
                     } else {
                         console.log('⚠️ Plex sharing had issues:', shareResult);
                         Utils.showNotification(
-                            `User ${isEditing ? 'updated' : 'created'}, but: ${shareResult.message}`,
+                            `User ${isEditing ? 'updated' : 'created'}, but Plex sharing needs attention: ${shareResult.message}`,
                             'warning'
                         );
                     }
                 } catch (shareError) {
                     console.error('❌ Plex sharing failed:', shareError);
                     Utils.showNotification(
-                        `User ${isEditing ? 'updated' : 'created'}, but Plex sharing had an issue: ${shareError.message}`,
+                        `User ${isEditing ? 'updated' : 'created'}, but Plex sharing failed: ${shareError.message}`,
                         'warning'
                     );
                 }
@@ -494,7 +291,7 @@ window.Users = {
                 Utils.showNotification(`User ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
             }
             
-            // Step 3: Reset form state and go back to users page
+            // Step 3: Clean up and navigate back
             console.log('🔄 Step 3: Cleaning up and navigating back...');
             this.resetFormState();
             showPage('users');
@@ -524,15 +321,14 @@ window.Users = {
         );
     },
     
-    // Enhanced Plex library sharing using the comprehensive sharing endpoint
+    // Enhanced Plex library sharing
     async shareUserPlexLibraries(userEmail, plexLibraries, isNewUser = false) {
         try {
             console.log(`🤝 Starting Plex sharing for ${userEmail}...`);
             console.log(`📋 Libraries to share:`, plexLibraries);
             console.log(`👤 Is new user: ${isNewUser}`);
             
-            // Use the comprehensive sharing endpoint
-            const shareResult = await apiCall('/plex/share-user-libraries', {
+            const shareResult = await API.call('/plex/share-user-libraries', {
                 method: 'POST',
                 body: JSON.stringify({
                     userEmail: userEmail,
@@ -542,7 +338,6 @@ window.Users = {
             });
             
             console.log('📊 Sharing result:', shareResult);
-            
             return shareResult;
             
         } catch (error) {
@@ -585,48 +380,238 @@ window.Users = {
         
         console.log('📋 Collected library selections:', plexLibraries);
         return plexLibraries;
-    },
-    
-    // Auto-calculation functions for subscriptions
-    calculateNewPlexExpiration() {
-        const subscription = document.getElementById('plexSubscription')?.value;
-        const expirationField = document.getElementById('plexExpiration');
-        
-        if (!expirationField) return;
-        
-        if (subscription === '12-month') {
-            const today = new Date();
-            const expiration = new Date(today.setFullYear(today.getFullYear() + 1));
-            expirationField.value = expiration.toISOString().split('T')[0];
-        } else if (subscription === 'free' || subscription === '') {
-            expirationField.value = '';
-        }
-    },
-    
-    calculateNewIptvExpiration() {
-        const subscription = document.getElementById('iptvSubscription')?.value;
-        const expirationField = document.getElementById('iptvExpiration');
-        
-        if (!expirationField) return;
-        
-        const selectedSub = window.AppState.subscriptionTypes?.find(sub => sub.id == subscription);
-        if (selectedSub) {
-            const today = new Date();
-            const expiration = new Date(today.setMonth(today.getMonth() + selectedSub.duration_months));
-            expirationField.value = expiration.toISOString().split('T')[0];
-        } else {
-            expirationField.value = '';
-        }
     }
 };
 
-// Make functions globally available for onclick handlers
-window.showUserForm = () => {
+// FORM STATE FIXES - Global functions
+
+// Override the global showUserForm function to fix new user pre-population
+window.showUserForm = function() {
+    console.log('🆕 Creating NEW user - clearing all state...');
+    
+    // CRITICAL: Clear editing state completely
     window.AppState.editingUserId = null;
     window.AppState.currentUserData = null;
+    
     showPage('user-form');
+    
+    // Wait for page load, then ensure completely clean form
+    setTimeout(() => {
+        console.log('🧹 Initializing clean form for new user...');
+        
+        // Reset the entire form
+        const form = document.getElementById('userFormData');
+        if (form) {
+            form.reset();
+        }
+        
+        // Explicitly clear all input fields
+        const inputFields = [
+            'userName', 'userEmail', 'userOwner', 'plexEmail',
+            'iptvUsername', 'iptvPassword', 'implayerCode', 
+            'plexSubscription', 'plexExpiration', 'iptvSubscription', 'iptvExpiration'
+        ];
+        
+        inputFields.forEach(fieldId => {
+            const element = document.getElementById(fieldId);
+            if (element) {
+                element.value = '';
+            }
+        });
+        
+        // Reset device count to default
+        const deviceCount = document.getElementById('deviceCount');
+        if (deviceCount) deviceCount.value = '1';
+        
+        // Clear ALL checkboxes
+        document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.checked = false;
+        });
+        
+        // Hide library sections
+        const plex1Group = document.getElementById('plex1LibraryGroup');
+        const plex2Group = document.getElementById('plex2LibraryGroup');
+        
+        if (plex1Group) plex1Group.style.display = 'none';
+        if (plex2Group) plex2Group.style.display = 'none';
+        
+        // Clear any library selections
+        ['plex1', 'plex2'].forEach(serverGroup => {
+            document.querySelectorAll(`input[name="${serverGroup}_regular"]`).forEach(cb => cb.checked = false);
+            document.querySelectorAll(`input[name="${serverGroup}_fourk"]`).forEach(cb => cb.checked = false);
+        });
+        
+        console.log('✅ Clean form initialized for new user');
+    }, 700);
 };
 
-window.saveUser = window.Users.saveUser.bind(window.Users);
-window.calculateNewPlexExpiration = window.Users.calculateNewPlexExpiration.bind(window.Users);
-window.calculateNewIptvExpiration = window.Users.calculateNewIptvExpiration.bind(window.Users);
+// Enhanced form population function
+function populateFormForEditing(user) {
+    console.log(`📝 Populating form with user data:`, user);
+    
+    // Fill basic fields
+    const fieldMappings = {
+        'userName': user.name,
+        'userEmail': user.email,
+        'userOwner': user.owner_id || '',
+        'plexEmail': user.plex_email || '',
+        'iptvUsername': user.iptv_username || '',
+        'iptvPassword': user.iptv_password || '',
+        'implayerCode': user.implayer_code || '',
+        'deviceCount': user.device_count || '1'
+    };
+    
+    Object.keys(fieldMappings).forEach(fieldId => {
+        const element = document.getElementById(fieldId);
+        if (element) {
+            element.value = fieldMappings[fieldId];
+            console.log(`📝 Set ${fieldId} = ${fieldMappings[fieldId]}`);
+        }
+    });
+    
+    // Handle BCC checkbox
+    const bccCheckbox = document.getElementById('bccOwnerRenewal');
+    if (bccCheckbox) {
+        bccCheckbox.checked = user.bcc_owner_renewal || false;
+    }
+    
+    // Clear all tags first, then set user's tags
+    console.log(`🏷️ Setting tags:`, user.tags);
+    document.querySelectorAll('input[name="tags"]').forEach(cb => cb.checked = false);
+    
+    if (user.tags && Array.isArray(user.tags)) {
+        user.tags.forEach(tag => {
+            const checkbox = document.querySelector(`input[name="tags"][value="${tag}"]`);
+            if (checkbox) {
+                checkbox.checked = true;
+                console.log(`✅ Checked tag: ${tag}`);
+                
+                // Show library sections for Plex tags and pre-select libraries
+                if (tag === 'Plex 1') {
+                    showPlexLibrariesAndPreSelect('plex1', user);
+                }
+                if (tag === 'Plex 2') {
+                    showPlexLibrariesAndPreSelect('plex2', user);
+                }
+            }
+        });
+    }
+    
+    console.log(`✅ Form population completed for ${user.name}`);
+}
+
+// Show Plex libraries and pre-select user's current access
+function showPlexLibrariesAndPreSelect(serverGroup, user) {
+    console.log(`📚 Showing ${serverGroup} libraries for editing...`);
+    
+    const libraryGroup = document.getElementById(`${serverGroup}LibraryGroup`);
+    if (libraryGroup) {
+        libraryGroup.style.display = 'block';
+        
+        // Load libraries first, then pre-select
+        if (window.Plex) {
+            window.Plex.loadLibrariesForGroup(serverGroup).then(() => {
+                // Wait a bit for rendering, then pre-select
+                setTimeout(() => {
+                    preSelectUserLibraries(serverGroup, user);
+                }, 800);
+            }).catch(error => {
+                console.error(`Error loading libraries for ${serverGroup}:`, error);
+            });
+        }
+        
+        // Test connection
+        if (window.testPlexConnection) {
+            window.testPlexConnection(serverGroup);
+        }
+    }
+}
+
+// Pre-select user's current library access
+function preSelectUserLibraries(serverGroup, user) {
+    console.log(`🔧 Pre-selecting libraries for ${serverGroup}:`, user.plex_libraries);
+    
+    if (!user.plex_libraries || !user.plex_libraries[serverGroup]) {
+        console.log(`ℹ️ No library data for ${serverGroup}`);
+        return;
+    }
+    
+    const userLibraries = user.plex_libraries[serverGroup];
+    let selectedCount = 0;
+    
+    // Pre-select regular libraries
+    if (userLibraries.regular && Array.isArray(userLibraries.regular)) {
+        userLibraries.regular.forEach(libId => {
+            const checkbox = document.querySelector(`input[name="${serverGroup}_regular"][value="${libId}"]`);
+            if (checkbox) {
+                checkbox.checked = true;
+                selectedCount++;
+                console.log(`✅ Pre-selected regular library: ${libId}`);
+            } else {
+                console.log(`⚠️ Regular library checkbox not found: ${libId}`);
+            }
+        });
+    }
+    
+    // Pre-select 4K libraries
+    if (userLibraries.fourk && Array.isArray(userLibraries.fourk)) {
+        userLibraries.fourk.forEach(libId => {
+            const checkbox = document.querySelector(`input[name="${serverGroup}_fourk"][value="${libId}"]`);
+            if (checkbox) {
+                checkbox.checked = true;
+                selectedCount++;
+                console.log(`✅ Pre-selected 4K library: ${libId}`);
+            } else {
+                console.log(`⚠️ 4K library checkbox not found: ${libId}`);
+            }
+        });
+    }
+    
+    console.log(`📊 Pre-selected ${selectedCount} libraries for ${serverGroup}`);
+}
+
+// Fix the togglePlexLibrariesByTag function
+window.togglePlexLibrariesByTag = function(serverGroup, isChecked) {
+    console.log(`🏷️ Tag ${serverGroup} changed to: ${isChecked}`);
+    
+    const libraryGroup = document.getElementById(`${serverGroup}LibraryGroup`);
+    
+    if (!libraryGroup) {
+        console.error(`❌ Library group not found: ${serverGroup}LibraryGroup`);
+        return;
+    }
+    
+    if (isChecked) {
+        libraryGroup.style.display = 'block';
+        
+        // Load libraries if not already loaded
+        if (window.Plex) {
+            window.Plex.loadLibrariesForGroup(serverGroup).then(() => {
+                // If we're editing a user, pre-select their libraries
+                if (window.AppState.editingUserId && window.AppState.currentUserData) {
+                    setTimeout(() => {
+                        preSelectUserLibraries(serverGroup, window.AppState.currentUserData);
+                    }, 500);
+                }
+            });
+        }
+        
+        // Test connection
+        if (window.testPlexConnection) {
+            window.testPlexConnection(serverGroup);
+        }
+    } else {
+        libraryGroup.style.display = 'none';
+        
+        // Clear all selections for this group
+        document.querySelectorAll(`input[name="${serverGroup}_regular"]`).forEach(cb => cb.checked = false);
+        document.querySelectorAll(`input[name="${serverGroup}_fourk"]`).forEach(cb => cb.checked = false);
+    }
+};
+
+// Global saveUser function
+window.saveUser = function(event) {
+    return window.Users.saveUser(event);
+};
+
+console.log('🔧 Complete Users.js loaded with form state fixes');
