@@ -138,7 +138,7 @@ class PlexService {
   // Get user's shared libraries using Plex.tv API (like your Python code)
   async getUserSharedLibraries(userEmail, serverConfig) {
     try {
-      console.log(`?? Checking shared libraries for ${userEmail} on ${serverConfig.name} (Server ID: ${serverConfig.serverId})`);
+      console.log(`🔍 Checking shared libraries for ${userEmail} on ${serverConfig.name} (Server ID: ${serverConfig.serverId})`);
       
       const xmlData = await this.makePlexTvRequest(serverConfig.serverId, serverConfig.token, '/shared_servers');
       const result = await this.parser.parseStringPromise(xmlData);
@@ -178,7 +178,7 @@ class PlexService {
           type: section.$.type
         }));
       
-      console.log(`? User ${userEmail} has access to ${sharedLibraries.length} libraries on ${serverConfig.name}:`, 
+      console.log(`📚 User ${userEmail} has access to ${sharedLibraries.length} libraries on ${serverConfig.name}:`, 
         sharedLibraries.map(l => l.title));
       
       return sharedLibraries;
@@ -191,13 +191,13 @@ class PlexService {
   // Get user's current access across all servers
   async getUserCurrentAccess(userEmail) {
     try {
-      console.log(`?? Getting current access for user: ${userEmail}`);
+      console.log(`🔍 Getting current access for user: ${userEmail}`);
       
       const serverConfigs = this.getServerConfig();
       const access = {};
       
       for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
-        console.log(`?? Checking ${groupName} access for ${userEmail}...`);
+        console.log(`🔍 Checking ${groupName} access for ${userEmail}...`);
         
         // Get access for regular server
         const regularAccess = await this.getUserSharedLibraries(userEmail, groupConfig.regular);
@@ -221,7 +221,7 @@ class PlexService {
           fourk: fourkAccess
         };
         
-        console.log(`?? ${groupName} access for ${userEmail}:`, access[groupName]);
+        console.log(`📊 ${groupName} access for ${userEmail}:`, access[groupName]);
       }
       
       return access;
@@ -234,7 +234,7 @@ class PlexService {
   // Sync user library access with current Plex state
   async syncUserLibraryAccess() {
     try {
-      console.log('?? Syncing user library access with Plex servers...');
+      console.log('🔄 Syncing user library access with Plex servers...');
       
       // Get all users with Plex emails
       const users = await db.query(`
@@ -245,28 +245,54 @@ class PlexService {
       
       console.log(`Found ${users.length} users with Plex emails to sync`);
       
+      let successfulSyncs = 0;
+      let failedSyncs = 0;
+      
       for (const user of users) {
         try {
-          console.log(`\n?? Syncing access for user: ${user.name} (${user.plex_email})`);
+          console.log(`\n👤 Syncing access for user: ${user.name} (${user.plex_email})`);
           
           // Parse user tags to determine which servers they should have access to
           let userTags = [];
           try {
             if (user.tags) {
               // Handle both JSON array format and comma-separated string format
-              if (user.tags.startsWith('[')) {
-                userTags = JSON.parse(user.tags);
-              } else {
-                // Handle comma-separated string format
-                userTags = user.tags.split(',').map(tag => tag.trim());
+              if (typeof user.tags === 'string') {
+                if (user.tags.startsWith('[')) {
+                  // JSON array format: ["Plex 1", "Plex 2", "IPTV"]
+                  userTags = JSON.parse(user.tags);
+                } else if (user.tags.includes(',')) {
+                  // Comma-separated string format: "Plex 1,Plex 2,IPTV"
+                  userTags = user.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+                } else if (user.tags.trim().length > 0) {
+                  // Single tag: "Plex 1"
+                  userTags = [user.tags.trim()];
+                }
+              } else if (Array.isArray(user.tags)) {
+                // Already an array
+                userTags = user.tags;
               }
             }
           } catch (e) {
-            console.log(`??  Could not parse tags for ${user.name}: "${user.tags}", skipping`);
+            console.log(`⚠️  Could not parse tags for ${user.name}: "${user.tags}", error: ${e.message}`);
+            console.log(`📝 Attempting to continue with raw tag processing...`);
+            
+            // Fallback: try to extract tags anyway
+            if (user.tags && typeof user.tags === 'string') {
+              userTags = user.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+            }
+          }
+          
+          console.log(`🏷️ User ${user.name} has tags:`, userTags);
+          
+          // Only sync users who have Plex tags
+          const plexTags = userTags.filter(tag => tag.toLowerCase().includes('plex'));
+          if (plexTags.length === 0) {
+            console.log(`⏭️  User ${user.name} has no Plex tags, skipping Plex sync`);
             continue;
           }
           
-          console.log(`?? User ${user.name} has tags:`, userTags);
+          console.log(`🎯 User ${user.name} has Plex tags:`, plexTags);
           
           // Get current access from Plex
           const currentAccess = await this.getUserCurrentAccess(user.plex_email);
@@ -278,58 +304,70 @@ class PlexService {
             WHERE id = ?
           `, [JSON.stringify(currentAccess), user.id]);
           
-          console.log(`? Updated cached library access for ${user.name}`);
+          console.log(`✅ Updated cached library access for ${user.name}`);
           
           // Log summary
           const totalLibraries = Object.values(currentAccess).reduce((total, group) => {
             return total + (group.regular?.length || 0) + (group.fourk?.length || 0);
           }, 0);
           
-          console.log(`?? ${user.name} has access to ${totalLibraries} total libraries across ${Object.keys(currentAccess).length} server groups`);
+          console.log(`📊 ${user.name} has access to ${totalLibraries} total libraries across ${Object.keys(currentAccess).length} server groups`);
+          
+          // Detailed breakdown
+          for (const [groupName, groupAccess] of Object.entries(currentAccess)) {
+            console.log(`  📁 ${groupName}: ${groupAccess.regular?.length || 0} regular + ${groupAccess.fourk?.length || 0} 4K libraries`);
+          }
+          
+          successfulSyncs++;
           
         } catch (userError) {
-          console.error(`? Error syncing access for user ${user.name}:`, userError.message);
+          console.error(`❌ Error syncing access for user ${user.name}:`, userError.message);
+          failedSyncs++;
         }
       }
       
-      console.log('\n? User library access sync completed successfully!');
+      console.log(`\n📈 User library access sync completed!`);
+      console.log(`✅ Successful syncs: ${successfulSyncs}`);
+      console.log(`❌ Failed syncs: ${failedSyncs}`);
+      console.log(`📊 Total users processed: ${users.length}`);
+      
     } catch (error) {
-      console.error('? Error syncing user library access:', error);
+      console.error('❌ Error syncing user library access:', error);
     }
   }
 
   // Sync all libraries and store in database
   async syncAllLibraries() {
     try {
-      console.log('?? Syncing Plex libraries using Plex.tv API...');
+      console.log('🔄 Syncing Plex libraries using Plex.tv API...');
       
       const serverConfigs = this.getServerConfig();
       
       for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
-        console.log(`?? Syncing group: ${groupName}`);
+        console.log(`📁 Syncing group: ${groupName}`);
         
         // Sync regular server libraries
         const regularLibs = await this.getServerLibraries(groupConfig.regular);
         await this.updateLibrariesInDatabase(groupName, 'regular', regularLibs);
-        console.log(`? Synced ${regularLibs.length} regular libraries for ${groupName}`);
+        console.log(`✅ Synced ${regularLibs.length} regular libraries for ${groupName}`);
         
         // Use hardcoded 4K libraries
         const fourkLibs = groupConfig.fourk.libraries || [];
         await this.updateLibrariesInDatabase(groupName, 'fourk', fourkLibs);
-        console.log(`? Using ${fourkLibs.length} hardcoded 4K libraries for ${groupName}`);
+        console.log(`✅ Using ${fourkLibs.length} hardcoded 4K libraries for ${groupName}`);
       }
       
       // Sync user access to match current state
-      console.log('\n?? Now syncing user library access...');
+      console.log('\n👥 Now syncing user library access...');
       await this.syncUserLibraryAccess();
       
       // Update the last sync timestamp
       await this.updateSyncTimestamp();
       
-      console.log('\n? Complete Plex sync finished successfully!');
+      console.log('\n🎉 Complete Plex sync finished successfully!');
       return { success: true, timestamp: new Date().toISOString() };
     } catch (error) {
-      console.error('? Error syncing libraries:', error);
+      console.error('❌ Error syncing libraries:', error);
       return { success: false, error: error.message };
     }
   }
@@ -407,15 +445,15 @@ class PlexService {
 
       // Test regular server via Plex.tv API
       await this.makePlexTvRequest(config.regular.serverId, config.regular.token, '');
-      console.log(`? Regular server connection successful: ${config.regular.name}`);
+      console.log(`✅ Regular server connection successful: ${config.regular.name}`);
 
       // Test 4K server via Plex.tv API
       await this.makePlexTvRequest(config.fourk.serverId, config.fourk.token, '');
-      console.log(`? 4K server connection successful: ${config.fourk.name}`);
+      console.log(`✅ 4K server connection successful: ${config.fourk.name}`);
 
       return { success: true, message: `Connection successful for ${serverGroup}` };
     } catch (error) {
-      console.error(`? Connection test failed for ${serverGroup}:`, error.message);
+      console.error(`❌ Connection test failed for ${serverGroup}:`, error.message);
       return { success: false, error: error.message };
     }
   }
@@ -429,9 +467,9 @@ class PlexService {
         VALUES ('last_plex_sync', ?, 'string')
         ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = NOW()
       `, [now, now]);
-      console.log('? Updated last sync timestamp:', now);
+      console.log('🕐 Updated last sync timestamp:', now);
     } catch (error) {
-      console.error('? Error updating sync timestamp:', error);
+      console.error('❌ Error updating sync timestamp:', error);
     }
   }
 
