@@ -135,16 +135,16 @@ class PlexService {
     }
   }
 
-  // Get user's shared libraries using Plex.tv API (like your Python code)
-  async getUserSharedLibraries(userEmail, serverConfig) {
+  // Get ALL shared users from a server (regardless of our database)
+  async getAllSharedUsersFromServer(serverConfig) {
     try {
-      console.log(`🔍 Checking shared libraries for ${userEmail} on ${serverConfig.name} (Server ID: ${serverConfig.serverId})`);
+      console.log(`🔍 Getting ALL shared users from ${serverConfig.name} (Server ID: ${serverConfig.serverId})`);
       
       const xmlData = await this.makePlexTvRequest(serverConfig.serverId, serverConfig.token, '/shared_servers');
       const result = await this.parser.parseStringPromise(xmlData);
       
       if (!result.MediaContainer || !result.MediaContainer.SharedServer) {
-        console.log(`No shared servers found for ${serverConfig.name}`);
+        console.log(`No shared users found on ${serverConfig.name}`);
         return [];
       }
 
@@ -152,43 +152,52 @@ class PlexService {
         ? result.MediaContainer.SharedServer
         : [result.MediaContainer.SharedServer];
 
-      // Find the shared server for this user by email
-      const userSharedServer = sharedServers.find(server => server.$.email === userEmail);
-      
-      if (!userSharedServer) {
-        console.log(`No shared libraries found for ${userEmail} on ${serverConfig.name}`);
-        return [];
+      const allSharedUsers = [];
+
+      for (const sharedServer of sharedServers) {
+        const userEmail = sharedServer.$.email;
+        const username = sharedServer.$.username;
+        
+        console.log(`👤 Found shared user: ${username} (${userEmail}) on ${serverConfig.name}`);
+
+        // Get their library access
+        const sharedLibraries = [];
+        if (sharedServer.Section) {
+          const sections = Array.isArray(sharedServer.Section) 
+            ? sharedServer.Section 
+            : [sharedServer.Section];
+
+          // Only get sections that are shared
+          const userSharedLibraries = sections
+            .filter(section => section.$.shared === '1')
+            .map(section => ({
+              id: section.$.id,
+              title: section.$.title,
+              type: section.$.type
+            }));
+          
+          sharedLibraries.push(...userSharedLibraries);
+        }
+
+        allSharedUsers.push({
+          email: userEmail,
+          username: username,
+          libraries: sharedLibraries
+        });
+
+        console.log(`📚 User ${username} has access to ${sharedLibraries.length} libraries: ${sharedLibraries.map(l => l.title).join(', ')}`);
       }
-
-      if (!userSharedServer.Section) {
-        console.log(`User ${userEmail} has no sections on ${serverConfig.name}`);
-        return [];
-      }
-
-      const sections = Array.isArray(userSharedServer.Section) 
-        ? userSharedServer.Section 
-        : [userSharedServer.Section];
-
-      // Only get sections that are shared
-      const sharedLibraries = sections
-        .filter(section => section.$.shared === '1')
-        .map(section => ({
-          id: section.$.id,
-          title: section.$.title,
-          type: section.$.type
-        }));
       
-      console.log(`📚 User ${userEmail} has access to ${sharedLibraries.length} libraries on ${serverConfig.name}:`, 
-        sharedLibraries.map(l => l.title));
+      console.log(`📊 Total shared users on ${serverConfig.name}: ${allSharedUsers.length}`);
+      return allSharedUsers;
       
-      return sharedLibraries;
     } catch (error) {
-      console.error(`Failed to get shared libraries for ${userEmail} on ${serverConfig.name}:`, error.message);
+      console.error(`Failed to get shared users from ${serverConfig.name}:`, error.message);
       return [];
     }
   }
 
-  // Get user's current access across all servers
+  // New method: Get user's current access across all servers by checking each server
   async getUserCurrentAccess(userEmail) {
     try {
       console.log(`🔍 Getting current access for user: ${userEmail}`);
@@ -199,26 +208,28 @@ class PlexService {
       for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
         console.log(`🔍 Checking ${groupName} access for ${userEmail}...`);
         
-        // Get access for regular server
-        const regularAccess = await this.getUserSharedLibraries(userEmail, groupConfig.regular);
+        // Get ALL shared users from regular server and find our user
+        const regularSharedUsers = await this.getAllSharedUsersFromServer(groupConfig.regular);
+        const regularUserAccess = regularSharedUsers.find(user => user.email.toLowerCase() === userEmail.toLowerCase());
+        const regularLibraryIds = regularUserAccess ? regularUserAccess.libraries.map(lib => lib.id) : [];
         
-        // Get access for 4K server (if it has real libraries)
-        let fourkAccess = [];
-        if (groupConfig.fourk.libraries) {
-          // For hardcoded 4K libraries, check if user has any access to that server
-          try {
-            const fourkSharedLibraries = await this.getUserSharedLibraries(userEmail, groupConfig.fourk);
-            // If user has any access to 4K server, give them the hardcoded libraries
-            fourkAccess = fourkSharedLibraries.length > 0 ? groupConfig.fourk.libraries.map(lib => lib.id) : [];
-          } catch (error) {
-            console.log(`No 4K access found for ${userEmail} on ${groupName}`);
-            fourkAccess = [];
+        // Get ALL shared users from 4K server and find our user
+        let fourkLibraryIds = [];
+        try {
+          const fourkSharedUsers = await this.getAllSharedUsersFromServer(groupConfig.fourk);
+          const fourkUserAccess = fourkSharedUsers.find(user => user.email.toLowerCase() === userEmail.toLowerCase());
+          
+          // If user has any access to 4K server, give them the hardcoded libraries
+          if (fourkUserAccess && fourkUserAccess.libraries.length > 0) {
+            fourkLibraryIds = groupConfig.fourk.libraries.map(lib => lib.id);
           }
+        } catch (error) {
+          console.log(`No 4K access found for ${userEmail} on ${groupName}: ${error.message}`);
         }
         
         access[groupName] = {
-          regular: regularAccess.map(lib => lib.id),
-          fourk: fourkAccess
+          regular: regularLibraryIds,
+          fourk: fourkLibraryIds
         };
         
         console.log(`📊 ${groupName} access for ${userEmail}:`, access[groupName]);
@@ -231,108 +242,196 @@ class PlexService {
     }
   }
 
-  // Sync user library access with current Plex state
+  // COMPLETELY REWRITTEN: Sync user library access by checking ALL servers
   async syncUserLibraryAccess() {
     try {
       console.log('🔄 Syncing user library access with Plex servers...');
+      console.log('📝 Strategy: Check ALL Plex servers for shared users, then match to our database users');
       
-      // Get all users with Plex emails
-      const users = await db.query(`
+      const serverConfigs = this.getServerConfig();
+      
+      // Step 1: Get ALL shared users from ALL servers
+      console.log('\n📡 Step 1: Getting all shared users from all Plex servers...');
+      const allPlexUsers = new Map(); // email -> { serverAccess: {}, plexUsername: string }
+      
+      for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
+        console.log(`\n🔍 Checking server group: ${groupName}`);
+        
+        // Get shared users from regular server
+        console.log(`📡 Getting shared users from ${groupConfig.regular.name}...`);
+        const regularUsers = await this.getAllSharedUsersFromServer(groupConfig.regular);
+        
+        // Get shared users from 4K server
+        console.log(`📡 Getting shared users from ${groupConfig.fourk.name}...`);
+        let fourkUsers = [];
+        try {
+          fourkUsers = await this.getAllSharedUsersFromServer(groupConfig.fourk);
+        } catch (error) {
+          console.log(`⚠️ Could not get 4K users for ${groupName}: ${error.message}`);
+        }
+        
+        // Process regular server users
+        for (const user of regularUsers) {
+          const email = user.email.toLowerCase();
+          if (!allPlexUsers.has(email)) {
+            allPlexUsers.set(email, { 
+              plexUsername: user.username,
+              serverAccess: {} 
+            });
+          }
+          
+          allPlexUsers.get(email).serverAccess[groupName] = {
+            regular: user.libraries.map(lib => lib.id),
+            fourk: [] // Will be set below if they have 4K access
+          };
+        }
+        
+        // Process 4K server users
+        for (const user of fourkUsers) {
+          const email = user.email.toLowerCase();
+          if (allPlexUsers.has(email)) {
+            // User has 4K access, give them hardcoded 4K libraries
+            if (user.libraries.length > 0) {
+              allPlexUsers.get(email).serverAccess[groupName].fourk = groupConfig.fourk.libraries.map(lib => lib.id);
+            }
+          } else {
+            // User only has 4K access, no regular access
+            allPlexUsers.set(email, {
+              plexUsername: user.username,
+              serverAccess: {
+                [groupName]: {
+                  regular: [],
+                  fourk: groupConfig.fourk.libraries.map(lib => lib.id)
+                }
+              }
+            });
+          }
+        }
+      }
+      
+      console.log(`\n📊 Found ${allPlexUsers.size} total unique users across all Plex servers:`);
+      for (const [email, userData] of allPlexUsers.entries()) {
+        console.log(`👤 ${userData.plexUsername} (${email}) - Access to ${Object.keys(userData.serverAccess).length} server groups`);
+      }
+      
+      // Step 2: Get ALL users from our database (check both email and plex_email fields)
+      console.log('\n📊 Step 2: Getting all users from database...');
+      const dbUsers = await db.query(`
         SELECT id, name, email, plex_email, tags, plex_libraries
-        FROM users 
-        WHERE plex_email IS NOT NULL AND plex_email != ''
+        FROM users
       `);
       
-      console.log(`Found ${users.length} users with Plex emails to sync`);
+      console.log(`📋 Found ${dbUsers.length} total users in database`);
       
-      let successfulSyncs = 0;
-      let failedSyncs = 0;
+      // Step 3: Match database users to Plex users using BOTH email fields
+      console.log('\n🔄 Step 3: Matching database users to Plex access using both email and plex_email fields...');
       
-      for (const user of users) {
-        try {
-          console.log(`\n👤 Syncing access for user: ${user.name} (${user.plex_email})`);
-          
-          // Parse user tags to determine which servers they should have access to
-          let userTags = [];
-          try {
-            if (user.tags) {
-              // Handle both JSON array format and comma-separated string format
-              if (typeof user.tags === 'string') {
-                if (user.tags.startsWith('[')) {
-                  // JSON array format: ["Plex 1", "Plex 2", "IPTV"]
-                  userTags = JSON.parse(user.tags);
-                } else if (user.tags.includes(',')) {
-                  // Comma-separated string format: "Plex 1,Plex 2,IPTV"
-                  userTags = user.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
-                } else if (user.tags.trim().length > 0) {
-                  // Single tag: "Plex 1"
-                  userTags = [user.tags.trim()];
-                }
-              } else if (Array.isArray(user.tags)) {
-                // Already an array
-                userTags = user.tags;
-              }
-            }
-          } catch (e) {
-            console.log(`⚠️  Could not parse tags for ${user.name}: "${user.tags}", error: ${e.message}`);
-            console.log(`📝 Attempting to continue with raw tag processing...`);
-            
-            // Fallback: try to extract tags anyway
-            if (user.tags && typeof user.tags === 'string') {
-              userTags = user.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
-            }
+      let updatedUsers = 0;
+      let usersWithAccess = 0;
+      let usersWithoutAccess = 0;
+      
+      for (const dbUser of dbUsers) {
+        console.log(`\n👤 Processing database user: ${dbUser.name}`);
+        
+        // Check both email fields for matching
+        const emailsToCheck = [];
+        if (dbUser.email) emailsToCheck.push(dbUser.email.toLowerCase());
+        if (dbUser.plex_email && dbUser.plex_email !== dbUser.email) {
+          emailsToCheck.push(dbUser.plex_email.toLowerCase());
+        }
+        
+        console.log(`📧 Checking emails: ${emailsToCheck.join(', ')}`);
+        
+        // Try to find user in Plex using either email
+        let plexUserData = null;
+        let matchedEmail = null;
+        
+        for (const emailToCheck of emailsToCheck) {
+          if (allPlexUsers.has(emailToCheck)) {
+            plexUserData = allPlexUsers.get(emailToCheck);
+            matchedEmail = emailToCheck;
+            break;
           }
+        }
+        
+        if (plexUserData) {
+          // User found in Plex servers
+          console.log(`✅ Found in Plex as: ${plexUserData.plexUsername} (matched email: ${matchedEmail})`);
+          console.log(`📚 Server access:`, plexUserData.serverAccess);
           
-          console.log(`🏷️ User ${user.name} has tags:`, userTags);
-          
-          // Only sync users who have Plex tags
-          const plexTags = userTags.filter(tag => tag.toLowerCase().includes('plex'));
-          if (plexTags.length === 0) {
-            console.log(`⏭️  User ${user.name} has no Plex tags, skipping Plex sync`);
-            continue;
-          }
-          
-          console.log(`🎯 User ${user.name} has Plex tags:`, plexTags);
-          
-          // Get current access from Plex
-          const currentAccess = await this.getUserCurrentAccess(user.plex_email);
-          
-          // Update user's plex_libraries in database with their current access
+          // Update their library access in database
           await db.query(`
             UPDATE users 
             SET plex_libraries = ?
             WHERE id = ?
-          `, [JSON.stringify(currentAccess), user.id]);
+          `, [JSON.stringify(plexUserData.serverAccess), dbUser.id]);
           
-          console.log(`✅ Updated cached library access for ${user.name}`);
-          
-          // Log summary
-          const totalLibraries = Object.values(currentAccess).reduce((total, group) => {
+          // Count total libraries
+          const totalLibraries = Object.values(plexUserData.serverAccess).reduce((total, group) => {
             return total + (group.regular?.length || 0) + (group.fourk?.length || 0);
           }, 0);
           
-          console.log(`📊 ${user.name} has access to ${totalLibraries} total libraries across ${Object.keys(currentAccess).length} server groups`);
+          console.log(`📊 Updated access: ${totalLibraries} total libraries across ${Object.keys(plexUserData.serverAccess).length} server groups`);
           
           // Detailed breakdown
-          for (const [groupName, groupAccess] of Object.entries(currentAccess)) {
+          for (const [groupName, groupAccess] of Object.entries(plexUserData.serverAccess)) {
             console.log(`  📁 ${groupName}: ${groupAccess.regular?.length || 0} regular + ${groupAccess.fourk?.length || 0} 4K libraries`);
           }
           
-          successfulSyncs++;
+          usersWithAccess++;
+        } else {
+          // User not found in any Plex server
+          console.log(`❌ No access found in any Plex server for any email`);
           
-        } catch (userError) {
-          console.error(`❌ Error syncing access for user ${user.name}:`, userError.message);
-          failedSyncs++;
+          // Clear their library access
+          await db.query(`
+            UPDATE users 
+            SET plex_libraries = ?
+            WHERE id = ?
+          `, ['{}', dbUser.id]);
+          
+          usersWithoutAccess++;
+        }
+        
+        updatedUsers++;
+      }
+      
+      // Step 4: Report on Plex users not in our database
+      console.log('\n📋 Step 4: Checking for Plex users not in our database...');
+      const dbEmails = new Set();
+      for (const dbUser of dbUsers) {
+        if (dbUser.email) dbEmails.add(dbUser.email.toLowerCase());
+        if (dbUser.plex_email) dbEmails.add(dbUser.plex_email.toLowerCase());
+      }
+      
+      const plexOnlyUsers = [];
+      
+      for (const [email, userData] of allPlexUsers.entries()) {
+        if (!dbEmails.has(email)) {
+          plexOnlyUsers.push({ email, username: userData.plexUsername });
         }
       }
       
+      if (plexOnlyUsers.length > 0) {
+        console.log(`⚠️ Found ${plexOnlyUsers.length} users in Plex who are NOT in our database:`);
+        for (const user of plexOnlyUsers) {
+          console.log(`  👤 ${user.username} (${user.email})`);
+        }
+      } else {
+        console.log(`✅ All Plex users are accounted for in our database`);
+      }
+      
+      // Final summary
       console.log(`\n📈 User library access sync completed!`);
-      console.log(`✅ Successful syncs: ${successfulSyncs}`);
-      console.log(`❌ Failed syncs: ${failedSyncs}`);
-      console.log(`📊 Total users processed: ${users.length}`);
+      console.log(`✅ Database users updated: ${updatedUsers}`);
+      console.log(`📚 Users with Plex access: ${usersWithAccess}`);
+      console.log(`❌ Users without Plex access: ${usersWithoutAccess}`);
+      console.log(`⚠️ Plex users not in database: ${plexOnlyUsers.length}`);
+      console.log(`📊 Total unique Plex users found: ${allPlexUsers.size}`);
       
     } catch (error) {
       console.error('❌ Error syncing user library access:', error);
+      throw error;
     }
   }
 
@@ -357,8 +456,8 @@ class PlexService {
         console.log(`✅ Using ${fourkLibs.length} hardcoded 4K libraries for ${groupName}`);
       }
       
-      // Sync user access to match current state
-      console.log('\n👥 Now syncing user library access...');
+      // Sync user access to match current state (IMPROVED METHOD)
+      console.log('\n👥 Now syncing user library access using improved method...');
       await this.syncUserLibraryAccess();
       
       // Update the last sync timestamp
