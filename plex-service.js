@@ -359,12 +359,57 @@ class PlexService {
           console.log(`✅ Found in Plex as: ${plexUserData.plexUsername} (matched email: ${matchedEmail})`);
           console.log(`📚 Server access:`, plexUserData.serverAccess);
           
-          // Update their library access in database
+          // Determine tags based on actual server access
+          const newTags = [];
+          
+          // Parse existing tags to preserve non-Plex tags (like IPTV)
+          let existingTags = [];
+          try {
+            if (dbUser.tags) {
+              if (typeof dbUser.tags === 'string') {
+                if (dbUser.tags.startsWith('[')) {
+                  existingTags = JSON.parse(dbUser.tags);
+                } else {
+                  existingTags = dbUser.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+                }
+              } else if (Array.isArray(dbUser.tags)) {
+                existingTags = dbUser.tags;
+              }
+            }
+          } catch (e) {
+            console.log(`⚠️ Could not parse existing tags for ${dbUser.name}: "${dbUser.tags}"`);
+            existingTags = [];
+          }
+          
+          // Preserve non-Plex tags (anything that doesn't contain "Plex")
+          const nonPlexTags = existingTags.filter(tag => !tag.toLowerCase().includes('plex'));
+          newTags.push(...nonPlexTags);
+          
+          // Add Plex tags based on actual access
+          for (const [serverGroup, access] of Object.entries(plexUserData.serverAccess)) {
+            const hasRegularAccess = access.regular && access.regular.length > 0;
+            const hasFourkAccess = access.fourk && access.fourk.length > 0;
+            
+            if (hasRegularAccess || hasFourkAccess) {
+              if (serverGroup === 'plex1') {
+                newTags.push('Plex 1');
+              } else if (serverGroup === 'plex2') {
+                newTags.push('Plex 2');
+              }
+            }
+          }
+          
+          // Remove duplicates
+          const uniqueTags = [...new Set(newTags)];
+          
+          console.log(`🏷️ Updating tags from [${existingTags.join(', ')}] to [${uniqueTags.join(', ')}]`);
+          
+          // Update their library access AND tags in database
           await db.query(`
             UPDATE users 
-            SET plex_libraries = ?
+            SET plex_libraries = ?, tags = ?
             WHERE id = ?
-          `, [JSON.stringify(plexUserData.serverAccess), dbUser.id]);
+          `, [JSON.stringify(plexUserData.serverAccess), JSON.stringify(uniqueTags), dbUser.id]);
           
           // Count total libraries
           const totalLibraries = Object.values(plexUserData.serverAccess).reduce((total, group) => {
