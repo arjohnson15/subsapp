@@ -7,10 +7,11 @@ const config = {
   database: process.env.DB_NAME || 'johnsonflix_db',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0,
-  acquireTimeout: 60000,
-  timeout: 60000,
-  reconnect: true
+  queueLimit: 0
+  // Removed invalid options that cause MySQL2 warnings:
+  // acquireTimeout: 60000,  // NOT VALID for mysql2
+  // timeout: 60000,         // NOT VALID for mysql2  
+  // reconnect: true         // NOT VALID for mysql2
 };
 
 const pool = mysql.createPool(config);

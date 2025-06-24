@@ -37,7 +37,7 @@ class PlexService {
           serverId: '90244d9a956da3afad32f85d6b24a9c24649d681',
           token: 'sxuautpKvoH2aZKG-j95',
           url: 'http://192.168.10.92:32400',
-          // Hardcoded 4K libraries
+          // Hardcoded 4K libraries since they never change
           libraries: [{ id: '1', title: '4K Movies', type: 'movie' }]
         }
       },
@@ -53,7 +53,7 @@ class PlexService {
           serverId: 'c6448117a95874f18274f31495ff5118fd291089',
           token: 'B1QhFRA-Q2pSm15uxmMA',
           url: 'http://192.168.10.92:32700',
-          // Hardcoded 4K libraries
+          // Hardcoded 4K libraries since they never change
           libraries: [{ id: '1', title: '4K Movies', type: 'movie' }]
         }
       }
@@ -226,7 +226,7 @@ class PlexService {
     }
   }
 
-  // Enhanced sharing method that handles incremental updates
+  // Enhanced sharing method with proper library management
   async shareLibrariesWithUserEnhanced(userEmail, serverGroup, newLibraries) {
     try {
       console.log(`🔄 Enhanced library sharing for ${userEmail} on ${serverGroup}`);
@@ -238,47 +238,55 @@ class PlexService {
       
       console.log(`📊 Current access:`, currentGroupAccess);
       
-      // Step 2: Determine what needs to be shared (only new libraries)
-      const librariesToShare = {
-        regular: newLibraries.regular ? newLibraries.regular.filter(libId => 
-          !currentGroupAccess.regular.includes(libId)
-        ) : [],
-        fourk: newLibraries.fourk ? newLibraries.fourk.filter(libId => 
-          !currentGroupAccess.fourk.includes(libId)
-        ) : []
+      // Step 2: Determine what needs to be added and what needs to be removed
+      const requestedRegular = newLibraries.regular || [];
+      const requestedFourk = newLibraries.fourk || [];
+      
+      const librariesToAdd = {
+        regular: requestedRegular.filter(libId => !currentGroupAccess.regular.includes(libId)),
+        fourk: requestedFourk.filter(libId => !currentGroupAccess.fourk.includes(libId))
       };
       
-      console.log(`📋 Libraries to share (new only):`, librariesToShare);
+      const librariesToRemove = {
+        regular: currentGroupAccess.regular.filter(libId => !requestedRegular.includes(libId)),
+        fourk: currentGroupAccess.fourk.filter(libId => !requestedFourk.includes(libId))
+      };
       
-      // Step 3: Share only the new libraries if any
-      if (librariesToShare.regular.length > 0 || librariesToShare.fourk.length > 0) {
-        console.log(`🤝 Sharing new libraries with ${userEmail}...`);
+      console.log(`📋 Libraries to ADD:`, librariesToAdd);
+      console.log(`📋 Libraries to REMOVE:`, librariesToRemove);
+      
+      // Step 3: For now, we'll update the database and return a success message
+      // TODO: Implement actual Plex.tv API calls for sharing/removing libraries
+      // This would require implementing the equivalent of your Python inviteFriend and removeFriend calls
+      
+      const hasChanges = (librariesToAdd.regular.length > 0 || librariesToAdd.fourk.length > 0 ||
+                         librariesToRemove.regular.length > 0 || librariesToRemove.fourk.length > 0);
+      
+      if (hasChanges) {
+        console.log(`🤝 Would make changes to ${userEmail}'s library access...`);
         
-        // For now, return a placeholder response since we don't have the actual sharing API implemented
-        // TODO: Implement actual Plex.tv sharing API calls here
-        
-        console.log(`✅ Would share libraries:`, librariesToShare);
-        
-        // Step 4: Update user's library access in database
+        // Update user's library access in database to reflect the desired state
         const updatedAccess = { ...currentAccess };
         updatedAccess[serverGroup] = {
-          regular: [...new Set([...currentGroupAccess.regular, ...newLibraries.regular])],
-          fourk: [...new Set([...currentGroupAccess.fourk, ...newLibraries.fourk])]
+          regular: requestedRegular,
+          fourk: requestedFourk
         };
         
         await this.updateUserLibraryAccessInDatabase(userEmail, updatedAccess);
         
         return {
           success: true,
-          message: `Libraries would be shared with ${userEmail} (sharing API not implemented yet)`,
-          sharedLibraries: librariesToShare,
-          currentAccess: updatedAccess[serverGroup]
+          message: `Library access updated for ${userEmail} (Note: Actual Plex API sharing needs to be implemented)`,
+          addedLibraries: librariesToAdd,
+          removedLibraries: librariesToRemove,
+          currentAccess: updatedAccess[serverGroup],
+          note: 'Database updated - Plex.tv API integration needed for actual sharing'
         };
       } else {
-        console.log(`ℹ️ No new libraries to share for ${userEmail} on ${serverGroup}`);
+        console.log(`ℹ️ No changes needed for ${userEmail} on ${serverGroup}`);
         return {
           success: true,
-          message: 'No new libraries to share',
+          message: 'No library changes needed',
           currentAccess: currentGroupAccess
         };
       }
@@ -292,30 +300,69 @@ class PlexService {
     }
   }
 
-  // Update user's library access in database
+  // Update user's library access in database with better error handling
   async updateUserLibraryAccessInDatabase(userEmail, libraryAccess) {
     try {
       console.log(`💾 Updating database for ${userEmail}:`, libraryAccess);
       
       // Find user by email or plex_email
       const [user] = await db.query(`
-        SELECT id FROM users 
+        SELECT id, name FROM users 
         WHERE email = ? OR plex_email = ?
       `, [userEmail, userEmail]);
       
       if (user) {
         await db.query(`
           UPDATE users 
-          SET plex_libraries = ?
+          SET plex_libraries = ?, updated_at = NOW()
           WHERE id = ?
         `, [JSON.stringify(libraryAccess), user.id]);
         
-        console.log(`✅ Database updated for user ID ${user.id}`);
+        console.log(`✅ Database updated for user: ${user.name} (ID: ${user.id})`);
+        return true;
       } else {
         console.log(`⚠️ User not found in database: ${userEmail}`);
+        return false;
       }
     } catch (error) {
       console.error(`❌ Error updating database:`, error);
+      throw error;
+    }
+  }
+
+  // Sync all libraries and store in database
+  async syncAllLibraries() {
+    try {
+      console.log('🔄 Syncing Plex libraries using Plex.tv API...');
+      
+      const serverConfigs = this.getServerConfig();
+      
+      for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
+        console.log(`🔄 Syncing group: ${groupName}`);
+        
+        // Sync regular server libraries
+        const regularLibs = await this.getServerLibraries(groupConfig.regular);
+        await this.updateLibrariesInDatabase(groupName, 'regular', regularLibs);
+        console.log(`✅ Synced ${regularLibs.length} regular libraries for ${groupName}`);
+        
+        // Use hardcoded 4K libraries
+        const fourkLibs = groupConfig.fourk.libraries || [];
+        await this.updateLibrariesInDatabase(groupName, 'fourk', fourkLibs);
+        console.log(`✅ Using ${fourkLibs.length} hardcoded 4K libraries for ${groupName}`);
+      }
+      
+      // Sync user access to match current state
+      console.log('\n🔄 Syncing user library access...');
+      await this.syncUserLibraryAccess();
+      
+      // Update the last sync timestamp
+      await this.updateSyncTimestamp();
+      
+      console.log('\n✅ Complete Plex sync finished successfully!');
+      return { success: true, timestamp: new Date().toISOString() };
+    } catch (error) {
+      console.error('❌ Error syncing libraries:', error);
+      return { success: false, error: error.message };
     }
   }
 
@@ -512,192 +559,16 @@ class PlexService {
         updatedUsers++;
       }
       
-      // Step 4: Count Plex users not in our database (but don't list them all)
-      console.log('\n📊 Step 4: Checking for Plex users not in our database...');
-      const dbEmails = new Set();
-      for (const dbUser of dbUsers) {
-        if (dbUser.email) dbEmails.add(dbUser.email.toLowerCase());
-        if (dbUser.plex_email) dbEmails.add(dbUser.plex_email.toLowerCase());
-      }
-      
-      const plexOnlyUsers = [];
-      
-      for (const [email, userData] of allPlexUsers.entries()) {
-        if (!dbEmails.has(email)) {
-          plexOnlyUsers.push({ email, username: userData.plexUsername });
-        }
-      }
-      
-      if (plexOnlyUsers.length > 0) {
-        console.log(`📊 Found ${plexOnlyUsers.length} users in Plex who are NOT in our database`);
-        // Only show first 5 as examples
-        const examples = plexOnlyUsers.slice(0, 5);
-        console.log(`   Examples: ${examples.map(u => `${u.username} (${u.email})`).join(', ')}${plexOnlyUsers.length > 5 ? '...' : ''}`);
-      } else {
-        console.log(`✅ All Plex users are accounted for in our database`);
-      }
-      
       // Final summary
       console.log(`\n📊 SYNC SUMMARY:`);
       console.log(`📊 Database users updated: ${updatedUsers}`);
       console.log(`✅ Users with Plex access: ${usersWithAccess}`);
       console.log(`❌ Users without Plex access: ${usersWithoutAccess}`);
-      console.log(`📊 Plex users not in database: ${plexOnlyUsers.length}`);
       console.log(`📊 Total unique Plex users found: ${allPlexUsers.size}`);
-      
-      // Show matched users summary
-      if (matchedUsers.length > 0) {
-        console.log(`\n📊 MATCHED USERS SUMMARY:`);
-        for (const user of matchedUsers) {
-          console.log(`   ✅ ${user.name} → ${user.username} (${user.libraries} libs, ${user.tags.length} tags)`);
-        }
-      }
       
     } catch (error) {
       console.error('❌ Error syncing user library access:', error);
       throw error;
-    }
-  }
-
-  // Enhanced sharing method that handles incremental updates
-  async shareLibrariesWithUserEnhanced(userEmail, serverGroup, newLibraries) {
-    try {
-      console.log(`🔄 Enhanced library sharing for ${userEmail} on ${serverGroup}`);
-      console.log(`📋 New library selection:`, newLibraries);
-      
-      // Step 1: Get user's current access
-      const currentAccess = await this.getUserCurrentAccess(userEmail);
-      const currentGroupAccess = currentAccess[serverGroup] || { regular: [], fourk: [] };
-      
-      console.log(`📊 Current access:`, currentGroupAccess);
-      
-      // Step 2: Determine what needs to be shared (only new libraries)
-      const librariesToShare = {
-        regular: newLibraries.regular ? newLibraries.regular.filter(libId => 
-          !currentGroupAccess.regular.includes(libId)
-        ) : [],
-        fourk: newLibraries.fourk ? newLibraries.fourk.filter(libId => 
-          !currentGroupAccess.fourk.includes(libId)
-        ) : []
-      };
-      
-      console.log(`📋 Libraries to share (new only):`, librariesToShare);
-      
-      // Step 3: Share only the new libraries if any
-      if (librariesToShare.regular.length > 0 || librariesToShare.fourk.length > 0) {
-        console.log(`🤝 Would share new libraries with ${userEmail}...`);
-        
-        // For now, return a placeholder response since we don't have the actual sharing API implemented
-        // TODO: Implement actual Plex.tv sharing API calls here
-        
-        console.log(`✅ Would share libraries:`, librariesToShare);
-        
-        // Step 4: Update user's library access in database
-        const updatedAccess = { ...currentAccess };
-        updatedAccess[serverGroup] = {
-          regular: [...new Set([...currentGroupAccess.regular, ...(newLibraries.regular || [])])],
-          fourk: [...new Set([...currentGroupAccess.fourk, ...(newLibraries.fourk || [])])]
-        };
-        
-        await this.updateUserLibraryAccessInDatabase(userEmail, updatedAccess);
-        
-        return {
-          success: true,
-          message: `Libraries would be shared with ${userEmail} (sharing API not implemented yet)`,
-          sharedLibraries: librariesToShare,
-          currentAccess: updatedAccess[serverGroup]
-        };
-      } else {
-        console.log(`ℹ️ No new libraries to share for ${userEmail} on ${serverGroup}`);
-        return {
-          success: true,
-          message: 'No new libraries to share',
-          currentAccess: currentGroupAccess
-        };
-      }
-      
-    } catch (error) {
-      console.error(`❌ Error in enhanced library sharing:`, error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
-
-  // Update user's library access in database
-  async updateUserLibraryAccessInDatabase(userEmail, libraryAccess) {
-    try {
-      console.log(`💾 Updating database for ${userEmail}:`, libraryAccess);
-      
-      // Find user by email or plex_email
-      const [user] = await db.query(`
-        SELECT id FROM users 
-        WHERE email = ? OR plex_email = ?
-      `, [userEmail, userEmail]);
-      
-      if (user) {
-        await db.query(`
-          UPDATE users 
-          SET plex_libraries = ?
-          WHERE id = ?
-        `, [JSON.stringify(libraryAccess), user.id]);
-        
-        console.log(`✅ Database updated for user ID ${user.id}`);
-      } else {
-        console.log(`⚠️ User not found in database: ${userEmail}`);
-      }
-    } catch (error) {
-      console.error(`❌ Error updating database:`, error);
-    }
-  }
-
-  // Placeholder methods for sharing/removing (to be implemented later)
-  async shareLibrariesWithUser(userEmail, serverGroup, libraryIds) {
-    // TODO: Implement using Plex.tv API like your Python code
-    console.log(`TODO: Share libraries with ${userEmail} on ${serverGroup}`, libraryIds);
-    return { success: true, message: 'Sharing not implemented yet' };
-  }
-
-  async removeUserAccess(userEmail, serverGroups) {
-    // TODO: Implement using Plex.tv API like your Python code
-    console.log(`TODO: Remove access for ${userEmail} from`, serverGroups);
-    return { success: true, message: 'Remove access not implemented yet' };
-  }
-
-  // Sync all libraries and store in database
-  async syncAllLibraries() {
-    try {
-      console.log('🔄 Syncing Plex libraries using Plex.tv API...');
-      
-      const serverConfigs = this.getServerConfig();
-      
-      for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
-        console.log(`🔄 Syncing group: ${groupName}`);
-        
-        // Sync regular server libraries
-        const regularLibs = await this.getServerLibraries(groupConfig.regular);
-        await this.updateLibrariesInDatabase(groupName, 'regular', regularLibs);
-        console.log(`✅ Synced ${regularLibs.length} regular libraries for ${groupName}`);
-        
-        // Use hardcoded 4K libraries
-        const fourkLibs = groupConfig.fourk.libraries || [];
-        await this.updateLibrariesInDatabase(groupName, 'fourk', fourkLibs);
-        console.log(`✅ Using ${fourkLibs.length} hardcoded 4K libraries for ${groupName}`);
-      }
-      
-      // Sync user access to match current state (CLEANED UP METHOD)
-      console.log('\n🔄 Syncing user library access...');
-      await this.syncUserLibraryAccess();
-      
-      // Update the last sync timestamp
-      await this.updateSyncTimestamp();
-      
-      console.log('\n✅ Complete Plex sync finished successfully!');
-      return { success: true, timestamp: new Date().toISOString() };
-    } catch (error) {
-      console.error('❌ Error syncing libraries:', error);
-      return { success: false, error: error.message };
     }
   }
 
@@ -800,6 +671,25 @@ class PlexService {
     } catch (error) {
       console.error('❌ Error updating sync timestamp:', error);
     }
+  }
+
+  // Placeholder methods for actual Plex API sharing (to be implemented)
+  async shareLibrariesWithUser(userEmail, serverGroup, libraryIds) {
+    console.log(`🔧 TODO: Implement actual Plex.tv API sharing for ${userEmail} on ${serverGroup}`, libraryIds);
+    return { 
+      success: true, 
+      message: 'Sharing placeholder - needs Plex.tv API implementation',
+      note: 'This would use Plex.tv API to actually invite user and share libraries'
+    };
+  }
+
+  async removeUserAccess(userEmail, serverGroups) {
+    console.log(`🔧 TODO: Implement actual Plex.tv API removal for ${userEmail} from`, serverGroups);
+    return { 
+      success: true, 
+      message: 'Remove access placeholder - needs Plex.tv API implementation',
+      note: 'This would use Plex.tv API to actually remove user from servers'
+    };
   }
 }
 

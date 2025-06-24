@@ -86,6 +86,7 @@ router.post('/share-user-libraries', async (req, res) => {
     
     const results = {};
     const errors = [];
+    let totalChanges = 0;
     
     // Process each server group in the request
     for (const [serverGroup, libraries] of Object.entries(plexLibraries)) {
@@ -117,6 +118,18 @@ router.post('/share-user-libraries', async (req, res) => {
           errors.push(`${serverGroup}: ${result.error}`);
         } else {
           console.log(`✅ ${serverGroup} sharing completed successfully`);
+          
+          // Count actual changes made
+          const addedCount = (result.addedLibraries?.regular?.length || 0) + (result.addedLibraries?.fourk?.length || 0);
+          const removedCount = (result.removedLibraries?.regular?.length || 0) + (result.removedLibraries?.fourk?.length || 0);
+          totalChanges += addedCount + removedCount;
+          
+          if (addedCount > 0) {
+            console.log(`   ➕ Added ${addedCount} libraries`);
+          }
+          if (removedCount > 0) {
+            console.log(`   ➖ Removed ${removedCount} libraries`);
+          }
         }
       } catch (error) {
         console.error(`❌ Error sharing ${serverGroup}:`, error);
@@ -134,11 +147,14 @@ router.post('/share-user-libraries', async (req, res) => {
       message = 'No library changes were needed';
     } else if (!overallSuccess) {
       message = 'Some library sharing operations had issues';
+    } else if (totalChanges === 0) {
+      message = 'User already had the correct library access - no changes needed';
     } else {
-      message = 'Library sharing completed successfully (Note: Actual Plex API sharing not yet implemented)';
+      message = `Library access updated successfully (${totalChanges} changes detected - Note: Actual Plex API sharing not yet implemented)`;
     }
     
     console.log(`📊 Overall result: ${overallSuccess ? 'SUCCESS' : 'PARTIAL FAILURE'}`);
+    console.log(`📊 Total changes detected: ${totalChanges}`);
     console.log(`📋 Results:`, results);
     
     res.json({
@@ -148,6 +164,7 @@ router.post('/share-user-libraries', async (req, res) => {
       previousAccess: currentAccess,
       results: results,
       errors: errors.length > 0 ? errors : undefined,
+      totalChanges: totalChanges,
       note: 'This is using the Node.js implementation. Actual Plex sharing API calls need to be implemented.'
     });
     
@@ -171,6 +188,10 @@ router.post('/remove-access', async (req, res) => {
     const result = await plexService.removeUserAccess(userEmail, serverGroups);
     
     if (result.success) {
+      // Update database to reflect removal
+      const emptyAccess = { plex1: { regular: [], fourk: [] }, plex2: { regular: [], fourk: [] } };
+      await plexService.updateUserLibraryAccessInDatabase(userEmail, emptyAccess);
+      
       res.json(result);
     } else {
       res.status(500).json(result);
@@ -206,11 +227,13 @@ router.post('/sync', async (req, res) => {
     
     if (result.success) {
       res.json({ 
+        success: true,
         message: 'Library sync completed successfully',
         timestamp: result.timestamp 
       });
     } else {
       res.status(500).json({ 
+        success: false,
         error: 'Library sync failed', 
         details: result.error 
       });
