@@ -1,4 +1,4 @@
-// User Management Functions
+// Enhanced User Management Functions with Intelligent Plex Sharing
 
 window.Users = {
     currentSortField: 'name',
@@ -372,10 +372,14 @@ window.Users = {
         }
     },
     
+    // ENHANCED: Smart user saving with intelligent Plex sharing
     async saveUser(event) {
         event.preventDefault();
         
         try {
+            Utils.showLoading();
+            console.log('💾 Starting user save process...');
+            
             const formData = Utils.collectFormData('userFormData');
             
             // Handle special field conversions
@@ -387,34 +391,112 @@ window.Users = {
             if (!Array.isArray(formData.tags)) formData.tags = [formData.tags];
             
             // Collect Plex library selections
-            formData.plex_libraries = this.collectPlexLibrarySelections();
+            const plexLibraries = this.collectPlexLibrarySelections();
+            formData.plex_libraries = plexLibraries;
             
             const isEditing = window.AppState.editingUserId;
             
+            console.log('📋 Form data prepared:', {
+                name: formData.name,
+                email: formData.email,
+                plex_email: formData.plex_email,
+                tags: formData.tags,
+                plexLibraries: plexLibraries,
+                isEditing: isEditing
+            });
+            
+            // Step 1: Save user to database first
+            console.log('💾 Step 1: Saving user to database...');
             if (isEditing) {
                 await API.User.update(window.AppState.editingUserId, formData);
-                Utils.showNotification('User updated successfully', 'success');
+                console.log('✅ User updated in database');
+                Utils.showNotification('User updated successfully!', 'success');
             } else {
                 await API.User.create(formData);
-                Utils.showNotification('User created successfully', 'success');
+                console.log('✅ User created in database');
+                Utils.showNotification('User created successfully!', 'success');
             }
             
-            // Handle Plex library sharing if user has Plex email and selected libraries
-            if (formData.plex_email && (formData.plex_libraries.plex1 || formData.plex_libraries.plex2)) {
+            // Step 2: Handle Plex library sharing if user has Plex email and selected libraries
+            if (formData.plex_email && this.hasPlexLibrariesSelected(plexLibraries)) {
+                console.log('🤝 Step 2: Processing Plex library sharing...');
+                
                 try {
-                    await this.sharePlexLibrariesWithUser(formData.plex_email, formData.plex_libraries);
+                    const shareResult = await this.shareUserPlexLibraries(
+                        formData.plex_email, 
+                        plexLibraries, 
+                        !isEditing // isNewUser
+                    );
+                    
+                    if (shareResult.success) {
+                        console.log('✅ Plex sharing completed successfully');
+                    } else {
+                        console.log('⚠️ Plex sharing had issues:', shareResult);
+                        Utils.showNotification(
+                            `Note: ${shareResult.message || 'Plex sharing is not yet fully implemented'}`,
+                            'info'
+                        );
+                    }
                 } catch (shareError) {
-                    console.error('Error sharing Plex libraries:', shareError);
-                    Utils.showNotification('User saved but there was an error sharing Plex libraries: ' + shareError.message, 'warning');
+                    console.error('❌ Plex sharing failed:', shareError);
+                    Utils.showNotification(
+                        `Note: Plex sharing encountered an issue: ${shareError.message}`,
+                        'warning'
+                    );
                 }
+            } else {
+                console.log('ℹ️ Step 2: Skipped - No Plex email or libraries selected');
             }
             
-            // Reset form state and go back to users page
+            // Step 3: Reset form state and go back to users page
+            console.log('🔄 Step 3: Cleaning up and navigating back...');
             window.AppState.editingUserId = null;
+            window.AppState.currentUserData = null;
             showPage('users');
             
         } catch (error) {
+            console.error('❌ Error saving user:', error);
             Utils.handleError(error, 'Saving user');
+        } finally {
+            Utils.hideLoading();
+        }
+    },
+    
+    // Check if any Plex libraries are selected
+    hasPlexLibrariesSelected(plexLibraries) {
+        return Object.values(plexLibraries).some(group => 
+            (group.regular && group.regular.length > 0) || 
+            (group.fourk && group.fourk.length > 0)
+        );
+    },
+    
+    // Enhanced Plex library sharing with intelligent conflict detection
+    async shareUserPlexLibraries(userEmail, plexLibraries, isNewUser = false) {
+        try {
+            console.log(`🤝 Starting intelligent Plex sharing for ${userEmail}...`);
+            console.log(`📋 Libraries to share:`, plexLibraries);
+            console.log(`👤 Is new user: ${isNewUser}`);
+            
+            // Use the comprehensive sharing endpoint
+            const shareResult = await apiCall('/plex/share-user-libraries', {
+                method: 'POST',
+                body: JSON.stringify({
+                    userEmail: userEmail,
+                    plexLibraries: plexLibraries,
+                    isNewUser: isNewUser
+                })
+            });
+            
+            console.log('📊 Sharing result:', shareResult);
+            
+            return shareResult;
+            
+        } catch (error) {
+            console.error('❌ Error in intelligent Plex sharing:', error);
+            return {
+                success: false,
+                error: error.message
+            };
         }
     },
     
@@ -447,37 +529,8 @@ window.Users = {
             }
         }
         
+        console.log('📋 Collected library selections:', plexLibraries);
         return plexLibraries;
-    },
-    
-    async sharePlexLibrariesWithUser(userEmail, plexLibraries) {
-        const sharePromises = [];
-        
-        // Share Plex 1 libraries
-        if (plexLibraries.plex1) {
-            sharePromises.push(
-                API.Plex.shareLibraries({
-                    userEmail,
-                    serverGroup: 'plex1',
-                    libraries: plexLibraries.plex1
-                })
-            );
-        }
-        
-        // Share Plex 2 libraries
-        if (plexLibraries.plex2) {
-            sharePromises.push(
-                API.Plex.shareLibraries({
-                    userEmail,
-                    serverGroup: 'plex2',
-                    libraries: plexLibraries.plex2
-                })
-            );
-        }
-        
-        if (sharePromises.length > 0) {
-            await Promise.all(sharePromises);
-        }
     },
     
     // Auto-calculation functions for subscriptions
@@ -502,7 +555,7 @@ window.Users = {
         
         if (!expirationField) return;
         
-        const selectedSub = window.AppState.subscriptionTypes.find(sub => sub.id == subscription);
+        const selectedSub = window.AppState.subscriptionTypes?.find(sub => sub.id == subscription);
         if (selectedSub) {
             const today = new Date();
             const expiration = new Date(today.setMonth(today.getMonth() + selectedSub.duration_months));
@@ -516,6 +569,7 @@ window.Users = {
 // Make functions globally available for onclick handlers
 window.showUserForm = () => {
     window.AppState.editingUserId = null;
+    window.AppState.currentUserData = null;
     showPage('user-form');
 };
 

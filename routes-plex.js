@@ -23,6 +23,8 @@ router.get('/libraries/:serverGroup', async (req, res) => {
 router.get('/user-access/:email', async (req, res) => {
   try {
     const { email } = req.params;
+    console.log(`🔍 API: Getting access for ${email}`);
+    
     const access = await plexService.getUserCurrentAccess(email);
     res.json(access);
   } catch (error) {
@@ -31,7 +33,7 @@ router.get('/user-access/:email', async (req, res) => {
   }
 });
 
-// Share libraries with user
+// Share libraries with user (original endpoint)
 router.post('/share', async (req, res) => {
   try {
     const { userEmail, serverGroup, libraries } = req.body;
@@ -43,6 +45,8 @@ router.post('/share', async (req, res) => {
     if (!['plex1', 'plex2'].includes(serverGroup)) {
       return res.status(400).json({ error: 'Invalid server group. Use plex1 or plex2' });
     }
+    
+    console.log(`🤝 API: Basic sharing request for ${userEmail} on ${serverGroup}`);
     
     const result = await plexService.shareLibrariesWithUser(userEmail, serverGroup, libraries);
     
@@ -57,6 +61,102 @@ router.post('/share', async (req, res) => {
   }
 });
 
+// Enhanced sharing endpoint with intelligent conflict detection
+router.post('/share-user-libraries', async (req, res) => {
+  try {
+    const { userEmail, plexLibraries, isNewUser = false } = req.body;
+    
+    if (!userEmail || !plexLibraries) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: userEmail, plexLibraries' 
+      });
+    }
+    
+    console.log(`🔧 API: Enhanced sharing for ${userEmail} (new user: ${isNewUser})`);
+    console.log(`📋 Requested libraries:`, plexLibraries);
+    
+    let currentAccess = {};
+    
+    // For existing users, get their current access first
+    if (!isNewUser) {
+      console.log(`🔍 Getting current access for existing user...`);
+      currentAccess = await plexService.getUserCurrentAccess(userEmail);
+      console.log(`📊 Current access:`, currentAccess);
+    }
+    
+    const results = {};
+    const errors = [];
+    
+    // Process each server group in the request
+    for (const [serverGroup, libraries] of Object.entries(plexLibraries)) {
+      if (!['plex1', 'plex2'].includes(serverGroup)) {
+        console.log(`⚠️ Skipping invalid server group: ${serverGroup}`);
+        continue;
+      }
+      
+      // Check if any libraries are specified for this group
+      const hasLibraries = (libraries.regular && libraries.regular.length > 0) || 
+                          (libraries.fourk && libraries.fourk.length > 0);
+      
+      if (!hasLibraries) {
+        console.log(`ℹ️ No libraries specified for ${serverGroup}, skipping`);
+        results[serverGroup] = {
+          success: true,
+          message: 'No libraries to share',
+          action: 'skipped'
+        };
+        continue;
+      }
+      
+      try {
+        // Use enhanced sharing that detects conflicts and only shares new libraries
+        const result = await plexService.shareLibrariesWithUserEnhanced(userEmail, serverGroup, libraries);
+        results[serverGroup] = result;
+        
+        if (!result.success) {
+          errors.push(`${serverGroup}: ${result.error}`);
+        } else {
+          console.log(`✅ ${serverGroup} sharing completed successfully`);
+        }
+      } catch (error) {
+        console.error(`❌ Error sharing ${serverGroup}:`, error);
+        results[serverGroup] = { success: false, error: error.message };
+        errors.push(`${serverGroup}: ${error.message}`);
+      }
+    }
+    
+    // Determine overall success
+    const overallSuccess = errors.length === 0;
+    const hasActions = Object.values(results).some(r => r.action !== 'skipped');
+    
+    let message = 'Library sharing process completed';
+    if (!hasActions) {
+      message = 'No library changes were needed';
+    } else if (!overallSuccess) {
+      message = 'Some library sharing operations had issues';
+    } else {
+      message = 'Library sharing completed successfully (Note: Actual Plex API sharing not yet implemented)';
+    }
+    
+    console.log(`📊 Overall result: ${overallSuccess ? 'SUCCESS' : 'PARTIAL FAILURE'}`);
+    console.log(`📋 Results:`, results);
+    
+    res.json({
+      success: overallSuccess,
+      message: message,
+      isNewUser: isNewUser,
+      previousAccess: currentAccess,
+      results: results,
+      errors: errors.length > 0 ? errors : undefined,
+      note: 'This is using the Node.js implementation. Actual Plex sharing API calls need to be implemented.'
+    });
+    
+  } catch (error) {
+    console.error('❌ Error in comprehensive sharing:', error);
+    res.status(500).json({ error: 'Failed to share user libraries' });
+  }
+});
+
 // Remove user access
 router.post('/remove-access', async (req, res) => {
   try {
@@ -65,6 +165,8 @@ router.post('/remove-access', async (req, res) => {
     if (!userEmail || !serverGroups || !Array.isArray(serverGroups)) {
       return res.status(400).json({ error: 'Missing required fields: userEmail, serverGroups (array)' });
     }
+    
+    console.log(`🗑️ API: Remove access request for ${userEmail} from:`, serverGroups);
     
     const result = await plexService.removeUserAccess(userEmail, serverGroups);
     
@@ -99,12 +201,19 @@ router.post('/test/:serverGroup', async (req, res) => {
 // Manually trigger library sync
 router.post('/sync', async (req, res) => {
   try {
+    console.log('🔄 API: Manual library sync triggered');
     const result = await plexService.syncAllLibraries();
     
     if (result.success) {
-      res.json({ message: 'Library sync completed successfully' });
+      res.json({ 
+        message: 'Library sync completed successfully',
+        timestamp: result.timestamp 
+      });
     } else {
-      res.status(500).json({ error: 'Library sync failed', details: result.error });
+      res.status(500).json({ 
+        error: 'Library sync failed', 
+        details: result.error 
+      });
     }
   } catch (error) {
     console.error('Error syncing libraries:', error);
