@@ -1,4 +1,4 @@
-// Enhanced User Management Functions with Form State Persistence
+// Enhanced User Management Functions with Real Plex API Integration
 
 window.Users = {
     currentSortField: 'name',
@@ -208,13 +208,13 @@ window.Users = {
         }
     },
     
-    // Enhanced user saving with proper library management
+    // Enhanced user saving with comprehensive Plex integration
     async saveUser(event) {
         event.preventDefault();
         
         try {
             Utils.showLoading();
-            console.log('💾 Starting user save process...');
+            console.log('💾 Starting enhanced user save process...');
             
             const formData = Utils.collectFormData('userFormData');
             
@@ -260,22 +260,27 @@ window.Users = {
                 console.log('🤝 Step 2: Processing Plex library sharing...');
                 
                 try {
-                    const shareResult = await this.shareUserPlexLibraries(
+                    const shareResult = await this.shareUserPlexLibrariesEnhanced(
                         formData.plex_email, 
                         plexLibraries, 
                         !isEditing // isNewUser
                     );
                     
+                    console.log('📊 Plex sharing result:', shareResult);
+                    
                     if (shareResult.success) {
-                        console.log('✅ Plex sharing completed successfully');
-                        Utils.showNotification(
-                            `User ${isEditing ? 'updated' : 'created'} successfully! Plex libraries shared.`,
-                            'success'
-                        );
+                        let message = `User ${isEditing ? 'updated' : 'created'} successfully!`;
+                        
+                        if (shareResult.apiCallsMade > 0) {
+                            message += ` Made ${shareResult.apiCallsMade} Plex API calls to update library access.`;
+                        } else if (shareResult.totalChanges === 0) {
+                            message += ` User already had correct Plex library access.`;
+                        }
+                        
+                        Utils.showNotification(message, 'success');
                     } else {
-                        console.log('⚠️ Plex sharing had issues:', shareResult);
                         Utils.showNotification(
-                            `User ${isEditing ? 'updated' : 'created'}, but Plex sharing needs attention: ${shareResult.message}`,
+                            `User ${isEditing ? 'updated' : 'created'}, but Plex sharing had issues: ${shareResult.message}`,
                             'warning'
                         );
                     }
@@ -321,10 +326,10 @@ window.Users = {
         );
     },
     
-    // Enhanced Plex library sharing
-    async shareUserPlexLibraries(userEmail, plexLibraries, isNewUser = false) {
+    // ENHANCED: Plex library sharing with detailed feedback
+    async shareUserPlexLibrariesEnhanced(userEmail, plexLibraries, isNewUser = false) {
         try {
-            console.log(`🤝 Starting Plex sharing for ${userEmail}...`);
+            console.log(`🤝 Starting enhanced Plex sharing for ${userEmail}...`);
             console.log(`📋 Libraries to share:`, plexLibraries);
             console.log(`👤 Is new user: ${isNewUser}`);
             
@@ -337,14 +342,35 @@ window.Users = {
                 })
             });
             
-            console.log('📊 Sharing result:', shareResult);
+            console.log('📊 Enhanced sharing result:', shareResult);
+            
+            // Provide detailed feedback based on the result
+            if (shareResult.success) {
+                if (shareResult.apiCallsMade > 0) {
+                    console.log(`✅ Successfully made ${shareResult.apiCallsMade} Plex API calls`);
+                    
+                    // Log details for each server group
+                    Object.entries(shareResult.results || {}).forEach(([serverGroup, result]) => {
+                        if (result.success && result.changes > 0) {
+                            console.log(`   📚 ${serverGroup}: ${result.changes} changes applied`);
+                        }
+                    });
+                } else {
+                    console.log(`ℹ️ No Plex API calls needed - user already has correct access`);
+                }
+            } else {
+                console.log(`❌ Plex sharing had issues:`, shareResult.errors);
+            }
+            
             return shareResult;
             
         } catch (error) {
-            console.error('❌ Error in Plex sharing:', error);
+            console.error('❌ Error in enhanced Plex sharing:', error);
             return {
                 success: false,
-                error: error.message
+                error: error.message,
+                apiCallsMade: 0,
+                totalChanges: 0
             };
         }
     },
@@ -380,6 +406,26 @@ window.Users = {
         
         console.log('📋 Collected library selections:', plexLibraries);
         return plexLibraries;
+    },
+    
+    // DEBUG: Test user's current Plex access
+    async debugUserAccess(userEmail) {
+        try {
+            console.log(`🐛 Debug: Testing access for ${userEmail}`);
+            
+            const debugResult = await API.call(`/plex/debug/user/${encodeURIComponent(userEmail)}`);
+            console.log('🐛 Debug result:', debugResult);
+            
+            Utils.showNotification(
+                `Debug complete for ${userEmail}. Check console for detailed results.`,
+                'info'
+            );
+            
+            return debugResult;
+        } catch (error) {
+            console.error('❌ Debug failed:', error);
+            Utils.handleError(error, 'Debug user access');
+        }
     }
 };
 
@@ -614,4 +660,15 @@ window.saveUser = function(event) {
     return window.Users.saveUser(event);
 };
 
-console.log('🔧 Complete Users.js loaded with form state fixes');
+// DEBUG: Add global debug function
+window.debugUserPlexAccess = function(userEmail) {
+    if (!userEmail) {
+        userEmail = prompt('Enter user email to debug:');
+    }
+    
+    if (userEmail) {
+        return window.Users.debugUserAccess(userEmail);
+    }
+};
+
+console.log('🔧 Enhanced Users.js loaded with real Plex API integration');

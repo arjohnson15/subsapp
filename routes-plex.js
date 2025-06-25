@@ -33,35 +33,7 @@ router.get('/user-access/:email', async (req, res) => {
   }
 });
 
-// Share libraries with user (original endpoint)
-router.post('/share', async (req, res) => {
-  try {
-    const { userEmail, serverGroup, libraries } = req.body;
-    
-    if (!userEmail || !serverGroup || !libraries) {
-      return res.status(400).json({ error: 'Missing required fields: userEmail, serverGroup, libraries' });
-    }
-    
-    if (!['plex1', 'plex2'].includes(serverGroup)) {
-      return res.status(400).json({ error: 'Invalid server group. Use plex1 or plex2' });
-    }
-    
-    console.log(`🤝 API: Basic sharing request for ${userEmail} on ${serverGroup}`);
-    
-    const result = await plexService.shareLibrariesWithUser(userEmail, serverGroup, libraries);
-    
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(500).json(result);
-    }
-  } catch (error) {
-    console.error('Error sharing libraries:', error);
-    res.status(500).json({ error: 'Failed to share libraries' });
-  }
-});
-
-// Enhanced sharing endpoint with intelligent conflict detection
+// ENHANCED: Comprehensive user library sharing endpoint
 router.post('/share-user-libraries', async (req, res) => {
   try {
     const { userEmail, plexLibraries, isNewUser = false } = req.body;
@@ -87,6 +59,7 @@ router.post('/share-user-libraries', async (req, res) => {
     const results = {};
     const errors = [];
     let totalChanges = 0;
+    let actualApiCalls = 0;
     
     // Process each server group in the request
     for (const [serverGroup, libraries] of Object.entries(plexLibraries)) {
@@ -100,17 +73,41 @@ router.post('/share-user-libraries', async (req, res) => {
                           (libraries.fourk && libraries.fourk.length > 0);
       
       if (!hasLibraries) {
-        console.log(`ℹ️ No libraries specified for ${serverGroup}, skipping`);
-        results[serverGroup] = {
-          success: true,
-          message: 'No libraries to share',
-          action: 'skipped'
-        };
+        console.log(`ℹ️ No libraries specified for ${serverGroup}, clearing access`);
+        
+        // Clear access if user currently has any
+        const currentGroupAccess = currentAccess[serverGroup];
+        const hasCurrentAccess = currentGroupAccess && 
+          ((currentGroupAccess.regular && currentGroupAccess.regular.length > 0) ||
+           (currentGroupAccess.fourk && currentGroupAccess.fourk.length > 0));
+        
+        if (hasCurrentAccess) {
+          // Need to clear access
+          const clearResult = await plexService.shareLibrariesWithUserEnhanced(
+            userEmail, 
+            serverGroup, 
+            { regular: [], fourk: [] }
+          );
+          
+          results[serverGroup] = clearResult;
+          if (clearResult.changes > 0) {
+            totalChanges += clearResult.changes;
+            actualApiCalls += clearResult.changes;
+          }
+        } else {
+          results[serverGroup] = {
+            success: true,
+            message: 'No libraries to share and none currently shared',
+            action: 'skipped',
+            changes: 0
+          };
+        }
         continue;
       }
       
       try {
-        // Use enhanced sharing that detects conflicts and only shares new libraries
+        // Use enhanced sharing with real API calls
+        console.log(`🤝 Processing ${serverGroup} with enhanced sharing...`);
         const result = await plexService.shareLibrariesWithUserEnhanced(userEmail, serverGroup, libraries);
         results[serverGroup] = result;
         
@@ -120,20 +117,19 @@ router.post('/share-user-libraries', async (req, res) => {
           console.log(`✅ ${serverGroup} sharing completed successfully`);
           
           // Count actual changes made
-          const addedCount = (result.addedLibraries?.regular?.length || 0) + (result.addedLibraries?.fourk?.length || 0);
-          const removedCount = (result.removedLibraries?.regular?.length || 0) + (result.removedLibraries?.fourk?.length || 0);
-          totalChanges += addedCount + removedCount;
+          const changes = result.changes || 0;
+          totalChanges += changes;
           
-          if (addedCount > 0) {
-            console.log(`   ➕ Added ${addedCount} libraries`);
-          }
-          if (removedCount > 0) {
-            console.log(`   ➖ Removed ${removedCount} libraries`);
+          if (changes > 0) {
+            actualApiCalls += changes;
+            console.log(`   🔄 Made ${changes} API calls to Plex servers`);
+          } else {
+            console.log(`   ℹ️ No changes needed - user already has correct access`);
           }
         }
       } catch (error) {
         console.error(`❌ Error sharing ${serverGroup}:`, error);
-        results[serverGroup] = { success: false, error: error.message };
+        results[serverGroup] = { success: false, error: error.message, changes: 0 };
         errors.push(`${serverGroup}: ${error.message}`);
       }
     }
@@ -143,18 +139,28 @@ router.post('/share-user-libraries', async (req, res) => {
     const hasActions = Object.values(results).some(r => r.action !== 'skipped');
     
     let message = 'Library sharing process completed';
+    let messageDetails = [];
+    
     if (!hasActions) {
       message = 'No library changes were needed';
     } else if (!overallSuccess) {
       message = 'Some library sharing operations had issues';
+      messageDetails.push(`Errors: ${errors.length}`);
     } else if (totalChanges === 0) {
       message = 'User already had the correct library access - no changes needed';
-    } else {
-      message = `Library access updated successfully (${totalChanges} changes detected - Note: Actual Plex API sharing not yet implemented)`;
+    } else if (actualApiCalls > 0) {
+      message = `Library access updated successfully`;
+      messageDetails.push(`${actualApiCalls} Plex API calls made`);
+      messageDetails.push(`${totalChanges} servers modified`);
+    }
+    
+    if (messageDetails.length > 0) {
+      message += ` (${messageDetails.join(', ')})`;
     }
     
     console.log(`📊 Overall result: ${overallSuccess ? 'SUCCESS' : 'PARTIAL FAILURE'}`);
     console.log(`📊 Total changes detected: ${totalChanges}`);
+    console.log(`📊 Actual Plex API calls made: ${actualApiCalls}`);
     console.log(`📋 Results:`, results);
     
     res.json({
@@ -165,12 +171,41 @@ router.post('/share-user-libraries', async (req, res) => {
       results: results,
       errors: errors.length > 0 ? errors : undefined,
       totalChanges: totalChanges,
-      note: 'This is using the Node.js implementation. Actual Plex sharing API calls need to be implemented.'
+      apiCallsMade: actualApiCalls,
+      note: 'Real Plex API integration - actual invites and library sharing performed'
     });
     
   } catch (error) {
     console.error('❌ Error in comprehensive sharing:', error);
     res.status(500).json({ error: 'Failed to share user libraries' });
+  }
+});
+
+// Legacy sharing endpoint (for backward compatibility)
+router.post('/share', async (req, res) => {
+  try {
+    const { userEmail, serverGroup, libraries } = req.body;
+    
+    if (!userEmail || !serverGroup || !libraries) {
+      return res.status(400).json({ error: 'Missing required fields: userEmail, serverGroup, libraries' });
+    }
+    
+    if (!['plex1', 'plex2'].includes(serverGroup)) {
+      return res.status(400).json({ error: 'Invalid server group. Use plex1 or plex2' });
+    }
+    
+    console.log(`🤝 API: Legacy sharing request for ${userEmail} on ${serverGroup}`);
+    
+    const result = await plexService.shareLibrariesWithUserEnhanced(userEmail, serverGroup, libraries);
+    
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  } catch (error) {
+    console.error('Error sharing libraries:', error);
+    res.status(500).json({ error: 'Failed to share libraries' });
   }
 });
 
@@ -264,6 +299,60 @@ router.get('/servers', async (req, res) => {
   } catch (error) {
     console.error('Error fetching servers:', error);
     res.status(500).json({ error: 'Failed to fetch servers' });
+  }
+});
+
+// DEBUG: Check user's current Plex status across all servers
+router.get('/debug/user/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+    console.log(`🐛 DEBUG: Comprehensive user check for ${email}`);
+    
+    const serverConfigs = plexService.getServerConfig();
+    const debugInfo = {};
+    
+    for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
+      debugInfo[groupName] = {};
+      
+      try {
+        // Check regular server
+        const regularUsers = await plexService.getAllSharedUsersFromServer(groupConfig.regular);
+        const regularUser = regularUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+        debugInfo[groupName].regular = {
+          server: groupConfig.regular.name,
+          found: !!regularUser,
+          libraries: regularUser ? regularUser.libraries.length : 0,
+          sharedServerId: regularUser ? regularUser.sharedServerId : null
+        };
+        
+        // Check 4K server
+        const fourkUsers = await plexService.getAllSharedUsersFromServer(groupConfig.fourk);
+        const fourkUser = fourkUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+        debugInfo[groupName].fourk = {
+          server: groupConfig.fourk.name,
+          found: !!fourkUser,
+          libraries: fourkUser ? fourkUser.libraries.length : 0,
+          sharedServerId: fourkUser ? fourkUser.sharedServerId : null
+        };
+        
+      } catch (error) {
+        debugInfo[groupName].error = error.message;
+      }
+    }
+    
+    // Also get database info
+    const dbAccess = await plexService.getUserCurrentAccess(email);
+    
+    res.json({
+      email: email,
+      plexServers: debugInfo,
+      databaseAccess: dbAccess,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Error in debug endpoint:', error);
+    res.status(500).json({ error: 'Failed to get debug info' });
   }
 });
 

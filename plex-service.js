@@ -61,20 +61,32 @@ class PlexService {
   }
 
   // Make request to Plex.tv API
-  async makePlexTvRequest(serverId, token, path = '') {
+  async makePlexTvRequest(serverId, token, path = '', method = 'GET', data = null) {
     try {
       const url = `https://plex.tv/api/servers/${serverId}${path}?X-Plex-Token=${token}`;
       
-      const response = await axios.get(url, {
+      const config = {
+        method: method,
+        url: url,
         headers: {
-          'Accept': 'application/xml'
+          'Accept': 'application/xml',
+          'Content-Type': 'application/x-www-form-urlencoded'
         },
-        timeout: 10000
-      });
+        timeout: 15000
+      };
+
+      if (data && (method === 'POST' || method === 'PUT')) {
+        config.data = data;
+      }
       
+      const response = await axios(config);
       return response.data;
     } catch (error) {
       console.error(`❌ Plex.tv API request failed for server ${serverId}:`, error.message);
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+      }
       throw error;
     }
   }
@@ -148,6 +160,7 @@ class PlexService {
       for (const sharedServer of sharedServers) {
         const userEmail = sharedServer.$.email;
         const username = sharedServer.$.username;
+        const sharedServerId = sharedServer.$.id;
 
         // Get their library access
         const sharedLibraries = [];
@@ -170,6 +183,7 @@ class PlexService {
         allSharedUsers.push({
           email: userEmail,
           username: username,
+          sharedServerId: sharedServerId,
           libraries: sharedLibraries
         });
       }
@@ -226,96 +240,22 @@ class PlexService {
     }
   }
 
-  // FIXED: Actual Plex API sharing implementation
-  async shareLibrariesWithUser(userEmail, serverGroup, libraries, action = 'add') {
+  // FIXED: Find user's shared server ID
+  async findSharedServerId(userEmail, serverConfig) {
     try {
-      console.log(`🤝 ${action.toUpperCase()} libraries for ${userEmail} on ${serverGroup}`);
-      
-      const serverConfigs = this.getServerConfig();
-      const config = serverConfigs[serverGroup];
-      
-      if (!config) {
-        throw new Error(`Invalid server group: ${serverGroup}`);
-      }
-      
-      const results = [];
-      
-      // Handle regular libraries
-      if (libraries.regular && libraries.regular.length > 0) {
-        console.log(`📚 ${action} regular libraries:`, libraries.regular);
-        
-        for (const libraryId of libraries.regular) {
-          try {
-            if (action === 'add') {
-              await this.inviteUserToLibrary(userEmail, config.regular, libraryId);
-            } else {
-              await this.removeUserFromLibrary(userEmail, config.regular, libraryId);
-            }
-            results.push(`${action}ed regular library ${libraryId}`);
-          } catch (error) {
-            console.error(`Error ${action}ing regular library ${libraryId}:`, error.message);
-            results.push(`Failed to ${action} regular library ${libraryId}: ${error.message}`);
-          }
-        }
-      }
-      
-      // Handle 4K libraries
-      if (libraries.fourk && libraries.fourk.length > 0) {
-        console.log(`📚 ${action} 4K libraries:`, libraries.fourk);
-        
-        for (const libraryId of libraries.fourk) {
-          try {
-            if (action === 'add') {
-              await this.inviteUserToLibrary(userEmail, config.fourk, libraryId);
-            } else {
-              await this.removeUserFromLibrary(userEmail, config.fourk, libraryId);
-            }
-            results.push(`${action}ed 4K library ${libraryId}`);
-          } catch (error) {
-            console.error(`Error ${action}ing 4K library ${libraryId}:`, error.message);
-            results.push(`Failed to ${action} 4K library ${libraryId}: ${error.message}`);
-          }
-        }
-      }
-      
-      return {
-        success: true,
-        message: `Successfully processed ${libraries.regular?.length || 0} regular + ${libraries.fourk?.length || 0} 4K libraries`,
-        details: results
-      };
-      
+      const sharedUsers = await this.getAllSharedUsersFromServer(serverConfig);
+      const user = sharedUsers.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+      return user ? user.sharedServerId : null;
     } catch (error) {
-      console.error(`❌ Error ${action}ing libraries:`, error);
-      return {
-        success: false,
-        error: error.message
-      };
+      console.error(`Error finding shared server ID for ${userEmail}:`, error);
+      return null;
     }
   }
 
-  // NEW: Invite user to specific library
-  async inviteUserToLibrary(userEmail, serverConfig, libraryId) {
+  // FIXED: Invite user to server if not already invited
+  async inviteUserToServer(userEmail, serverConfig) {
     try {
-      console.log(`📧 Inviting ${userEmail} to library ${libraryId} on ${serverConfig.name}`);
-      
-      // Step 1: Make sure user is invited to server
-      await this.ensureUserInvitedToServer(userEmail, serverConfig);
-      
-      // Step 2: Share the specific library
-      await this.shareSpecificLibraryWithUser(userEmail, serverConfig, libraryId);
-      
-      console.log(`✅ Successfully invited ${userEmail} to library ${libraryId}`);
-      
-    } catch (error) {
-      console.error(`❌ Error inviting user to library:`, error);
-      throw error;
-    }
-  }
-
-  // NEW: Ensure user is invited to server
-  async ensureUserInvitedToServer(userEmail, serverConfig) {
-    try {
-      console.log(`🔍 Checking if ${userEmail} is invited to ${serverConfig.name}`);
+      console.log(`📧 Checking if ${userEmail} needs invitation to ${serverConfig.name}...`);
       
       // Check if user is already invited
       const existingUsers = await this.getAllSharedUsersFromServer(serverConfig);
@@ -323,13 +263,11 @@ class PlexService {
       
       if (userExists) {
         console.log(`✅ User ${userEmail} already invited to ${serverConfig.name}`);
-        return;
+        return { success: true, sharedServerId: userExists.sharedServerId };
       }
       
       // Invite user to server
-      console.log(`📧 Inviting ${userEmail} to ${serverConfig.name}`);
-      
-      const inviteUrl = `https://plex.tv/api/servers/${serverConfig.serverId}/shared_servers`;
+      console.log(`📧 Inviting ${userEmail} to ${serverConfig.name}...`);
       
       const formData = new URLSearchParams();
       formData.append('server_id', serverConfig.serverId);
@@ -341,187 +279,124 @@ class PlexService {
       formData.append('shared_server[settings][filterTelevision]', '');
       formData.append('shared_server[settings][filterMusic]', '');
       
-      const response = await axios.post(inviteUrl, formData, {
-        headers: {
-          'X-Plex-Token': serverConfig.token,
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        timeout: 15000
-      });
+      const responseData = await this.makePlexTvRequest(
+        serverConfig.serverId, 
+        serverConfig.token, 
+        '/shared_servers', 
+        'POST', 
+        formData
+      );
       
-      console.log(`✅ User ${userEmail} invited to ${serverConfig.name}`);
-      return response.data;
+      // Parse the response to get the shared server ID
+      const result = await this.parser.parseStringPromise(responseData);
+      const sharedServerId = result.MediaContainer?.SharedServer?.$?.id;
+      
+      console.log(`✅ User ${userEmail} invited to ${serverConfig.name} with shared server ID: ${sharedServerId}`);
+      
+      return { success: true, sharedServerId: sharedServerId };
       
     } catch (error) {
       if (error.response && error.response.status === 422) {
-        // User already invited - this is okay
-        console.log(`ℹ️ User ${userEmail} already invited to ${serverConfig.name}`);
-        return;
+        // User already invited or other expected error
+        console.log(`ℹ️ User ${userEmail} already invited to ${serverConfig.name} (422 response)`);
+        
+        // Try to find their shared server ID
+        const sharedServerId = await this.findSharedServerId(userEmail, serverConfig);
+        return { success: true, sharedServerId: sharedServerId };
       }
       
-      console.error(`❌ Error inviting user to server:`, error.message);
-      throw error;
+      console.error(`❌ Error inviting user to ${serverConfig.name}:`, error.message);
+      return { success: false, error: error.message };
     }
   }
 
-  // NEW: Share specific library with user
-  async shareSpecificLibraryWithUser(userEmail, serverConfig, libraryId) {
+  // FIXED: Update user's library access on a server
+  async updateUserLibraryAccess(userEmail, serverConfig, libraryIds) {
     try {
-      console.log(`📚 Sharing library ${libraryId} with ${userEmail} on ${serverConfig.name}`);
+      console.log(`📚 Updating library access for ${userEmail} on ${serverConfig.name}`);
+      console.log(`📋 New library IDs:`, libraryIds);
       
-      // Get the user's shared server ID
-      const sharedServerId = await this.getSharedServerId(userEmail, serverConfig);
+      // Ensure user is invited first
+      const inviteResult = await this.inviteUserToServer(userEmail, serverConfig);
+      if (!inviteResult.success) {
+        throw new Error(`Failed to invite user: ${inviteResult.error}`);
+      }
       
+      const sharedServerId = inviteResult.sharedServerId;
       if (!sharedServerId) {
-        throw new Error(`Could not find shared server for ${userEmail} on ${serverConfig.name}`);
+        throw new Error(`Could not find shared server ID for ${userEmail}`);
       }
       
-      // Get user's current libraries
-      const currentLibraries = await this.getUserLibrariesOnServer(userEmail, serverConfig);
-      
-      // Add the new library if not already there
-      if (!currentLibraries.includes(libraryId)) {
-        currentLibraries.push(libraryId);
-      }
-      
-      // Update user's library access
-      const shareUrl = `https://plex.tv/api/servers/${serverConfig.serverId}/shared_servers/${sharedServerId}`;
-      
+      // Update library access
       const formData = new URLSearchParams();
-      currentLibraries.forEach(id => {
-        formData.append(`shared_server[librarySectionIds][]`, id);
+      
+      // Add each library ID to the form data
+      libraryIds.forEach(id => {
+        formData.append('shared_server[librarySectionIds][]', id);
       });
       
-      const response = await axios.put(shareUrl, formData, {
-        headers: {
-          'X-Plex-Token': serverConfig.token,
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        timeout: 15000
-      });
+      // Also maintain other settings
+      formData.append('shared_server[settings][allowChannels]', '1');
+      formData.append('shared_server[settings][allowSync]', '1');
+      formData.append('shared_server[settings][allowCameraUpload]', '0');
       
-      console.log(`✅ Library ${libraryId} shared with ${userEmail}`);
-      return response.data;
-      
-    } catch (error) {
-      console.error(`❌ Error sharing library:`, error.message);
-      throw error;
-    }
-  }
-
-  // NEW: Get shared server ID for a user
-  async getSharedServerId(userEmail, serverConfig) {
-    try {
-      const xmlData = await this.makePlexTvRequest(serverConfig.serverId, serverConfig.token, '/shared_servers');
-      const result = await this.parser.parseStringPromise(xmlData);
-      
-      if (!result.MediaContainer || !result.MediaContainer.SharedServer) {
-        return null;
-      }
-      
-      const sharedServers = Array.isArray(result.MediaContainer.SharedServer)
-        ? result.MediaContainer.SharedServer
-        : [result.MediaContainer.SharedServer];
-      
-      const userServer = sharedServers.find(server => 
-        server.$.email.toLowerCase() === userEmail.toLowerCase()
+      await this.makePlexTvRequest(
+        serverConfig.serverId,
+        serverConfig.token,
+        `/shared_servers/${sharedServerId}`,
+        'PUT',
+        formData
       );
       
-      return userServer ? userServer.$.id : null;
+      console.log(`✅ Updated library access for ${userEmail} on ${serverConfig.name}`);
+      return { success: true };
       
     } catch (error) {
-      console.error('Error getting shared server ID:', error);
-      return null;
+      console.error(`❌ Error updating library access for ${userEmail}:`, error.message);
+      return { success: false, error: error.message };
     }
   }
 
-  // NEW: Get user's current libraries on a server
-  async getUserLibrariesOnServer(userEmail, serverConfig) {
+  // FIXED: Remove user from server entirely
+  async removeUserFromServer(userEmail, serverConfig) {
     try {
-      const allUsers = await this.getAllSharedUsersFromServer(serverConfig);
-      const user = allUsers.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+      console.log(`🗑️ Removing ${userEmail} from ${serverConfig.name}...`);
       
-      return user ? user.libraries.map(lib => lib.id) : [];
-      
-    } catch (error) {
-      console.error('Error getting user libraries:', error);
-      return [];
-    }
-  }
-
-  // NEW: Remove user from specific library
-  async removeUserFromLibrary(userEmail, serverConfig, libraryId) {
-    try {
-      console.log(`🗑️ Removing ${userEmail} from library ${libraryId} on ${serverConfig.name}`);
-      
-      const sharedServerId = await this.getSharedServerId(userEmail, serverConfig);
+      const sharedServerId = await this.findSharedServerId(userEmail, serverConfig);
       
       if (!sharedServerId) {
         console.log(`ℹ️ User ${userEmail} not found on ${serverConfig.name}`);
-        return;
+        return { success: true, message: 'User not found on server' };
       }
       
-      // Get current libraries and remove the specified one
-      const currentLibraries = await this.getUserLibrariesOnServer(userEmail, serverConfig);
-      const newLibraries = currentLibraries.filter(id => id !== libraryId);
-      
-      // Update with new library list
-      const shareUrl = `https://plex.tv/api/servers/${serverConfig.serverId}/shared_servers/${sharedServerId}`;
-      
-      const formData = new URLSearchParams();
-      newLibraries.forEach(id => {
-        formData.append(`shared_server[librarySectionIds][]`, id);
-      });
-      
-      const response = await axios.put(shareUrl, formData, {
-        headers: {
-          'X-Plex-Token': serverConfig.token,
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        timeout: 15000
-      });
-      
-      console.log(`✅ Library ${libraryId} removed from ${userEmail}`);
-      return response.data;
-      
-    } catch (error) {
-      console.error(`❌ Error removing library:`, error.message);
-      throw error;
-    }
-  }
-
-  // NEW: Remove user from server entirely
-  async removeUserFromServer(userEmail, serverConfig) {
-    try {
-      const sharedServerId = await this.getSharedServerId(userEmail, serverConfig);
-      
-      if (!sharedServerId) {
-        console.log(`User ${userEmail} not found on ${serverConfig.name}`);
-        return;
-      }
-      
-      const removeUrl = `https://plex.tv/api/servers/${serverConfig.serverId}/shared_servers/${sharedServerId}`;
-      
-      await axios.delete(removeUrl, {
-        headers: {
-          'X-Plex-Token': serverConfig.token
-        },
-        timeout: 15000
-      });
+      await this.makePlexTvRequest(
+        serverConfig.serverId,
+        serverConfig.token,
+        `/shared_servers/${sharedServerId}`,
+        'DELETE'
+      );
       
       console.log(`✅ Removed ${userEmail} from ${serverConfig.name}`);
+      return { success: true };
       
     } catch (error) {
-      console.error(`Error removing user from server:`, error);
-      throw error;
+      console.error(`❌ Error removing user from ${serverConfig.name}:`, error.message);
+      return { success: false, error: error.message };
     }
   }
 
-  // FIXED: Enhanced sharing method with real API calls
+  // COMPLETELY REWRITTEN: Enhanced sharing method with real API calls
   async shareLibrariesWithUserEnhanced(userEmail, serverGroup, newLibraries) {
     try {
       console.log(`🔄 Enhanced library sharing for ${userEmail} on ${serverGroup}`);
       console.log(`📋 New library selection:`, newLibraries);
+      
+      const serverConfigs = this.getServerConfig();
+      const config = serverConfigs[serverGroup];
+      
+      if (!config) {
+        throw new Error(`Invalid server group: ${serverGroup}`);
+      }
       
       // Step 1: Get user's current access
       const currentAccess = await this.getUserCurrentAccess(userEmail);
@@ -529,49 +404,55 @@ class PlexService {
       
       console.log(`📊 Current access:`, currentGroupAccess);
       
-      // Step 2: Determine what needs to be added and what needs to be removed
+      // Step 2: Determine what needs to be done
       const requestedRegular = newLibraries.regular || [];
       const requestedFourk = newLibraries.fourk || [];
       
-      const librariesToAdd = {
-        regular: requestedRegular.filter(libId => !currentGroupAccess.regular.includes(libId)),
-        fourk: requestedFourk.filter(libId => !currentGroupAccess.fourk.includes(libId))
-      };
+      let results = {};
+      let totalChanges = 0;
       
-      const librariesToRemove = {
-        regular: currentGroupAccess.regular.filter(libId => !requestedRegular.includes(libId)),
-        fourk: currentGroupAccess.fourk.filter(libId => !requestedFourk.includes(libId))
-      };
-      
-      console.log(`📋 Libraries to ADD:`, librariesToAdd);
-      console.log(`📋 Libraries to REMOVE:`, librariesToRemove);
-      
-      // Step 3: Actually make the Plex API calls
-      const hasChanges = (librariesToAdd.regular.length > 0 || librariesToAdd.fourk.length > 0 ||
-                         librariesToRemove.regular.length > 0 || librariesToRemove.fourk.length > 0);
-      
-      if (hasChanges) {
-        console.log(`🤝 Making actual changes to ${userEmail}'s library access...`);
+      // Step 3: Handle regular server libraries
+      if (!this.arraysEqual(currentGroupAccess.regular, requestedRegular)) {
+        console.log(`🔄 Updating regular server access...`);
+        console.log(`   Current: [${currentGroupAccess.regular.join(', ')}]`);
+        console.log(`   Requested: [${requestedRegular.join(', ')}]`);
         
-        // Add new libraries
-        if (librariesToAdd.regular.length > 0 || librariesToAdd.fourk.length > 0) {
-          const addResult = await this.shareLibrariesWithUser(userEmail, serverGroup, librariesToAdd, 'add');
-          if (!addResult.success) {
-            throw new Error(`Failed to add libraries: ${addResult.error}`);
-          }
-          console.log(`✅ Added libraries:`, addResult.details);
+        const regularResult = await this.updateUserLibraryAccess(userEmail, config.regular, requestedRegular);
+        results.regular = regularResult;
+        
+        if (regularResult.success) {
+          totalChanges++;
+          console.log(`✅ Regular server access updated`);
+        } else {
+          console.log(`❌ Regular server access failed: ${regularResult.error}`);
         }
+      } else {
+        console.log(`ℹ️ Regular server access unchanged`);
+        results.regular = { success: true, message: 'No changes needed' };
+      }
+      
+      // Step 4: Handle 4K server libraries
+      if (!this.arraysEqual(currentGroupAccess.fourk, requestedFourk)) {
+        console.log(`🔄 Updating 4K server access...`);
+        console.log(`   Current: [${currentGroupAccess.fourk.join(', ')}]`);
+        console.log(`   Requested: [${requestedFourk.join(', ')}]`);
         
-        // Remove libraries
-        if (librariesToRemove.regular.length > 0 || librariesToRemove.fourk.length > 0) {
-          const removeResult = await this.shareLibrariesWithUser(userEmail, serverGroup, librariesToRemove, 'remove');
-          if (!removeResult.success) {
-            throw new Error(`Failed to remove libraries: ${removeResult.error}`);
-          }
-          console.log(`✅ Removed libraries:`, removeResult.details);
+        const fourkResult = await this.updateUserLibraryAccess(userEmail, config.fourk, requestedFourk);
+        results.fourk = fourkResult;
+        
+        if (fourkResult.success) {
+          totalChanges++;
+          console.log(`✅ 4K server access updated`);
+        } else {
+          console.log(`❌ 4K server access failed: ${fourkResult.error}`);
         }
-        
-        // Update database
+      } else {
+        console.log(`ℹ️ 4K server access unchanged`);
+        results.fourk = { success: true, message: 'No changes needed' };
+      }
+      
+      // Step 5: Update database with new access
+      if (totalChanges > 0) {
         const updatedAccess = { ...currentAccess };
         updatedAccess[serverGroup] = {
           regular: requestedRegular,
@@ -579,22 +460,24 @@ class PlexService {
         };
         
         await this.updateUserLibraryAccessInDatabase(userEmail, updatedAccess);
-        
-        return {
-          success: true,
-          message: `Library access updated successfully for ${userEmail} - Changes applied to Plex servers`,
-          addedLibraries: librariesToAdd,
-          removedLibraries: librariesToRemove,
-          currentAccess: updatedAccess[serverGroup]
-        };
-      } else {
-        console.log(`ℹ️ No changes needed for ${userEmail} on ${serverGroup}`);
-        return {
-          success: true,
-          message: 'No library changes needed',
-          currentAccess: currentGroupAccess
-        };
+        console.log(`💾 Database updated with new access`);
       }
+      
+      // Step 6: Return comprehensive result
+      const overallSuccess = results.regular.success && results.fourk.success;
+      
+      return {
+        success: overallSuccess,
+        message: totalChanges > 0 
+          ? `Library access updated successfully (${totalChanges} servers modified)`
+          : 'No library changes needed',
+        changes: totalChanges,
+        results: results,
+        currentAccess: {
+          regular: requestedRegular,
+          fourk: requestedFourk
+        }
+      };
       
     } catch (error) {
       console.error(`❌ Error in enhanced library sharing:`, error);
@@ -603,6 +486,14 @@ class PlexService {
         error: error.message
       };
     }
+  }
+
+  // Helper function to compare arrays
+  arraysEqual(a, b) {
+    if (a.length !== b.length) return false;
+    const sortedA = [...a].sort();
+    const sortedB = [...b].sort();
+    return sortedA.every((val, index) => val === sortedB[index]);
   }
 
   // FIXED: Remove user access with real API calls
@@ -619,12 +510,20 @@ class PlexService {
         
         try {
           // Remove from regular server
-          await this.removeUserFromServer(userEmail, config.regular);
-          results.push(`Removed from ${config.regular.name}`);
+          const regularResult = await this.removeUserFromServer(userEmail, config.regular);
+          if (regularResult.success) {
+            results.push(`Removed from ${config.regular.name}`);
+          } else {
+            results.push(`Failed to remove from ${config.regular.name}: ${regularResult.error}`);
+          }
           
           // Remove from 4K server  
-          await this.removeUserFromServer(userEmail, config.fourk);
-          results.push(`Removed from ${config.fourk.name}`);
+          const fourkResult = await this.removeUserFromServer(userEmail, config.fourk);
+          if (fourkResult.success) {
+            results.push(`Removed from ${config.fourk.name}`);
+          } else {
+            results.push(`Failed to remove from ${config.fourk.name}: ${fourkResult.error}`);
+          }
           
         } catch (error) {
           console.error(`Error removing user from ${serverGroup}:`, error);
@@ -644,6 +543,16 @@ class PlexService {
         success: false,
         error: error.message
       };
+    }
+  }
+
+  // SIMPLIFIED: Legacy method for backward compatibility
+  async shareLibrariesWithUser(userEmail, serverGroup, libraries, action = 'add') {
+    if (action === 'add') {
+      return await this.shareLibrariesWithUserEnhanced(userEmail, serverGroup, libraries);
+    } else {
+      // For remove action, set empty libraries
+      return await this.shareLibrariesWithUserEnhanced(userEmail, serverGroup, { regular: [], fourk: [] });
     }
   }
 
