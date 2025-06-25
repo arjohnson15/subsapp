@@ -1,3 +1,4 @@
+// users-routes.js - Fixed version with proper tag handling
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const db = require('./database-config');
@@ -13,6 +14,41 @@ function safeJsonParse(jsonString, defaultValue = null) {
     console.error('JSON parse error:', error, 'for string:', jsonString);
     return defaultValue;
   }
+}
+
+// FIXED: Smart tag processing that preserves tags with remaining library access
+function processTagsForUpdate(plexLibraries, existingTags = []) {
+  console.log('Processing tags for update:', plexLibraries);
+  console.log('Existing tags:', existingTags);
+  
+  // Start with non-Plex tags (preserve IPTV, etc.)
+  const nonPlexTags = existingTags.filter(tag => 
+    !tag.toLowerCase().includes('plex')
+  );
+  
+  const updatedTags = [...nonPlexTags];
+  
+  // Add Plex tags based on library access
+  Object.keys(plexLibraries).forEach(serverGroup => {
+    const libraries = plexLibraries[serverGroup];
+    
+    // Check if user has ANY library access for this server group
+    const hasRegularAccess = libraries.regular && libraries.regular.length > 0;
+    const hasFourkAccess = libraries.fourk && libraries.fourk.length > 0;
+    const hasAnyAccess = hasRegularAccess || hasFourkAccess;
+    
+    if (hasAnyAccess) {
+      if (serverGroup === 'plex1' && !updatedTags.includes('Plex 1')) {
+        updatedTags.push('Plex 1');
+      } else if (serverGroup === 'plex2' && !updatedTags.includes('Plex 2')) {
+        updatedTags.push('Plex 2');
+      }
+    }
+    // Note: We do NOT remove tags here - only add them if access exists
+  });
+  
+  console.log('Processed tags for update:', updatedTags);
+  return updatedTags;
 }
 
 // Get all users with their subscriptions
@@ -106,7 +142,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create new user (updated field names)
+// Create new user
 router.post('/', [
   body('name').notEmpty().trim().escape(),
   body('email').isEmail().normalizeEmail(),
@@ -132,6 +168,11 @@ router.post('/', [
       return res.status(400).json({ error: 'Email already exists' });
     }
 
+    // FIXED: Process tags based on actual library access
+    const processedTags = plex_libraries ? 
+      processTagsForUpdate(plex_libraries, tags || []) : 
+      (tags || []);
+
     const result = await db.query(`
       INSERT INTO users (
         name, email, owner_id, plex_email,
@@ -141,7 +182,9 @@ router.post('/', [
     `, [
       name, email, owner_id || null, plex_email,
       iptv_username, iptv_password, implayer_code, device_count || 1,
-      bcc_owner_renewal || false, JSON.stringify(tags || []), JSON.stringify(plex_libraries || {})
+      bcc_owner_renewal || false, 
+      JSON.stringify(processedTags), 
+      JSON.stringify(plex_libraries || {})
     ]);
 
     res.status(201).json({ 
@@ -154,7 +197,7 @@ router.post('/', [
   }
 });
 
-// Update user (updated field names)
+// FIXED: Update user with smart tag processing
 router.put('/:id', [
   body('name').notEmpty().trim().escape(),
   body('email').isEmail().normalizeEmail(),
@@ -180,6 +223,22 @@ router.put('/:id', [
       return res.status(400).json({ error: 'Email already exists' });
     }
 
+    // FIXED: Get current user data to preserve existing tags properly
+    const [currentUser] = await db.query('SELECT tags, plex_libraries FROM users WHERE id = ?', [req.params.id]);
+    const currentTags = safeJsonParse(currentUser?.tags, []);
+    const currentPlexLibraries = safeJsonParse(currentUser?.plex_libraries, {});
+
+    console.log('Current user tags:', currentTags);
+    console.log('Current plex libraries:', currentPlexLibraries);
+    console.log('New plex libraries:', plex_libraries);
+
+    // FIXED: Process tags based on the new library access
+    const processedTags = plex_libraries ? 
+      processTagsForUpdate(plex_libraries, currentTags) : 
+      (tags || currentTags);
+
+    console.log('Final processed tags:', processedTags);
+
     await db.query(`
       UPDATE users SET 
         name = ?, email = ?, owner_id = ?, plex_email = ?,
@@ -189,7 +248,9 @@ router.put('/:id', [
     `, [
       name, email, owner_id || null, plex_email,
       iptv_username, iptv_password, implayer_code, device_count || 1,
-      bcc_owner_renewal || false, JSON.stringify(tags || []), JSON.stringify(plex_libraries || {}),
+      bcc_owner_renewal || false, 
+      JSON.stringify(processedTags), 
+      JSON.stringify(plex_libraries || {}),
       req.params.id
     ]);
 
