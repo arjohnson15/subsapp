@@ -356,4 +356,40 @@ router.get('/debug/user/:email', async (req, res) => {
   }
 });
 
+// DEBUG: Get user's detailed Plex access information
+router.get('/debug/user/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+    console.log(`🐛 DEBUG: Getting detailed info for ${email}`);
+    
+    // Get current access from our system
+    const currentAccess = await plexService.getUserCurrentAccess(email);
+    
+    // Get user from database
+    const [dbUser] = await db.query(`
+      SELECT id, name, email, plex_email, tags, plex_libraries
+      FROM users 
+      WHERE email = ? OR plex_email = ?
+    `, [email, email]);
+    
+    res.json({
+      email: email,
+      databaseUser: dbUser ? {
+        id: dbUser.id,
+        name: dbUser.name,
+        email: dbUser.email,
+        plex_email: dbUser.plex_email,
+        tags: JSON.parse(dbUser.tags || '[]'),
+        plex_libraries: JSON.parse(dbUser.plex_libraries || '{}')
+      } : null,
+      currentPlexAccess: currentAccess,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Error in debug endpoint:', error);
+    res.status(500).json({ error: 'Failed to get debug info' });
+  }
+});
+
 module.exports = router;
