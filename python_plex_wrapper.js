@@ -5,6 +5,10 @@ const path = require('path');
 class PythonPlexService {
   constructor() {
     this.pythonScript = path.join(__dirname, 'plex_service.py');
+    // Use Python from virtual environment in Docker, fallback to system python3
+    this.pythonExecutable = process.env.NODE_ENV === 'production' 
+      ? '/app/venv/bin/python' 
+      : 'python3';
   }
 
   /**
@@ -12,9 +16,9 @@ class PythonPlexService {
    */
   async executePythonCommand(args) {
     return new Promise((resolve, reject) => {
-      console.log(`🐍 Executing Python command: python3 ${this.pythonScript} ${args.join(' ')}`);
+      console.log(`🐍 Executing Python command: ${this.pythonExecutable} ${this.pythonScript} ${args.join(' ')}`);
       
-      const python = spawn('python3', [this.pythonScript, ...args]);
+      const python = spawn(this.pythonExecutable, [this.pythonScript, ...args]);
       
       let stdout = '';
       let stderr = '';
