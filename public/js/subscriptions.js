@@ -7,9 +7,11 @@ window.Subscriptions = {
     editingSubscriptionId: null,
     
     async init() {
+        console.log('🔧 Initializing Subscriptions module...');
         await this.loadSubscriptions();
         this.setupEventListeners();
         this.updateStats();
+        console.log('✅ Subscriptions module initialized');
     },
     
     setupEventListeners() {
@@ -37,18 +39,25 @@ window.Subscriptions = {
     
     async loadSubscriptions() {
         try {
+            console.log('📊 Loading subscriptions from API...');
             window.AppState.subscriptionTypes = await API.Subscription.getAll();
+            console.log('📊 Subscriptions loaded:', window.AppState.subscriptionTypes.length);
             this.renderSubscriptionsTable();
         } catch (error) {
+            console.error('❌ Error loading subscriptions:', error);
             Utils.handleError(error, 'Loading subscriptions');
         }
     },
     
     renderSubscriptionsTable() {
         const tbody = document.getElementById('subscriptionsTableBody');
-        if (!tbody) return;
+        if (!tbody) {
+            console.log('⚠️ Table body not found');
+            return;
+        }
         
-        const subscriptions = window.AppState.subscriptionTypes;
+        const subscriptions = window.AppState.subscriptionTypes || [];
+        console.log('🎨 Rendering', subscriptions.length, 'subscriptions');
         
         if (subscriptions.length === 0) {
             tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No subscription types found</td></tr>';
@@ -71,25 +80,32 @@ window.Subscriptions = {
                 </td>
                 <td>
                     <button class="btn btn-small btn-edit" onclick="Subscriptions.editSubscription(${sub.id})">Edit</button>
-                    <button class="btn btn-small btn-delete" onclick="Subscriptions.deleteSubscription(${sub.id})">
+                    <button class="btn btn-small btn-delete" onclick="Subscriptions.toggleSubscription(${sub.id})">
                         ${sub.active ? 'Deactivate' : 'Activate'}
                     </button>
                 </td>
             </tr>
         `).join('');
+        
+        console.log('✅ Subscriptions table rendered');
     },
     
     updateStats() {
         const subscriptions = window.AppState.subscriptionTypes || [];
         
         // Update stat numbers
-        document.getElementById('totalSubscriptions').textContent = subscriptions.length;
+        const totalElement = document.getElementById('totalSubscriptions');
+        const plexElement = document.getElementById('plexSubscriptions');
+        const iptvElement = document.getElementById('iptvSubscriptions');
+        const avgElement = document.getElementById('averagePrice');
+        
+        if (totalElement) totalElement.textContent = subscriptions.length;
         
         const plexSubs = subscriptions.filter(sub => sub.type === 'plex');
         const iptvSubs = subscriptions.filter(sub => sub.type === 'iptv');
         
-        document.getElementById('plexSubscriptions').textContent = plexSubs.length;
-        document.getElementById('iptvSubscriptions').textContent = iptvSubs.length;
+        if (plexElement) plexElement.textContent = plexSubs.length;
+        if (iptvElement) iptvElement.textContent = iptvSubs.length;
         
         // Calculate average price
         const activeSubs = subscriptions.filter(sub => sub.active);
@@ -97,7 +113,14 @@ window.Subscriptions = {
             ? activeSubs.reduce((sum, sub) => sum + parseFloat(sub.price), 0) / activeSubs.length
             : 0;
         
-        document.getElementById('averagePrice').textContent = `$${avgPrice.toFixed(2)}`;
+        if (avgElement) avgElement.textContent = `$${avgPrice.toFixed(2)}`;
+        
+        console.log('📊 Stats updated:', {
+            total: subscriptions.length,
+            plex: plexSubs.length,
+            iptv: iptvSubs.length,
+            avgPrice: avgPrice
+        });
     },
     
     sortSubscriptions(field) {
@@ -118,20 +141,26 @@ window.Subscriptions = {
     },
     
     showCreateForm() {
+        console.log('📝 Showing create form...');
         this.editingSubscriptionId = null;
         this.resetForm();
         
-        document.getElementById('formTitle').textContent = 'Create Subscription Type';
-        document.getElementById('subscriptionFormContainer').style.display = 'block';
+        const titleElement = document.getElementById('formTitle');
+        const containerElement = document.getElementById('subscriptionFormContainer');
         
-        // Scroll to form
-        document.getElementById('subscriptionFormContainer').scrollIntoView({ 
-            behavior: 'smooth' 
-        });
+        if (titleElement) titleElement.textContent = 'Create Subscription Type';
+        if (containerElement) {
+            containerElement.style.display = 'block';
+            containerElement.scrollIntoView({ behavior: 'smooth' });
+        }
     },
     
     hideForm() {
-        document.getElementById('subscriptionFormContainer').style.display = 'none';
+        console.log('❌ Hiding form...');
+        const containerElement = document.getElementById('subscriptionFormContainer');
+        if (containerElement) {
+            containerElement.style.display = 'none';
+        }
         this.resetForm();
         this.editingSubscriptionId = null;
     },
@@ -153,6 +182,7 @@ window.Subscriptions = {
     
     async editSubscription(subscriptionId) {
         try {
+            console.log('📝 Editing subscription:', subscriptionId);
             const subscription = window.AppState.subscriptionTypes.find(sub => sub.id === subscriptionId);
             if (!subscription) {
                 Utils.showNotification('Subscription not found', 'error');
@@ -162,24 +192,38 @@ window.Subscriptions = {
             this.editingSubscriptionId = subscriptionId;
             
             // Populate form
-            document.getElementById('subscriptionName').value = subscription.name;
-            document.getElementById('subscriptionType').value = subscription.type;
-            document.getElementById('subscriptionDuration').value = subscription.duration_months;
-            document.getElementById('subscriptionPrice').value = subscription.price;
-            document.getElementById('subscriptionStreams').value = subscription.streams || '';
-            document.getElementById('subscriptionActive').checked = subscription.active;
+            const fields = {
+                'subscriptionName': subscription.name,
+                'subscriptionType': subscription.type,
+                'subscriptionDuration': subscription.duration_months,
+                'subscriptionPrice': subscription.price,
+                'subscriptionStreams': subscription.streams || '',
+                'subscriptionActive': subscription.active
+            };
+            
+            Object.keys(fields).forEach(fieldId => {
+                const element = document.getElementById(fieldId);
+                if (element) {
+                    if (element.type === 'checkbox') {
+                        element.checked = fields[fieldId];
+                    } else {
+                        element.value = fields[fieldId];
+                    }
+                }
+            });
             
             // Show streams field if IPTV
             this.handleTypeChange();
             
             // Update form title and show
-            document.getElementById('formTitle').textContent = 'Edit Subscription Type';
-            document.getElementById('subscriptionFormContainer').style.display = 'block';
+            const titleElement = document.getElementById('formTitle');
+            const containerElement = document.getElementById('subscriptionFormContainer');
             
-            // Scroll to form
-            document.getElementById('subscriptionFormContainer').scrollIntoView({ 
-                behavior: 'smooth' 
-            });
+            if (titleElement) titleElement.textContent = 'Edit Subscription Type';
+            if (containerElement) {
+                containerElement.style.display = 'block';
+                containerElement.scrollIntoView({ behavior: 'smooth' });
+            }
             
         } catch (error) {
             Utils.handleError(error, 'Loading subscription for editing');
@@ -191,6 +235,7 @@ window.Subscriptions = {
         
         try {
             Utils.showLoading();
+            console.log('💾 Saving subscription...');
             
             const formData = Utils.collectFormData('subscriptionForm');
             
@@ -206,7 +251,7 @@ window.Subscriptions = {
                 formData.streams = null;
             }
             
-            console.log('Saving subscription:', formData);
+            console.log('💾 Form data:', formData);
             
             if (this.editingSubscriptionId) {
                 // Update existing
@@ -230,7 +275,7 @@ window.Subscriptions = {
         }
     },
     
-    async deleteSubscription(subscriptionId) {
+    async toggleSubscription(subscriptionId) {
         try {
             const subscription = window.AppState.subscriptionTypes.find(sub => sub.id === subscriptionId);
             if (!subscription) return;
@@ -262,62 +307,20 @@ window.Subscriptions = {
         } finally {
             Utils.hideLoading();
         }
-    },
-    
-    // Bulk operations
-    async activateAll() {
-        if (!confirm('Activate all subscription types?')) return;
-        
-        try {
-            Utils.showLoading();
-            
-            const subscriptions = window.AppState.subscriptionTypes;
-            const inactiveSubscriptions = subscriptions.filter(sub => !sub.active);
-            
-            for (const sub of inactiveSubscriptions) {
-                await API.Subscription.update(sub.id, { ...sub, active: true });
-            }
-            
-            Utils.showNotification(`Activated ${inactiveSubscriptions.length} subscription types`, 'success');
-            
-            await this.loadSubscriptions();
-            this.updateStats();
-            
-        } catch (error) {
-            Utils.handleError(error, 'Bulk activating subscriptions');
-        } finally {
-            Utils.hideLoading();
-        }
-    },
-    
-    async deactivateAll() {
-        if (!confirm('Deactivate all subscription types? This will prevent new users from selecting them.')) return;
-        
-        try {
-            Utils.showLoading();
-            
-            const subscriptions = window.AppState.subscriptionTypes;
-            const activeSubscriptions = subscriptions.filter(sub => sub.active);
-            
-            for (const sub of activeSubscriptions) {
-                await API.Subscription.update(sub.id, { ...sub, active: false });
-            }
-            
-            Utils.showNotification(`Deactivated ${activeSubscriptions.length} subscription types`, 'success');
-            
-            await this.loadSubscriptions();
-            this.updateStats();
-            
-        } catch (error) {
-            Utils.handleError(error, 'Bulk deactivating subscriptions');
-        } finally {
-            Utils.hideLoading();
-        }
     }
 };
 
 // Make functions globally available for onclick handlers
-window.activateAllSubscriptions = window.Subscriptions.activateAll.bind(window.Subscriptions);
-window.deactivateAllSubscriptions = window.Subscriptions.deactivateAll.bind(window.Subscriptions);
+window.activateAllSubscriptions = function() {
+    if (window.Subscriptions && window.Subscriptions.activateAll) {
+        return window.Subscriptions.activateAll();
+    }
+};
 
-console.log('📋 Subscriptions.js loaded successfully');
+window.deactivateAllSubscriptions = function() {
+    if (window.Subscriptions && window.Subscriptions.deactivateAll) {
+        return window.Subscriptions.deactivateAll();
+    }
+};
+
+console.log('✅ Subscriptions.js loaded successfully');
