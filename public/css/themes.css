@@ -197,6 +197,61 @@ td:nth-child(2) {
     text-overflow: ellipsis;
 }
 
+/* Subscription Management Styles */
+.subscription-form {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.subscription-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.subscription-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.subscription-type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.subscription-type-plex {
+    background: linear-gradient(45deg, #4caf50, #8bc34a);
+}
+
+.subscription-type-iptv {
+    background: linear-gradient(45deg, #ff9800, #ffc107);
+}
+
+/* Form specific for subscriptions */
+#subscriptionFormContainer {
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 /* Responsive Theme Adjustments */
 @media (max-width: 768px) {
     .dashboard-grid {
@@ -214,5 +269,13 @@ td:nth-child(2) {
     .plex-actions {
         flex-direction: column;
         gap: 5px;
+    }
+    
+    .subscription-actions {
+        flex-direction: column;
+    }
+    
+    .subscription-stats {
+        grid-template-columns: 1fr;
     }
 }

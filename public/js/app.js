@@ -115,6 +115,12 @@ async function initializePage(pageId) {
             await initUserFormPage();
             break;
             
+        case 'subscriptions':
+            if (window.Subscriptions && window.Subscriptions.init) {
+                await window.Subscriptions.init();
+            }
+            break;
+            
         case 'email':
             if (window.Email && window.Email.init) {
                 await window.Email.init();

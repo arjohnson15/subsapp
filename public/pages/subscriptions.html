@@ -1,0 +1,103 @@
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+    <h2 style="color: #4fc3f7;">Manage Subscriptions</h2>
+    <button class="btn" onclick="Subscriptions.showCreateForm()">Create New Subscription</button>
+</div>
+
+<div class="form-container" id="subscriptionFormContainer" style="display: none; margin-bottom: 30px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="color: #4fc3f7;" id="formTitle">Create Subscription Type</h3>
+        <button class="btn btn-secondary" onclick="Subscriptions.hideForm()">Cancel</button>
+    </div>
+    
+    <form id="subscriptionForm" onsubmit="Subscriptions.saveSubscription(event)">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="subscriptionName">Subscription Name:</label>
+                <input type="text" id="subscriptionName" name="name" required placeholder="e.g., Plex 12 Month">
+            </div>
+            <div class="form-group">
+                <label for="subscriptionType">Service Type:</label>
+                <select id="subscriptionType" name="type" required>
+                    <option value="">-- Select Type --</option>
+                    <option value="plex">Plex</option>
+                    <option value="iptv">IPTV</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="subscriptionDuration">Duration (Months):</label>
+                <input type="number" id="subscriptionDuration" name="duration_months" required min="1" max="120" placeholder="e.g., 12">
+            </div>
+            <div class="form-group">
+                <label for="subscriptionPrice">Price ($):</label>
+                <input type="number" id="subscriptionPrice" name="price" required min="0" step="0.01" placeholder="e.g., 120.00">
+            </div>
+        </div>
+        
+        <div class="form-group" id="streamCountGroup" style="display: none;">
+            <label for="subscriptionStreams">Number of Streams:</label>
+            <input type="number" id="subscriptionStreams" name="streams" min="1" max="10" placeholder="e.g., 2">
+            <small style="color: #4fc3f7;">Leave blank if not applicable</small>
+        </div>
+        
+        <div class="form-group">
+            <label>Status:</label>
+            <div class="checkbox-group">
+                <div class="checkbox-item">
+                    <input type="checkbox" id="subscriptionActive" name="active" checked>
+                    <label for="subscriptionActive">Active (available for new users)</label>
+                </div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <button type="submit" class="btn">Save Subscription</button>
+            <button type="button" class="btn btn-secondary" onclick="Subscriptions.hideForm()">Cancel</button>
+        </div>
+    </form>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th onclick="Subscriptions.sortSubscriptions('name')">Name ▼</th>
+                <th onclick="Subscriptions.sortSubscriptions('type')">Type ▼</th>
+                <th onclick="Subscriptions.sortSubscriptions('duration_months')">Duration ▼</th>
+                <th>Streams</th>
+                <th onclick="Subscriptions.sortSubscriptions('price')">Price ▼</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="subscriptionsTableBody">
+            <tr><td colspan="7" style="text-align: center;">Loading subscriptions...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Quick Stats -->
+<div class="dashboard-grid" style="margin-top: 30px;">
+    <div class="card">
+        <h3>Total Subscription Types</h3>
+        <div class="stat-number" id="totalSubscriptions">0</div>
+        <p>Available subscription options</p>
+    </div>
+    <div class="card">
+        <h3>Plex Subscriptions</h3>
+        <div class="stat-number" id="plexSubscriptions">0</div>
+        <p>Plex-based subscription types</p>
+    </div>
+    <div class="card">
+        <h3>IPTV Subscriptions</h3>
+        <div class="stat-number" id="iptvSubscriptions">0</div>
+        <p>IPTV-based subscription types</p>
+    </div>
+    <div class="card">
+        <h3>Average Price</h3>
+        <div class="stat-number" id="averagePrice">$0</div>
+        <p>Average subscription cost</p>
+    </div>
+</div>
