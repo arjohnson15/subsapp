@@ -130,8 +130,11 @@ async function initializePage(pageId) {
             break;
             
         case 'subscriptions':
+            console.log('🔧 Initializing subscriptions page...');
             if (window.Subscriptions && window.Subscriptions.init) {
                 await window.Subscriptions.init();
+            } else {
+                console.error('❌ Subscriptions module not available');
             }
             break;
             
