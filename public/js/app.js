@@ -34,7 +34,9 @@ async function initializeApp() {
         // Set up page routing
         handleHashChange();
         
-        console.log('✅ JohnsonFlix Manager initialized successfully');
+        checkModulesLoaded();
+
+         console.log('✅ JohnsonFlix Manager initialized successfully');
     } catch (error) {
         console.error('❌ Failed to initialize app:', error);
         Utils.showNotification('Failed to initialize application: ' + error.message, 'error');
@@ -66,6 +68,18 @@ async function loadInitialData() {
         console.error('Error loading initial data:', error);
         throw error;
     }
+}
+
+// Debug: Check if all modules are loaded
+function checkModulesLoaded() {
+    const modules = ['Utils', 'API', 'Plex', 'Users', 'Email', 'Settings', 'Subscriptions'];
+    modules.forEach(module => {
+        if (window[module]) {
+            console.log(`✅ ${module} module loaded`);
+        } else {
+            console.error(`❌ ${module} module NOT loaded`);
+        }
+    });
 }
 
 // Page navigation with hash routing

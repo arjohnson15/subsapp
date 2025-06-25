@@ -1,4 +1,5 @@
 // Subscription Management Functions
+console.log('📋 Loading Subscriptions.js...');
 
 window.Subscriptions = {
     currentSortField: 'name',

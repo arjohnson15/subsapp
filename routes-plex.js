@@ -1,5 +1,6 @@
 const express = require('express');
 const plexService = require('./plex-service');
+const db = require('./database-config');
 const router = express.Router();
 
 // Get libraries for a server group (plex1 or plex2)
@@ -302,19 +303,22 @@ router.get('/servers', async (req, res) => {
   }
 });
 
-// DEBUG: Check user's current Plex status across all servers
+// ENHANCED DEBUG: Get comprehensive user Plex status
 router.get('/debug/user/:email', async (req, res) => {
   try {
     const { email } = req.params;
-    console.log(`🐛 DEBUG: Comprehensive user check for ${email}`);
+    console.log(`🐛 DEBUG: Enhanced check for ${email}`);
     
     const serverConfigs = plexService.getServerConfig();
     const debugInfo = {};
     
+    // Check each server group with real-time API calls
     for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
       debugInfo[groupName] = {};
       
       try {
+        console.log(`🔍 Checking ${groupName} servers for ${email}...`);
+        
         // Check regular server
         const regularUsers = await plexService.getAllSharedUsersFromServer(groupConfig.regular);
         const regularUser = regularUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
@@ -322,6 +326,8 @@ router.get('/debug/user/:email', async (req, res) => {
           server: groupConfig.regular.name,
           found: !!regularUser,
           libraries: regularUser ? regularUser.libraries.length : 0,
+          libraryIds: regularUser ? regularUser.libraries.map(lib => lib.id) : [],
+          libraryNames: regularUser ? regularUser.libraries.map(lib => lib.title) : [],
           sharedServerId: regularUser ? regularUser.sharedServerId : null
         };
         
@@ -332,6 +338,8 @@ router.get('/debug/user/:email', async (req, res) => {
           server: groupConfig.fourk.name,
           found: !!fourkUser,
           libraries: fourkUser ? fourkUser.libraries.length : 0,
+          libraryIds: fourkUser ? fourkUser.libraries.map(lib => lib.id) : [],
+          libraryNames: fourkUser ? fourkUser.libraries.map(lib => lib.title) : [],
           sharedServerId: fourkUser ? fourkUser.sharedServerId : null
         };
         
@@ -340,55 +348,85 @@ router.get('/debug/user/:email', async (req, res) => {
       }
     }
     
-    // Also get database info
-    const dbAccess = await plexService.getUserCurrentAccess(email);
-    
-    res.json({
-      email: email,
-      plexServers: debugInfo,
-      databaseAccess: dbAccess,
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('Error in debug endpoint:', error);
-    res.status(500).json({ error: 'Failed to get debug info' });
-  }
-});
-
-// DEBUG: Get user's detailed Plex access information
-router.get('/debug/user/:email', async (req, res) => {
-  try {
-    const { email } = req.params;
-    console.log(`🐛 DEBUG: Getting detailed info for ${email}`);
-    
-    // Get current access from our system
-    const currentAccess = await plexService.getUserCurrentAccess(email);
-    
-    // Get user from database
+    // Get database info
     const [dbUser] = await db.query(`
       SELECT id, name, email, plex_email, tags, plex_libraries
       FROM users 
       WHERE email = ? OR plex_email = ?
     `, [email, email]);
     
+    // Get cached access using our method
+    const cachedAccess = await plexService.getUserCurrentAccess(email);
+    
     res.json({
       email: email,
+      realTimeStatus: debugInfo,
       databaseUser: dbUser ? {
         id: dbUser.id,
         name: dbUser.name,
         email: dbUser.email,
         plex_email: dbUser.plex_email,
         tags: JSON.parse(dbUser.tags || '[]'),
-        plex_libraries: JSON.parse(dbUser.plex_libraries || '{}')
+        stored_plex_libraries: JSON.parse(dbUser.plex_libraries || '{}')
       } : null,
-      currentPlexAccess: currentAccess,
+      cachedAccess: cachedAccess,
+      summary: {
+        totalPlexLibraries: Object.values(debugInfo).reduce((total, group) => {
+          return total + (group.regular?.libraries || 0) + (group.fourk?.libraries || 0);
+        }, 0),
+        hasAnyAccess: Object.values(debugInfo).some(group => 
+          (group.regular?.found) || (group.fourk?.found)
+        )
+      },
       timestamp: new Date().toISOString()
     });
     
   } catch (error) {
-    console.error('Error in debug endpoint:', error);
+    console.error('Error in enhanced debug endpoint:', error);
     res.status(500).json({ error: 'Failed to get debug info' });
+  }
+});
+
+// SIMPLE DEBUG: Test library update for a specific user
+router.post('/debug/test-update/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+    const { serverGroup, libraries } = req.body;
+    
+    if (!serverGroup || !libraries) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: serverGroup, libraries' 
+      });
+    }
+    
+    console.log(`🧪 DEBUG: Testing library update for ${email} on ${serverGroup}`);
+    console.log(`📋 Test libraries:`, libraries);
+    
+    // Get current access first
+    const currentAccess = await plexService.getUserCurrentAccess(email);
+    console.log(`📊 Current access:`, currentAccess);
+    
+    // Perform the update
+    const result = await plexService.shareLibrariesWithUserEnhanced(email, serverGroup, libraries);
+    
+    // Get new access after update
+    const newAccess = await plexService.getUserCurrentAccess(email);
+    console.log(`📊 New access:`, newAccess);
+    
+    res.json({
+      email: email,
+      serverGroup: serverGroup,
+      requestedLibraries: libraries,
+      previousAccess: currentAccess,
+      updateResult: result,
+      newAccess: newAccess,
+      accessChanged: JSON.stringify(currentAccess) !== JSON.stringify(newAccess),
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Error in test update:', error);
+    res.status(500).json({ error: 'Failed to test update' });
   }
 });
 
