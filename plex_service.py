@@ -173,9 +173,9 @@ def share_libraries_with_user_on_server(server_config, user_email, library_ids):
                 "message": "User has pending invite - cannot update library access"
             }
         
-        # Get library objects
+        # Get library objects for target libraries
+        libraries_to_share = []
         if len(library_ids) > 0:
-            libraries_to_share = []
             all_libraries = server.library.sections()
             
             for lib_id in library_ids:
@@ -197,28 +197,12 @@ def share_libraries_with_user_on_server(server_config, user_email, library_ids):
                     "error": "No valid libraries found",
                     "server": server_config['name']
                 }
-        else:
-            libraries_to_share = []
         
-        # Perform the sharing action
-        if user_status == "existing" and len(library_ids) == 0:
-            # Remove all access for existing user
-            log_info(f"Removing all library access for existing user")
+        # Choose the right method based on user status
+        if user_status == "existing":
+            # For existing users, use updateFriend
+            log_info(f"Updating existing user {user_email} access to {len(libraries_to_share)} libraries")
             account.updateFriend(
-                user_email,
-                server,
-                sections=[],
-                allowSync=False,
-                allowCameraUpload=False,
-                allowChannels=False
-            )
-            action = "removed_all_access"
-            
-        else:
-            # Use inviteFriend for both new users and existing users with libraries
-            # This handles updates automatically for existing users
-            log_info(f"Sharing {len(libraries_to_share)} libraries with {user_email}")
-            account.inviteFriend(
                 user_email,
                 server,
                 sections=libraries_to_share,
@@ -227,10 +211,22 @@ def share_libraries_with_user_on_server(server_config, user_email, library_ids):
                 allowChannels=False
             )
             
-            if user_status == "existing":
+            if len(libraries_to_share) > 0:
                 action = "updated_access"
             else:
-                action = "invited_new_user"
+                action = "removed_all_access"
+        else:
+            # For new users, use inviteFriend
+            log_info(f"Inviting new user {user_email} to {len(libraries_to_share)} libraries")
+            account.inviteFriend(
+                user_email,
+                server,
+                sections=libraries_to_share,
+                allowSync=True,
+                allowCameraUpload=False,
+                allowChannels=False
+            )
+            action = "invited_new_user"
         
         shared_library_names = [lib.title for lib in libraries_to_share]
         log_info(f"Successfully processed {user_email}: {shared_library_names}")
