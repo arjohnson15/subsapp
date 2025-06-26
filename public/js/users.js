@@ -424,10 +424,10 @@ async saveUser(event) {
             const librarySelectionsChanged = !this.deepEqual(currentPlexLibraries, originalLibraries);
             const plexEmailChanged = userData.plex_email !== (originalUserData.plex_email || '');
             
-            // Check if Plex tags changed (Plex 1, Plex 2)
-const currentPlexTags = userData.tags.filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
-const originalPlexTags = (this.originalTagsBaseline || []).filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
-const plexTagsChanged = !this.deepEqual(currentPlexTags, originalPlexTags);
+            // FIXED: Check if Plex tags changed (Plex 1, Plex 2) - only compare RELEVANT tags
+            const currentPlexTags = userData.tags.filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
+            const originalPlexTags = (this.originalTagsBaseline || []).filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
+            const plexTagsChanged = !this.deepEqual(currentPlexTags, originalPlexTags);
             
             // Only trigger API calls for actual Plex access changes
             if (librarySelectionsChanged || plexEmailChanged || plexTagsChanged) {
@@ -447,7 +447,21 @@ const plexTagsChanged = !this.deepEqual(currentPlexTags, originalPlexTags);
                 console.log('   - Libraries unchanged:', JSON.stringify(originalLibraries), '===', JSON.stringify(currentPlexLibraries));
                 console.log('   - Plex email unchanged:', originalUserData.plex_email, '===', userData.plex_email);
                 console.log('   - Plex tags unchanged:', originalPlexTags, '===', currentPlexTags);
-                shouldUpdatePlexAccess = false;
+                
+                // ADDITIONAL CHECK: Make sure we really have the same libraries selected vs available
+                const hasPlexTagsNow = currentPlexTags.length > 0;
+                const hasPlexLibrariesSelected = Object.values(currentPlexLibraries).some(serverGroup => 
+                    (serverGroup.regular && serverGroup.regular.length > 0) || 
+                    (serverGroup.fourk && serverGroup.fourk.length > 0)
+                );
+                
+                // If user has Plex tags but no libraries selected, or vice versa, we need to update
+                if (hasPlexTagsNow !== hasPlexLibrariesSelected) {
+                    console.log('🔄 Plex tag/library mismatch detected - need to sync');
+                    shouldUpdatePlexAccess = true;
+                } else {
+                    shouldUpdatePlexAccess = false;
+                }
             }
             
             // Tell backend NOT to process tags automatically 
@@ -470,20 +484,21 @@ const plexTagsChanged = !this.deepEqual(currentPlexTags, originalPlexTags);
             body: JSON.stringify(userData)
         });
         
-// Show immediate success message
-Utils.showNotification(isEditing ? 'User updated successfully' : 'User created successfully', 'success');
+        // Show immediate success message
+        Utils.showNotification(isEditing ? 'User updated successfully' : 'User created successfully', 'success');
 
-// Clear baselines after successful save
-if (isEditing) {
-    this.originalLibraryBaseline = null;
-    this.originalTagsBaseline = null;
-}
+        // Clear baselines after successful save
+        if (isEditing) {
+            this.originalLibraryBaseline = null;
+            this.originalTagsBaseline = null;
+        }
 
-// CRITICAL: Navigate away IMMEDIATELY - use setTimeout to ensure it happens
-setTimeout(async () => {
-    await showPage('users');
-    await this.loadUsers();
-}, 100);
+        // CRITICAL: Navigate away IMMEDIATELY after database save - before Plex operations
+        console.log('🚀 Navigating back to users page immediately...');
+        setTimeout(async () => {
+            await showPage('users');
+            await this.loadUsers();
+        }, 100);
         
         // Handle Plex operations in background ONLY if needed
         if (shouldUpdatePlexAccess && userData.plex_email) {
@@ -509,7 +524,7 @@ setTimeout(async () => {
         console.error('Error saving user:', error);
         Utils.handleError(error, 'Saving user');
     }
-},
+}
 
 // Background task processing for Plex operations
 async processPlexLibrariesInBackground(taskId, userEmail, plexLibraries, isNewUser) {
@@ -903,41 +918,41 @@ resetFormState() {
         return true;
     },
 
-    // Enhanced collectPlexLibrarySelections function that only includes selected libraries
-    collectPlexLibrarySelections() {
-        const plexLibraries = {};
+// Enhanced collectPlexLibrarySelections function that only includes selected libraries and sorts arrays
+collectPlexLibrarySelections() {
+    const plexLibraries = {};
+    
+    // Check if Plex 1 tag is selected AND get its libraries
+    if (document.getElementById('tag-plex1')?.checked) {
+        const regularChecked = Array.from(document.querySelectorAll('input[name="plex1_regular"]:checked')).map(cb => cb.value);
+        const fourkChecked = Array.from(document.querySelectorAll('input[name="plex1_fourk"]:checked')).map(cb => cb.value);
         
-        // Check if Plex 1 tag is selected AND get its libraries
-        if (document.getElementById('tag-plex1')?.checked) {
-            const regularChecked = Array.from(document.querySelectorAll('input[name="plex1_regular"]:checked')).map(cb => cb.value);
-            const fourkChecked = Array.from(document.querySelectorAll('input[name="plex1_fourk"]:checked')).map(cb => cb.value);
-            
-            // Only add if there are actually selected libraries
-            if (regularChecked.length > 0 || fourkChecked.length > 0) {
-                plexLibraries.plex1 = {
-                    regular: regularChecked,
-                    fourk: fourkChecked
-                };
-            }
+        // Only add if there are actually selected libraries
+        if (regularChecked.length > 0 || fourkChecked.length > 0) {
+            plexLibraries.plex1 = {
+                regular: regularChecked.sort(), // CRITICAL: Sort to ensure consistent comparison
+                fourk: fourkChecked.sort()      // CRITICAL: Sort to ensure consistent comparison
+            };
         }
+    }
+    
+    // Check if Plex 2 tag is selected AND get its libraries
+    if (document.getElementById('tag-plex2')?.checked) {
+        const regularChecked = Array.from(document.querySelectorAll('input[name="plex2_regular"]:checked')).map(cb => cb.value);
+        const fourkChecked = Array.from(document.querySelectorAll('input[name="plex2_fourk"]:checked')).map(cb => cb.value);
         
-        // Check if Plex 2 tag is selected AND get its libraries
-        if (document.getElementById('tag-plex2')?.checked) {
-            const regularChecked = Array.from(document.querySelectorAll('input[name="plex2_regular"]:checked')).map(cb => cb.value);
-            const fourkChecked = Array.from(document.querySelectorAll('input[name="plex2_fourk"]:checked')).map(cb => cb.value);
-            
-            // Only add if there are actually selected libraries
-            if (regularChecked.length > 0 || fourkChecked.length > 0) {
-                plexLibraries.plex2 = {
-                    regular: regularChecked,
-                    fourk: fourkChecked
-                };
-            }
+        // Only add if there are actually selected libraries
+        if (regularChecked.length > 0 || fourkChecked.length > 0) {
+            plexLibraries.plex2 = {
+                regular: regularChecked.sort(), // CRITICAL: Sort to ensure consistent comparison
+                fourk: fourkChecked.sort()      // CRITICAL: Sort to ensure consistent comparison
+            };
         }
-        
-        console.log('📋 Collected library selections:', plexLibraries);
-        return plexLibraries;
-    },
+    }
+    
+    console.log('📋 Collected library selections (sorted):', plexLibraries);
+    return plexLibraries;
+},
 	
     // Check if any Plex libraries are selected
     hasPlexLibrariesSelected(plexLibraries) {

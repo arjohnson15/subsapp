@@ -304,35 +304,47 @@ class PlexService {
     }
   }
 
-  // Update user's library access in database (kept)
-  async updateUserLibraryAccessInDatabase(userEmail, libraryAccess) {
-    try {
-      console.log(`💾 Updating database for ${userEmail}:`, libraryAccess);
-      
-      // Find user by email or plex_email
-      const [user] = await db.query(`
-        SELECT id, name FROM users 
-        WHERE email = ? OR plex_email = ?
-      `, [userEmail, userEmail]);
-      
-      if (user) {
-        await db.query(`
-          UPDATE users 
-          SET plex_libraries = ?, updated_at = NOW()
-          WHERE id = ?
-        `, [JSON.stringify(libraryAccess), user.id]);
-        
-        console.log(`✅ Database updated for user: ${user.name} (ID: ${user.id})`);
-        return true;
-      } else {
-        console.log(`⚠️ User not found in database: ${userEmail}`);
-        return false;
-      }
-    } catch (error) {
-      console.error(`❌ Error updating database:`, error);
-      throw error;
+// Update user's library access in database with consistent sorting
+async updateUserLibraryAccessInDatabase(userEmail, libraryAccess) {
+  try {
+    console.log(`💾 Updating database for ${userEmail}:`, libraryAccess);
+    
+    // CRITICAL FIX: Sort all arrays to ensure consistent comparison later
+    const sortedLibraryAccess = {};
+    for (const [serverGroup, access] of Object.entries(libraryAccess)) {
+      sortedLibraryAccess[serverGroup] = {
+        regular: (access.regular || []).slice().sort(), // Sort regular arrays
+        fourk: (access.fourk || []).slice().sort()      // Sort 4K arrays
+      };
     }
+    
+    console.log(`📋 Sorted library access for database:`, sortedLibraryAccess);
+    
+    // Find user by email or plex_email
+    const [user] = await db.query(`
+      SELECT id, name FROM users 
+      WHERE email = ? OR plex_email = ?
+    `, [userEmail, userEmail]);
+    
+    if (user) {
+      await db.query(`
+        UPDATE users 
+        SET plex_libraries = ?, updated_at = NOW()
+        WHERE id = ?
+      `, [JSON.stringify(sortedLibraryAccess), user.id]);
+      
+      console.log(`✅ Database updated for user: ${user.name} (ID: ${user.id})`);
+      console.log(`📊 Stored sorted access: ${JSON.stringify(sortedLibraryAccess)}`);
+      return true;
+    } else {
+      console.log(`⚠️ User not found in database: ${userEmail}`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`❌ Error updating database:`, error);
+    throw error;
   }
+}
 
   // Sync all libraries and store in database (kept - no changes needed)
   async syncAllLibraries() {
