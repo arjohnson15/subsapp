@@ -207,22 +207,44 @@ async loadUsers() {
         window.AppState.users = originalUsers; // Restore original for other functions
     },
     
-    sortUsers(field) {
-        if (this.currentSortField === field) {
-            this.currentSortDirection = this.currentSortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            this.currentSortField = field;
-            this.currentSortDirection = 'asc';
+sortUsers(field) {
+    if (this.currentSortField === field) {
+        this.currentSortDirection = this.currentSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        this.currentSortField = field;
+        this.currentSortDirection = 'asc';
+    }
+    
+    window.AppState.users = Utils.sortArray(
+        window.AppState.users, 
+        field, 
+        this.currentSortDirection
+    );
+    
+    // Update sort indicators
+    this.updateSortIndicators(field, this.currentSortDirection);
+    
+    this.renderUsersTable();
+},
+
+// NEW FUNCTION: Update visual sort indicators in table headers
+updateSortIndicators(activeField, direction) {
+    // Reset all sort indicators
+    const sortableFields = ['name', 'email', 'owner_name', 'plex_expiration', 'iptv_expiration'];
+    
+    sortableFields.forEach(field => {
+        const indicator = document.getElementById(`sort-${field}`);
+        if (indicator) {
+            if (field === activeField) {
+                indicator.textContent = direction === 'asc' ? '▲' : '▼';
+                indicator.style.color = '#4fc3f7'; // Highlight active sort
+            } else {
+                indicator.textContent = '▼';
+                indicator.style.color = '#666'; // Dim inactive sorts
+            }
         }
-        
-        window.AppState.users = Utils.sortArray(
-            window.AppState.users, 
-            field, 
-            this.currentSortDirection
-        );
-        
-        this.renderUsersTable();
-    },
+    });
+},
     
     async viewUser(userId) {
         try {
@@ -366,7 +388,7 @@ async saveUser(event) {
         userData.device_count = parseInt(formData.get('device_count')) || 1;
         userData.bcc_owner_renewal = document.getElementById('bccOwnerRenewal')?.checked || false;
 
-        // Collect checked tags
+        // Collect checked tags - PRESERVE all existing tags, don't let backend process them
         userData.tags = [];
         document.querySelectorAll('input[name="tags"]:checked').forEach(checkbox => {
             userData.tags.push(checkbox.value);
@@ -378,25 +400,33 @@ async saveUser(event) {
         
         console.log('🔍 Current form data:', userData);
         
-        // SMART CHANGE DETECTION: Compare with original user data
+        // SMART CHANGE DETECTION: Always get fresh data from database for comparison
         let shouldUpdatePlexAccess = false;
         let originalPlexLibraries = {};
         
-        if (window.AppState?.editingUserId && window.AppState?.currentUserData) {
-            originalPlexLibraries = window.AppState.currentUserData.plex_libraries || {};
+        if (window.AppState?.editingUserId) {
+            // Get FRESH user data from database for accurate comparison
+            console.log('📊 Fetching current database state for comparison...');
+            const freshUserData = await API.User.getById(window.AppState.editingUserId);
+            originalPlexLibraries = freshUserData.plex_libraries || {};
             
-            // Deep compare Plex library selections
+            // Deep compare Plex library selections ONLY
             const librariesChanged = !this.deepEqual(currentPlexLibraries, originalPlexLibraries);
             
             if (librariesChanged) {
                 console.log('🔄 Plex library changes detected:');
-                console.log('   Original:', originalPlexLibraries);
-                console.log('   New:', currentPlexLibraries);
+                console.log('   Database has:', originalPlexLibraries);
+                console.log('   Form has:', currentPlexLibraries);
                 shouldUpdatePlexAccess = true;
             } else {
                 console.log('✅ No Plex library changes detected - skipping API calls');
+                console.log('   Database:', JSON.stringify(originalPlexLibraries));
+                console.log('   Form:', JSON.stringify(currentPlexLibraries));
                 shouldUpdatePlexAccess = false;
             }
+            
+            // IMPORTANT: Tell backend NOT to process tags automatically 
+            userData._skipTagProcessing = true;
         } else {
             // New user - always update if they have Plex access
             shouldUpdatePlexAccess = Object.keys(currentPlexLibraries).length > 0;
@@ -407,119 +437,121 @@ async saveUser(event) {
         const method = isEditing ? 'PUT' : 'POST';
         const endpoint = isEditing ? `/users/${window.AppState.editingUserId}` : '/users';
         
-        // Save user data to database
+        // Save user data to database FIRST
         console.log('💾 Saving user to database...');
         await API.call(endpoint, {
             method,
             body: JSON.stringify(userData)
         });
         
-        // Only update Plex library sharing if changes were detected
-        if (shouldUpdatePlexAccess && userData.plex_email) {
-            try {
-                console.log('🚀 Updating Plex access due to detected changes...');
-                await this.sharePlexLibrariesWithUser(userData.plex_email, userData.plex_libraries);
-                console.log('✅ Plex access updated successfully');
-            } catch (shareError) {
-                console.error('Error sharing Plex libraries:', shareError);
-                Utils.showNotification('User saved but there was an error updating Plex libraries: ' + shareError.message, 'warning');
-            }
-        } else if (!shouldUpdatePlexAccess) {
-            console.log('⏭️ Skipping Plex API calls - no library changes detected');
-        }
-        
+        // Show immediate success and close the form
         Utils.showNotification(isEditing ? 'User updated successfully' : 'User created successfully', 'success');
         showPage('users');
         await this.loadUsers();
+        
+        // Handle Plex operations in background if needed
+        if (shouldUpdatePlexAccess && userData.plex_email) {
+            // Create background task
+            const taskId = this.createBackgroundTask(
+                'plex_update',
+                `Updating Plex access for ${userData.name}`,
+                { userEmail: userData.plex_email, plexLibraries: userData.plex_libraries }
+            );
+            
+            // Show background task notification
+            this.showBackgroundTaskIndicator('Background job started: Updating Plex access...');
+            Utils.showNotification('Background job started: Updating Plex access', 'info');
+            
+            // Process in background
+            this.processPlexLibrariesInBackground(taskId, userData.plex_email, userData.plex_libraries, !isEditing);
+            
+        } else if (!shouldUpdatePlexAccess) {
+            console.log('⏭️ Skipping Plex API calls - no library changes detected');
+        }
         
     } catch (error) {
         console.error('Error saving user:', error);
         Utils.handleError(error, 'Saving user');
     }
 },
-    
-    // Background task processing for Plex operations
-    async processPlexLibrariesInBackground(taskId, userEmail, plexLibraries, isNewUser) {
-        try {
-            console.log(`🔄 Background task ${taskId}: Processing Plex libraries...`);
-            
-            const result = await API.call('/plex/share-user-libraries', {
-                method: 'POST',
-                body: JSON.stringify({
-                    userEmail: userEmail,
-                    plexLibraries: plexLibraries,
-                    isNewUser: isNewUser
-                })
-            });
-            
-            // Store result for the task monitor to pick up
-            await this.storeBackgroundTaskResult(taskId, {
-                status: result.success ? 'completed' : 'failed',
-                data: result,
-                error: result.success ? null : result.message || 'Unknown error'
-            });
-            
-            console.log(`✅ Background task ${taskId}: Completed`, result);
-            
-        } catch (error) {
-            console.error(`❌ Background task ${taskId}: Failed`, error);
-            
-            await this.storeBackgroundTaskResult(taskId, {
-                status: 'failed',
-                error: error.message,
-                data: null
-            });
-        }
-    },
-    
-    // Store background task result (in memory for now, could be database later)
-    async storeBackgroundTaskResult(taskId, result) {
-        // For now, just update the task in memory
-        const task = this.backgroundTasks.get(taskId);
-        if (task) {
-            task.result = result;
-            task.completedAt = new Date();
-        }
+
+// Background task processing for Plex operations
+async processPlexLibrariesInBackground(taskId, userEmail, plexLibraries, isNewUser) {
+    try {
+        console.log(`🔄 Background task ${taskId}: Processing Plex libraries...`);
         
-        // In a real system, you'd store this in database or Redis
-        // For now, the checkBackgroundTasks will find it in memory
-    },
+        const result = await this.sharePlexLibrariesWithUser(userEmail, plexLibraries);
+        
+        // Store result for the task monitor to pick up
+        await this.storeBackgroundTaskResult(taskId, {
+            status: 'completed',
+            data: result,
+            error: null
+        });
+        
+        console.log(`✅ Background task ${taskId}: Completed`, result);
+        
+    } catch (error) {
+        console.error(`❌ Background task ${taskId}: Failed`, error);
+        
+        await this.storeBackgroundTaskResult(taskId, {
+            status: 'failed',
+            error: error.message,
+            data: null
+        });
+    }
+},
+
+// Store background task result (in memory for now, could be database later)
+async storeBackgroundTaskResult(taskId, result) {
+    // For now, just update the task in memory
+    const task = this.backgroundTasks.get(taskId);
+    if (task) {
+        task.result = result;
+        task.completedAt = new Date();
+    }
     
-    // Show a non-blocking background task indicator
-    showBackgroundTaskIndicator(message) {
-        // Create a small, unobtrusive indicator
-        const indicator = document.createElement('div');
-        indicator.id = 'backgroundTaskIndicator';
-        indicator.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: linear-gradient(45deg, #2196f3, #03a9f4);
-            color: white;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            z-index: 1000;
-            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        `;
-        
-        indicator.innerHTML = `
-            <div style="
-                width: 16px;
-                height: 16px;
-                border: 2px solid rgba(255,255,255,0.3);
-                border-top: 2px solid white;
-                border-radius: 50%;
-                animation: spin 1s linear infinite;
-            "></div>
-            ${message}
-        `;
-        
-        // Add spinner animation
+    // In a real system, you'd store this in database or Redis
+    // For now, the checkBackgroundTasks will find it in memory
+},
+
+// Show a non-blocking background task indicator
+showBackgroundTaskIndicator(message) {
+    // Create a small, unobtrusive indicator
+    const indicator = document.createElement('div');
+    indicator.id = 'backgroundTaskIndicator';
+    indicator.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: linear-gradient(45deg, #2196f3, #03a9f4);
+        color: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        z-index: 1000;
+        box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    `;
+    
+    indicator.innerHTML = `
+        <div style="
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        "></div>
+        ${message}
+    `;
+    
+    // Add spinner animation if not already present
+    if (!document.getElementById('spinnerStyle')) {
         const style = document.createElement('style');
+        style.id = 'spinnerStyle';
         style.textContent = `
             @keyframes spin {
                 0% { transform: rotate(0deg); }
@@ -527,44 +559,114 @@ async saveUser(event) {
             }
         `;
         document.head.appendChild(style);
-        
-        // Remove any existing indicator
-        const existing = document.getElementById('backgroundTaskIndicator');
-        if (existing) existing.remove();
-        
-        // Add new indicator
-        document.body.appendChild(indicator);
-        
-        // Auto-remove after 60 seconds if task doesn't complete
-        setTimeout(() => {
-            const stillThere = document.getElementById('backgroundTaskIndicator');
-            if (stillThere) stillThere.remove();
-        }, 60000);
-    },
+    }
     
-    // Hide background task indicator
-    hideBackgroundTaskIndicator() {
-        const indicator = document.getElementById('backgroundTaskIndicator');
-        if (indicator) indicator.remove();
-    },
+    // Remove any existing indicator
+    const existing = document.getElementById('backgroundTaskIndicator');
+    if (existing) existing.remove();
     
-    // Mock API endpoint simulation for background tasks
-    async checkBackgroundTasks() {
-        for (const [taskId, task] of this.backgroundTasks.entries()) {
-            // Check if task has a result (completed in background)
-            if (task.result) {
-                if (task.result.status === 'completed') {
-                    this.handleTaskCompletion(taskId, task, task.result);
-                } else if (task.result.status === 'failed') {
-                    this.handleTaskFailure(taskId, task, task.result);
-                }
-                
-                this.backgroundTasks.delete(taskId);
-                this.hideBackgroundTaskIndicator();
+    // Add new indicator
+    document.body.appendChild(indicator);
+    
+    // Auto-remove after 60 seconds if task doesn't complete
+    setTimeout(() => {
+        const stillThere = document.getElementById('backgroundTaskIndicator');
+        if (stillThere) stillThere.remove();
+    }, 60000);
+},
+
+// Hide background task indicator
+hideBackgroundTaskIndicator() {
+    const indicator = document.getElementById('backgroundTaskIndicator');
+    if (indicator) indicator.remove();
+},
+
+async checkBackgroundTasks() {
+    for (const [taskId, task] of this.backgroundTasks.entries()) {
+        // Check if task has a result (completed in background) - NO API CALLS
+        if (task.result) {
+            if (task.result.status === 'completed') {
+                this.handleTaskCompletion(taskId, task, task.result);
+            } else if (task.result.status === 'failed') {
+                this.handleTaskFailure(taskId, task, task.result);
             }
-            // If no result yet, keep monitoring
+            
+            this.backgroundTasks.delete(taskId);
+            this.hideBackgroundTaskIndicator();
         }
-    },
+        // If no result yet, keep monitoring (tasks update themselves)
+    }
+},
+
+async sharePlexLibrariesWithUser(userEmail, plexLibraries) {
+    try {
+        console.log('🤝 Sharing Plex libraries with user:', userEmail, plexLibraries);
+        
+        const result = await API.call('/plex/share-user-libraries', {
+            method: 'POST',
+            body: JSON.stringify({
+                userEmail: userEmail,
+                plexLibraries: plexLibraries
+            })
+        });
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to share Plex libraries');
+        }
+        
+        console.log('✅ Plex libraries shared successfully');
+        return result;
+        
+    } catch (error) {
+        console.error('❌ Error sharing Plex libraries:', error);
+        throw error;
+    }
+},
+
+handleTaskCompletion(taskId, task, result) {
+    console.log(`✅ Background task completed: ${taskId}`, result);
+    
+    // Show success notification with details
+    let message = `${task.description} completed successfully!`;
+    
+    if (result.data && result.data.success) {
+        message = 'Background job completed: Plex access updated successfully';
+    }
+    
+    Utils.showNotification(message, 'success');
+    
+    // Hide any loading indicators
+    Utils.hideLoading();
+    
+    // Refresh users list if it was a user operation
+    if (task.type === 'plex_update') {
+        this.loadUsers();
+    }
+},
+
+handleTaskFailure(taskId, task, result) {
+    console.error(`❌ Background task failed: ${taskId}`, result);
+    
+    let message = `${task.description} failed: ${result.error || 'Unknown error'}`;
+    Utils.showNotification(message, 'error');
+    
+    Utils.hideLoading();
+},
+
+createBackgroundTask(type, description, data = {}) {
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    this.backgroundTasks.set(taskId, {
+        id: taskId,
+        type: type,
+        description: description,
+        data: data,
+        startTime: new Date()
+    });
+    
+    console.log(`🚀 Created background task: ${taskId} - ${description}`);
+    return taskId;
+},
     
     // NEW: Remove all Plex access for current user
     async removePlexAccess() {
@@ -792,32 +894,6 @@ async saveUser(event) {
         
         console.log('📋 Collected library selections:', plexLibraries);
         return plexLibraries;
-    },
-
-    // Share Plex libraries with user
-    async sharePlexLibrariesWithUser(userEmail, plexLibraries) {
-        try {
-            console.log('🤝 Sharing Plex libraries with user:', userEmail, plexLibraries);
-            
-            const result = await API.call('/plex/share-user-libraries', {
-                method: 'POST',
-                body: JSON.stringify({
-                    userEmail: userEmail,
-                    plexLibraries: plexLibraries
-                })
-            });
-            
-            if (!result.success) {
-                throw new Error(result.error || 'Failed to share Plex libraries');
-            }
-            
-            console.log('✅ Plex libraries shared successfully');
-            return result;
-            
-        } catch (error) {
-            console.error('❌ Error sharing Plex libraries:', error);
-            throw error;
-        }
     },
 	
     // Check if any Plex libraries are selected

@@ -215,7 +215,9 @@ router.post('/', [
   }
 });
 
-// Update user - FIXED validation 
+// REPLACEMENT for the Update User route in users-routes.js
+
+// Update user - FIXED to preserve tags when requested
 router.put('/:id', [
   body('name').notEmpty().trim().escape(),
   body('email').isEmail().normalizeEmail(),
@@ -233,7 +235,7 @@ router.put('/:id', [
     const {
       name, email, owner_id, plex_email,
       iptv_username, iptv_password, implayer_code, device_count,
-      bcc_owner_renewal, tags, plex_libraries
+      bcc_owner_renewal, tags, plex_libraries, _skipTagProcessing
     } = req.body;
 
     // Check if email exists for different user
@@ -242,7 +244,7 @@ router.put('/:id', [
       return res.status(400).json({ error: 'Email already exists' });
     }
 
-    // Get current user data to preserve existing tags properly
+    // Get current user data
     const [currentUser] = await db.query('SELECT tags, plex_libraries FROM users WHERE id = ?', [req.params.id]);
     const currentTags = safeJsonParse(currentUser?.tags, []);
     const currentPlexLibraries = safeJsonParse(currentUser?.plex_libraries, {});
@@ -250,13 +252,21 @@ router.put('/:id', [
     console.log('Current user tags:', currentTags);
     console.log('Current plex libraries:', currentPlexLibraries);
     console.log('New plex libraries:', plex_libraries);
+    console.log('Skip tag processing:', _skipTagProcessing);
 
-    // Process tags based on the new library access
-    const processedTags = plex_libraries ? 
-      processTagsForUpdate(plex_libraries, currentTags) : 
-      (tags || currentTags);
-
-    console.log('Final processed tags:', processedTags);
+    // FIXED: Respect tag preservation when frontend requests it
+    let processedTags;
+    if (_skipTagProcessing) {
+        // Use tags exactly as provided by frontend
+        processedTags = tags || currentTags;
+        console.log('Using frontend-provided tags without processing:', processedTags);
+    } else {
+        // Process tags based on Plex library access (for new users or when explicitly updating Plex)
+        processedTags = plex_libraries ? 
+          processTagsForUpdate(plex_libraries, currentTags) : 
+          (tags || currentTags);
+        console.log('Processed tags based on Plex access:', processedTags);
+    }
 
     // Clean up owner_id - convert null, undefined, or empty string to null
     const cleanOwnerId = (owner_id === null || owner_id === undefined || owner_id === '') ? null : owner_id;
