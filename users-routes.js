@@ -73,20 +73,22 @@ router.get('/', async (req, res) => {
       SELECT u.*, 
         o.name as owner_name,
         o.email as owner_email,
-        GROUP_CONCAT(
-          CASE 
-            WHEN st.type = 'plex' AND s.status = 'active' 
-            THEN s.expiration_date 
-            ELSE NULL 
+        MAX(CASE 
+          WHEN st.type = 'plex' AND s.status = 'active' 
+          THEN CASE 
+            WHEN s.is_free = TRUE THEN 'FREE'
+            ELSE s.expiration_date 
           END
-        ) as plex_expiration,
-        GROUP_CONCAT(
-          CASE 
-            WHEN st.type = 'iptv' AND s.status = 'active' 
-            THEN s.expiration_date 
-            ELSE NULL 
+          ELSE NULL 
+        END) as plex_expiration,
+        MAX(CASE 
+          WHEN st.type = 'iptv' AND s.status = 'active' 
+          THEN CASE 
+            WHEN s.is_free = TRUE THEN 'FREE'
+            ELSE s.expiration_date 
           END
-        ) as iptv_expiration
+          ELSE NULL 
+        END) as iptv_expiration
       FROM users u
       LEFT JOIN owners o ON u.owner_id = o.id
       LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
@@ -100,9 +102,9 @@ router.get('/', async (req, res) => {
       user.tags = safeJsonParse(user.tags, []);
       user.plex_libraries = safeJsonParse(user.plex_libraries, {});
       
-      // Format expiration dates properly
-      user.plex_expiration = user.plex_expiration || null;
-      user.iptv_expiration = user.iptv_expiration || null;
+      // Handle expiration dates - show FREE for free subscriptions, blank for no subscription
+      user.plex_expiration = user.plex_expiration === 'FREE' ? 'FREE' : (user.plex_expiration || '');
+      user.iptv_expiration = user.iptv_expiration === 'FREE' ? 'FREE' : (user.iptv_expiration || '');
     });
 
     res.json(users);

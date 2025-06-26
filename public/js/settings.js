@@ -188,22 +188,22 @@ window.Settings = {
     },
     
     // Subscription Management Functions
-    async loadSubscriptions() {
-        try {
-            console.log('📊 Loading subscriptions from API...');
-            const subscriptions = await API.Subscription.getAll();
-            console.log('📊 Subscriptions loaded:', subscriptions.length);
-            
-            // Store in global state
-            window.AppState.subscriptionTypes = subscriptions;
-            
-            this.renderSubscriptionsTable();
-            this.updateSubscriptionStats();
-        } catch (error) {
-            console.error('❌ Error loading subscriptions:', error);
-            Utils.handleError(error, 'Loading subscriptions');
-        }
-    },
+async loadSubscriptions() {
+    try {
+        console.log('📊 Loading subscriptions from API...');
+        const subscriptions = await API.Subscription.getAll();
+        console.log('📊 Subscriptions loaded:', subscriptions.length);
+        
+        // Store in global state
+        window.AppState.subscriptionTypes = subscriptions;
+        
+        this.renderSubscriptionsTable();
+        // Note: updateSubscriptionStats() removed since we removed the stats section
+    } catch (error) {
+        console.error('❌ Error loading subscriptions:', error);
+        Utils.handleError(error, 'Loading subscriptions');
+    }
+}
     
     renderSubscriptionsTable() {
         const tbody = document.getElementById('subscriptionsTableBody');
@@ -244,39 +244,6 @@ window.Settings = {
         `).join('');
         
         console.log('✅ Subscriptions table rendered');
-    },
-    
-    updateSubscriptionStats() {
-        const subscriptions = window.AppState.subscriptionTypes || [];
-        
-        // Update stat numbers
-        const totalElement = document.getElementById('totalSubscriptionTypes');
-        const plexElement = document.getElementById('plexSubscriptionTypes');
-        const iptvElement = document.getElementById('iptvSubscriptionTypes');
-        const avgElement = document.getElementById('averageSubscriptionPrice');
-        
-        if (totalElement) totalElement.textContent = subscriptions.length;
-        
-        const plexSubs = subscriptions.filter(sub => sub.type === 'plex');
-        const iptvSubs = subscriptions.filter(sub => sub.type === 'iptv');
-        
-        if (plexElement) plexElement.textContent = plexSubs.length;
-        if (iptvElement) iptvElement.textContent = iptvSubs.length;
-        
-        // Calculate average price
-        const activeSubs = subscriptions.filter(sub => sub.active);
-        const avgPrice = activeSubs.length > 0 
-            ? activeSubs.reduce((sum, sub) => sum + parseFloat(sub.price), 0) / activeSubs.length
-            : 0;
-        
-        if (avgElement) avgElement.textContent = `$${avgPrice.toFixed(2)}`;
-        
-        console.log('📊 Subscription stats updated:', {
-            total: subscriptions.length,
-            plex: plexSubs.length,
-            iptv: iptvSubs.length,
-            avgPrice: avgPrice
-        });
     },
     
     sortSubscriptions(field) {

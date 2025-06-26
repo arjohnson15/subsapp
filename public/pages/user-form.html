@@ -69,15 +69,11 @@
                 <div class="library-checkboxes">
                     <div class="library-group">
                         <h5>Regular Libraries</h5>
-                        <div id="plex1RegularLibrariesList" class="library-list">
-                            <div style="color: #4fc3f7;">Check Plex 1 tag to load libraries...</div>
-                        </div>
+                        <div id="plex1RegularLibrariesList">Loading...</div>
                     </div>
                     <div class="library-group">
                         <h5>4K Libraries</h5>
-                        <div id="plex1FourkLibrariesList" class="library-list">
-                            <div style="color: #4fc3f7;">Check Plex 1 tag to load 4K libraries...</div>
-                        </div>
+                        <div id="plex1FourkLibrariesList">Loading...</div>
                     </div>
                 </div>
             </div>
@@ -101,45 +97,39 @@
                 <div class="library-checkboxes">
                     <div class="library-group">
                         <h5>Regular Libraries</h5>
-                        <div id="plex2RegularLibrariesList" class="library-list">
-                            <div style="color: #4fc3f7;">Check Plex 2 tag to load libraries...</div>
-                        </div>
+                        <div id="plex2RegularLibrariesList">Loading...</div>
                     </div>
                     <div class="library-group">
                         <h5>4K Libraries</h5>
-                        <div id="plex2FourkLibrariesList" class="library-list">
-                            <div style="color: #4fc3f7;">Check Plex 2 tag to load 4K libraries...</div>
-                        </div>
+                        <div id="plex2FourkLibrariesList">Loading...</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="form-grid">
-            <div class="form-group">
-                <label for="plexSubscription">Select Plex Subscription:</label>
-                <select id="plexSubscription" onchange="calculateNewPlexExpiration()">
-                    <option value="">-- No Plex Selected --</option>
-                    <option value="free">Free Plex User</option>
-                    <option value="12-month">Plex 12 Month - $120</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="plexExpiration">Plex Expiration Date:</label>
-                <input type="date" id="plexExpiration">
-            </div>
-        </div>
-
-        <div class="form-grid">
-            <div class="form-group">
-                <label for="iptvSubscription">Select IPTV Subscription:</label>
-                <select id="iptvSubscription" onchange="calculateNewIptvExpiration()">
-                    <option value="">-- No IPTV Selected --</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="iptvExpiration">IPTV Expiration Date:</label>
-                <input type="date" id="iptvExpiration">
+        <div class="form-group">
+            <label>Subscription Information:</label>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="plexSubscription">Plex Subscription:</label>
+                    <select id="plexSubscription" name="plex_subscription">
+                        <option value="">No Plex Subscription</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="plexExpiration">Plex Expiration:</label>
+                    <input type="date" id="plexExpiration">
+                </div>
+                <div class="form-group">
+                    <label for="iptvSubscription">IPTV Subscription:</label>
+                    <select id="iptvSubscription" name="iptv_subscription">
+                        <option value="">No IPTV Subscription</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="iptvExpiration">IPTV Expiration:</label>
+                    <input type="date" id="iptvExpiration">
+                </div>
             </div>
         </div>
 
@@ -172,20 +162,6 @@
                     <input type="checkbox" id="bccOwnerRenewal" name="bcc_owner_renewal">
                     <label for="bccOwnerRenewal">BCC Owner on Renewal Reminders</label>
                 </div>
-            </div>
-        </div>
-
-        <!-- NEW: Plex Access Management -->
-        <div class="form-group" id="plexAccessManagement" style="display: none;">
-            <label>Plex Access Management:</label>
-            <div style="background: rgba(244, 67, 54, 0.1); border: 1px solid rgba(244, 67, 54, 0.3); border-radius: 8px; padding: 15px; margin-top: 10px;">
-                <h5 style="color: #f44336; margin-bottom: 10px;">⚠️ Danger Zone</h5>
-                <p style="color: #fff; font-size: 0.9rem; margin-bottom: 15px;">
-                    This will completely remove the user from all Plex servers, clear their library access, and remove all Plex tags.
-                </p>
-                <button type="button" class="btn" style="background: linear-gradient(45deg, #f44336, #e91e63);" onclick="Users.removePlexAccess()">
-                    Remove All Plex Access
-                </button>
             </div>
         </div>
 
