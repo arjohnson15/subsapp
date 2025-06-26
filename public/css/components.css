@@ -291,6 +291,86 @@ tbody tr:hover {
     background: rgba(255, 255, 255, 0.05);
 }
 
+/* SORTING ARROW FIX - Fixes the question mark issue */
+th.sortable {
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    padding-right: 25px !important;
+}
+
+th.sortable::after {
+    content: '';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 4px solid rgba(255, 255, 255, 0.5);
+    opacity: 0.5;
+    transition: all 0.2s ease;
+}
+
+th.sortable:hover::after {
+    opacity: 0.8;
+    border-bottom-color: #fff;
+}
+
+/* Ascending sort arrow */
+th.sortable.asc::after {
+    border-bottom: 4px solid #4fc3f7;
+    border-top: none;
+    opacity: 1;
+}
+
+/* Descending sort arrow */
+th.sortable.desc::after {
+    border-top: 4px solid #4fc3f7;
+    border-bottom: none;
+    opacity: 1;
+}
+
+/* Remove default sorting indicators */
+th.sortable .sort-arrow {
+    display: none;
+}
+
+/* Alternative sorting implementation for backwards compatibility */
+.table-container th[data-sort] {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    padding-right: 25px !important;
+}
+
+.table-container th[data-sort]::after {
+    content: '⇅';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 12px;
+    transition: color 0.2s ease;
+}
+
+.table-container th[data-sort]:hover::after {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.table-container th[data-sort].asc::after {
+    content: '↑';
+    color: #4fc3f7;
+}
+
+.table-container th[data-sort].desc::after {
+    content: '↓';
+    color: #4fc3f7;
+}
+
 /* Tag Components */
 .tag {
     display: inline-block;

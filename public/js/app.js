@@ -274,14 +274,15 @@ function updateSubscriptionDropdowns(subscriptions) {
             .map(sub => `<option value="${sub.id}">${sub.name} - $${sub.price}</option>`)
             .join('');
         
-        // CRITICAL: Add FREE option for Plex
+        // CRITICAL: Add FREE option for Plex - this ensures it's always there
         plexSelect.innerHTML = `
             <option value="">No Plex Subscription</option>
             <option value="free">FREE Plex Access</option>
             ${plexOptions}
         `;
         
-        console.log('✅ Plex dropdown updated with FREE option');
+        console.log('✅ Plex dropdown updated with FREE option and', plexOptions.length, 'paid options');
+        console.log('📝 Final Plex dropdown HTML:', plexSelect.innerHTML);
     } else {
         console.warn('⚠️ Plex subscription dropdown not found');
     }
@@ -301,9 +302,27 @@ function updateSubscriptionDropdowns(subscriptions) {
             ${iptvOptions}
         `;
         
-        console.log('✅ IPTV dropdown updated');
+        console.log('✅ IPTV dropdown updated with', iptvOptions.length, 'options');
     } else {
         console.warn('⚠️ IPTV subscription dropdown not found');
+    }
+}
+
+function debugSubscriptionDropdowns() {
+    console.log('🔍 Debugging subscription dropdowns...');
+    
+    const plexSelect = document.getElementById('plexSubscription');
+    const iptvSelect = document.getElementById('iptvSubscription');
+    
+    console.log('Plex dropdown element:', plexSelect);
+    console.log('Plex dropdown HTML:', plexSelect?.innerHTML);
+    console.log('IPTV dropdown element:', iptvSelect);
+    console.log('IPTV dropdown HTML:', iptvSelect?.innerHTML);
+    
+    if (window.AppState?.subscriptionTypes) {
+        console.log('Available subscription types:', window.AppState.subscriptionTypes);
+    } else {
+        console.log('No subscription types in AppState');
     }
 }
 
