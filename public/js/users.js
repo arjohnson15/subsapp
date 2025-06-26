@@ -379,6 +379,7 @@ console.log('🏷️ Stored original tags baseline:', this.originalTagsBaseline)
 
 async saveUser(event) {
     event.preventDefault();
+    console.log('🎯 Form submission triggered - starting save process');
     
     try {
         console.log('💾 Starting optimized user save with smart change detection...');
@@ -469,18 +470,20 @@ const plexTagsChanged = !this.deepEqual(currentPlexTags, originalPlexTags);
             body: JSON.stringify(userData)
         });
         
-        // Show immediate success message and navigate away
-        Utils.showNotification(isEditing ? 'User updated successfully' : 'User created successfully', 'success');
-        
-        // Clear baseline after successful save
+// Show immediate success message
+Utils.showNotification(isEditing ? 'User updated successfully' : 'User created successfully', 'success');
+
+// Clear baselines after successful save
 if (isEditing) {
     this.originalLibraryBaseline = null;
     this.originalTagsBaseline = null;
 }
-        
-        // IMMEDIATELY navigate back to users page and reload
-        showPage('users');
-        await this.loadUsers();
+
+// CRITICAL: Navigate away IMMEDIATELY - use setTimeout to ensure it happens
+setTimeout(async () => {
+    await showPage('users');
+    await this.loadUsers();
+}, 100);
         
         // Handle Plex operations in background ONLY if needed
         if (shouldUpdatePlexAccess && userData.plex_email) {
@@ -859,6 +862,7 @@ resetFormState() {
     window.AppState.editingUserId = null;
     window.AppState.currentUserData = null;
     this.originalLibraryBaseline = null; // Clear baseline
+    this.originalTagsBaseline = null; // Clear tags baseline too
 },
 	
 	deepClone(obj) {
