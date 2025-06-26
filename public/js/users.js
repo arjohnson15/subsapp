@@ -4,6 +4,7 @@ window.Users = {
     currentSortField: 'name',
     currentSortDirection: 'asc',
     backgroundTasks: new Map(), // Track background tasks
+    originalLibraryBaseline: null, // Track original library state for change detection
     
     async init() {
         await this.loadUsers();
@@ -315,33 +316,37 @@ updateSortIndicators(activeField, direction) {
         }
     },
     
-    async editUser(userId) {
-        try {
-            console.log(`📝 Starting edit for user ID: ${userId}`);
-            
-            // Set editing state FIRST
-            window.AppState.editingUserId = userId;
-            
-            // Load the user data
-            const user = await API.User.getById(userId);
-            console.log(`📊 Loaded user for editing:`, user);
-            
-            // Store user data globally
-            window.AppState.currentUserData = user;
-            
-            // Navigate to user form
-            await showPage('user-form');
-            
-            // Wait for page to fully load, then populate
-            setTimeout(() => {
-                console.log(`🔧 Populating form for editing user: ${user.name}`);
-                populateFormForEditing(user);
-            }, 1200);
-            
-        } catch (error) {
-            Utils.handleError(error, 'Loading user for editing');
-        }
-    },
+async editUser(userId) {
+    try {
+        console.log(`📝 Starting edit for user ID: ${userId}`);
+        
+        // Set editing state FIRST
+        window.AppState.editingUserId = userId;
+        
+        // Load the user data
+        const user = await API.User.getById(userId);
+        console.log(`📊 Loaded user for editing:`, user);
+        
+        // Store user data globally
+        window.AppState.currentUserData = user;
+        
+        // CRITICAL: Store baseline library state for change detection
+        this.originalLibraryBaseline = this.deepClone(user.plex_libraries || {});
+        console.log('📋 Stored original library baseline:', this.originalLibraryBaseline);
+        
+        // Navigate to user form
+        await showPage('user-form');
+        
+        // Wait for page to fully load, then populate
+        setTimeout(() => {
+            console.log(`🔧 Populating form for editing user: ${user.name}`);
+            populateFormForEditing(user);
+        }, 1200);
+        
+    } catch (error) {
+        Utils.handleError(error, 'Loading user for editing');
+    }
+},
     
     emailUser(userName, userEmail) {
         showPage('email');
@@ -371,7 +376,7 @@ async saveUser(event) {
     event.preventDefault();
     
     try {
-        console.log('💾 Starting smart user save with change detection...');
+        console.log('💾 Starting optimized user save with smart change detection...');
         
         // Collect form data properly
         const formData = new FormData(event.target);
@@ -388,7 +393,7 @@ async saveUser(event) {
         userData.device_count = parseInt(formData.get('device_count')) || 1;
         userData.bcc_owner_renewal = document.getElementById('bccOwnerRenewal')?.checked || false;
 
-        // Collect checked tags - PRESERVE all existing tags, don't let backend process them
+        // Collect checked tags
         userData.tags = [];
         document.querySelectorAll('input[name="tags"]:checked').forEach(checkbox => {
             userData.tags.push(checkbox.value);
@@ -400,40 +405,55 @@ async saveUser(event) {
         
         console.log('🔍 Current form data:', userData);
         
-        // SMART CHANGE DETECTION: Always get fresh data from database for comparison
+        // OPTIMIZED CHANGE DETECTION
         let shouldUpdatePlexAccess = false;
-        let originalPlexLibraries = {};
+        const isEditing = window.AppState?.editingUserId;
         
-        if (window.AppState?.editingUserId) {
-            // Get FRESH user data from database for accurate comparison
-            console.log('📊 Fetching current database state for comparison...');
-            const freshUserData = await API.User.getById(window.AppState.editingUserId);
-            originalPlexLibraries = freshUserData.plex_libraries || {};
+        if (isEditing) {
+            // Use stored baseline instead of database fetch
+            const originalLibraries = this.originalLibraryBaseline || {};
+            const originalUserData = window.AppState.currentUserData || {};
             
-            // Deep compare Plex library selections ONLY
-            const librariesChanged = !this.deepEqual(currentPlexLibraries, originalPlexLibraries);
+            // Check ONLY library-related changes that require API calls
+            const librarySelectionsChanged = !this.deepEqual(currentPlexLibraries, originalLibraries);
+            const plexEmailChanged = userData.plex_email !== (originalUserData.plex_email || '');
             
-            if (librariesChanged) {
-                console.log('🔄 Plex library changes detected:');
-                console.log('   Database has:', originalPlexLibraries);
-                console.log('   Form has:', currentPlexLibraries);
+            // Check if Plex tags changed (Plex 1, Plex 2)
+            const currentPlexTags = userData.tags.filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
+            const originalPlexTags = (originalUserData.tags || []).filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
+            const plexTagsChanged = !this.deepEqual(currentPlexTags, originalPlexTags);
+            
+            // Only trigger API calls for actual Plex access changes
+            if (librarySelectionsChanged || plexEmailChanged || plexTagsChanged) {
+                console.log('🔄 Plex access changes detected:');
+                if (librarySelectionsChanged) {
+                    console.log('   - Library selections changed:', {from: originalLibraries, to: currentPlexLibraries});
+                }
+                if (plexEmailChanged) {
+                    console.log('   - Plex email changed:', {from: originalUserData.plex_email, to: userData.plex_email});
+                }
+                if (plexTagsChanged) {
+                    console.log('   - Plex tags changed:', {from: originalPlexTags, to: currentPlexTags});
+                }
                 shouldUpdatePlexAccess = true;
             } else {
-                console.log('✅ No Plex library changes detected - skipping API calls');
-                console.log('   Database:', JSON.stringify(originalPlexLibraries));
-                console.log('   Form:', JSON.stringify(currentPlexLibraries));
+                console.log('✅ No Plex access changes detected - skipping API calls');
+                console.log('   - Libraries unchanged:', JSON.stringify(originalLibraries), '===', JSON.stringify(currentPlexLibraries));
+                console.log('   - Plex email unchanged:', originalUserData.plex_email, '===', userData.plex_email);
+                console.log('   - Plex tags unchanged:', originalPlexTags, '===', currentPlexTags);
                 shouldUpdatePlexAccess = false;
             }
             
-            // IMPORTANT: Tell backend NOT to process tags automatically 
+            // Tell backend NOT to process tags automatically 
             userData._skipTagProcessing = true;
         } else {
-            // New user - always update if they have Plex access
-            shouldUpdatePlexAccess = Object.keys(currentPlexLibraries).length > 0;
+            // New user - check if they have Plex access to share
+            const hasPlexTags = userData.tags.some(tag => tag === 'Plex 1' || tag === 'Plex 2');
+            const hasPlexLibraries = Object.keys(currentPlexLibraries).length > 0;
+            shouldUpdatePlexAccess = hasPlexTags && hasPlexLibraries && userData.plex_email;
             console.log('👤 New user - will update Plex access:', shouldUpdatePlexAccess);
         }
         
-        const isEditing = window.AppState?.editingUserId;
         const method = isEditing ? 'PUT' : 'POST';
         const endpoint = isEditing ? `/users/${window.AppState.editingUserId}` : '/users';
         
@@ -444,12 +464,19 @@ async saveUser(event) {
             body: JSON.stringify(userData)
         });
         
-        // Show immediate success and close the form
+        // Show immediate success message and navigate away
         Utils.showNotification(isEditing ? 'User updated successfully' : 'User created successfully', 'success');
+        
+        // Clear baseline after successful save
+        if (isEditing) {
+            this.originalLibraryBaseline = null;
+        }
+        
+        // IMMEDIATELY navigate back to users page and reload
         showPage('users');
         await this.loadUsers();
         
-        // Handle Plex operations in background if needed
+        // Handle Plex operations in background ONLY if needed
         if (shouldUpdatePlexAccess && userData.plex_email) {
             // Create background task
             const taskId = this.createBackgroundTask(
@@ -465,8 +492,8 @@ async saveUser(event) {
             // Process in background
             this.processPlexLibrariesInBackground(taskId, userData.plex_email, userData.plex_libraries, !isEditing);
             
-        } else if (!shouldUpdatePlexAccess) {
-            console.log('⏭️ Skipping Plex API calls - no library changes detected');
+        } else if (!shouldUpdatePlexAccess && isEditing) {
+            console.log('⏭️ Skipping Plex API calls - no Plex access changes detected');
         }
         
     } catch (error) {
@@ -826,6 +853,11 @@ createBackgroundTask(type, description, data = {}) {
         window.AppState.editingUserId = null;
         window.AppState.currentUserData = null;
     },
+	
+	deepClone(obj) {
+    if (!obj) return obj;
+    return JSON.parse(JSON.stringify(obj));
+},
     
 	deepEqual(obj1, obj2) {
         if (obj1 === obj2) return true;
