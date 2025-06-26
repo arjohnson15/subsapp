@@ -197,13 +197,13 @@ def verify_library_change_after_404(server_config, user_email, expected_library_
         log_info(f"  Actual:   {new_libs}")
         
         if new_set == expected_set:
-            log_info(f"✅ 404 error ignored successfully - libraries updated correctly!")
+            log_info(f"? 404 error ignored successfully - libraries updated correctly!")
             return True
         elif new_set != original_set:
-            log_info(f"⚠️ Libraries changed but not exactly as expected - partial success")
+            log_info(f"?? Libraries changed but not exactly as expected - partial success")
             return True
         else:
-            log_error(f"❌ No library changes detected - 404 error was real failure")
+            log_error(f"? No library changes detected - 404 error was real failure")
             return False
             
     except Exception as e:
@@ -305,7 +305,7 @@ def share_libraries_with_user_on_server(server_config, user_email, library_ids):
                 )
                 signal.alarm(0)
                 action = "updated_existing_user"
-                log_info(f"✅ updateFriend() completed successfully")
+                log_info(f"? updateFriend() completed successfully")
                 
             except PlexApiException as e:
                 signal.alarm(0)
@@ -313,15 +313,15 @@ def share_libraries_with_user_on_server(server_config, user_email, library_ids):
                 
                 # FIXED: Check for the specific 404 sharing error that we know still works
                 if "404" in error_str and ("sharing" in error_str or "not_found" in error_str):
-                    log_info(f"⚠️ Got expected 404 error from updateFriend() - verifying if changes took effect...")
+                    log_info(f"?? Got expected 404 error from updateFriend() - verifying if changes took effect...")
                     error_was_404 = True
                     action = "updated_existing_user_with_404"
                     
                     # Verify the changes actually happened despite the 404 error
                     if verify_library_change_after_404(server_config, user_email, library_ids, current_libs):
-                        log_info(f"✅ 404 error ignored - updateFriend() actually worked!")
+                        log_info(f"? 404 error ignored - updateFriend() actually worked!")
                     else:
-                        log_error(f"❌ 404 error was a real failure")
+                        log_error(f"? 404 error was a real failure")
                         return {
                             "success": False,
                             "error": f"updateFriend failed with 404 and no changes detected: {str(e)[:200]}",
