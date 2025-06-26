@@ -16,36 +16,49 @@ function safeJsonParse(jsonString, defaultValue = null) {
   }
 }
 
-// FIXED: Smart tag processing that preserves tags with remaining library access
+// FIXED: Smart tag processing that handles both string and object inputs
 function processTagsForUpdate(plexLibraries, existingTags = []) {
   console.log('Processing tags for update:', plexLibraries);
   console.log('Existing tags:', existingTags);
   
+  // FIXED: Normalize existing tags to string array
+  let normalizedExistingTags = [];
+  if (Array.isArray(existingTags)) {
+    normalizedExistingTags = existingTags.map(tag => {
+      if (typeof tag === 'string') return tag;
+      if (typeof tag === 'object' && tag.value) return tag.value;
+      if (typeof tag === 'object' && tag.name) return tag.name;
+      return String(tag);
+    });
+  }
+  
   // Start with non-Plex tags (preserve IPTV, etc.)
-  const nonPlexTags = existingTags.filter(tag => 
-    !tag.toLowerCase().includes('plex')
+  const nonPlexTags = normalizedExistingTags.filter(tag => 
+    !String(tag).toLowerCase().includes('plex')
   );
   
   const updatedTags = [...nonPlexTags];
   
   // Add Plex tags based on library access
-  Object.keys(plexLibraries).forEach(serverGroup => {
-    const libraries = plexLibraries[serverGroup];
-    
-    // Check if user has ANY library access for this server group
-    const hasRegularAccess = libraries.regular && libraries.regular.length > 0;
-    const hasFourkAccess = libraries.fourk && libraries.fourk.length > 0;
-    const hasAnyAccess = hasRegularAccess || hasFourkAccess;
-    
-    if (hasAnyAccess) {
-      if (serverGroup === 'plex1' && !updatedTags.includes('Plex 1')) {
-        updatedTags.push('Plex 1');
-      } else if (serverGroup === 'plex2' && !updatedTags.includes('Plex 2')) {
-        updatedTags.push('Plex 2');
+  if (plexLibraries && typeof plexLibraries === 'object') {
+    Object.keys(plexLibraries).forEach(serverGroup => {
+      const libraries = plexLibraries[serverGroup];
+      
+      // Check if user has ANY library access for this server group
+      const hasRegularAccess = libraries && libraries.regular && libraries.regular.length > 0;
+      const hasFourkAccess = libraries && libraries.fourk && libraries.fourk.length > 0;
+      const hasAnyAccess = hasRegularAccess || hasFourkAccess;
+      
+      if (hasAnyAccess) {
+        if (serverGroup === 'plex1' && !updatedTags.includes('Plex 1')) {
+          updatedTags.push('Plex 1');
+        } else if (serverGroup === 'plex2' && !updatedTags.includes('Plex 2')) {
+          updatedTags.push('Plex 2');
+        }
       }
-    }
-    // Note: We do NOT remove tags here - only add them if access exists
-  });
+      // Note: We do NOT remove tags here - only add them if access exists
+    });
+  }
   
   console.log('Processed tags for update:', updatedTags);
   return updatedTags;
@@ -258,6 +271,78 @@ router.put('/:id', [
   } catch (error) {
     console.error('Error updating user:', error);
     res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+// NEW: Remove user's Plex access completely
+router.post('/:id/remove-plex-access', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    // Get user data
+    const [user] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const userEmail = user.plex_email || user.email;
+    if (!userEmail) {
+      return res.status(400).json({ error: 'User has no email configured for Plex removal' });
+    }
+    
+    console.log(`🗑️ Removing all Plex access for user: ${user.name} (${userEmail})`);
+    
+    // Remove from all Plex server groups
+    const removalResults = [];
+    
+    try {
+      // Remove from plex1
+      const plex1Result = await fetch('/api/plex/remove-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userEmail: userEmail,
+          serverGroups: ['plex1', 'plex2']
+        })
+      });
+      
+      if (plex1Result.ok) {
+        const result = await plex1Result.json();
+        removalResults.push(result);
+      }
+    } catch (error) {
+      console.error('Error removing from Plex servers:', error);
+    }
+    
+    // Update database - remove Plex tags and clear library access
+    const currentTags = safeJsonParse(user.tags, []);
+    const nonPlexTags = currentTags.filter(tag => 
+      !String(tag).toLowerCase().includes('plex')
+    );
+    
+    await db.query(`
+      UPDATE users 
+      SET tags = ?, plex_libraries = ?, plex_email = NULL
+      WHERE id = ?
+    `, [
+      JSON.stringify(nonPlexTags),
+      JSON.stringify({}),
+      userId
+    ]);
+    
+    console.log(`✅ Removed Plex access for ${user.name}`);
+    
+    res.json({
+      success: true,
+      message: `All Plex access removed for ${user.name}`,
+      removedTags: currentTags.filter(tag => String(tag).toLowerCase().includes('plex')),
+      remainingTags: nonPlexTags,
+      plexResults: removalResults
+    });
+    
+  } catch (error) {
+    console.error('Error removing Plex access:', error);
+    res.status(500).json({ error: 'Failed to remove Plex access' });
   }
 });
 
