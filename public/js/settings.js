@@ -188,22 +188,22 @@ window.Settings = {
     },
     
     // Subscription Management Functions
-async loadSubscriptions() {
-    try {
-        console.log('📊 Loading subscriptions from API...');
-        const subscriptions = await API.Subscription.getAll();
-        console.log('📊 Subscriptions loaded:', subscriptions.length);
-        
-        // Store in global state
-        window.AppState.subscriptionTypes = subscriptions;
-        
-        this.renderSubscriptionsTable();
-        // Note: updateSubscriptionStats() removed since we removed the stats section
-    } catch (error) {
-        console.error('❌ Error loading subscriptions:', error);
-        Utils.handleError(error, 'Loading subscriptions');
-    }
-}
+    async loadSubscriptions() {
+        try {
+            console.log('📊 Loading subscriptions from API...');
+            const subscriptions = await API.Subscription.getAll();
+            console.log('📊 Subscriptions loaded:', subscriptions.length);
+            
+            // Store in global state
+            window.AppState.subscriptionTypes = subscriptions;
+            
+            this.renderSubscriptionsTable();
+            // Note: updateSubscriptionStats() removed since we removed the stats section
+        } catch (error) {
+            console.error('❌ Error loading subscriptions:', error);
+            Utils.handleError(error, 'Loading subscriptions');
+        }
+    },
     
     renderSubscriptionsTable() {
         const tbody = document.getElementById('subscriptionsTableBody');

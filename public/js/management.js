@@ -64,14 +64,13 @@ window.Management = {
         if (!passwordInput) return;
         
         const enteredPassword = passwordInput.value;
-        const enteredHash = await this.simpleHash(enteredPassword);
         
-        if (enteredHash === this.passwordHash) {
+        if (enteredPassword === 'Gunshy@1') {
             // Correct password
             this.isAuthenticated = true;
             
-            // Store authentication in session (expires when browser closes)
-            sessionStorage.setItem('managementAuth', this.passwordHash);
+            // Store authentication in session
+            sessionStorage.setItem('managementAuth', 'authenticated');
             sessionStorage.setItem('managementAuthTime', Date.now().toString());
             
             // Hide modal
@@ -86,14 +85,10 @@ window.Management = {
             // Wrong password
             if (errorDiv) {
                 errorDiv.style.display = 'block';
-                
-                // Hide error after 3 seconds
                 setTimeout(() => {
                     errorDiv.style.display = 'none';
                 }, 3000);
             }
-            
-            // Clear input
             passwordInput.value = '';
             passwordInput.focus();
         }
@@ -103,17 +98,6 @@ window.Management = {
     async simpleHash(str) {
         // Simple transformation for "Gunshy@1" -> "gunshy1"
         return str.toLowerCase().replace('@', '').replace(/[^a-z0-9]/g, '');
-    },
-    
-    // Fallback hash for browsers without crypto.subtle
-    fallbackHash(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            const char = str.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // Convert to 32-bit integer
-        }
-        return Math.abs(hash).toString(16);
     },
     
     logout() {
@@ -204,58 +188,58 @@ window.Management = {
         }
     },
     
-renderTools() {
-    const grid = document.getElementById('managementToolsGrid');
-    if (!grid) return;
-    
-    if (this.tools.length === 0) {
-        grid.innerHTML = `
-            <div class="card" style="text-align: center; color: #4fc3f7;">
-                <h3>No Management Tools</h3>
-                <p>Click "Add New Tool" to create your first management tool.</p>
+    renderTools() {
+        const grid = document.getElementById('managementToolsGrid');
+        if (!grid) return;
+        
+        if (this.tools.length === 0) {
+            grid.innerHTML = `
+                <div class="card" style="text-align: center; color: #4fc3f7;">
+                    <h3>No Management Tools</h3>
+                    <p>Click "Add New Tool" to create your first management tool.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        grid.innerHTML = this.tools.map(tool => `
+            <div class="management-tool">
+                <div class="tool-header">
+                    <h3 class="tool-name">${tool.name}</h3>
+                    <div class="tool-actions">
+                        <button class="btn btn-small btn-tool-edit" onclick="Management.editTool('${tool.id}')">Edit</button>
+                        <button class="btn btn-small btn-tool-delete" onclick="Management.deleteTool('${tool.id}')">Delete</button>
+                    </div>
+                </div>
+                
+                <a href="${tool.url}" target="_blank" class="tool-button">
+                    Open ${tool.name}
+                </a>
+                
+                <div class="tool-credentials">
+                    <div class="credential-row">
+                        <span class="credential-label">Username:</span>
+                        <span class="credential-value" onclick="Management.copyToClipboard('${tool.username}')" title="Click to copy">
+                            ${tool.username || 'Not set'}
+                        </span>
+                    </div>
+                    <div class="credential-row">
+                        <span class="credential-label">Password:</span>
+                        <span class="credential-value" onclick="Management.copyToClipboard('${tool.password}')" title="Click to copy">
+                            ${tool.password ? '••••••••' : 'Not set'}
+                        </span>
+                    </div>
+                </div>
+                
+                ${tool.notes ? `
+                    <div class="tool-notes">
+                        <strong>Notes:</strong><br>
+                        ${tool.notes}
+                    </div>
+                ` : ''}
             </div>
-        `;
-        return;
-    }
-    
-    grid.innerHTML = this.tools.map(tool => `
-        <div class="management-tool">
-            <div class="tool-header">
-                <h3 class="tool-name">${tool.name}</h3>
-                <div class="tool-actions">
-                    <button class="btn btn-small btn-tool-edit" onclick="Management.editTool('${tool.id}')">Edit</button>
-                    <button class="btn btn-small btn-tool-delete" onclick="Management.deleteTool('${tool.id}')">Delete</button>
-                </div>
-            </div>
-            
-            <a href="${tool.url}" target="_blank" class="tool-button">
-                Open ${tool.name}
-            </a>
-            
-            <div class="tool-credentials">
-                <div class="credential-row">
-                    <span class="credential-label">Username:</span>
-                    <span class="credential-value" onclick="Management.copyToClipboard('${tool.username}')" title="Click to copy">
-                        ${tool.username || 'Not set'}
-                    </span>
-                </div>
-                <div class="credential-row">
-                    <span class="credential-label">Password:</span>
-                    <span class="credential-value" onclick="Management.copyToClipboard('${tool.password}')" title="Click to copy">
-                        ${tool.password ? '••••••••' : 'Not set'}
-                    </span>
-                </div>
-            </div>
-            
-            ${tool.notes ? `
-                <div class="tool-notes">
-                    <strong>Notes:</strong><br>
-                    ${tool.notes}
-                </div>
-            ` : ''}
-        </div>
-    `).join('');
-}
+        `).join('');
+    },
     
     showAddForm() {
         this.editingToolId = null;
@@ -420,8 +404,5 @@ renderTools() {
         }
     }
 };
-
-// Make functions globally available for onclick handlers
-window.addManagementTool = window.Management.showAddForm.bind(window.Management);
 
 console.log('✅ Management.js loaded successfully');
