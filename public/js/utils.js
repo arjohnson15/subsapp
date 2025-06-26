@@ -37,13 +37,102 @@ function formatDate(dateString) {
     }
 }
 
+// Check if a date is expired (past today)
+function isDateExpired(dateString) {
+    if (!dateString || dateString === 'N/A' || dateString === 'FREE' || dateString === 'NEVER') {
+        return false; // Special cases are not expired
+    }
+    
+    try {
+        const date = new Date(dateString);
+        const today = new Date();
+        
+        // Set time to beginning of day for accurate comparison
+        today.setHours(0, 0, 0, 0);
+        date.setHours(0, 0, 0, 0);
+        
+        return date < today;
+    } catch (error) {
+        return false; // If we can't parse the date, assume it's not expired
+    }
+}
+
+// Check if a date is expiring soon (within X days)
+function isDateExpiringSoon(dateString, daysThreshold = 7) {
+    if (!dateString || dateString === 'N/A' || dateString === 'FREE' || dateString === 'NEVER') {
+        return false;
+    }
+    
+    try {
+        const date = new Date(dateString);
+        const today = new Date();
+        const threshold = new Date();
+        threshold.setDate(today.getDate() + daysThreshold);
+        
+        // Set time to beginning of day for accurate comparison
+        today.setHours(0, 0, 0, 0);
+        date.setHours(0, 0, 0, 0);
+        threshold.setHours(0, 0, 0, 0);
+        
+        return date >= today && date <= threshold;
+    } catch (error) {
+        return false;
+    }
+}
+
 // Show/hide loading indicator
-function showLoading() {
-    document.getElementById('loadingIndicator').style.display = 'flex';
+function showLoading(message = 'Loading...') {
+    let loadingIndicator = document.getElementById('loadingIndicator');
+    
+    if (!loadingIndicator) {
+        // Create loading indicator if it doesn't exist
+        loadingIndicator = document.createElement('div');
+        loadingIndicator.id = 'loadingIndicator';
+        loadingIndicator.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            color: white;
+            font-size: 1.2rem;
+        `;
+        document.body.appendChild(loadingIndicator);
+    }
+    
+    loadingIndicator.innerHTML = `
+        <div style="text-align: center;">
+            <div style="border: 4px solid rgba(255, 255, 255, 0.3); border-top: 4px solid #4fc3f7; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+            <div>${message}</div>
+        </div>
+    `;
+    
+    // Add spin animation if not already present
+    if (!document.getElementById('loadingSpinStyle')) {
+        const style = document.createElement('style');
+        style.id = 'loadingSpinStyle';
+        style.textContent = `
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    loadingIndicator.style.display = 'flex';
 }
 
 function hideLoading() {
-    document.getElementById('loadingIndicator').style.display = 'none';
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'none';
+    }
 }
 
 // Show notification/alert with custom styling
@@ -51,10 +140,57 @@ function showNotification(message, type = 'info') {
     // Create notification element
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 10000;
+        max-width: 400px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        animation: slideInRight 0.3s ease-out;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    `;
+    
+    // Set background color based on type
+    const colors = {
+        success: 'linear-gradient(45deg, #4caf50, #8bc34a)',
+        error: 'linear-gradient(45deg, #f44336, #e91e63)',
+        warning: 'linear-gradient(45deg, #ff9800, #ffc107)',
+        info: 'linear-gradient(45deg, #2196f3, #03a9f4)'
+    };
+    
+    notification.style.background = colors[type] || colors.info;
+    
     notification.innerHTML = `
         <span>${message}</span>
-        <button onclick="this.parentElement.remove()">&times;</button>
+        <button onclick="this.parentElement.remove()" style="background: none; border: none; color: white; font-size: 18px; cursor: pointer; padding: 0; line-height: 1;">&times;</button>
     `;
+    
+    // Add CSS animation if not already present
+    if (!document.getElementById('notificationStyle')) {
+        const style = document.createElement('style');
+        style.id = 'notificationStyle';
+        style.textContent = `
+            @keyframes slideInRight {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
     
     // Add to DOM
     document.body.appendChild(notification);
@@ -69,7 +205,10 @@ function showNotification(message, type = 'info') {
 
 // Modal functions
 function closeModal(modalId) {
-    document.getElementById(modalId).classList.remove('active');
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('active');
+    }
 }
 
 // Close modal when clicking outside
@@ -82,7 +221,7 @@ window.onclick = function(event) {
 // Page loading utility
 async function loadPageContent(pageName) {
     try {
-        showLoading();
+        showLoading(`Loading ${pageName} page...`);
         const response = await fetch(`pages/${pageName}.html`);
         if (!response.ok) {
             throw new Error(`Failed to load ${pageName} page`);
@@ -246,6 +385,8 @@ function handleError(error, context = '') {
 // Export for use in other modules
 window.Utils = {
     formatDate,
+    isDateExpired,
+    isDateExpiringSoon,
     showLoading,
     hideLoading,
     showNotification,
@@ -263,3 +404,5 @@ window.Utils = {
     collectFormData,
     handleError
 };
+
+console.log('🔧 Utils module loaded successfully');
