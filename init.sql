@@ -43,7 +43,7 @@ CREATE TABLE users (
   FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE SET NULL
 );
 
--- Subscriptions table with unique constraints
+-- Subscriptions table with simpler unique constraint approach
 CREATE TABLE subscriptions (
   id INT PRIMARY KEY AUTO_INCREMENT,
   user_id INT NOT NULL,
@@ -55,22 +55,12 @@ CREATE TABLE subscriptions (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   
-  -- Generated column that combines user_id + service_type for active subscriptions only
-  user_service_type_active VARCHAR(50) GENERATED ALWAYS AS (
-    CASE 
-      WHEN status = 'active' THEN CONCAT(user_id, '_', (
-        SELECT type FROM subscription_types WHERE id = subscription_type_id
-      ))
-      ELSE NULL 
-    END
-  ) STORED,
-  
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (subscription_type_id) REFERENCES subscription_types(id),
-  
-  -- CRITICAL: This constraint ensures only ONE active subscription per service type per user
-  UNIQUE KEY unique_active_user_service_type (user_service_type_active)
+  FOREIGN KEY (subscription_type_id) REFERENCES subscription_types(id)
 );
+
+-- Create a view to help enforce uniqueness and add triggers
+-- We'll use a different approach since generated columns with subqueries aren't allowed
 
 -- Email templates table
 CREATE TABLE email_templates (
@@ -185,12 +175,58 @@ INSERT INTO users (name, email, owner_id, plex_email, iptv_username, iptv_passwo
 ('Andrew', 'arjohnson15@gmail.com', 1, 'arjohnson15@gmail.com', 'andrew_iptv', 'iptv456', 'ABC123', 2, true, '["Plex 1", "Plex 2", "IPTV"]'),
 ('Aaron Fleuren', 'afleuren@yahoo.com', 1, 'afleuren@yahoo.com', '', '', '', 1, false, '["Plex 1"]');
 
--- Insert sample subscriptions (demonstrating the unique constraint)
+-- Insert sample subscriptions
 INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status) VALUES
-(1, 1, CURDATE(), NULL, true, 'active'), -- Andrew - Free Plex (only one Plex subscription allowed)
-(1, 2, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY), false, 'active'), -- Andrew - IPTV expiring soon (only one IPTV subscription allowed)
+(1, 1, CURDATE(), NULL, true, 'active'), -- Andrew - Free Plex
+(1, 2, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY), false, 'active'), -- Andrew - IPTV expiring soon
 (2, 1, '2024-04-15', '2025-04-15', false, 'active'); -- Aaron - Paid Plex
 
--- Note: The unique constraint will prevent inserting duplicate active subscriptions like:
--- INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status) VALUES
--- (1, 1, CURDATE(), '2025-12-31', false, 'active'); -- This would FAIL because Andrew already has an active Plex subscription
+-- Create triggers to enforce unique constraint manually since generated columns with subqueries don't work
+DELIMITER //
+
+CREATE TRIGGER prevent_duplicate_active_subscriptions_insert
+BEFORE INSERT ON subscriptions
+FOR EACH ROW
+BEGIN
+  DECLARE existing_count INT DEFAULT 0;
+  
+  IF NEW.status = 'active' THEN
+    SELECT COUNT(*) INTO existing_count
+    FROM subscriptions s
+    JOIN subscription_types st ON s.subscription_type_id = st.id
+    JOIN subscription_types new_st ON NEW.subscription_type_id = new_st.id
+    WHERE s.user_id = NEW.user_id 
+      AND s.status = 'active'
+      AND st.type = new_st.type;
+    
+    IF existing_count > 0 THEN
+      SIGNAL SQLSTATE '45000' 
+      SET MESSAGE_TEXT = 'User already has an active subscription of this type';
+    END IF;
+  END IF;
+END//
+
+CREATE TRIGGER prevent_duplicate_active_subscriptions_update
+BEFORE UPDATE ON subscriptions
+FOR EACH ROW
+BEGIN
+  DECLARE existing_count INT DEFAULT 0;
+  
+  IF NEW.status = 'active' AND (OLD.status != 'active' OR OLD.subscription_type_id != NEW.subscription_type_id OR OLD.user_id != NEW.user_id) THEN
+    SELECT COUNT(*) INTO existing_count
+    FROM subscriptions s
+    JOIN subscription_types st ON s.subscription_type_id = st.id
+    JOIN subscription_types new_st ON NEW.subscription_type_id = new_st.id
+    WHERE s.user_id = NEW.user_id 
+      AND s.status = 'active'
+      AND st.type = new_st.type
+      AND s.id != NEW.id;
+    
+    IF existing_count > 0 THEN
+      SIGNAL SQLSTATE '45000' 
+      SET MESSAGE_TEXT = 'User already has an active subscription of this type';
+    END IF;
+  END IF;
+END//
+
+DELIMITER ;
