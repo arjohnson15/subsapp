@@ -453,7 +453,15 @@ async saveUser(event) {
             const originalUserData = window.AppState.currentUserData || {};
             
             // Check ONLY library-related changes that require API calls
-            const librarySelectionsChanged = !this.deepEqual(currentPlexLibraries, originalLibraries);
+const normalizedCurrent = this.normalizeLibrariesForComparison(currentPlexLibraries);
+const normalizedOriginal = this.normalizeLibrariesForComparison(originalLibraries);
+const librarySelectionsChanged = !this.deepEqual(normalizedCurrent, normalizedOriginal);
+
+if (librarySelectionsChanged) {
+    console.log('📊 Library change comparison:');
+    console.log('   Original normalized:', normalizedOriginal);
+    console.log('   Current normalized:', normalizedCurrent);
+}
             const plexEmailChanged = userData.plex_email !== (originalUserData.plex_email || '');
             
             // FIXED: Check if Plex tags changed (Plex 1, Plex 2) - only compare RELEVANT tags
@@ -884,42 +892,57 @@ async saveUser(event) {
         
         return true;
     },
+	
+	// Normalize library objects for comparison - ensures consistent sorting
+normalizeLibrariesForComparison(libraries) {
+    if (!libraries) return {};
+    const normalized = {};
+    for (const [serverGroup, access] of Object.entries(libraries)) {
+        if (access) {
+            normalized[serverGroup] = {
+                regular: (access.regular || []).slice().sort(),
+                fourk: (access.fourk || []).slice().sort()
+            };
+        }
+    }
+    return normalized;
+},
 
-    // Enhanced collectPlexLibrarySelections function that only includes selected libraries and sorts arrays
-    collectPlexLibrarySelections() {
-        const plexLibraries = {};
+// Enhanced collectPlexLibrarySelections function that only includes selected libraries and sorts arrays
+collectPlexLibrarySelections() {
+    const plexLibraries = {};
+    
+    // Check if Plex 1 tag is selected AND get its libraries
+    if (document.getElementById('tag-plex1')?.checked) {
+        const regularChecked = Array.from(document.querySelectorAll('input[name="plex1_regular"]:checked')).map(cb => cb.value);
+        const fourkChecked = Array.from(document.querySelectorAll('input[name="plex1_fourk"]:checked')).map(cb => cb.value);
         
-        // Check if Plex 1 tag is selected AND get its libraries
-        if (document.getElementById('tag-plex1')?.checked) {
-            const regularChecked = Array.from(document.querySelectorAll('input[name="plex1_regular"]:checked')).map(cb => cb.value);
-            const fourkChecked = Array.from(document.querySelectorAll('input[name="plex1_fourk"]:checked')).map(cb => cb.value);
-            
-            // Only add if there are actually selected libraries
-            if (regularChecked.length > 0 || fourkChecked.length > 0) {
-                plexLibraries.plex1 = {
-                    regular: regularChecked.sort(), // CRITICAL: Sort to ensure consistent comparison
-                    fourk: fourkChecked.sort()      // CRITICAL: Sort to ensure consistent comparison
-                };
-            }
+        // Only add if there are actually selected libraries
+        if (regularChecked.length > 0 || fourkChecked.length > 0) {
+            plexLibraries.plex1 = {
+                regular: regularChecked.sort(), // CRITICAL: Sort to ensure consistent comparison
+                fourk: fourkChecked.sort()      // CRITICAL: Sort to ensure consistent comparison
+            };
         }
+    }
+    
+    // Check if Plex 2 tag is selected AND get its libraries
+    if (document.getElementById('tag-plex2')?.checked) {
+        const regularChecked = Array.from(document.querySelectorAll('input[name="plex2_regular"]:checked')).map(cb => cb.value);
+        const fourkChecked = Array.from(document.querySelectorAll('input[name="plex2_fourk"]:checked')).map(cb => cb.value);
         
-        // Check if Plex 2 tag is selected AND get its libraries
-        if (document.getElementById('tag-plex2')?.checked) {
-            const regularChecked = Array.from(document.querySelectorAll('input[name="plex2_regular"]:checked')).map(cb => cb.value);
-            const fourkChecked = Array.from(document.querySelectorAll('input[name="plex2_fourk"]:checked')).map(cb => cb.value);
-            
-            // Only add if there are actually selected libraries
-            if (regularChecked.length > 0 || fourkChecked.length > 0) {
-                plexLibraries.plex2 = {
-                    regular: regularChecked.sort(), // CRITICAL: Sort to ensure consistent comparison
-                    fourk: fourkChecked.sort()      // CRITICAL: Sort to ensure consistent comparison
-                };
-            }
+        // Only add if there are actually selected libraries
+        if (regularChecked.length > 0 || fourkChecked.length > 0) {
+            plexLibraries.plex2 = {
+                regular: regularChecked.sort(), // CRITICAL: Sort to ensure consistent comparison
+                fourk: fourkChecked.sort()      // CRITICAL: Sort to ensure consistent comparison
+            };
         }
-        
-        console.log('📋 Collected library selections (sorted):', plexLibraries);
-        return plexLibraries;
-    },
+    }
+    
+    console.log('📋 Collected library selections (sorted):', plexLibraries);
+    return plexLibraries;
+},
 	
     // Check if any Plex libraries are selected
     hasPlexLibrariesSelected(plexLibraries) {
