@@ -3,12 +3,26 @@ const { body, validationResult } = require('express-validator');
 const db = require('./database-config');
 const router = express.Router();
 
-// Helper function to safely parse JSON
-function safeJsonParse(jsonString, defaultValue = null) {
+// Helper function to safely parse JSON - handles both JSON and legacy string data
+function safeJsonParse(value, defaultValue = null) {
+  if (!value) return defaultValue;
+  if (typeof value === 'object') return value; // Already parsed
+  if (typeof value !== 'string') return defaultValue;
+  
   try {
-    return jsonString ? JSON.parse(jsonString) : defaultValue;
+    // Try parsing as JSON first
+    return JSON.parse(value);
   } catch (error) {
-    console.error('JSON parse error:', error);
+    // Handle legacy string data that's not JSON
+    if (value.includes(',')) {
+      // Looks like comma-separated tags: "Plex 1, Plex 2, IPTV"
+      return value.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+    } else if (value.length > 0) {
+      // Single string value
+      return [value.trim()];
+    }
+    
+    console.warn('Could not parse value:', value, 'using default:', defaultValue);
     return defaultValue;
   }
 }
@@ -52,22 +66,43 @@ function processTagsForUpdate(plexLibraries, existingTags = []) {
   return newTags;
 }
 
-// Get all users
+// Get all users with subscription data
 router.get('/', async (req, res) => {
   try {
     const users = await db.query(`
       SELECT u.*, 
         o.name as owner_name,
-        o.email as owner_email
+        o.email as owner_email,
+        GROUP_CONCAT(
+          CASE 
+            WHEN st.type = 'plex' AND s.status = 'active' 
+            THEN s.expiration_date 
+            ELSE NULL 
+          END
+        ) as plex_expiration,
+        GROUP_CONCAT(
+          CASE 
+            WHEN st.type = 'iptv' AND s.status = 'active' 
+            THEN s.expiration_date 
+            ELSE NULL 
+          END
+        ) as iptv_expiration
       FROM users u
       LEFT JOIN owners o ON u.owner_id = o.id
+      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
+      LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
+      GROUP BY u.id, o.name, o.email
       ORDER BY u.name
     `);
 
-    // Safe JSON parsing for all users
+    // Safe JSON parsing and date formatting
     users.forEach(user => {
       user.tags = safeJsonParse(user.tags, []);
       user.plex_libraries = safeJsonParse(user.plex_libraries, {});
+      
+      // Format expiration dates properly
+      user.plex_expiration = user.plex_expiration || null;
+      user.iptv_expiration = user.iptv_expiration || null;
     });
 
     res.json(users);

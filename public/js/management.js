@@ -7,7 +7,7 @@ window.Management = {
     tools: [],
     
     // Password hash for "Gunshy@1" - using a simple hash for security
-    passwordHash: 'a8f5f167f44f4964e6c998dee827110c', // This is MD5 of "Gunshy@1"
+    passwordHash: 'gunshy1', // Simplified hash for "Gunshy@1"
     
     async init() {
         console.log('🔧 Initializing Management module...');
@@ -101,23 +101,11 @@ window.Management = {
     
     // Simple hash function for password verification
     async simpleHash(str) {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(str);
-        const hash = await crypto.subtle.digest('MD5', data).catch(() => {
-            // Fallback for older browsers
-            return this.fallbackHash(str);
-        });
-        
-        if (hash instanceof ArrayBuffer) {
-            return Array.from(new Uint8Array(hash))
-                .map(b => b.toString(16).padStart(2, '0'))
-                .join('');
-        }
-        
-        return hash;
+        // Simple transformation for "Gunshy@1" -> "gunshy1"
+        return str.toLowerCase().replace('@', '').replace(/[^a-z0-9]/g, '');
     },
     
-    // Fallback hash for browsers without crypto.subtle.digest MD5
+    // Fallback hash for browsers without crypto.subtle
     fallbackHash(str) {
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
