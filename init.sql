@@ -1,4 +1,4 @@
--- JohnsonFlix Database Schema
+-- JohnsonFlix Database Schema with Unique Subscription Constraints
 CREATE DATABASE IF NOT EXISTS subsapp_db;
 USE subsapp_db;
 
@@ -43,7 +43,7 @@ CREATE TABLE users (
   FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE SET NULL
 );
 
--- Subscriptions table
+-- Subscriptions table with unique constraints
 CREATE TABLE subscriptions (
   id INT PRIMARY KEY AUTO_INCREMENT,
   user_id INT NOT NULL,
@@ -54,8 +54,22 @@ CREATE TABLE subscriptions (
   status ENUM('active', 'expired', 'cancelled') DEFAULT 'active',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  -- Generated column that combines user_id + service_type for active subscriptions only
+  user_service_type_active VARCHAR(50) GENERATED ALWAYS AS (
+    CASE 
+      WHEN status = 'active' THEN CONCAT(user_id, '_', (
+        SELECT type FROM subscription_types WHERE id = subscription_type_id
+      ))
+      ELSE NULL 
+    END
+  ) STORED,
+  
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (subscription_type_id) REFERENCES subscription_types(id)
+  FOREIGN KEY (subscription_type_id) REFERENCES subscription_types(id),
+  
+  -- CRITICAL: This constraint ensures only ONE active subscription per service type per user
+  UNIQUE KEY unique_active_user_service_type (user_service_type_active)
 );
 
 -- Email templates table
@@ -171,8 +185,12 @@ INSERT INTO users (name, email, owner_id, plex_email, iptv_username, iptv_passwo
 ('Andrew', 'arjohnson15@gmail.com', 1, 'arjohnson15@gmail.com', 'andrew_iptv', 'iptv456', 'ABC123', 2, true, '["Plex 1", "Plex 2", "IPTV"]'),
 ('Aaron Fleuren', 'afleuren@yahoo.com', 1, 'afleuren@yahoo.com', '', '', '', 1, false, '["Plex 1"]');
 
--- Insert sample subscriptions
+-- Insert sample subscriptions (demonstrating the unique constraint)
 INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status) VALUES
-(1, 1, CURDATE(), NULL, true, 'active'), -- Andrew - Free Plex
-(1, 2, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY), false, 'active'), -- Andrew - IPTV expiring soon
+(1, 1, CURDATE(), NULL, true, 'active'), -- Andrew - Free Plex (only one Plex subscription allowed)
+(1, 2, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY), false, 'active'), -- Andrew - IPTV expiring soon (only one IPTV subscription allowed)
 (2, 1, '2024-04-15', '2025-04-15', false, 'active'); -- Aaron - Paid Plex
+
+-- Note: The unique constraint will prevent inserting duplicate active subscriptions like:
+-- INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status) VALUES
+-- (1, 1, CURDATE(), '2025-12-31', false, 'active'); -- This would FAIL because Andrew already has an active Plex subscription
