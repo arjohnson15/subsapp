@@ -1,12 +1,14 @@
-// Enhanced User Management Functions with Real Plex API Integration
+// Enhanced User Management Functions with Background Task System
 
 window.Users = {
     currentSortField: 'name',
     currentSortDirection: 'asc',
+    backgroundTasks: new Map(), // Track background tasks
     
     async init() {
         await this.loadUsers();
         this.setupEventListeners();
+        this.startBackgroundTaskMonitor();
     },
     
     setupEventListeners() {
@@ -15,6 +17,83 @@ window.Users = {
         if (searchInput) {
             searchInput.addEventListener('input', Utils.debounce(this.filterUsers.bind(this), 300));
         }
+    },
+    
+    // Background task monitoring system
+    startBackgroundTaskMonitor() {
+        // Check for completed background tasks every 2 seconds
+        setInterval(() => {
+            this.checkBackgroundTasks();
+        }, 2000);
+        
+        console.log('🔄 Background task monitor started');
+    },
+    
+    async checkBackgroundTasks() {
+        for (const [taskId, task] of this.backgroundTasks.entries()) {
+            try {
+                const result = await API.call(`/background-tasks/${taskId}`);
+                
+                if (result.status === 'completed') {
+                    this.handleTaskCompletion(taskId, task, result);
+                    this.backgroundTasks.delete(taskId);
+                } else if (result.status === 'failed') {
+                    this.handleTaskFailure(taskId, task, result);
+                    this.backgroundTasks.delete(taskId);
+                }
+                // If status is 'running', keep monitoring
+                
+            } catch (error) {
+                // Task endpoint might not exist yet, that's fine
+                console.log(`Task ${taskId} not found, removing from monitor`);
+                this.backgroundTasks.delete(taskId);
+            }
+        }
+    },
+    
+    handleTaskCompletion(taskId, task, result) {
+        console.log(`✅ Background task completed: ${taskId}`, result);
+        
+        // Show success notification with details
+        let message = `${task.description} completed successfully!`;
+        
+        if (result.data && result.data.apiCallsMade) {
+            message += ` Made ${result.data.apiCallsMade} Plex API calls.`;
+        }
+        
+        Utils.showNotification(message, 'success');
+        
+        // Hide any loading indicators
+        Utils.hideLoading();
+        
+        // Refresh users list if it was a user operation
+        if (task.type === 'user_save') {
+            this.loadUsers();
+        }
+    },
+    
+    handleTaskFailure(taskId, task, result) {
+        console.error(`❌ Background task failed: ${taskId}`, result);
+        
+        let message = `${task.description} failed: ${result.error || 'Unknown error'}`;
+        Utils.showNotification(message, 'error');
+        
+        Utils.hideLoading();
+    },
+    
+    createBackgroundTask(type, description, data = {}) {
+        const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        this.backgroundTasks.set(taskId, {
+            id: taskId,
+            type: type,
+            description: description,
+            data: data,
+            startTime: new Date()
+        });
+        
+        console.log(`🚀 Created background task: ${taskId} - ${description}`);
+        return taskId;
     },
     
     async loadUsers() {
@@ -208,13 +287,12 @@ window.Users = {
         }
     },
     
-    // Enhanced user saving with comprehensive Plex integration
+    // ENHANCED: User saving with background task system
     async saveUser(event) {
         event.preventDefault();
         
         try {
-            Utils.showLoading();
-            console.log('💾 Starting enhanced user save process...');
+            console.log('💾 Starting enhanced user save with background processing...');
             
             const formData = Utils.collectFormData('userFormData');
             
@@ -241,7 +319,7 @@ window.Users = {
                 isEditing: isEditing
             });
             
-            // Step 1: Save user to database
+            // Step 1: Save user to database quickly
             console.log('💾 Step 1: Saving user to database...');
             let savedUserId;
             
@@ -255,48 +333,40 @@ window.Users = {
                 console.log('✅ User created in database');
             }
             
-            // Step 2: Handle Plex library sharing if applicable
+            // Step 2: Handle Plex library sharing in background if applicable
             if (formData.plex_email && this.hasPlexLibrariesSelected(plexLibraries)) {
-                console.log('🤝 Step 2: Processing Plex library sharing...');
+                console.log('🚀 Step 2: Starting background Plex library processing...');
                 
-                try {
-                    const shareResult = await this.shareUserPlexLibrariesEnhanced(
-                        formData.plex_email, 
-                        plexLibraries, 
-                        !isEditing // isNewUser
-                    );
-                    
-                    console.log('📊 Plex sharing result:', shareResult);
-                    
-                    if (shareResult.success) {
-                        let message = `User ${isEditing ? 'updated' : 'created'} successfully!`;
-                        
-                        if (shareResult.apiCallsMade > 0) {
-                            message += ` Made ${shareResult.apiCallsMade} Plex API calls to update library access.`;
-                        } else if (shareResult.totalChanges === 0) {
-                            message += ` User already had correct Plex library access.`;
-                        }
-                        
-                        Utils.showNotification(message, 'success');
-                    } else {
-                        Utils.showNotification(
-                            `User ${isEditing ? 'updated' : 'created'}, but Plex sharing had issues: ${shareResult.message}`,
-                            'warning'
-                        );
+                // Create background task
+                const taskId = this.createBackgroundTask(
+                    'user_save',
+                    `${isEditing ? 'Updating' : 'Setting up'} Plex access for ${formData.name}`,
+                    {
+                        userEmail: formData.plex_email,
+                        plexLibraries: plexLibraries,
+                        isNewUser: !isEditing,
+                        userName: formData.name
                     }
-                } catch (shareError) {
-                    console.error('❌ Plex sharing failed:', shareError);
-                    Utils.showNotification(
-                        `User ${isEditing ? 'updated' : 'created'}, but Plex sharing failed: ${shareError.message}`,
-                        'warning'
-                    );
-                }
+                );
+                
+                // Start background processing (fire and forget)
+                this.processPlexLibrariesInBackground(taskId, formData.plex_email, plexLibraries, !isEditing);
+                
+                // Show immediate success message
+                Utils.showNotification(
+                    `User ${isEditing ? 'updated' : 'created'} successfully! Plex access is being processed in the background.`,
+                    'success'
+                );
+                
+                // Show a small loading indicator for the background task
+                this.showBackgroundTaskIndicator(`Processing Plex access for ${formData.name}...`);
+                
             } else {
                 console.log('ℹ️ Step 2: Skipped - No Plex email or libraries selected');
                 Utils.showNotification(`User ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
             }
             
-            // Step 3: Clean up and navigate back
+            // Step 3: Clean up and navigate back immediately
             console.log('🔄 Step 3: Cleaning up and navigating back...');
             this.resetFormState();
             showPage('users');
@@ -307,8 +377,134 @@ window.Users = {
         } catch (error) {
             console.error('❌ Error saving user:', error);
             Utils.handleError(error, 'Saving user');
-        } finally {
-            Utils.hideLoading();
+        }
+    },
+    
+    // Background task processing for Plex operations
+    async processPlexLibrariesInBackground(taskId, userEmail, plexLibraries, isNewUser) {
+        try {
+            console.log(`🔄 Background task ${taskId}: Processing Plex libraries...`);
+            
+            const result = await API.call('/plex/share-user-libraries', {
+                method: 'POST',
+                body: JSON.stringify({
+                    userEmail: userEmail,
+                    plexLibraries: plexLibraries,
+                    isNewUser: isNewUser
+                })
+            });
+            
+            // Store result for the task monitor to pick up
+            await this.storeBackgroundTaskResult(taskId, {
+                status: result.success ? 'completed' : 'failed',
+                data: result,
+                error: result.success ? null : result.message || 'Unknown error'
+            });
+            
+            console.log(`✅ Background task ${taskId}: Completed`, result);
+            
+        } catch (error) {
+            console.error(`❌ Background task ${taskId}: Failed`, error);
+            
+            await this.storeBackgroundTaskResult(taskId, {
+                status: 'failed',
+                error: error.message,
+                data: null
+            });
+        }
+    },
+    
+    // Store background task result (in memory for now, could be database later)
+    async storeBackgroundTaskResult(taskId, result) {
+        // For now, just update the task in memory
+        const task = this.backgroundTasks.get(taskId);
+        if (task) {
+            task.result = result;
+            task.completedAt = new Date();
+        }
+        
+        // In a real system, you'd store this in database or Redis
+        // For now, the checkBackgroundTasks will find it in memory
+    },
+    
+    // Show a non-blocking background task indicator
+    showBackgroundTaskIndicator(message) {
+        // Create a small, unobtrusive indicator
+        const indicator = document.createElement('div');
+        indicator.id = 'backgroundTaskIndicator';
+        indicator.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: linear-gradient(45deg, #2196f3, #03a9f4);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        `;
+        
+        indicator.innerHTML = `
+            <div style="
+                width: 16px;
+                height: 16px;
+                border: 2px solid rgba(255,255,255,0.3);
+                border-top: 2px solid white;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            "></div>
+            ${message}
+        `;
+        
+        // Add spinner animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Remove any existing indicator
+        const existing = document.getElementById('backgroundTaskIndicator');
+        if (existing) existing.remove();
+        
+        // Add new indicator
+        document.body.appendChild(indicator);
+        
+        // Auto-remove after 60 seconds if task doesn't complete
+        setTimeout(() => {
+            const stillThere = document.getElementById('backgroundTaskIndicator');
+            if (stillThere) stillThere.remove();
+        }, 60000);
+    },
+    
+    // Hide background task indicator
+    hideBackgroundTaskIndicator() {
+        const indicator = document.getElementById('backgroundTaskIndicator');
+        if (indicator) indicator.remove();
+    },
+    
+    // Mock API endpoint simulation for background tasks
+    async checkBackgroundTasks() {
+        for (const [taskId, task] of this.backgroundTasks.entries()) {
+            // Check if task has a result (completed in background)
+            if (task.result) {
+                if (task.result.status === 'completed') {
+                    this.handleTaskCompletion(taskId, task, task.result);
+                } else if (task.result.status === 'failed') {
+                    this.handleTaskFailure(taskId, task, task.result);
+                }
+                
+                this.backgroundTasks.delete(taskId);
+                this.hideBackgroundTaskIndicator();
+            }
+            // If no result yet, keep monitoring
         }
     },
     
@@ -324,55 +520,6 @@ window.Users = {
             (group.regular && group.regular.length > 0) || 
             (group.fourk && group.fourk.length > 0)
         );
-    },
-    
-    // ENHANCED: Plex library sharing with detailed feedback
-    async shareUserPlexLibrariesEnhanced(userEmail, plexLibraries, isNewUser = false) {
-        try {
-            console.log(`🤝 Starting enhanced Plex sharing for ${userEmail}...`);
-            console.log(`📋 Libraries to share:`, plexLibraries);
-            console.log(`👤 Is new user: ${isNewUser}`);
-            
-            const shareResult = await API.call('/plex/share-user-libraries', {
-                method: 'POST',
-                body: JSON.stringify({
-                    userEmail: userEmail,
-                    plexLibraries: plexLibraries,
-                    isNewUser: isNewUser
-                })
-            });
-            
-            console.log('📊 Enhanced sharing result:', shareResult);
-            
-            // Provide detailed feedback based on the result
-            if (shareResult.success) {
-                if (shareResult.apiCallsMade > 0) {
-                    console.log(`✅ Successfully made ${shareResult.apiCallsMade} Plex API calls`);
-                    
-                    // Log details for each server group
-                    Object.entries(shareResult.results || {}).forEach(([serverGroup, result]) => {
-                        if (result.success && result.changes > 0) {
-                            console.log(`   📚 ${serverGroup}: ${result.changes} changes applied`);
-                        }
-                    });
-                } else {
-                    console.log(`ℹ️ No Plex API calls needed - user already has correct access`);
-                }
-            } else {
-                console.log(`❌ Plex sharing had issues:`, shareResult.errors);
-            }
-            
-            return shareResult;
-            
-        } catch (error) {
-            console.error('❌ Error in enhanced Plex sharing:', error);
-            return {
-                success: false,
-                error: error.message,
-                apiCallsMade: 0,
-                totalChanges: 0
-            };
-        }
     },
     
     collectPlexLibrarySelections() {
@@ -613,62 +760,4 @@ function preSelectUserLibraries(serverGroup, user) {
         });
     }
     
-    console.log(`📊 Pre-selected ${selectedCount} libraries for ${serverGroup}`);
-}
-
-// Fix the togglePlexLibrariesByTag function
-window.togglePlexLibrariesByTag = function(serverGroup, isChecked) {
-    console.log(`🏷️ Tag ${serverGroup} changed to: ${isChecked}`);
-    
-    const libraryGroup = document.getElementById(`${serverGroup}LibraryGroup`);
-    
-    if (!libraryGroup) {
-        console.error(`❌ Library group not found: ${serverGroup}LibraryGroup`);
-        return;
-    }
-    
-    if (isChecked) {
-        libraryGroup.style.display = 'block';
-        
-        // Load libraries if not already loaded
-        if (window.Plex) {
-            window.Plex.loadLibrariesForGroup(serverGroup).then(() => {
-                // If we're editing a user, pre-select their libraries
-                if (window.AppState.editingUserId && window.AppState.currentUserData) {
-                    setTimeout(() => {
-                        preSelectUserLibraries(serverGroup, window.AppState.currentUserData);
-                    }, 500);
-                }
-            });
-        }
-        
-        // Test connection
-        if (window.testPlexConnection) {
-            window.testPlexConnection(serverGroup);
-        }
-    } else {
-        libraryGroup.style.display = 'none';
-        
-        // Clear all selections for this group
-        document.querySelectorAll(`input[name="${serverGroup}_regular"]`).forEach(cb => cb.checked = false);
-        document.querySelectorAll(`input[name="${serverGroup}_fourk"]`).forEach(cb => cb.checked = false);
-    }
-};
-
-// Global saveUser function
-window.saveUser = function(event) {
-    return window.Users.saveUser(event);
-};
-
-// DEBUG: Add global debug function
-window.debugUserPlexAccess = function(userEmail) {
-    if (!userEmail) {
-        userEmail = prompt('Enter user email to debug:');
-    }
-    
-    if (userEmail) {
-        return window.Users.debugUserAccess(userEmail);
-    }
-};
-
-console.log('🔧 Enhanced Users.js loaded with real Plex API integration');
+    console.log(`
