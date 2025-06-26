@@ -294,42 +294,41 @@ window.Users = {
         try {
             console.log('💾 Starting enhanced user save with background processing...');
             
-            const formData = Utils.collectFormData('userFormData');
-            console.log('🔍 Raw form data from Utils.collectFormData:', formData);
-            
-            // Handle special field conversions
-            formData.bcc_owner_renewal = document.getElementById('bccOwnerRenewal')?.checked || false;
-            formData.device_count = parseInt(formData.device_count) || 1;
-            
-            // FIXED: Ensure tags is always an array of strings
-            if (!formData.tags) {
-                formData.tags = [];
-            } else if (!Array.isArray(formData.tags)) {
-                // If it's a single value, make it an array
-                formData.tags = [formData.tags];
-            }
-            
-            // Ensure all tags are strings
-            formData.tags = formData.tags.map(tag => {
-                if (typeof tag === 'string') return tag;
-                if (typeof tag === 'object' && tag.value) return tag.value;
-                if (typeof tag === 'object' && tag.name) return tag.name;
-                return String(tag);
+            // FIXED: Proper form data collection instead of using Utils.collectFormData
+            const formData = new FormData(event.target);
+            const userData = {};
+
+            // Collect text inputs
+            userData.name = formData.get('name');
+            userData.email = formData.get('email');
+            userData.owner_id = formData.get('owner_id') || null;
+            userData.plex_email = formData.get('plex_email');
+            userData.iptv_username = formData.get('iptv_username');
+            userData.iptv_password = formData.get('iptv_password');
+            userData.implayer_code = formData.get('implayer_code');
+            userData.device_count = parseInt(formData.get('device_count')) || 1;
+            userData.bcc_owner_renewal = document.getElementById('bccOwnerRenewal')?.checked || false;
+
+            // FIXED: Properly collect checked tags
+            userData.tags = [];
+            document.querySelectorAll('input[name="tags"]:checked').forEach(checkbox => {
+                userData.tags.push(checkbox.value);
             });
-            
-            console.log('🔍 Processed tags:', formData.tags);
+
+            console.log('🔍 Properly collected form data:', userData);
+            console.log('🔍 Tags collected:', userData.tags);
             
             // Collect Plex library selections
             const plexLibraries = this.collectPlexLibrarySelections();
-            formData.plex_libraries = plexLibraries;
+            userData.plex_libraries = plexLibraries;
             
             const isEditing = window.AppState.editingUserId;
             
-            console.log('📋 Form data prepared:', {
-                name: formData.name,
-                email: formData.email,
-                plex_email: formData.plex_email,
-                tags: formData.tags,
+            console.log('📋 Final form data prepared:', {
+                name: userData.name,
+                email: userData.email,
+                plex_email: userData.plex_email,
+                tags: userData.tags,
                 plexLibraries: plexLibraries,
                 isEditing: isEditing
             });
@@ -339,12 +338,12 @@ window.Users = {
             let savedUserId;
             
             if (isEditing) {
-                await API.User.update(window.AppState.editingUserId, formData);
+                await API.User.update(window.AppState.editingUserId, userData);
                 savedUserId = window.AppState.editingUserId;
                 console.log('✅ User updated in database');
             } else {
                 try {
-                    const result = await API.User.create(formData);
+                    const result = await API.User.create(userData);
                     savedUserId = result.userId || result.id;
                     console.log('✅ User created in database');
                 } catch (createError) {
@@ -361,23 +360,23 @@ window.Users = {
             }
             
             // Step 2: Handle Plex library sharing in background if applicable
-            if (formData.plex_email && this.hasPlexLibrariesSelected(plexLibraries)) {
+            if (userData.plex_email && this.hasPlexLibrariesSelected(plexLibraries)) {
                 console.log('🚀 Step 2: Starting background Plex library processing...');
                 
                 // Create background task
                 const taskId = this.createBackgroundTask(
                     'user_save',
-                    `${isEditing ? 'Updating' : 'Setting up'} Plex access for ${formData.name}`,
+                    `${isEditing ? 'Updating' : 'Setting up'} Plex access for ${userData.name}`,
                     {
-                        userEmail: formData.plex_email,
+                        userEmail: userData.plex_email,
                         plexLibraries: plexLibraries,
                         isNewUser: !isEditing,
-                        userName: formData.name
+                        userName: userData.name
                     }
                 );
                 
                 // Start background processing (fire and forget)
-                this.processPlexLibrariesInBackground(taskId, formData.plex_email, plexLibraries, !isEditing);
+                this.processPlexLibrariesInBackground(taskId, userData.plex_email, plexLibraries, !isEditing);
                 
                 // Show immediate success message
                 Utils.showNotification(
@@ -386,7 +385,7 @@ window.Users = {
                 );
                 
                 // Show a small loading indicator for the background task
-                this.showBackgroundTaskIndicator(`Processing Plex access for ${formData.name}...`);
+                this.showBackgroundTaskIndicator(`Processing Plex access for ${userData.name}...`);
                 
             } else {
                 console.log('ℹ️ Step 2: Skipped - No Plex email or libraries selected');

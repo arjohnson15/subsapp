@@ -129,18 +129,18 @@ async function initializePage(pageId) {
             await initUserFormPage();
             break;
             
-        case 'subscriptions':
-            console.log('🔧 Initializing subscriptions page...');
-            if (window.Subscriptions && window.Subscriptions.init) {
-                await window.Subscriptions.init();
-            } else {
-                console.error('❌ Subscriptions module not available');
-            }
-            break;
-            
         case 'email':
             if (window.Email && window.Email.init) {
                 await window.Email.init();
+            }
+            break;
+            
+        case 'management':
+            console.log('🔧 Initializing management page...');
+            if (window.Management && window.Management.init) {
+                await window.Management.init();
+            } else {
+                console.error('❌ Management module not available');
             }
             break;
             
