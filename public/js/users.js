@@ -5,6 +5,7 @@ window.Users = {
     currentSortDirection: 'asc',
     backgroundTasks: new Map(), // Track background tasks
     originalLibraryBaseline: null, // Track original library state for change detection
+originalTagsBaseline: null, // Track original tags for comparison
     
     async init() {
         await this.loadUsers();
@@ -330,9 +331,13 @@ async editUser(userId) {
         // Store user data globally
         window.AppState.currentUserData = user;
         
-        // CRITICAL: Store baseline library state for change detection
-        this.originalLibraryBaseline = this.deepClone(user.plex_libraries || {});
-        console.log('📋 Stored original library baseline:', this.originalLibraryBaseline);
+// CRITICAL: Store baseline library state for change detection
+this.originalLibraryBaseline = this.deepClone(user.plex_libraries || {});
+console.log('📋 Stored original library baseline:', this.originalLibraryBaseline);
+
+// Also store original tags for comparison
+this.originalTagsBaseline = [...(user.tags || [])];
+console.log('🏷️ Stored original tags baseline:', this.originalTagsBaseline);
         
         // Navigate to user form
         await showPage('user-form');
@@ -419,9 +424,9 @@ async saveUser(event) {
             const plexEmailChanged = userData.plex_email !== (originalUserData.plex_email || '');
             
             // Check if Plex tags changed (Plex 1, Plex 2)
-            const currentPlexTags = userData.tags.filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
-            const originalPlexTags = (originalUserData.tags || []).filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
-            const plexTagsChanged = !this.deepEqual(currentPlexTags, originalPlexTags);
+const currentPlexTags = userData.tags.filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
+const originalPlexTags = (this.originalTagsBaseline || []).filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
+const plexTagsChanged = !this.deepEqual(currentPlexTags, originalPlexTags);
             
             // Only trigger API calls for actual Plex access changes
             if (librarySelectionsChanged || plexEmailChanged || plexTagsChanged) {
@@ -468,9 +473,10 @@ async saveUser(event) {
         Utils.showNotification(isEditing ? 'User updated successfully' : 'User created successfully', 'success');
         
         // Clear baseline after successful save
-        if (isEditing) {
-            this.originalLibraryBaseline = null;
-        }
+if (isEditing) {
+    this.originalLibraryBaseline = null;
+    this.originalTagsBaseline = null;
+}
         
         // IMMEDIATELY navigate back to users page and reload
         showPage('users');
@@ -848,11 +854,12 @@ createBackgroundTask(type, description, data = {}) {
         console.log(`✅ Form updated after ${serverGroup} removal`);
     },
     
-    // Reset form state
-    resetFormState() {
-        window.AppState.editingUserId = null;
-        window.AppState.currentUserData = null;
-    },
+// Reset form state
+resetFormState() {
+    window.AppState.editingUserId = null;
+    window.AppState.currentUserData = null;
+    this.originalLibraryBaseline = null; // Clear baseline
+},
 	
 	deepClone(obj) {
     if (!obj) return obj;
@@ -966,6 +973,12 @@ window.showUserForm = function() {
     // CRITICAL: Clear editing state completely
     window.AppState.editingUserId = null;
     window.AppState.currentUserData = null;
+    
+    // Clear baselines for new user
+    if (window.Users) {
+        window.Users.originalLibraryBaseline = null;
+        window.Users.originalTagsBaseline = null;
+    }
     
     showPage('user-form');
     
