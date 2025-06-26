@@ -6,9 +6,6 @@ window.Management = {
     editingToolId: null,
     tools: [],
     
-    // Password hash for "Gunshy@1" - using a simple hash for security
-    passwordHash: 'gunshy1', // Simplified hash for "Gunshy@1"
-    
     async init() {
         console.log('🔧 Initializing Management module...');
         
@@ -19,7 +16,7 @@ window.Management = {
         // Authentication expires after 4 hours
         if (authToken && authTime) {
             const fourHoursAgo = Date.now() - (4 * 60 * 60 * 1000);
-            if (parseInt(authTime) > fourHoursAgo && authToken === this.passwordHash) {
+            if (parseInt(authTime) > fourHoursAgo && authToken === 'authenticated') {
                 this.isAuthenticated = true;
                 console.log('✅ User already authenticated via session');
             }
@@ -92,12 +89,6 @@ window.Management = {
             passwordInput.value = '';
             passwordInput.focus();
         }
-    },
-    
-    // Simple hash function for password verification
-    async simpleHash(str) {
-        // Simple transformation for "Gunshy@1" -> "gunshy1"
-        return str.toLowerCase().replace('@', '').replace(/[^a-z0-9]/g, '');
     },
     
     logout() {
