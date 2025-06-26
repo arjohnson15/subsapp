@@ -1,27 +1,27 @@
-// Plex Management Functions
+// Enhanced Plex Library Management with improved refresh functionality
 
 window.Plex = {
+    async init() {
+        await this.loadLibraries();
+    },
+    
     async loadLibraries() {
         try {
-            console.log('🔍 Loading Plex libraries from API...');
+            console.log('📚 Loading Plex libraries...');
             
-            // Load both server groups in parallel
+            // Load both server groups
             const [plex1Data, plex2Data] = await Promise.all([
-                API.Plex.getLibraries('plex1'),
-                API.Plex.getLibraries('plex2')
+                this.loadLibrariesForGroup('plex1'),
+                this.loadLibrariesForGroup('plex2')
             ]);
             
-            console.log('📚 Plex data received:', { plex1: plex1Data, plex2: plex2Data });
-            
             // Update global state
-            window.AppState.plexLibraries.plex1 = plex1Data;
-            window.AppState.plexLibraries.plex2 = plex2Data;
+            window.AppState.plexLibraries = {
+                plex1: plex1Data,
+                plex2: plex2Data
+            };
             
-            // Render libraries
-            this.renderPlexLibraries('plex1', plex1Data);
-            this.renderPlexLibraries('plex2', plex2Data);
-            
-            console.log('✅ All Plex libraries loaded successfully');
+            console.log('✅ All Plex libraries loaded');
         } catch (error) {
             console.error('❌ Error loading Plex libraries:', error);
             Utils.handleError(error, 'Loading Plex libraries');
@@ -30,69 +30,57 @@ window.Plex = {
     
     async loadLibrariesForGroup(serverGroup) {
         try {
-            console.log(`📚 Loading libraries specifically for ${serverGroup}`);
             const data = await API.Plex.getLibraries(serverGroup);
-            console.log(`📊 Data loaded for ${serverGroup}:`, data);
-            
             window.AppState.plexLibraries[serverGroup] = data;
-            this.renderPlexLibraries(serverGroup, data);
+            
+            // Render if DOM elements exist
+            this.renderPlexLibrariesForGroup(serverGroup, data);
+            
+            return data;
         } catch (error) {
-            console.error(`❌ Error loading libraries for ${serverGroup}:`, error);
-            Utils.handleError(error, `Loading ${serverGroup} libraries`);
+            console.error(`Error loading ${serverGroup} libraries:`, error);
+            throw error;
         }
     },
     
-    renderPlexLibraries(serverGroup, libraryData) {
-        console.log(`🎨 Rendering libraries for ${serverGroup}:`, libraryData);
-        
+    renderPlexLibrariesForGroup(serverGroup, data) {
         const regularList = document.getElementById(`${serverGroup}RegularLibrariesList`);
         const fourkList = document.getElementById(`${serverGroup}FourkLibrariesList`);
         
-        if (!regularList || !fourkList) {
-            console.error(`❌ Could not find library elements for ${serverGroup}`);
+        if (regularList && data.regular) {
+            this.renderLibraryList(regularList, data.regular, serverGroup, 'regular');
+        }
+        
+        if (fourkList && data.fourk) {
+            this.renderLibraryList(fourkList, data.fourk, serverGroup, 'fourk');
+        }
+    },
+    
+    renderLibraryList(container, libraries, serverGroup, type) {
+        if (!libraries || libraries.length === 0) {
+            container.innerHTML = '<p style="color: #666;">No libraries available</p>';
             return;
         }
         
-        // Render regular libraries
-        if (libraryData.regular && Array.isArray(libraryData.regular) && libraryData.regular.length > 0) {
-            console.log(`📖 Rendering ${libraryData.regular.length} regular libraries`);
-            regularList.innerHTML = libraryData.regular.map(lib => `
-                <div class="library-item">
-                    <input type="checkbox" id="${serverGroup}_regular_${lib.id}" name="${serverGroup}_regular" value="${lib.id}">
-                    <label for="${serverGroup}_regular_${lib.id}">${lib.title} (${lib.type})</label>
-                </div>
-            `).join('');
-        } else {
-            console.log('❌ No regular libraries found');
-            regularList.innerHTML = '<div style="color: #4fc3f7;">No regular libraries available</div>';
-        }
-        
-        // Render 4K libraries
-        if (libraryData.fourk && Array.isArray(libraryData.fourk) && libraryData.fourk.length > 0) {
-            console.log(`📖 Rendering ${libraryData.fourk.length} 4K libraries`);
-            fourkList.innerHTML = libraryData.fourk.map(lib => `
-                <div class="library-item">
-                    <input type="checkbox" id="${serverGroup}_fourk_${lib.id}" name="${serverGroup}_fourk" value="${lib.id}">
-                    <label for="${serverGroup}_fourk_${lib.id}">${lib.title} (${lib.type})</label>
-                </div>
-            `).join('');
-        } else {
-            console.log('❌ No 4K libraries found');
-            fourkList.innerHTML = '<div style="color: #4fc3f7;">No 4K libraries available</div>';
-        }
-        
-        console.log(`✅ Finished rendering libraries for ${serverGroup}`);
+        container.innerHTML = libraries.map(library => `
+            <div class="library-item">
+                <input type="checkbox" 
+                       id="${serverGroup}_${type}_${library.id}" 
+                       name="${serverGroup}_${type}" 
+                       value="${library.id}">
+                <label for="${serverGroup}_${type}_${library.id}">${library.title}</label>
+            </div>
+        `).join('');
     },
     
     async testConnection(serverGroup) {
-        const statusElement = document.getElementById(`${serverGroup}Status`) || document.getElementById(`${serverGroup}ServerStatus`);
-        
-        if (statusElement) {
-            statusElement.textContent = 'Testing...';
-            statusElement.className = 'connection-status';
-        }
-        
         try {
+            const statusElement = document.getElementById(`${serverGroup}Status`);
+            if (statusElement) {
+                statusElement.textContent = 'Testing...';
+                statusElement.className = 'connection-status';
+            }
+            
             const result = await API.Plex.testConnection(serverGroup);
             
             if (statusElement) {
@@ -105,32 +93,19 @@ window.Plex = {
                 }
             }
             
-            // Only show popup if manually clicked (check if this was called from a button click)
-            if (event && event.target && event.target.tagName === 'BUTTON') {
-                if (result.success) {
-                    Utils.showNotification(`${serverGroup.toUpperCase()} connection successful!`, 'success');
-                } else {
-                    Utils.showNotification(`${serverGroup.toUpperCase()} connection failed: ${result.error}`, 'error');
-                }
-            }
-            
             return result;
         } catch (error) {
             console.error(`Error testing ${serverGroup} connection:`, error);
+            const statusElement = document.getElementById(`${serverGroup}Status`);
             if (statusElement) {
                 statusElement.textContent = 'Error';
                 statusElement.className = 'connection-status status-disconnected';
             }
-            
-            // Only show popup if manually clicked
-            if (event && event.target && event.target.tagName === 'BUTTON') {
-                Utils.handleError(error, `Testing ${serverGroup} connection`);
-            }
-            
-            return { success: false, error: error.message };
+            throw error;
         }
     },
     
+    // UPDATED: Enhanced refresh with pre-selection restore
     async refreshLibraries(serverGroup) {
         try {
             const button = event.target;
@@ -147,8 +122,18 @@ window.Plex = {
             // Update global state
             window.AppState.plexLibraries[serverGroup] = libraryData;
             
-            // Re-render
-            this.renderPlexLibraries(serverGroup, libraryData);
+            // Re-render the libraries
+            this.renderPlexLibrariesForGroup(serverGroup, libraryData);
+            
+            // CRITICAL: If we're editing a user, pre-select their current libraries
+            if (window.AppState && window.AppState.editingUserId) {
+                console.log(`🔧 Re-applying user library selections for ${serverGroup}...`);
+                
+                // Wait for DOM to update, then pre-select
+                setTimeout(() => {
+                    this.preSelectUserLibrariesAfterRefresh(serverGroup);
+                }, 300);
+            }
             
             button.textContent = originalText;
             button.disabled = false;
@@ -164,6 +149,63 @@ window.Plex = {
             button.disabled = false;
             Utils.handleError(error, 'Refreshing libraries');
         }
+    },
+    
+    // NEW: Pre-select user libraries after refresh
+    preSelectUserLibrariesAfterRefresh(serverGroup) {
+        console.log(`🎯 Attempting to pre-select libraries for ${serverGroup} after refresh...`);
+        
+        // Try different ways to get current user data
+        let currentUserData = null;
+        
+        if (window.AppState && window.AppState.currentUserData) {
+            currentUserData = window.AppState.currentUserData;
+        }
+        
+        if (!currentUserData) {
+            console.log('❌ No current user data available for pre-selection');
+            return;
+        }
+        
+        if (!currentUserData.plex_libraries || !currentUserData.plex_libraries[serverGroup]) {
+            console.log(`ℹ️ No library access data for ${serverGroup}`);
+            return;
+        }
+        
+        const userLibraries = currentUserData.plex_libraries[serverGroup];
+        console.log(`📋 Pre-selecting libraries for ${serverGroup}:`, userLibraries);
+        
+        let selectedCount = 0;
+        
+        // Pre-select regular libraries
+        if (userLibraries.regular && Array.isArray(userLibraries.regular)) {
+            userLibraries.regular.forEach(libId => {
+                const checkbox = document.querySelector(`input[name="${serverGroup}_regular"][value="${libId}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    selectedCount++;
+                    console.log(`✅ Pre-selected regular library: ${libId}`);
+                } else {
+                    console.log(`⚠️ Regular library checkbox not found: ${libId}`);
+                }
+            });
+        }
+        
+        // Pre-select 4K libraries
+        if (userLibraries.fourk && Array.isArray(userLibraries.fourk)) {
+            userLibraries.fourk.forEach(libId => {
+                const checkbox = document.querySelector(`input[name="${serverGroup}_fourk"][value="${libId}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    selectedCount++;
+                    console.log(`✅ Pre-selected 4K library: ${libId}`);
+                } else {
+                    console.log(`⚠️ 4K library checkbox not found: ${libId}`);
+                }
+            });
+        }
+        
+        console.log(`📊 Pre-selected ${selectedCount} total libraries for ${serverGroup}`);
     },
     
     async syncAllLibraries() {
@@ -262,7 +304,7 @@ window.Plex = {
             
             // Try to render manually
             console.log(`🎨 Calling renderPlexLibraries manually...`);
-            this.renderPlexLibraries(serverGroup, data);
+            this.renderPlexLibrariesForGroup(serverGroup, data);
             
             // Update global state
             window.AppState.plexLibraries[serverGroup] = data;

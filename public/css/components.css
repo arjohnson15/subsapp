@@ -88,6 +88,7 @@
     font-weight: bold;
 }
 
+/* FIXED FORM INPUTS AND DROPDOWNS */
 .form-group input,
 .form-group select,
 .form-group textarea {
@@ -98,6 +99,43 @@
     border-radius: 8px;
     color: white;
     font-size: 1rem;
+}
+
+/* CRITICAL FIX FOR DROPDOWN OPTIONS */
+.form-group select option {
+    background: #2a2a2a;
+    color: white;
+    padding: 8px;
+}
+
+.form-group select option:hover {
+    background: #3a3a3a;
+}
+
+.form-group select option:checked {
+    background: #4fc3f7;
+    color: white;
+}
+
+/* Fix for all select elements globally */
+select {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: white !important;
+}
+
+select option {
+    background: #2a2a2a !important;
+    color: white !important;
+    padding: 8px !important;
+}
+
+select option:hover {
+    background: #3a3a3a !important;
+}
+
+select option:checked {
+    background: #4fc3f7 !important;
+    color: white !important;
 }
 
 .form-group textarea {
@@ -125,6 +163,74 @@
 
 .checkbox-item input[type="checkbox"] {
     width: auto;
+    margin: 0;
+}
+
+/* IMPROVED LIBRARY SELECTION STYLING */
+.library-checkboxes {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 15px;
+}
+
+.library-group {
+    margin-bottom: 25px;
+}
+
+.library-group:last-child {
+    margin-bottom: 0;
+}
+
+.library-group h5 {
+    color: #4fc3f7;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+/* Modern Grid Layout for Library Lists */
+.library-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+}
+
+/* Individual Library Item Styling */
+.library-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    min-height: 45px;
+}
+
+.library-item:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(76, 195, 247, 0.5);
+    transform: translateY(-1px);
+}
+
+.library-item input[type="checkbox"] {
+    margin: 0;
+    width: 18px;
+    height: 18px;
+    accent-color: #4fc3f7;
+    cursor: pointer;
+}
+
+.library-item label {
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+    flex: 1;
     margin: 0;
 }
 
@@ -311,7 +417,7 @@ tbody tr:hover {
     color: #f44336;
 }
 
-/* Responsive Form Grids */
+/* Responsive adjustments */
 @media (max-width: 768px) {
     .form-grid {
         grid-template-columns: 1fr;
@@ -323,5 +429,26 @@ tbody tr:hover {
     
     .checkbox-group {
         flex-direction: column;
+    }
+    
+    .library-list {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .library-item {
+        padding: 10px 14px;
+        min-height: 40px;
+    }
+}
+
+@media (max-width: 480px) {
+    .library-checkboxes {
+        padding: 15px;
+    }
+    
+    .library-item {
+        padding: 8px 12px;
+        font-size: 0.9rem;
     }
 }
