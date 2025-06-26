@@ -262,14 +262,48 @@ function updateOwnerDropdown(owners) {
 }
 
 function updateSubscriptionDropdowns(subscriptions) {
-    const iptvSelect = document.getElementById('iptvSubscription');
-    if (iptvSelect) {
-        const iptvOptions = subscriptions
-            .filter(sub => sub.type === 'iptv')
+    console.log('📋 Updating subscription dropdowns with:', subscriptions);
+    
+    // Update Plex subscription dropdown
+    const plexSelect = document.getElementById('plexSubscription');
+    if (plexSelect) {
+        console.log('📋 Found Plex subscription dropdown');
+        
+        const plexOptions = subscriptions
+            .filter(sub => sub.type === 'plex' && sub.active)
             .map(sub => `<option value="${sub.id}">${sub.name} - $${sub.price}</option>`)
             .join('');
         
-        iptvSelect.innerHTML = '<option value="">-- No IPTV Selected --</option>' + iptvOptions;
+        // CRITICAL: Add FREE option for Plex
+        plexSelect.innerHTML = `
+            <option value="">No Plex Subscription</option>
+            <option value="free">FREE Plex Access</option>
+            ${plexOptions}
+        `;
+        
+        console.log('✅ Plex dropdown updated with FREE option');
+    } else {
+        console.warn('⚠️ Plex subscription dropdown not found');
+    }
+    
+    // Update IPTV subscription dropdown
+    const iptvSelect = document.getElementById('iptvSubscription');
+    if (iptvSelect) {
+        console.log('📋 Found IPTV subscription dropdown');
+        
+        const iptvOptions = subscriptions
+            .filter(sub => sub.type === 'iptv' && sub.active)
+            .map(sub => `<option value="${sub.id}">${sub.name} - $${sub.price}</option>`)
+            .join('');
+        
+        iptvSelect.innerHTML = `
+            <option value="">-- No IPTV Selected --</option>
+            ${iptvOptions}
+        `;
+        
+        console.log('✅ IPTV dropdown updated');
+    } else {
+        console.warn('⚠️ IPTV subscription dropdown not found');
     }
 }
 
@@ -624,32 +658,74 @@ window.preSelectUserLibraries = preSelectUserLibraries;
 
 // Auto-calculation functions for subscriptions
 window.calculateNewPlexExpiration = function() {
+    console.log('📅 Calculating new Plex expiration...');
+    
     const subscription = document.getElementById('plexSubscription')?.value;
     const expirationField = document.getElementById('plexExpiration');
     
-    if (!expirationField) return;
+    if (!expirationField) {
+        console.warn('⚠️ Plex expiration field not found');
+        return;
+    }
     
-    if (subscription === '12-month') {
+    console.log('📅 Selected subscription:', subscription);
+    
+    if (subscription === 'free') {
+        // FREE subscription - clear the date field (backend will handle as FREE)
+        expirationField.value = '';
+        console.log('✅ Set Plex to FREE - cleared expiration date');
+        return;
+    }
+    
+    if (!subscription || subscription === '') {
+        // No subscription selected
+        expirationField.value = '';
+        console.log('✅ No Plex subscription - cleared expiration date');
+        return;
+    }
+    
+    // Find the subscription type from loaded data
+    const selectedSub = window.AppState.subscriptionTypes?.find(sub => sub.id == subscription);
+    if (selectedSub) {
         const today = new Date();
-        const expiration = new Date(today.setFullYear(today.getFullYear() + 1));
+        const expiration = new Date();
+        expiration.setMonth(today.getMonth() + selectedSub.duration_months);
         expirationField.value = expiration.toISOString().split('T')[0];
-    } else if (subscription === 'free' || subscription === '') {
+        console.log(`✅ Set Plex expiration to: ${expirationField.value} (${selectedSub.duration_months} months from today)`);
+    } else {
+        console.warn('⚠️ Subscription type not found for ID:', subscription);
         expirationField.value = '';
     }
 };
 
 window.calculateNewIptvExpiration = function() {
+    console.log('📅 Calculating new IPTV expiration...');
+    
     const subscription = document.getElementById('iptvSubscription')?.value;
     const expirationField = document.getElementById('iptvExpiration');
     
-    if (!expirationField) return;
+    if (!expirationField) {
+        console.warn('⚠️ IPTV expiration field not found');
+        return;
+    }
+    
+    console.log('📅 Selected IPTV subscription:', subscription);
+    
+    if (!subscription || subscription === '') {
+        expirationField.value = '';
+        console.log('✅ No IPTV subscription - cleared expiration date');
+        return;
+    }
     
     const selectedSub = window.AppState.subscriptionTypes?.find(sub => sub.id == subscription);
     if (selectedSub) {
         const today = new Date();
-        const expiration = new Date(today.setMonth(today.getMonth() + selectedSub.duration_months));
+        const expiration = new Date();
+        expiration.setMonth(today.getMonth() + selectedSub.duration_months);
         expirationField.value = expiration.toISOString().split('T')[0];
+        console.log(`✅ Set IPTV expiration to: ${expirationField.value} (${selectedSub.duration_months} months from today)`);
     } else {
+        console.warn('⚠️ IPTV subscription type not found for ID:', subscription);
         expirationField.value = '';
     }
 };
