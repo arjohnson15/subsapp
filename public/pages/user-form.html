@@ -55,15 +55,16 @@
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <h5>Plex 1 Libraries</h5>
                     <div class="plex-actions">
-                        <button type="button" class="btn btn-test" onclick="testPlexConnection('plex1')">Test Connection</button>
-                        <button type="button" class="btn btn-sync" onclick="refreshPlexLibraries('plex1')">Refresh Libraries</button>
-                        <button type="button" class="btn" style="background: linear-gradient(45deg, #9c27b0, #e91e63);" onclick="debugPlexLibraries('plex1')">Debug API</button>
+                        <button type="button" class="btn btn-test" style="padding: 6px 12px; font-size: 0.8rem;" onclick="testPlexConnection('plex1')">Test</button>
+                        <button type="button" class="btn btn-sync" style="padding: 6px 12px; font-size: 0.8rem;" onclick="refreshPlexLibraries('plex1')">Refresh</button>
+                        <button type="button" class="btn" style="background: linear-gradient(45deg, #9c27b0, #e91e63); padding: 6px 12px; font-size: 0.8rem;" onclick="debugPlexLibraries('plex1')">Debug</button>
                     </div>
                 </div>
                 <div style="margin-bottom: 15px;">
                     <span id="plex1Status" class="connection-status">Click Test Connection</span>
                     <button type="button" class="btn" style="margin-left: 10px; padding: 4px 12px; font-size: 0.8rem;" onclick="selectAllPlex1Libraries()">Select All</button>
                     <button type="button" class="btn btn-secondary" style="margin-left: 5px; padding: 4px 12px; font-size: 0.8rem;" onclick="clearAllPlex1Libraries()">Clear All</button>
+                    <button type="button" class="btn" style="background: linear-gradient(45deg, #f44336, #e91e63); margin-left: 5px; padding: 4px 12px; font-size: 0.8rem;" onclick="Users.removePlexServerAccess('plex1')">🗑️ Remove from Plex</button>
                 </div>
                 <div class="library-checkboxes">
                     <div class="library-group">
@@ -86,15 +87,16 @@
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <h5>Plex 2 Libraries</h5>
                     <div class="plex-actions">
-                        <button type="button" class="btn btn-test" onclick="testPlexConnection('plex2')">Test Connection</button>
-                        <button type="button" class="btn btn-sync" onclick="refreshPlexLibraries('plex2')">Refresh Libraries</button>
-                        <button type="button" class="btn" style="background: linear-gradient(45deg, #9c27b0, #e91e63);" onclick="debugPlexLibraries('plex2')">Debug API</button>
+                        <button type="button" class="btn btn-test" style="padding: 6px 12px; font-size: 0.8rem;" onclick="testPlexConnection('plex2')">Test</button>
+                        <button type="button" class="btn btn-sync" style="padding: 6px 12px; font-size: 0.8rem;" onclick="refreshPlexLibraries('plex2')">Refresh</button>
+                        <button type="button" class="btn" style="background: linear-gradient(45deg, #9c27b0, #e91e63); padding: 6px 12px; font-size: 0.8rem;" onclick="debugPlexLibraries('plex2')">Debug</button>
                     </div>
                 </div>
                 <div style="margin-bottom: 15px;">
                     <span id="plex2Status" class="connection-status">Click Test Connection</span>
                     <button type="button" class="btn" style="margin-left: 10px; padding: 4px 12px; font-size: 0.8rem;" onclick="selectAllPlex2Libraries()">Select All</button>
                     <button type="button" class="btn btn-secondary" style="margin-left: 5px; padding: 4px 12px; font-size: 0.8rem;" onclick="clearAllPlex2Libraries()">Clear All</button>
+                    <button type="button" class="btn" style="background: linear-gradient(45deg, #f44336, #e91e63); margin-left: 5px; padding: 4px 12px; font-size: 0.8rem;" onclick="Users.removePlexServerAccess('plex2')">🗑️ Remove from Plex</button>
                 </div>
                 <div class="library-checkboxes">
                     <div class="library-group">
@@ -172,8 +174,9 @@
                 </div>
             </div>
         </div>
-		
-		        <div class="form-group" id="plexAccessManagement" style="display: none;">
+
+        <!-- NEW: Plex Access Management -->
+        <div class="form-group" id="plexAccessManagement" style="display: none;">
             <label>Plex Access Management:</label>
             <div style="background: rgba(244, 67, 54, 0.1); border: 1px solid rgba(244, 67, 54, 0.3); border-radius: 8px; padding: 15px; margin-top: 10px;">
                 <h5 style="color: #f44336; margin-bottom: 10px;">⚠️ Danger Zone</h5>

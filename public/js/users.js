@@ -295,14 +295,29 @@ window.Users = {
             console.log('💾 Starting enhanced user save with background processing...');
             
             const formData = Utils.collectFormData('userFormData');
+            console.log('🔍 Raw form data from Utils.collectFormData:', formData);
             
             // Handle special field conversions
             formData.bcc_owner_renewal = document.getElementById('bccOwnerRenewal')?.checked || false;
             formData.device_count = parseInt(formData.device_count) || 1;
             
-            // Ensure tags is always an array
-            if (!formData.tags) formData.tags = [];
-            if (!Array.isArray(formData.tags)) formData.tags = [formData.tags];
+            // FIXED: Ensure tags is always an array of strings
+            if (!formData.tags) {
+                formData.tags = [];
+            } else if (!Array.isArray(formData.tags)) {
+                // If it's a single value, make it an array
+                formData.tags = [formData.tags];
+            }
+            
+            // Ensure all tags are strings
+            formData.tags = formData.tags.map(tag => {
+                if (typeof tag === 'string') return tag;
+                if (typeof tag === 'object' && tag.value) return tag.value;
+                if (typeof tag === 'object' && tag.name) return tag.name;
+                return String(tag);
+            });
+            
+            console.log('🔍 Processed tags:', formData.tags);
             
             // Collect Plex library selections
             const plexLibraries = this.collectPlexLibrarySelections();
@@ -328,9 +343,21 @@ window.Users = {
                 savedUserId = window.AppState.editingUserId;
                 console.log('✅ User updated in database');
             } else {
-                const result = await API.User.create(formData);
-                savedUserId = result.userId || result.id;
-                console.log('✅ User created in database');
+                try {
+                    const result = await API.User.create(formData);
+                    savedUserId = result.userId || result.id;
+                    console.log('✅ User created in database');
+                } catch (createError) {
+                    console.error('❌ Detailed create error:', createError);
+                    
+                    // Try to get the actual error message from the server
+                    let errorMessage = 'Failed to create user';
+                    if (createError.message && createError.message.includes('400')) {
+                        errorMessage = 'Validation error - check all required fields are filled correctly';
+                    }
+                    
+                    throw new Error(errorMessage + ': ' + createError.message);
+                }
             }
             
             // Step 2: Handle Plex library sharing in background if applicable
@@ -508,6 +535,159 @@ window.Users = {
         }
     },
     
+    // NEW: Remove all Plex access for current user
+    async removePlexAccess() {
+        const userId = window.AppState.editingUserId;
+        const userData = window.AppState.currentUserData;
+        
+        if (!userId || !userData) {
+            Utils.showNotification('No user selected for Plex removal', 'error');
+            return;
+        }
+        
+        const confirmMessage = `Are you sure you want to COMPLETELY REMOVE all Plex access for ${userData.name}?\n\nThis will:\n- Remove them from all Plex servers\n- Clear all library access\n- Remove Plex tags\n- Clear Plex email\n\nThis action cannot be undone!`;
+        
+        if (!confirm(confirmMessage)) return;
+        
+        try {
+            Utils.showLoading();
+            console.log(`🗑️ Removing all Plex access for user ID: ${userId}`);
+            
+            const result = await API.call(`/users/${userId}/remove-plex-access`, {
+                method: 'POST'
+            });
+            
+            if (result.success) {
+                Utils.showNotification(
+                    `All Plex access removed for ${userData.name}. Removed tags: ${result.removedTags.join(', ')}`,
+                    'success'
+                );
+                
+                // Update the form to reflect changes
+                this.refreshFormAfterPlexRemoval(result);
+                
+                // Reload user data
+                await this.loadUsers();
+            } else {
+                Utils.showNotification('Failed to remove Plex access: ' + (result.error || 'Unknown error'), 'error');
+            }
+            
+        } catch (error) {
+            console.error('❌ Error removing Plex access:', error);
+            Utils.handleError(error, 'Removing Plex access');
+        } finally {
+            Utils.hideLoading();
+        }
+    },
+    
+    // NEW: Remove user from specific Plex server group
+    async removePlexServerAccess(serverGroup) {
+        const userId = window.AppState.editingUserId;
+        const userData = window.AppState.currentUserData;
+        
+        if (!userId || !userData) {
+            Utils.showNotification('No user selected for Plex removal', 'error');
+            return;
+        }
+        
+        const confirmMessage = `Remove ${userData.name} from ${serverGroup.toUpperCase()}?\n\nThis will:\n- Remove them from ${serverGroup} servers\n- Clear ${serverGroup} library access\n- Remove ${serverGroup} tag if no libraries selected\n\nThis action cannot be undone!`;
+        
+        if (!confirm(confirmMessage)) return;
+        
+        try {
+            Utils.showLoading();
+            console.log(`🗑️ Removing ${serverGroup} access for user ID: ${userId}`);
+            
+            const userEmail = userData.plex_email || userData.email;
+            if (!userEmail) {
+                Utils.showNotification('User has no email configured for Plex removal', 'error');
+                return;
+            }
+            
+            // Remove from specific server group
+            const result = await API.call('/plex/remove-access', {
+                method: 'POST',
+                body: JSON.stringify({
+                    userEmail: userEmail,
+                    serverGroups: [serverGroup]
+                })
+            });
+            
+            if (result.success) {
+                Utils.showNotification(
+                    `${userData.name} removed from ${serverGroup.toUpperCase()} successfully!`,
+                    'success'
+                );
+                
+                // Update the form to reflect changes
+                this.refreshFormAfterServerRemoval(serverGroup);
+                
+                // Reload user data
+                await this.loadUsers();
+            } else {
+                Utils.showNotification('Failed to remove from ' + serverGroup + ': ' + (result.error || 'Unknown error'), 'error');
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error removing from ${serverGroup}:`, error);
+            Utils.handleError(error, `Removing from ${serverGroup}`);
+        } finally {
+            Utils.hideLoading();
+        }
+    },
+    
+    // Update form after Plex access removal
+    refreshFormAfterPlexRemoval(result) {
+        // Clear Plex email
+        const plexEmailField = document.getElementById('plexEmail');
+        if (plexEmailField) plexEmailField.value = '';
+        
+        // Uncheck Plex tags
+        const plex1Tag = document.getElementById('tag-plex1');
+        const plex2Tag = document.getElementById('tag-plex2');
+        
+        if (plex1Tag) {
+            plex1Tag.checked = false;
+            togglePlexLibrariesByTag('plex1', false);
+        }
+        
+        if (plex2Tag) {
+            plex2Tag.checked = false;
+            togglePlexLibrariesByTag('plex2', false);
+        }
+        
+        // Hide the management section
+        const managementSection = document.getElementById('plexAccessManagement');
+        if (managementSection) {
+            managementSection.style.display = 'none';
+        }
+        
+        console.log('✅ Form updated after Plex access removal');
+    },
+    
+    // Update form after specific server removal
+    refreshFormAfterServerRemoval(serverGroup) {
+        // Uncheck specific tag
+        const tag = document.getElementById(`tag-${serverGroup}`);
+        if (tag) {
+            tag.checked = false;
+            togglePlexLibrariesByTag(serverGroup, false);
+        }
+        
+        // Check if user still has any Plex access
+        const plex1Tag = document.getElementById('tag-plex1');
+        const plex2Tag = document.getElementById('tag-plex2');
+        const hasAnyPlexAccess = (plex1Tag && plex1Tag.checked) || (plex2Tag && plex2Tag.checked);
+        
+        // Hide management section if no Plex access
+        const managementSection = document.getElementById('plexAccessManagement');
+        if (managementSection && !hasAnyPlexAccess) {
+            managementSection.style.display = 'none';
+        }
+        
+        console.log(`✅ Form updated after ${serverGroup} removal`);
+    },
+    
     // Reset form state
     resetFormState() {
         window.AppState.editingUserId = null;
@@ -624,9 +804,11 @@ window.showUserForm = function() {
         // Hide library sections
         const plex1Group = document.getElementById('plex1LibraryGroup');
         const plex2Group = document.getElementById('plex2LibraryGroup');
+        const managementSection = document.getElementById('plexAccessManagement');
         
         if (plex1Group) plex1Group.style.display = 'none';
         if (plex2Group) plex2Group.style.display = 'none';
+        if (managementSection) managementSection.style.display = 'none';
         
         // Clear any library selections
         ['plex1', 'plex2'].forEach(serverGroup => {
@@ -671,6 +853,16 @@ function populateFormForEditing(user) {
     // Clear all tags first, then set user's tags
     console.log(`🏷️ Setting tags:`, user.tags);
     document.querySelectorAll('input[name="tags"]').forEach(cb => cb.checked = false);
+    
+    // Show Plex Access Management section if user has Plex access
+    const managementSection = document.getElementById('plexAccessManagement');
+    const hasPlexAccess = user.tags && user.tags.some(tag => 
+        String(tag).toLowerCase().includes('plex')
+    );
+    
+    if (managementSection) {
+        managementSection.style.display = hasPlexAccess ? 'block' : 'none';
+    }
     
     if (user.tags && Array.isArray(user.tags)) {
         user.tags.forEach(tag => {
@@ -760,4 +952,10 @@ function preSelectUserLibraries(serverGroup, user) {
         });
     }
     
-    console.log(`
+    console.log(`📊 Pre-selected ${selectedCount} total libraries for ${serverGroup}`);
+}
+
+// Make the saveUser function globally available
+window.saveUser = function(event) {
+    return window.Users.saveUser(event);
+};
