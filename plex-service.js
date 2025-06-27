@@ -6,21 +6,36 @@ const pythonPlexService = require('./python-plex-wrapper');
 class PlexService {
   constructor() {
     this.parser = new xml2js.Parser({ explicitArray: false });
-    this.initializeSync();
+    // FIXED: Don't call initializeSync immediately - let the app start first
+    setTimeout(() => {
+      this.initializeSync();
+    }, 5000); // Wait 5 seconds for app to fully start
   }
 
   // Initialize periodic library sync
   initializeSync() {
     console.log('Starting Plex library sync service...');
     
-    // Sync immediately on startup
-    this.syncAllLibraries();
+    // FIXED: Don't sync immediately on startup - too risky
+    // this.syncAllLibraries();
     
     // Set up hourly sync
     setInterval(() => {
       console.log('Running scheduled Plex library sync...');
-      this.syncAllLibraries();
+      this.syncAllLibrariesSafely(); // Use safe version
     }, 60 * 60 * 1000); // 1 hour
+    
+    console.log('✅ Plex sync scheduled - will run every hour');
+  }
+
+  // FIXED: Safe version that won't crash the app
+  async syncAllLibrariesSafely() {
+    try {
+      await this.syncAllLibraries();
+    } catch (error) {
+      console.error('❌ Scheduled Plex sync failed (non-fatal):', error.message);
+      // Don't throw - just log and continue
+    }
   }
 
   // Server configuration mapping (matches your existing config)
