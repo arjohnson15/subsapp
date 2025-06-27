@@ -45,21 +45,20 @@ async function initializeApp() {
 
 async function loadInitialData() {
     try {
-        console.log('?? Loading initial data...');
+        console.log('🔄 Loading initial data...');
         
-// Load only essential initial data (not users - they load when navigating to users page)
-const [owners, subscriptions] = await Promise.all([
-    API.Owner.getAll(),
-    API.Subscription.getAll()
-]);
+        // Load only essential initial data (not users - they load when navigating to users page)
+        const [owners, subscriptions] = await Promise.all([
+            API.Owner.getAll(),
+            API.Subscription.getAll()
+        ]);
 
-// Update global state
-window.AppState.owners = owners;
-window.AppState.subscriptionTypes = subscriptions;
-// Users will be loaded by the Users module when needed
+        // Update global state
+        window.AppState.owners = owners;
+        window.AppState.subscriptionTypes = subscriptions;
+        // Users will be loaded by the Users module when needed
         
-        console.log('?? Initial data loaded:', {
-            users: users.length,
+        console.log('🔄 Initial data loaded:', {
             owners: owners.length,
             subscriptions: subscriptions.length
         });
