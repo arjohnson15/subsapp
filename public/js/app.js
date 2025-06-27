@@ -643,13 +643,28 @@ window.addEventListener('unhandledrejection', function(event) {
 // Dashboard functionality
 window.Dashboard = {
     async init() {
+        // FIXED: Load users first if they're not already loaded
+        if (!window.AppState.users || window.AppState.users.length === 0) {
+            console.log('📊 Dashboard: Loading users for stats...');
+            try {
+                const users = await API.User.getAll();
+                window.AppState.users = users;
+                window.AppState.allUsers = users;
+                console.log(`📊 Dashboard: Loaded ${users.length} users for stats`);
+            } catch (error) {
+                console.error('📊 Dashboard: Error loading users:', error);
+                window.AppState.users = []; // Fallback to empty array
+            }
+        }
+        
         await this.loadStats();
         await this.loadExpiringUsers();
     },
     
     async loadStats() {
         try {
-            const users = window.AppState.users;
+            const users = window.AppState.users || [];
+            console.log('📊 Dashboard: Calculating stats for', users.length, 'users');
             
             // Calculate total unique users (users with any Plex or IPTV tags)
             const uniqueUsers = users.filter(u => {
@@ -658,19 +673,23 @@ window.Dashboard = {
             });
             
             // Update total users count
-            document.getElementById('totalUsers').textContent = uniqueUsers.length;
+            const totalUsersEl = document.getElementById('totalUsers');
+            if (totalUsersEl) totalUsersEl.textContent = uniqueUsers.length;
             
             // Calculate individual Plex user counts
             const plex1Users = users.filter(u => u.tags && u.tags.includes('Plex 1'));
             const plex2Users = users.filter(u => u.tags && u.tags.includes('Plex 2'));
             
             // Update individual Plex counts in the split layout
-            document.getElementById('plex1Count').textContent = plex1Users.length;
-            document.getElementById('plex2Count').textContent = plex2Users.length;
+            const plex1CountEl = document.getElementById('plex1Count');
+            const plex2CountEl = document.getElementById('plex2Count');
+            if (plex1CountEl) plex1CountEl.textContent = plex1Users.length;
+            if (plex2CountEl) plex2CountEl.textContent = plex2Users.length;
             
             // Calculate IPTV users
             const iptvUsers = users.filter(u => u.tags && u.tags.includes('IPTV'));
-            document.getElementById('iptvUsers').textContent = iptvUsers.length;
+            const iptvUsersEl = document.getElementById('iptvUsers');
+            if (iptvUsersEl) iptvUsersEl.textContent = iptvUsers.length;
             
             console.log('📊 Dashboard stats updated:', {
                 totalUnique: uniqueUsers.length,

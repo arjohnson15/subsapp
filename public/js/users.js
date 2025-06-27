@@ -1,4 +1,5 @@
 // Enhanced User Management Functions with Background Task System and Fixed Baseline Updates
+console.log('👥 Loading Users.js...');
 
 window.Users = {
     currentSortField: 'name',
@@ -216,7 +217,7 @@ window.Users = {
         }
     },
     
-renderUsersTable() {
+    renderUsersTable() {
         const tbody = document.getElementById('usersTableBody');
         if (!tbody) return;
         
@@ -398,7 +399,7 @@ renderUsersTable() {
         }
     },
     
-    // UPDATED: Use new baseline reloader for editing
+    // UPDATED: Use new baseline reloader for editing - FIXED function references
     async editUser(userId) {
         try {
             console.log(`📝 Starting edit for user ID: ${userId}`);
@@ -409,13 +410,13 @@ renderUsersTable() {
             // Use our new baseline reloader
             const user = await this.reloadUserDataForEditing(userId);
             
-            // Navigate to user form
-            await showPage('user-form');
+            // Navigate to user form - FIXED: Use window.showPage
+            await window.showPage('user-form');
             
-            // Wait for page to fully load, then populate
+            // Wait for page to fully load, then populate - FIXED: Use window.populateFormForEditing
             setTimeout(() => {
                 console.log(`🔧 Populating form for editing user: ${user.name}`);
-                populateFormForEditing(user);
+                window.populateFormForEditing(user);
             }, 1200);
             
         } catch (error) {
@@ -424,7 +425,8 @@ renderUsersTable() {
     },
     
     emailUser(userName, userEmail) {
-        showPage('email');
+        // FIXED: Use window.showPage
+        window.showPage('email');
         setTimeout(() => {
             const recipientField = document.getElementById('emailRecipient');
             const subjectField = document.getElementById('emailSubject');
@@ -485,90 +487,103 @@ renderUsersTable() {
             const iptvSubscription = document.getElementById('iptvSubscription')?.value;
             const iptvExpiration = document.getElementById('iptvExpiration')?.value;
             
-// FIXED: Handle Plex subscription with proper "remove" case
-console.log('🔍 Raw subscription values:', {
-    plexSubscription, plexExpiration, iptvSubscription, iptvExpiration
-});
+            // FIXED: Handle Plex subscription with proper "remove" case
+            console.log('🔍 Raw subscription values:', {
+                plexSubscription, plexExpiration, iptvSubscription, iptvExpiration
+            });
 
-if (plexSubscription === 'free') {
-    userData.plex_subscription = 'free';
-    userData.plex_expiration = null;
-    userData.plex_is_free = true;
-} else if (plexSubscription === 'remove') {
-    // FIXED: Properly handle remove case
-    userData.plex_subscription = 'remove';
-    userData.plex_expiration = null;
-    userData.plex_is_free = false;
-} else if (plexSubscription && plexSubscription !== '') {
-    // Paid subscription
-    userData.plex_subscription = parseInt(plexSubscription);
-    userData.plex_expiration = plexExpiration || null;
-    userData.plex_is_free = false;
-} else {
-    // Keep current (no change)
-    userData.plex_subscription = null;
-    userData.plex_expiration = null;
-    userData.plex_is_free = false;
-}
+            if (plexSubscription === 'free') {
+                userData.plex_subscription = 'free';
+                userData.plex_expiration = null;
+                userData.plex_is_free = true;
+            } else if (plexSubscription === 'remove') {
+                // FIXED: Properly handle remove case
+                userData.plex_subscription = 'remove';
+                userData.plex_expiration = null;
+                userData.plex_is_free = false;
+            } else if (plexSubscription && plexSubscription !== '') {
+                // Paid subscription
+                userData.plex_subscription = parseInt(plexSubscription);
+                userData.plex_expiration = plexExpiration || null;
+                userData.plex_is_free = false;
+            } else {
+                // Keep current (no change)
+                userData.plex_subscription = null;
+                userData.plex_expiration = null;
+                userData.plex_is_free = false;
+            }
 
-// FIXED: Handle IPTV subscription with proper "remove" case
-if (iptvSubscription === 'remove') {
-    // FIXED: Properly handle remove case
-    userData.iptv_subscription = 'remove';
-    userData.iptv_expiration = null;
-    userData.iptv_is_free = false;
-} else if (iptvSubscription && iptvSubscription !== '') {
-    // Paid subscription
-    userData.iptv_subscription = parseInt(iptvSubscription);
-    userData.iptv_expiration = iptvExpiration || null;
-    userData.iptv_is_free = false;
-} else {
-    // Keep current (no change)
-    userData.iptv_subscription = null;
-    userData.iptv_expiration = null;
-    userData.iptv_is_free = false;
-}
+            // FIXED: Handle IPTV subscription with proper "remove" case
+            if (iptvSubscription === 'remove') {
+                // FIXED: Properly handle remove case
+                userData.iptv_subscription = 'remove';
+                userData.iptv_expiration = null;
+                userData.iptv_is_free = false;
+            } else if (iptvSubscription && iptvSubscription !== '') {
+                // Paid subscription
+                userData.iptv_subscription = parseInt(iptvSubscription);
+                userData.iptv_expiration = iptvExpiration || null;
+                userData.iptv_is_free = false;
+            } else {
+                // Keep current (no change)
+                userData.iptv_subscription = null;
+                userData.iptv_expiration = null;
+                userData.iptv_is_free = false;
+            }
 
-console.log('🔍 Processed subscription data:', {
-    plex_subscription: userData.plex_subscription,
-    plex_expiration: userData.plex_expiration,
-    iptv_subscription: userData.iptv_subscription,
-    iptv_expiration: userData.iptv_expiration
-});
+            console.log('🔍 Processed subscription data:', {
+                plex_subscription: userData.plex_subscription,
+                plex_expiration: userData.plex_expiration,
+                iptv_subscription: userData.iptv_subscription,
+                iptv_expiration: userData.iptv_expiration
+            });
             
             console.log('🔍 Current form data with subscriptions:', userData);
             
-            // OPTIMIZED CHANGE DETECTION
+            // FIXED CHANGE DETECTION - Only trigger Plex updates for actual Plex changes
             let shouldUpdatePlexAccess = false;
             const isEditing = window.AppState?.editingUserId;
             
-            if (isEditing) {
-                // Use stored baseline instead of database fetch
-                const originalLibraries = this.originalLibraryBaseline || {};
+            console.log('🔍 Change detection debug:', {
+                isEditing: isEditing,
+                hasOriginalLibraryBaseline: !!this.originalLibraryBaseline,
+                hasOriginalTagsBaseline: !!this.originalTagsBaseline,
+                currentPlexLibraries: currentPlexLibraries,
+                originalLibraryBaseline: this.originalLibraryBaseline
+            });
+            
+            if (isEditing && this.originalLibraryBaseline && this.originalTagsBaseline) {
+                // Use stored baseline for comparison
                 const originalUserData = window.AppState.currentUserData || {};
                 
                 // Check ONLY library-related changes that require API calls
                 const normalizedCurrent = this.normalizeLibrariesForComparison(currentPlexLibraries);
-                const normalizedOriginal = this.normalizeLibrariesForComparison(originalLibraries);
+                const normalizedOriginal = this.normalizeLibrariesForComparison(this.originalLibraryBaseline);
                 const librarySelectionsChanged = !this.deepEqual(normalizedCurrent, normalizedOriginal);
 
-                if (librarySelectionsChanged) {
-                    console.log('📊 Library change comparison:');
-                    console.log('   Original normalized:', normalizedOriginal);
-                    console.log('   Current normalized:', normalizedCurrent);
-                }
+                // Check if Plex email changed
                 const plexEmailChanged = userData.plex_email !== (originalUserData.plex_email || '');
                 
-                // FIXED: Check if Plex tags changed (Plex 1, Plex 2) - only compare RELEVANT tags
+                // Check if Plex tags changed (Plex 1, Plex 2) - only compare RELEVANT tags
                 const currentPlexTags = userData.tags.filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
-                const originalPlexTags = (this.originalTagsBaseline || []).filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
+                const originalPlexTags = this.originalTagsBaseline.filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
                 const plexTagsChanged = !this.deepEqual(currentPlexTags, originalPlexTags);
+                
+                console.log('🔍 Detailed change analysis:', {
+                    librarySelectionsChanged: librarySelectionsChanged,
+                    plexEmailChanged: plexEmailChanged,
+                    plexTagsChanged: plexTagsChanged,
+                    normalizedCurrent: normalizedCurrent,
+                    normalizedOriginal: normalizedOriginal,
+                    currentPlexTags: currentPlexTags,
+                    originalPlexTags: originalPlexTags
+                });
                 
                 // Only trigger API calls for actual Plex access changes
                 if (librarySelectionsChanged || plexEmailChanged || plexTagsChanged) {
-                    console.log('🔄 Plex access changes detected:');
+                    console.log('🔄 Plex access changes detected - API calls needed:');
                     if (librarySelectionsChanged) {
-                        console.log('   - Library selections changed:', {from: originalLibraries, to: currentPlexLibraries});
+                        console.log('   - Library selections changed');
                     }
                     if (plexEmailChanged) {
                         console.log('   - Plex email changed:', {from: originalUserData.plex_email, to: userData.plex_email});
@@ -578,25 +593,16 @@ console.log('🔍 Processed subscription data:', {
                     }
                     shouldUpdatePlexAccess = true;
                 } else {
-                    console.log('✅ No Plex access changes detected - skipping API calls');
-                    
-                    // ADDITIONAL CHECK: Make sure we really have the same libraries selected vs available
-                    const hasPlexTagsNow = currentPlexTags.length > 0;
-                    const hasPlexLibrariesSelected = Object.values(currentPlexLibraries).some(serverGroup => 
-                        (serverGroup.regular && serverGroup.regular.length > 0) || 
-                        (serverGroup.fourk && serverGroup.fourk.length > 0)
-                    );
-                    
-                    // If user has Plex tags but no libraries selected, or vice versa, we need to update
-                    if (hasPlexTagsNow !== hasPlexLibrariesSelected) {
-                        console.log('🔄 Plex tag/library mismatch detected - need to sync');
-                        shouldUpdatePlexAccess = true;
-                    } else {
-                        shouldUpdatePlexAccess = false;
-                    }
+                    console.log('✅ NO Plex access changes detected - SKIPPING all API calls');
+                    shouldUpdatePlexAccess = false;
                 }
                 
                 // Tell backend NOT to process tags automatically 
+                userData._skipTagProcessing = true;
+            } else if (isEditing) {
+                // If we don't have baselines, something went wrong - don't make API calls
+                console.log('⚠️ Missing baselines for editing user - skipping Plex API calls');
+                shouldUpdatePlexAccess = false;
                 userData._skipTagProcessing = true;
             } else {
                 // New user - check if they have Plex access to share
@@ -628,7 +634,8 @@ console.log('🔍 Processed subscription data:', {
             // CRITICAL: Navigate away IMMEDIATELY after database save - before Plex operations
             console.log('🚀 Navigating back to users page immediately...');
             setTimeout(async () => {
-                await showPage('users');
+                // FIXED: Use window.showPage
+                await window.showPage('users');
                 await this.loadUsers();
             }, 100);
             
@@ -789,7 +796,6 @@ console.log('🔍 Processed subscription data:', {
         }
     },
     
-	
     // Check invite status and display appropriate indicators
     async checkAndDisplayInviteStatus(userEmail, plexTags) {
         try {
@@ -1061,91 +1067,6 @@ console.log('🔍 Processed subscription data:', {
         if (plex2Group) plex2Group.style.display = 'none';
         
         console.log(`🔄 Form refreshed after Plex removal`);
-    },	
-    
-    // Remove user from specific Plex server group
-    async removePlexServerAccess(serverGroup) {
-        const userId = window.AppState.editingUserId;
-        const userData = window.AppState.currentUserData;
-        
-        if (!userId || !userData) {
-            Utils.showNotification('No user selected for Plex removal', 'error');
-            return;
-        }
-        
-        const confirmMessage = `Remove ${userData.name} from ${serverGroup.toUpperCase()}?\n\nThis will:\n- Remove them from ${serverGroup} servers\n- Clear ${serverGroup} library access\n- Remove ${serverGroup} tag if no libraries selected\n\nThis action cannot be undone!`;
-        
-        if (!confirm(confirmMessage)) return;
-        
-        try {
-            Utils.showLoading();
-            console.log(`🗑️ Removing ${serverGroup} access for user ID: ${userId}`);
-            
-            const userEmail = userData.plex_email || userData.email;
-            if (!userEmail) {
-                Utils.showNotification('User has no email configured for Plex removal', 'error');
-                return;
-            }
-            
-            // Remove from specific server group
-            const result = await API.call('/plex/remove-access', {
-                method: 'POST',
-                body: JSON.stringify({
-                    userEmail: userEmail,
-                    serverGroups: [serverGroup]
-                })
-            });
-            
-            if (result.success) {
-                Utils.showNotification(
-                    `${userData.name} removed from ${serverGroup.toUpperCase()} successfully!`,
-                    'success'
-                );
-                
-                // Update the form to reflect changes
-                this.refreshFormAfterServerRemoval(serverGroup);
-                
-                // Reload user data
-                await this.loadUsers();
-            } else {
-                Utils.showNotification('Failed to remove from ' + serverGroup + ': ' + (result.error || 'Unknown error'), 'error');
-            }
-            
-        } catch (error) {
-            console.error(`❌ Error removing from ${serverGroup}:`, error);
-            Utils.handleError(error, `Removing from ${serverGroup}`);
-        } finally {
-            Utils.hideLoading();
-        }
-    },
-    
-    // Update form after Plex access removal
-    refreshFormAfterPlexRemoval(result) {
-        // Clear Plex email
-        const plexEmailField = document.getElementById('plexEmail');
-        if (plexEmailField) plexEmailField.value = '';
-        
-        // Uncheck Plex tags
-        const plex1Tag = document.getElementById('tag-plex1');
-        const plex2Tag = document.getElementById('tag-plex2');
-        
-        if (plex1Tag) {
-            plex1Tag.checked = false;
-            togglePlexLibrariesByTag('plex1', false);
-        }
-        
-        if (plex2Tag) {
-            plex2Tag.checked = false;
-            togglePlexLibrariesByTag('plex2', false);
-        }
-        
-        // Hide the management section
-        const managementSection = document.getElementById('plexAccessManagement');
-        if (managementSection) {
-            managementSection.style.display = 'none';
-        }
-        
-        console.log('✅ Form updated after Plex access removal');
     },
     
     // Update form after specific server removal
@@ -1154,7 +1075,10 @@ console.log('🔍 Processed subscription data:', {
         const tag = document.getElementById(`tag-${serverGroup}`);
         if (tag) {
             tag.checked = false;
-            togglePlexLibrariesByTag(serverGroup, false);
+            // FIXED: Use window.togglePlexLibrariesByTag
+            if (window.togglePlexLibrariesByTag) {
+                window.togglePlexLibrariesByTag(serverGroup, false);
+            }
         }
         
         // Check if user still has any Plex access
@@ -1203,7 +1127,7 @@ console.log('🔍 Processed subscription data:', {
             
             if (Array.isArray(obj1[key]) && Array.isArray(obj2[key])) {
                 // Compare arrays
-                if (obj1[key].length !== obj2[key].length) return false;
+                if (obj1[key].length !== obj2.length) return false;
                 const sorted1 = [...obj1[key]].sort();
                 const sorted2 = [...obj2[key]].sort();
                 for (let i = 0; i < sorted1.length; i++) {
@@ -1313,7 +1237,8 @@ window.showUserForm = function() {
         window.Users.resetFormState();
     }
     
-    showPage('user-form');
+    // FIXED: Use window.showPage
+    window.showPage('user-form');
     
     // Wait for page load, then ensure completely clean form
     setTimeout(() => {
@@ -1379,8 +1304,8 @@ window.showUserForm = function() {
     }, 700);
 };
 
-// Enhanced form population function
-function populateFormForEditing(user) {
+// Enhanced form population function - MOVED TO GLOBAL SCOPE AND MADE ASYNC
+window.populateFormForEditing = async function(user) {
     console.log(`📝 Populating form with user data:`, user);
     
     // Fill basic fields
@@ -1423,37 +1348,36 @@ function populateFormForEditing(user) {
         managementSection.style.display = hasPlexAccess ? 'block' : 'none';
     }
     
-const plexTags = []; // ADD THIS LINE
-if (user.tags && Array.isArray(user.tags)) {
-    user.tags.forEach(tag => {
-        const checkbox = document.querySelector(`input[name="tags"][value="${tag}"]`);
-        if (checkbox) {
-            checkbox.checked = true;
-            
-            // Show library sections for Plex tags
-            if (tag === 'Plex 1') {
-                plexTags.push('plex1'); // ADD THIS LINE
-                // existing code for Plex 1
+    const plexTags = []; // Track Plex tags for invite status check
+    if (user.tags && Array.isArray(user.tags)) {
+        user.tags.forEach(tag => {
+            const checkbox = document.querySelector(`input[name="tags"][value="${tag}"]`);
+            if (checkbox) {
+                checkbox.checked = true;
+                
+                // Show library sections for Plex tags
+                if (tag === 'Plex 1') {
+                    plexTags.push('plex1');
+                    window.showPlexLibrariesAndPreSelect('plex1', user);
+                }
+                if (tag === 'Plex 2') {
+                    plexTags.push('plex2');
+                    window.showPlexLibrariesAndPreSelect('plex2', user);
+                }
             }
-            if (tag === 'Plex 2') {
-                plexTags.push('plex2'); // ADD THIS LINE
-                // existing code for Plex 2
-            }
-        }
-    });
-}
-
-// ADD THESE LINES AT THE END OF THE FUNCTION:
-// If user has Plex tags, check invite status and show appropriate indicators
-if (plexTags.length > 0 && user.plex_email) {
-    await this.checkAndDisplayInviteStatus(user.plex_email, plexTags);
-}
+        });
+    }
+    
+    // If user has Plex tags, check invite status and show appropriate indicators
+    if (plexTags.length > 0 && user.plex_email && window.Users) {
+        await window.Users.checkAndDisplayInviteStatus(user.plex_email, plexTags);
+    }
     
     console.log(`✅ Form population completed for ${user.name}`);
-}
+};
 
-// Show Plex libraries and pre-select user's current access
-function showPlexLibrariesAndPreSelect(serverGroup, user) {
+// Show Plex libraries and pre-select user's current access - MOVED TO GLOBAL SCOPE
+window.showPlexLibrariesAndPreSelect = function(serverGroup, user) {
     console.log(`📚 Showing ${serverGroup} libraries for editing...`);
     
     const libraryGroup = document.getElementById(`${serverGroup}LibraryGroup`);
@@ -1465,7 +1389,7 @@ function showPlexLibrariesAndPreSelect(serverGroup, user) {
             window.Plex.loadLibrariesForGroup(serverGroup).then(() => {
                 // Wait a bit for rendering, then pre-select
                 setTimeout(() => {
-                    preSelectUserLibraries(serverGroup, user);
+                    window.preSelectUserLibraries(serverGroup, user);
                 }, 800);
             }).catch(error => {
                 console.error(`Error loading libraries for ${serverGroup}:`, error);
@@ -1477,10 +1401,10 @@ function showPlexLibrariesAndPreSelect(serverGroup, user) {
             window.testPlexConnection(serverGroup);
         }
     }
-}
+};
 
-// Pre-select user's current library access
-function preSelectUserLibraries(serverGroup, user) {
+// Pre-select user's current library access - MOVED TO GLOBAL SCOPE
+window.preSelectUserLibraries = function(serverGroup, user) {
     console.log(`🔧 Pre-selecting libraries for ${serverGroup}:`, user.plex_libraries);
     
     if (!user.plex_libraries || !user.plex_libraries[serverGroup]) {
@@ -1520,7 +1444,7 @@ function preSelectUserLibraries(serverGroup, user) {
     }
     
     console.log(`📊 Pre-selected ${selectedCount} total libraries for ${serverGroup}`);
-}
+};
 
 // Export for global access
 window.Users.loadUsers = window.Users.loadUsers.bind(window.Users);
