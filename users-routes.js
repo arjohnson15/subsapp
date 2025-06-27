@@ -222,54 +222,61 @@ router.post('/', [
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
-        name, email, owner_id, plex_email, iptv_username, iptv_password, 
-        implayer_code, device_count || 1, bcc_owner_renewal || false, 
+        name, email, owner_id || null, plex_email || null,
+        iptv_username || null, iptv_password || null, implayer_code || null,
+        device_count || 1, bcc_owner_renewal || false,
         JSON.stringify(tags || []), JSON.stringify(plex_libraries || {})
       ]
     });
 
-    // Execute the user creation transaction
-    const results = await db.transaction(transactionQueries);
-    const userId = results[0].insertId;
+    // Execute user creation first to get ID
+    const result = await db.transaction(transactionQueries);
+    const userId = result[0].insertId;
 
-    // Handle subscriptions after user creation (separate transactions to avoid complexity)
+    console.log('✅ User created with ID:', userId);
+
+    // Handle subscriptions after user creation
     try {
       // Handle Plex subscription
-      if (plex_subscription === 'free') {
-        // Create FREE Plex subscription - use a dummy subscription type ID for free users
-        await db.query(`
-          INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status)
-          VALUES (?, 1, CURDATE(), NULL, TRUE, 'active')
-        `, [userId]);
-        console.log('✅ Created FREE Plex subscription for user:', userId);
-      } else if (plex_subscription && plex_subscription !== '' && plex_expiration) {
-        // Create paid Plex subscription
-        await db.query(`
-          INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status)
-          VALUES (?, ?, CURDATE(), ?, FALSE, 'active')
-        `, [userId, parseInt(plex_subscription), plex_expiration]);
-        console.log('✅ Created paid Plex subscription for user:', userId, 'type:', plex_subscription);
+      if (plex_subscription && plex_subscription !== 'remove') {
+        if (plex_subscription === 'free') {
+          await db.query(`
+            INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status)
+            VALUES (?, NULL, CURDATE(), NULL, TRUE, 'active')
+          `, [userId]);
+          console.log('✅ Created FREE Plex subscription for user:', userId);
+        } else if (plex_expiration) {
+          await db.query(`
+            INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status)
+            VALUES (?, ?, CURDATE(), ?, FALSE, 'active')
+          `, [userId, parseInt(plex_subscription), plex_expiration]);
+          console.log('✅ Created paid Plex subscription for user:', userId, 'type:', plex_subscription);
+        }
       }
 
       // Handle IPTV subscription
-      if (iptv_subscription && iptv_subscription !== '' && iptv_expiration) {
-        await db.query(`
-          INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status)
-          VALUES (?, ?, CURDATE(), ?, FALSE, 'active')
-        `, [userId, parseInt(iptv_subscription), iptv_expiration]);
-        console.log('✅ Created IPTV subscription for user:', userId, 'type:', iptv_subscription);
+      if (iptv_subscription && iptv_subscription !== 'remove') {
+        if (iptv_subscription === 'free') {
+          await db.query(`
+            INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status)
+            VALUES (?, NULL, CURDATE(), NULL, TRUE, 'active')
+          `, [userId]);
+          console.log('✅ Created FREE IPTV subscription for user:', userId);
+        } else if (iptv_expiration) {
+          await db.query(`
+            INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status)
+            VALUES (?, ?, CURDATE(), ?, FALSE, 'active')
+          `, [userId, parseInt(iptv_subscription), iptv_expiration]);
+          console.log('✅ Created paid IPTV subscription for user:', userId, 'type:', iptv_subscription);
+        }
       }
 
-      res.status(201).json({ 
-        message: 'User created successfully', 
-        id: userId 
-      });
+      res.status(201).json({ message: 'User created successfully', id: userId });
 
     } catch (subscriptionError) {
-      console.error('Error creating subscriptions for user:', subscriptionError);
-      // User was created successfully, but subscription creation failed
+      console.error('Error creating subscriptions:', subscriptionError);
       res.status(201).json({ 
-        message: 'User created successfully, but there was an issue with subscriptions. Please edit the user to add subscriptions.', 
+        message: 'User created successfully, but there was an issue creating subscriptions. Please edit the user to add subscriptions.', 
         id: userId,
         warning: 'Subscription creation failed'
       });
@@ -341,79 +348,42 @@ router.put('/:id', [
 
     // Get current user data
     const [currentUser] = await db.query('SELECT tags, plex_libraries FROM users WHERE id = ?', [req.params.id]);
-    const currentTags = safeJsonParse(currentUser?.tags, []);
-    const currentPlexLibraries = safeJsonParse(currentUser?.plex_libraries, {});
-
-    console.log('Current user tags:', currentTags);
-    console.log('Current plex libraries:', currentPlexLibraries);
-    console.log('New plex libraries:', plex_libraries);
-    console.log('Skip tag processing:', _skipTagProcessing);
-
-    // FIXED: Respect tag preservation when frontend requests it
-    let processedTags;
-    if (_skipTagProcessing) {
-        // Use tags exactly as provided by frontend
-        processedTags = tags || currentTags;
-        console.log('Using frontend-provided tags without processing:', processedTags);
-    } else {
-        // Process tags based on Plex library access (for new users or when explicitly updating Plex)
-        processedTags = plex_libraries ? 
-          processTagsForUpdate(plex_libraries, currentTags) : 
-          (tags || currentTags);
-        console.log('Processed tags based on Plex access:', processedTags);
+    if (!currentUser) {
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    // Clean up owner_id - convert null, undefined, or empty string to null
-    const cleanOwnerId = (owner_id === null || owner_id === undefined || owner_id === '') ? 
-      null : parseInt(owner_id);
+    // Process tags (only if not explicitly skipped)
+    let finalTags = tags || [];
+    if (!_skipTagProcessing && plex_libraries) {
+      const currentTags = safeJsonParse(currentUser.tags, []);
+      finalTags = processTagsForUpdate(plex_libraries, currentTags);
+    }
 
-    // Use transaction for user and subscription updates
-    const transactionQueries = [];
+    // Update user information
+    await db.query(`
+      UPDATE users SET 
+        name = ?, email = ?, owner_id = ?, plex_email = ?, 
+        iptv_username = ?, iptv_password = ?, implayer_code = ?, device_count = ?,
+        bcc_owner_renewal = ?, tags = ?, plex_libraries = ?
+      WHERE id = ?
+    `, [
+      name, email, owner_id || null, plex_email || null,
+      iptv_username || null, iptv_password || null, implayer_code || null, device_count || 1,
+      bcc_owner_renewal || false, JSON.stringify(finalTags), JSON.stringify(plex_libraries || {}),
+      req.params.id
+    ]);
 
-    // Update user query
-    transactionQueries.push({
-      sql: `
-        UPDATE users SET 
-          name = ?, email = ?, owner_id = ?, plex_email = ?, 
-          iptv_username = ?, iptv_password = ?, implayer_code = ?, 
-          device_count = ?, bcc_owner_renewal = ?, tags = ?, plex_libraries = ?
-        WHERE id = ?
-      `,
-      params: [
-        name, email, cleanOwnerId, plex_email,
-        iptv_username, iptv_password, implayer_code,
-        device_count || 1, bcc_owner_renewal || false,
-        JSON.stringify(processedTags), JSON.stringify(plex_libraries || currentPlexLibraries),
-        req.params.id
-      ]
-    });
+    console.log('✅ Updated user basic info for ID:', req.params.id);
 
-    // Execute user update transaction
-    await db.transaction(transactionQueries);
-
-    // Handle subscription updates separately to avoid transaction complexity
-    const userId = req.params.id;
-
+    // Handle subscription updates if provided
     try {
+      const userId = req.params.id;
+
       // Handle Plex subscription updates - ONLY if explicitly provided
       if (plex_subscription !== undefined) {
-        if (plex_subscription === 'free') {
-          // Set to FREE Plex subscription - first deactivate ALL existing Plex subscriptions
-          await db.query(`
-            UPDATE subscriptions s 
-            JOIN subscription_types st ON s.subscription_type_id = st.id 
-            SET s.status = 'cancelled' 
-            WHERE s.user_id = ? AND st.type = 'plex' AND s.status = 'active'
-          `, [userId]);
-
-          // Create new free subscription
-          await db.query(`
-            INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status)
-            VALUES (?, 1, CURDATE(), NULL, TRUE, 'active')
-          `, [userId]);
-          console.log('✅ Updated to FREE Plex subscription for user:', userId);
-
-        } else if (plex_subscription === 'remove') {
+        console.log('🔄 Processing Plex subscription update:', plex_subscription);
+        
+        if (plex_subscription === 'remove') {
           // Remove Plex subscription - deactivate ALL Plex subscriptions
           await db.query(`
             UPDATE subscriptions s 
@@ -422,6 +392,22 @@ router.put('/:id', [
             WHERE s.user_id = ? AND st.type = 'plex' AND s.status = 'active'
           `, [userId]);
           console.log('✅ Removed Plex subscription for user:', userId);
+
+        } else if (plex_subscription === 'free') {
+          // Set to FREE Plex - first deactivate ALL existing Plex subscriptions
+          await db.query(`
+            UPDATE subscriptions s 
+            JOIN subscription_types st ON s.subscription_type_id = st.id 
+            SET s.status = 'cancelled' 
+            WHERE s.user_id = ? AND st.type = 'plex' AND s.status = 'active'
+          `, [userId]);
+
+          // Create new FREE subscription
+          await db.query(`
+            INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status)
+            VALUES (?, NULL, CURDATE(), NULL, TRUE, 'active')
+          `, [userId]);
+          console.log('✅ Updated to FREE Plex subscription for user:', userId);
 
         } else if (plex_subscription && plex_subscription !== '' && plex_expiration) {
           // Set to paid Plex subscription - first deactivate ALL existing Plex subscriptions
@@ -463,6 +449,8 @@ router.put('/:id', [
 
       // Handle IPTV subscription updates - ONLY if explicitly provided
       if (iptv_subscription !== undefined) {
+        console.log('🔄 Processing IPTV subscription update:', iptv_subscription);
+        
         if (iptv_subscription === 'remove') {
           // Remove IPTV subscription - deactivate ALL IPTV subscriptions
           await db.query(`
@@ -472,6 +460,22 @@ router.put('/:id', [
             WHERE s.user_id = ? AND st.type = 'iptv' AND s.status = 'active'
           `, [userId]);
           console.log('✅ Removed IPTV subscription for user:', userId);
+
+        } else if (iptv_subscription === 'free') {
+          // Set to FREE IPTV - first deactivate ALL existing IPTV subscriptions
+          await db.query(`
+            UPDATE subscriptions s 
+            JOIN subscription_types st ON s.subscription_type_id = st.id 
+            SET s.status = 'cancelled' 
+            WHERE s.user_id = ? AND st.type = 'iptv' AND s.status = 'active'
+          `, [userId]);
+
+          // Create new FREE subscription
+          await db.query(`
+            INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status)
+            VALUES (?, NULL, CURDATE(), NULL, TRUE, 'active')
+          `, [userId]);
+          console.log('✅ Updated to FREE IPTV subscription for user:', userId);
 
         } else if (iptv_subscription && iptv_subscription !== '' && iptv_expiration) {
           // Set to paid IPTV subscription - first deactivate ALL existing IPTV subscriptions
@@ -584,12 +588,14 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// Get users expiring soon (used by dashboard)
+// Get users expiring soon (used by dashboard) - FIXED: Added subscription_type field
 router.get('/expiring/:days', async (req, res) => {
   try {
     const days = parseInt(req.params.days) || 7;
     const users = await db.query(`
-      SELECT u.name, u.email, s.expiration_date, st.name as subscription_name, st.type
+      SELECT u.name, u.email, s.expiration_date, 
+             st.name as subscription_name, 
+             st.type as subscription_type
       FROM users u
       JOIN subscriptions s ON u.id = s.user_id
       JOIN subscription_types st ON s.subscription_type_id = st.id
@@ -597,7 +603,7 @@ router.get('/expiring/:days', async (req, res) => {
         AND s.is_free = FALSE
         AND s.expiration_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
         AND s.expiration_date >= CURDATE()
-      ORDER BY s.expiration_date ASC
+      ORDER BY s.expiration_date
     `, [days]);
 
     res.json(users);
