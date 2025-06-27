@@ -229,23 +229,9 @@ async renderUsersTable() {
         return;
     }
 
-    // PERFORMANCE FIX: Don't check invite status during initial table render
-    // Instead, render basic table first and then enhance with status checks
-    console.log('📋 Rendering users table (optimized)...');
+    // PERFORMANCE FIX: Always use basic rendering - no invite status checks
+    console.log('📋 Rendering users table (fast mode)...');
     this.renderUsersTableBasic();
-    
-    // Only after basic table is rendered, check invite status for Plex users
-    const plexUsers = users.filter(user => 
-        user.tags && user.tags.some(tag => tag.includes('Plex')) && (user.plex_email || user.email)
-    );
-    
-    if (plexUsers.length > 0) {
-        console.log(`🔍 Checking invite status for ${plexUsers.length} Plex users...`);
-        // Use setTimeout to not block UI rendering
-        setTimeout(() => {
-            this.enhanceTableWithInviteStatus(plexUsers);
-        }, 100);
-    }
 },
 
 

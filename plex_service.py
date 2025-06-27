@@ -649,7 +649,7 @@ def cancel_pending_invite(server_config, user_email):
         
         if invite:
             signal.alarm(30)
-            invite.delete()  # Cancel the invite
+            account.cancelInvite(user_email)
             signal.alarm(0)
             log_info(f"Cancelled pending invite for {user_email} on {server_config['name']}")
             return {
