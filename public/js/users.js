@@ -234,7 +234,7 @@ async renderUsersTable() {
 },
 
 
-// Updated renderUsersTableBasic with improved structure
+// Updated renderUsersTableBasic with Plex status column
 renderUsersTableBasic() {
     const tbody = document.getElementById('usersTableBody');
     if (!tbody) return;
@@ -249,6 +249,9 @@ renderUsersTableBasic() {
             <td class="tags-cell">
                 ${user.tags && user.tags.length > 0 ? 
                     user.tags.map(tag => `<span class="tag tag-${tag.toLowerCase().replace(' ', '')}">${tag}</span>`).join('') : ''}
+            </td>
+            <td class="plex-status-cell">
+                ${this.renderPlexStatus(user)}
             </td>
             <td style="color: ${user.plex_expiration === 'FREE' ? '#4fc3f7' : (user.plex_expiration ? Utils.isDateExpired(user.plex_expiration) ? '#f44336' : '#4caf50' : '#666')}">
                 ${user.plex_expiration === 'FREE' ? 'FREE' : (user.plex_expiration ? Utils.formatDate(user.plex_expiration) : '')}
@@ -265,7 +268,7 @@ renderUsersTableBasic() {
         </tr>
     `).join('');
     
-    console.log(`✅ Basic users table rendered with ${users.length} users`);
+    console.log(`✅ Basic users table rendered with ${users.length} users (including Plex status)`);
 },
 
     
@@ -465,6 +468,19 @@ this.displayStoredLibraryAccess(user);
             Utils.handleError(error, 'Deleting user');
         }
     },
+	
+	// NEW: Render Plex status with pending invites support
+renderPlexStatus(user) {
+    const pendingInvites = user.pending_plex_invites || null;
+    
+    // Only show indicator if user has pending invites
+    if (pendingInvites && Object.keys(pendingInvites).length > 0) {
+        return '<span class="pending-invite-indicator">⏳ Pending Invite</span>';
+    }
+    
+    // Return empty string if no pending invites (no indicator needed)
+    return '';
+},
     
     // Enhanced saveUser function with smart change detection and baseline management
     async saveUser(event) {

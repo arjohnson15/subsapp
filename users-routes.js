@@ -4,6 +4,61 @@ const db = require('./database-config');
 const plexService = require('./plex-service');
 const router = express.Router();
 
+router.post('/:id/check-pending-invites', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    console.log(`🔍 Manual pending invite check for user ID: ${userId}`);
+    
+    // Get user data
+    const [user] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const userEmail = user.plex_email || user.email;
+    
+    if (!userEmail) {
+      return res.status(400).json({ error: 'User has no email configured for Plex invite check' });
+    }
+    
+    console.log(`📧 Checking pending invites for: ${userEmail}`);
+    
+    // Check for pending invites using the Plex service
+    // Use the plexService already imported at the top
+    const pendingInvites = await plexService.checkUserPendingInvites(userEmail);
+    
+    // Update database with current pending invites status
+    await db.query(`
+      UPDATE users 
+      SET pending_plex_invites = ?, updated_at = NOW()
+      WHERE id = ?
+    `, [pendingInvites ? JSON.stringify(pendingInvites) : null, user.id]);
+    
+    if (pendingInvites) {
+      const serverGroups = Object.keys(pendingInvites);
+      console.log(`⏳ ${user.name} has pending invites for: ${serverGroups.join(', ')}`);
+    } else {
+      console.log(`✅ ${user.name} has no pending invites`);
+    }
+    
+    res.json({ 
+      success: true,
+      user: user.name,
+      email: userEmail,
+      pendingInvites: pendingInvites,
+      message: pendingInvites 
+        ? `User has pending invites for: ${Object.keys(pendingInvites).join(', ')}`
+        : 'User has no pending invites'
+    });
+    
+  } catch (error) {
+    console.error('Error checking pending invites:', error);
+    res.status(500).json({ error: 'Failed to check pending invites' });
+  }
+});
+
 // Safe JSON parsing function
 function safeJsonParse(str, defaultValue = null) {
   try {
@@ -71,6 +126,7 @@ router.get('/', async (req, res) => {
       // Safe JSON parsing
       user.tags = safeJsonParse(user.tags, []);
       user.plex_libraries = safeJsonParse(user.plex_libraries, {});
+	  user.pending_plex_invites = safeJsonParse(user.pending_plex_invites, null);
       user.subscriptions = subscriptions;
 
       // Add subscription expiration dates to user object for frontend compatibility
@@ -144,6 +200,7 @@ router.get('/:id', async (req, res) => {
     // Safe JSON parsing
     user.tags = safeJsonParse(user.tags, []);
     user.plex_libraries = safeJsonParse(user.plex_libraries, {});
+	user.pending_plex_invites = safeJsonParse(user.pending_plex_invites, null);
     user.subscriptions = subscriptions;
 
     // Add subscription expiration dates to user object for frontend compatibility
@@ -524,6 +581,95 @@ router.put('/:id', [
         warning: 'Subscription update failed'
       });
     }
+
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+// Enhanced user update that also syncs pending invites (ADDITION)
+router.put('/:id/enhanced', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const {
+      name, email, owner_id, plex_email, iptv_username, iptv_password, 
+      implayer_code, device_count, bcc_owner_renewal, plex_libraries
+    } = req.body;
+
+    // Validate required fields
+    if (!name || !email) {
+      return res.status(400).json({ error: 'Name and email are required' });
+    }
+
+    // Check if email is already taken by another user
+    const [existingUser] = await db.query(
+      'SELECT id FROM users WHERE email = ? AND id != ?',
+      [email, userId]
+    );
+
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+
+    // Prepare library data
+    const libraryData = plex_libraries ? JSON.stringify(plex_libraries) : null;
+
+    // Update user
+    await db.query(`
+      UPDATE users SET
+        name = ?, email = ?, owner_id = ?, plex_email = ?, 
+        iptv_username = ?, iptv_password = ?, implayer_code = ?, 
+        device_count = ?, bcc_owner_renewal = ?, plex_libraries = ?, 
+        updated_at = NOW()
+      WHERE id = ?
+    `, [
+      name, email, owner_id || null, plex_email || null,
+      iptv_username || null, iptv_password || null, implayer_code || null,
+      device_count || 1, bcc_owner_renewal || false, libraryData, userId
+    ]);
+
+    // If user has Plex access, sync their pending invites immediately
+    if (plex_email && plex_libraries && Object.keys(plex_libraries).length > 0) {
+      try {
+        console.log(`🔄 Syncing pending invites for updated user: ${name}`);
+        
+        const pendingInvites = await plexService.checkUserPendingInvites(plex_email);
+        
+        // Update pending invites in database
+        await db.query(`
+          UPDATE users 
+          SET pending_plex_invites = ?, updated_at = NOW()
+          WHERE id = ?
+        `, [pendingInvites ? JSON.stringify(pendingInvites) : null, userId]);
+        
+        console.log(`✅ Updated pending invites for ${name}`);
+        
+      } catch (error) {
+        console.error(`⚠️ Could not sync pending invites for ${name}:`, error.message);
+        // Don't fail the whole request if pending invite sync fails
+      }
+    } else {
+      // Clear pending invites if user no longer has Plex access
+      await db.query(`
+        UPDATE users 
+        SET pending_plex_invites = NULL
+        WHERE id = ?
+      `, [userId]);
+    }
+
+    // Get updated user data
+    const [updatedUser] = await db.query(`
+      SELECT u.*, o.name as owner_name, o.email as owner_email
+      FROM users u
+      LEFT JOIN owners o ON u.owner_id = o.id
+      WHERE u.id = ?
+    `, [userId]);
+
+    res.json({
+      message: 'User updated successfully',
+      user: updatedUser
+    });
 
   } catch (error) {
     console.error('Error updating user:', error);

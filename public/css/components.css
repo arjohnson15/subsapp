@@ -743,3 +743,28 @@ th.sortable .sort-arrow {
     50% { box-shadow: 0 4px 16px rgba(255, 152, 0, 0.4); }
     100% { box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
 }
+
+/* Simple pending invite indicator */
+.pending-invite-indicator {
+    display: inline-flex;
+    align-items: center;
+    background: linear-gradient(45deg, #ff9800, #ffb74d);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    animation: pulse-orange 2s infinite;
+    box-shadow: 0 2px 4px rgba(255, 152, 0, 0.3);
+}
+
+@keyframes pulse-orange {
+    0% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.02); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+.plex-status-cell {
+    min-width: 120px;
+    text-align: center;
+}
