@@ -217,123 +217,71 @@ window.Users = {
         }
     },
     
-// Enhanced renderUsersTable with invite status checking
-    async renderUsersTable() {
-        const tbody = document.getElementById('usersTableBody');
-        if (!tbody) return;
+// Enhanced renderUsersTable with performance optimization
+async renderUsersTable() {
+    const tbody = document.getElementById('usersTableBody');
+    if (!tbody) return;
 
-        const users = window.AppState.users;
-        
-        if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No users found</td></tr>';
-            return;
-        }
+    const users = window.AppState.users;
+    
+    if (users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No users found</td></tr>';
+        return;
+    }
 
-        // Check if we should use enhanced rendering (with invite status)
-        const shouldCheckInviteStatus = users.some(user => 
-            user.tags && user.tags.some(tag => tag.includes('Plex')) && (user.plex_email || user.email)
-        );
-        
-        if (shouldCheckInviteStatus) {
-            console.log('🔍 Rendering users table with invite status checks...');
-            await this.renderUsersTableWithInviteStatus();
-        } else {
-            console.log('📋 Rendering users table (no Plex users to check)...');
-            this.renderUsersTableBasic();
-        }
-    },
+    // PERFORMANCE FIX: Don't check invite status during initial table render
+    // Instead, render basic table first and then enhance with status checks
+    console.log('📋 Rendering users table (optimized)...');
+    this.renderUsersTableBasic();
+    
+    // Only after basic table is rendered, check invite status for Plex users
+    const plexUsers = users.filter(user => 
+        user.tags && user.tags.some(tag => tag.includes('Plex')) && (user.plex_email || user.email)
+    );
+    
+    if (plexUsers.length > 0) {
+        console.log(`🔍 Checking invite status for ${plexUsers.length} Plex users...`);
+        // Use setTimeout to not block UI rendering
+        setTimeout(() => {
+            this.enhanceTableWithInviteStatus(plexUsers);
+        }, 100);
+    }
+},
 
-    // New method: Enhanced rendering with invite status
-    async renderUsersTableWithInviteStatus() {
-        const tbody = document.getElementById('usersTableBody');
-        if (!tbody) return;
 
-        const users = window.AppState.users;
+// Updated renderUsersTableBasic with improved structure
+renderUsersTableBasic() {
+    const tbody = document.getElementById('usersTableBody');
+    if (!tbody) return;
 
-        // Check invite status for users with Plex tags
-        const usersWithInviteStatus = await Promise.all(users.map(async (user) => {
-            // Clone user object to avoid modifying original
-            const userWithStatus = { ...user };
-            
-            // Check if user has Plex tags and plex_email
-            const plexTags = user.tags ? user.tags.filter(tag => tag.includes('Plex')) : [];
-            if (plexTags.length > 0 && (user.plex_email || user.email)) {
-                try {
-                    const email = user.plex_email || user.email;
-                    const response = await API.call(`/plex/invite-status/${encodeURIComponent(email)}`);
-                    
-                    if (response.success && response.summary) {
-                        userWithStatus.inviteStatus = response.summary;
-                        userWithStatus.hasPendingInvites = response.summary.has_pending_invites;
-                        userWithStatus.pendingServers = response.summary.pending_servers || [];
-                    }
-                } catch (error) {
-                    console.warn(`Could not check invite status for ${user.name}:`, error);
-                    userWithStatus.inviteStatus = null;
-                    userWithStatus.hasPendingInvites = false;
-                }
-            } else {
-                userWithStatus.hasPendingInvites = false;
-            }
-            
-            return userWithStatus;
-        }));
+    const users = window.AppState.users;
 
-        tbody.innerHTML = usersWithInviteStatus.map(user => `
-            <tr>
-                <td>${user.name}</td>
-                <td>${user.email}</td>
-                <td>${user.owner_name || 'N/A'}</td>
-                <td>
-                    ${this.renderTagsWithInviteStatus(user)}
-                </td>
-                <td style="color: ${user.plex_expiration === 'FREE' ? '#4fc3f7' : (user.plex_expiration ? Utils.isDateExpired(user.plex_expiration) ? '#f44336' : '#4caf50' : '#666')}">
-                    ${user.plex_expiration === 'FREE' ? 'FREE' : (user.plex_expiration ? Utils.formatDate(user.plex_expiration) : '')}
-                </td>
-                <td style="color: ${user.iptv_expiration === 'FREE' ? '#4fc3f7' : (user.iptv_expiration ? Utils.isDateExpired(user.iptv_expiration) ? '#f44336' : '#4caf50' : '#666')}">
-                    ${user.iptv_expiration === 'FREE' ? 'FREE' : (user.iptv_expiration ? Utils.formatDate(user.iptv_expiration) : '')}
-                </td>
-                <td>
-                    <button class="btn btn-small btn-view" onclick="Users.viewUser(${user.id})">View</button>
-                    <button class="btn btn-small btn-edit" onclick="Users.editUser(${user.id})">Edit</button>
-                    <button class="btn btn-small btn-email" onclick="Users.emailUser('${user.name}', '${user.email}')">Email</button>
-                    <button class="btn btn-small btn-delete" onclick="Users.deleteUser(${user.id})">Delete</button>
-                </td>
-            </tr>
-        `).join('');
-    },
-
-    // New method: Basic rendering without invite status (for performance when not needed)
-    renderUsersTableBasic() {
-        const tbody = document.getElementById('usersTableBody');
-        if (!tbody) return;
-
-        const users = window.AppState.users;
-
-        tbody.innerHTML = users.map(user => `
-            <tr>
-                <td>${user.name}</td>
-                <td>${user.email}</td>
-                <td>${user.owner_name || 'N/A'}</td>
-                <td>
-                    ${user.tags && user.tags.length > 0 ? 
-                        user.tags.map(tag => `<span class="tag tag-${tag.toLowerCase().replace(' ', '')}">${tag}</span>`).join('') : ''}
-                </td>
-                <td style="color: ${user.plex_expiration === 'FREE' ? '#4fc3f7' : (user.plex_expiration ? Utils.isDateExpired(user.plex_expiration) ? '#f44336' : '#4caf50' : '#666')}">
-                    ${user.plex_expiration === 'FREE' ? 'FREE' : (user.plex_expiration ? Utils.formatDate(user.plex_expiration) : '')}
-                </td>
-                <td style="color: ${user.iptv_expiration === 'FREE' ? '#4fc3f7' : (user.iptv_expiration ? Utils.isDateExpired(user.iptv_expiration) ? '#f44336' : '#4caf50' : '#666')}">
-                    ${user.iptv_expiration === 'FREE' ? 'FREE' : (user.iptv_expiration ? Utils.formatDate(user.iptv_expiration) : '')}
-                </td>
-                <td>
-                    <button class="btn btn-small btn-view" onclick="Users.viewUser(${user.id})">View</button>
-                    <button class="btn btn-small btn-edit" onclick="Users.editUser(${user.id})">Edit</button>
-                    <button class="btn btn-small btn-email" onclick="Users.emailUser('${user.name}', '${user.email}')">Email</button>
-                    <button class="btn btn-small btn-delete" onclick="Users.deleteUser(${user.id})">Delete</button>
-                </td>
-            </tr>
-        `).join('');
-    },
+    tbody.innerHTML = users.map(user => `
+        <tr data-user-id="${user.id}">
+            <td>${user.name}</td>
+            <td>${user.email}</td>
+            <td>${user.owner_name || 'N/A'}</td>
+            <td class="tags-cell">
+                ${user.tags && user.tags.length > 0 ? 
+                    user.tags.map(tag => `<span class="tag tag-${tag.toLowerCase().replace(' ', '')}">${tag}</span>`).join('') : ''}
+            </td>
+            <td style="color: ${user.plex_expiration === 'FREE' ? '#4fc3f7' : (user.plex_expiration ? Utils.isDateExpired(user.plex_expiration) ? '#f44336' : '#4caf50' : '#666')}">
+                ${user.plex_expiration === 'FREE' ? 'FREE' : (user.plex_expiration ? Utils.formatDate(user.plex_expiration) : '')}
+            </td>
+            <td style="color: ${user.iptv_expiration === 'FREE' ? '#4fc3f7' : (user.iptv_expiration ? Utils.isDateExpired(user.iptv_expiration) ? '#f44336' : '#4caf50' : '#666')}">
+                ${user.iptv_expiration === 'FREE' ? 'FREE' : (user.iptv_expiration ? Utils.formatDate(user.iptv_expiration) : '')}
+            </td>
+            <td>
+                <button class="btn btn-small btn-view" onclick="Users.viewUser(${user.id})">View</button>
+                <button class="btn btn-small btn-edit" onclick="Users.editUser(${user.id})">Edit</button>
+                <button class="btn btn-small btn-email" onclick="Users.emailUser('${user.name}', '${user.email}')">Email</button>
+                <button class="btn btn-small btn-delete" onclick="Users.deleteUser(${user.id})">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+    
+    console.log(`✅ Basic users table rendered with ${users.length} users`);
+},
 
     // New method: Enhanced tag rendering with invite status indicators
     renderTagsWithInviteStatus(user) {
@@ -903,26 +851,160 @@ window.Users = {
         }
     },
     
-    // Check invite status and display appropriate indicators
-    async checkAndDisplayInviteStatus(userEmail, plexTags) {
-        try {
-            console.log(`🔍 Checking invite status for ${userEmail} on servers:`, plexTags);
+// OPTIMIZED: Check invite status and display appropriate indicators
+// This method now uses caching to avoid duplicate API calls
+async checkAndDisplayInviteStatus(userEmail, plexTags) {
+    try {
+        // Use cache to avoid duplicate calls for the same user
+        const cacheKey = `invite_status_${userEmail}`;
+        const cached = this.inviteStatusCache?.get(cacheKey);
+        
+        if (cached && (Date.now() - cached.timestamp) < 30000) { // 30 second cache
+            console.log(`📋 Using cached invite status for ${userEmail}`);
+            plexTags.forEach(serverGroup => {
+                this.displayInviteStatusForServer(serverGroup, cached.data, userEmail);
+            });
+            return;
+        }
+        
+        console.log(`🔍 Checking invite status for ${userEmail} on servers:`, plexTags);
+        
+        const response = await API.call(`/plex/invite-status/${encodeURIComponent(userEmail)}`);
+        
+        if (response.success) {
+            // Cache the result
+            if (!this.inviteStatusCache) {
+                this.inviteStatusCache = new Map();
+            }
+            this.inviteStatusCache.set(cacheKey, {
+                data: response,
+                timestamp: Date.now()
+            });
             
-            const response = await API.call(`/plex/invite-status/${encodeURIComponent(userEmail)}`);
-            
-            if (response.success) {
-                // Display invite status for each server group
-                plexTags.forEach(serverGroup => {
-                    this.displayInviteStatusForServer(serverGroup, response, userEmail);
-                });
-            } else {
-                console.warn(`⚠️ Could not check invite status:`, response.error);
+            // Clean old cache entries (keep cache size reasonable)
+            if (this.inviteStatusCache.size > 20) {
+                const oldestKey = this.inviteStatusCache.keys().next().value;
+                this.inviteStatusCache.delete(oldestKey);
             }
             
-        } catch (error) {
-            console.error('❌ Error checking invite status:', error);
+            // Display invite status for each server group
+            plexTags.forEach(serverGroup => {
+                this.displayInviteStatusForServer(serverGroup, response, userEmail);
+            });
+        } else {
+            console.warn(`⚠️ Could not check invite status:`, response.error);
         }
-    },
+        
+    } catch (error) {
+        console.error('❌ Error checking invite status:', error);
+    }
+},
+
+// New method: Enhance already-rendered table with invite status (non-blocking)
+async enhanceTableWithInviteStatus(plexUsers) {
+    try {
+        console.log('🔍 Enhancing table with invite status checks...');
+        
+        // Process users in small batches to avoid overwhelming the server
+        const batchSize = 3; // Check 3 users at a time
+        
+        for (let i = 0; i < plexUsers.length; i += batchSize) {
+            const batch = plexUsers.slice(i, i + batchSize);
+            
+            // Process batch in parallel
+            const statusPromises = batch.map(async (user) => {
+                try {
+                    const userEmail = user.plex_email || user.email;
+                    const plexTags = user.tags.filter(tag => tag.includes('Plex'));
+                    
+                    const response = await API.call(`/plex/invite-status/${encodeURIComponent(userEmail)}`);
+                    
+                    if (response.success) {
+                        // Update the table row with status indicators
+                        this.updateUserRowWithInviteStatus(user.id, response, plexTags);
+                    }
+                } catch (error) {
+                    console.warn(`⚠️ Could not check invite status for ${user.name}:`, error.message);
+                }
+            });
+            
+            await Promise.all(statusPromises);
+            
+            // Small delay between batches to be gentle on the server
+            if (i + batchSize < plexUsers.length) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+        
+        console.log('✅ Invite status enhancement completed');
+        
+    } catch (error) {
+        console.error('❌ Error enhancing table with invite status:', error);
+    }
+},
+
+// New method: Update specific user row with invite status
+updateUserRowWithInviteStatus(userId, inviteResponse, plexTags) {
+    const userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
+    if (!userRow) return;
+    
+    // Find the tags cell and add invite status indicators
+    const tagsCell = userRow.querySelector('.tags-cell');
+    if (!tagsCell) return;
+    
+    // Clear any existing status indicators
+    const existingStatus = tagsCell.querySelectorAll('.invite-status');
+    existingStatus.forEach(el => el.remove());
+    
+    // Add status indicators for each Plex server group
+    plexTags.forEach(serverTag => {
+        const serverGroup = serverTag === 'Plex 1' ? 'plex1' : 'plex2';
+        const serverData = inviteResponse.servers?.[serverGroup];
+        
+        if (serverData) {
+            const statusIndicator = this.createInviteStatusIndicator(serverData, serverGroup);
+            if (statusIndicator) {
+                tagsCell.appendChild(statusIndicator);
+            }
+        }
+    });
+},
+
+// Create compact status indicator for table
+createInviteStatusIndicator(serverData, serverGroup) {
+    let hasPendingInvites = false;
+    let hasAccess = false;
+    const pendingServers = [];
+    
+    for (const [serverType, serverInfo] of Object.entries(serverData)) {
+        if (serverInfo.status === 'pending') {
+            hasPendingInvites = true;
+            pendingServers.push(serverType);
+        } else if (serverInfo.status === 'accepted') {
+            hasAccess = true;
+        }
+    }
+    
+    if (!hasPendingInvites && !hasAccess) return null;
+    
+    const indicator = document.createElement('div');
+    indicator.className = 'invite-status';
+    indicator.style.cssText = 'font-size: 0.8em; margin-top: 4px; display: flex; align-items: center; gap: 4px;';
+    
+    if (hasPendingInvites) {
+        indicator.innerHTML = `
+            <i class="fas fa-clock" style="color: #ff9800; font-size: 0.9em;"></i>
+            <span style="color: #ff9800;">${serverGroup.toUpperCase()}: Pending</span>
+        `;
+    } else if (hasAccess) {
+        indicator.innerHTML = `
+            <i class="fas fa-check-circle" style="color: #4caf50; font-size: 0.9em;"></i>
+            <span style="color: #4caf50;">${serverGroup.toUpperCase()}: Active</span>
+        `;
+    }
+    
+    return indicator;
+},
 
     // Display invite status indicator for a specific server
     displayInviteStatusForServer(serverGroup, inviteResponse, userEmail) {
@@ -1129,7 +1211,7 @@ window.Users = {
             warningContent = `
                 <i class="fas fa-exclamation-triangle"></i>
                 <div>
-                    <strong>Partial Access:</strong> User has pending invites on ${pendingServers.join(', ')} server${pendingServers.length > 1 ? 's' : ''}.
+                    <strong>Partial Access:</strong> User has pending invites to Plex.
                     <br><small>Library changes will only affect servers where user has accepted invites.</small>
                 </div>
             `;
@@ -1138,7 +1220,7 @@ window.Users = {
             warningContent = `
                 <i class="fas fa-clock"></i>
                 <div>
-                    <strong>Pending Invites:</strong> User must accept invites on ${pendingServers.join(', ')} server${pendingServers.length > 1 ? 's' : ''} before library access will work.
+                    <strong>Pending Invites:</strong> User must accept invite from Plex before library access will work.
                     <br><small>Library selections below will take effect once invites are accepted.</small>
                 </div>
             `;

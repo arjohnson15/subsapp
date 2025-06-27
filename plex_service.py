@@ -809,11 +809,20 @@ def check_invite_status_all_servers(user_email):
                     invite = next((invite for invite in invitations if invite.email.lower() == user_email.lower()), None)
                     
                     if invite:
+                        # FIX: Properly handle invite_id to avoid NaN in JSON
+                        invite_id = getattr(invite, 'id', None)
+                        if invite_id is not None:
+                            try:
+                                # Ensure invite_id is a valid JSON-serializable value
+                                invite_id = str(invite_id) if invite_id != 'nan' else None
+                            except:
+                                invite_id = None
+                        
                         results[server_group_name][server_type] = {
                             "status": "pending",
                             "server": server_config['name'],
                             "email": user_email,
-                            "invite_id": getattr(invite, 'id', None)
+                            "invite_id": invite_id  # This will be None or a string, never NaN
                         }
                         log_info(f"Found pending invite for {user_email} on {server_config['name']}")
                     else:
