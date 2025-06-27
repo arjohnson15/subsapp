@@ -216,7 +216,7 @@ window.Users = {
         }
     },
     
-    renderUsersTable() {
+renderUsersTable() {
         const tbody = document.getElementById('usersTableBody');
         if (!tbody) return;
         
@@ -233,13 +233,14 @@ window.Users = {
                 <td>${user.email}</td>
                 <td>${user.owner_name || 'N/A'}</td>
                 <td>
-                    ${user.tags ? user.tags.map(tag => `<span class="tag tag-${tag.toLowerCase().replace(' ', '')}">${tag}</span>`).join('') : ''}
+                    ${user.tags && user.tags.length > 0 ? 
+                        user.tags.map(tag => `<span class="tag tag-${tag.toLowerCase().replace(' ', '')}">${tag}</span>`).join('') : ''}
                 </td>
                 <td style="color: ${user.plex_expiration === 'FREE' ? '#4fc3f7' : (user.plex_expiration ? Utils.isDateExpired(user.plex_expiration) ? '#f44336' : '#4caf50' : '#666')}">
-                    ${user.plex_expiration || 'No Subscription'}
+                    ${user.plex_expiration === 'FREE' ? 'FREE' : (user.plex_expiration ? Utils.formatDate(user.plex_expiration) : '')}
                 </td>
                 <td style="color: ${user.iptv_expiration === 'FREE' ? '#4fc3f7' : (user.iptv_expiration ? Utils.isDateExpired(user.iptv_expiration) ? '#f44336' : '#4caf50' : '#666')}">
-                    ${user.iptv_expiration || 'No Subscription'}
+                    ${user.iptv_expiration === 'FREE' ? 'FREE' : (user.iptv_expiration ? Utils.formatDate(user.iptv_expiration) : '')}
                 </td>
                 <td>
                     <button class="btn btn-small btn-view" onclick="Users.viewUser(${user.id})">View</button>
@@ -310,7 +311,7 @@ window.Users = {
     },
 
     // Update visual sort indicators in table headers
-    updateSortIndicators(activeField, direction) {
+     updateSortIndicators(activeField, direction) {
         // Reset all sort indicators
         const sortableFields = ['name', 'email', 'owner_name', 'plex_expiration', 'iptv_expiration'];
         
@@ -1067,8 +1068,6 @@ console.log('🔍 Processed subscription data:', {
     }
 };
 
-// FORM STATE FIXES - Global functions
-
 // Override the global showUserForm function to fix new user pre-population
 window.showUserForm = function() {
     console.log('🆕 Creating NEW user - clearing all state...');
@@ -1081,6 +1080,8 @@ window.showUserForm = function() {
     if (window.Users) {
         window.Users.originalLibraryBaseline = null;
         window.Users.originalTagsBaseline = null;
+        // Reset the Users module editing state as well
+        window.Users.resetFormState();
     }
     
     showPage('user-form');
@@ -1113,8 +1114,13 @@ window.showUserForm = function() {
         const deviceCount = document.getElementById('deviceCount');
         if (deviceCount) deviceCount.value = '1';
         
-        // Clear ALL checkboxes
+        // Clear ALL checkboxes - this is crucial
         document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.checked = false;
+        });
+        
+        // Clear all tag checkboxes specifically
+        document.querySelectorAll('input[name="tags"]').forEach(cb => {
             cb.checked = false;
         });
         
@@ -1131,6 +1137,13 @@ window.showUserForm = function() {
         ['plex1', 'plex2'].forEach(serverGroup => {
             document.querySelectorAll(`input[name="${serverGroup}_regular"]`).forEach(cb => cb.checked = false);
             document.querySelectorAll(`input[name="${serverGroup}_fourk"]`).forEach(cb => cb.checked = false);
+        });
+        
+        // Clear any select elements
+        document.querySelectorAll('select').forEach(select => {
+            if (select.id !== 'userOwner') { // Keep owner dropdown as is
+                select.selectedIndex = 0;
+            }
         });
         
         console.log('✅ Clean form initialized for new user');

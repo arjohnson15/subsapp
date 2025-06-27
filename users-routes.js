@@ -99,12 +99,12 @@ router.get('/', async (req, res) => {
         }
       });
 
-      // If no subscriptions found, set default values
+      // If no subscriptions found, leave as null (will display as empty in frontend)
       if (user.plex_expiration === null) {
-        user.plex_expiration = 'No Subscription';
+        user.plex_expiration = null;
       }
       if (user.iptv_expiration === null) {
-        user.iptv_expiration = 'No Subscription';
+        user.iptv_expiration = null;
       }
 
       return user;
@@ -172,12 +172,12 @@ router.get('/:id', async (req, res) => {
       }
     });
 
-    // If no subscriptions found, set default values
+    // If no subscriptions found, leave as null (will display as empty in frontend)
     if (user.plex_expiration === null) {
-      user.plex_expiration = 'No Subscription';
+      user.plex_expiration = null;
     }
     if (user.iptv_expiration === null) {
-      user.iptv_expiration = 'No Subscription';
+      user.iptv_expiration = null;
     }
 
     res.json(user);

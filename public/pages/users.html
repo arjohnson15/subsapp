@@ -1,8 +1,6 @@
-<!-- REPLACE the content of public/pages/users.html with this -->
-
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
     <h2 style="color: #4fc3f7;">Manage Users</h2>
-    <button class="btn" onclick="showPage('user-form')">Create New User</button>
+    <button class="btn" onclick="showUserForm()">Create New User</button>
 </div>
 
 <!-- Search and Filter Controls -->
@@ -34,20 +32,20 @@
         <thead>
             <tr>
                 <th onclick="Users.sortUsers('name')" style="cursor: pointer;">
-                    Name <span id="sort-name">▼</span>
+                    Name <span id="sort-name" style="color: #666;">v</span>
                 </th>
                 <th onclick="Users.sortUsers('email')" style="cursor: pointer;">
-                    Email <span id="sort-email">▼</span>
+                    Email <span id="sort-email" style="color: #666;">v</span>
                 </th>
                 <th onclick="Users.sortUsers('owner_name')" style="cursor: pointer;">
-                    Owner <span id="sort-owner_name">▼</span>
+                    Owner <span id="sort-owner_name" style="color: #666;">v</span>
                 </th>
                 <th>Tags</th>
                 <th onclick="Users.sortUsers('plex_expiration')" style="cursor: pointer;">
-                    Plex Expiration <span id="sort-plex_expiration">▼</span>
+                    Plex Expiration <span id="sort-plex_expiration" style="color: #666;">v</span>
                 </th>
                 <th onclick="Users.sortUsers('iptv_expiration')" style="cursor: pointer;">
-                    IPTV Expiration <span id="sort-iptv_expiration">▼</span>
+                    IPTV Expiration <span id="sort-iptv_expiration" style="color: #666;">v</span>
                 </th>
                 <th>Actions</th>
             </tr>
