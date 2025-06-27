@@ -24,7 +24,7 @@ router.get('/libraries/:serverGroup', async (req, res) => {
 router.get('/user-access/:email', async (req, res) => {
   try {
     const { email } = req.params;
-    console.log(`🔍 API: Getting access for ${email}`);
+    console.log(`?? API: Getting access for ${email}`);
     
     const access = await plexService.getUserCurrentAccess(email);
     res.json(access);
@@ -45,16 +45,16 @@ router.post('/share-user-libraries', async (req, res) => {
       });
     }
     
-    console.log(`🔧 API: Enhanced sharing for ${userEmail} (new user: ${isNewUser})`);
-    console.log(`📋 Requested libraries:`, plexLibraries);
+    console.log(`?? API: Enhanced sharing for ${userEmail} (new user: ${isNewUser})`);
+    console.log(`?? Requested libraries:`, plexLibraries);
     
     let currentAccess = {};
     
     // For existing users, get their current access first
     if (!isNewUser) {
-      console.log(`🔍 Getting current access for existing user...`);
+      console.log(`?? Getting current access for existing user...`);
       currentAccess = await plexService.getUserCurrentAccess(userEmail);
-      console.log(`📊 Current access:`, currentAccess);
+      console.log(`?? Current access:`, currentAccess);
     }
     
     const results = {};
@@ -65,7 +65,7 @@ router.post('/share-user-libraries', async (req, res) => {
     // Process each server group in the request
     for (const [serverGroup, libraries] of Object.entries(plexLibraries)) {
       if (!['plex1', 'plex2'].includes(serverGroup)) {
-        console.log(`⚠️ Skipping invalid server group: ${serverGroup}`);
+        console.log(`?? Skipping invalid server group: ${serverGroup}`);
         continue;
       }
       
@@ -74,7 +74,7 @@ router.post('/share-user-libraries', async (req, res) => {
                           (libraries.fourk && libraries.fourk.length > 0);
       
       if (!hasLibraries) {
-        console.log(`ℹ️ No libraries specified for ${serverGroup}, clearing access`);
+        console.log(`?? No libraries specified for ${serverGroup}, clearing access`);
         
         // Clear access if user currently has any
         const currentGroupAccess = currentAccess[serverGroup];
@@ -108,14 +108,14 @@ router.post('/share-user-libraries', async (req, res) => {
       
       try {
         // Use enhanced sharing with real API calls
-        console.log(`🤝 Processing ${serverGroup} with enhanced sharing...`);
+        console.log(`?? Processing ${serverGroup} with enhanced sharing...`);
         const result = await plexService.shareLibrariesWithUserEnhanced(userEmail, serverGroup, libraries);
         results[serverGroup] = result;
         
         if (!result.success) {
           errors.push(`${serverGroup}: ${result.error}`);
         } else {
-          console.log(`✅ ${serverGroup} sharing completed successfully`);
+          console.log(`? ${serverGroup} sharing completed successfully`);
           
           // Count actual changes made
           const changes = result.changes || 0;
@@ -123,13 +123,13 @@ router.post('/share-user-libraries', async (req, res) => {
           
           if (changes > 0) {
             actualApiCalls += changes;
-            console.log(`   🔄 Made ${changes} API calls to Plex servers`);
+            console.log(`   ?? Made ${changes} API calls to Plex servers`);
           } else {
-            console.log(`   ℹ️ No changes needed - user already has correct access`);
+            console.log(`   ?? No changes needed - user already has correct access`);
           }
         }
       } catch (error) {
-        console.error(`❌ Error sharing ${serverGroup}:`, error);
+        console.error(`? Error sharing ${serverGroup}:`, error);
         results[serverGroup] = { success: false, error: error.message, changes: 0 };
         errors.push(`${serverGroup}: ${error.message}`);
       }
@@ -159,10 +159,10 @@ router.post('/share-user-libraries', async (req, res) => {
       message += ` (${messageDetails.join(', ')})`;
     }
     
-    console.log(`📊 Overall result: ${overallSuccess ? 'SUCCESS' : 'PARTIAL FAILURE'}`);
-    console.log(`📊 Total changes detected: ${totalChanges}`);
-    console.log(`📊 Actual Plex API calls made: ${actualApiCalls}`);
-    console.log(`📋 Results:`, results);
+    console.log(`?? Overall result: ${overallSuccess ? 'SUCCESS' : 'PARTIAL FAILURE'}`);
+    console.log(`?? Total changes detected: ${totalChanges}`);
+    console.log(`?? Actual Plex API calls made: ${actualApiCalls}`);
+    console.log(`?? Results:`, results);
     
     res.json({
       success: overallSuccess,
@@ -177,7 +177,7 @@ router.post('/share-user-libraries', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Error in comprehensive sharing:', error);
+    console.error('? Error in comprehensive sharing:', error);
     res.status(500).json({ error: 'Failed to share user libraries' });
   }
 });
@@ -195,7 +195,7 @@ router.post('/share', async (req, res) => {
       return res.status(400).json({ error: 'Invalid server group. Use plex1 or plex2' });
     }
     
-    console.log(`🤝 API: Legacy sharing request for ${userEmail} on ${serverGroup}`);
+    console.log(`?? API: Legacy sharing request for ${userEmail} on ${serverGroup}`);
     
     const result = await plexService.shareLibrariesWithUserEnhanced(userEmail, serverGroup, libraries);
     
@@ -219,7 +219,7 @@ router.post('/remove-access', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields: userEmail, serverGroups (array)' });
     }
     
-    console.log(`🗑️ API: Remove access request for ${userEmail} from:`, serverGroups);
+    console.log(`??? API: Remove access request for ${userEmail} from:`, serverGroups);
     
     const result = await plexService.removeUserAccess(userEmail, serverGroups);
     
@@ -258,7 +258,7 @@ router.post('/test/:serverGroup', async (req, res) => {
 // Manually trigger library sync
 router.post('/sync', async (req, res) => {
   try {
-    console.log('🔄 API: Manual library sync triggered');
+    console.log('?? API: Manual library sync triggered');
     const result = await plexService.syncAllLibraries();
     
     if (result.success) {
@@ -307,7 +307,7 @@ router.get('/servers', async (req, res) => {
 router.get('/debug/user/:email', async (req, res) => {
   try {
     const { email } = req.params;
-    console.log(`🐛 DEBUG: Enhanced check for ${email}`);
+    console.log(`?? DEBUG: Enhanced check for ${email}`);
     
     const serverConfigs = plexService.getServerConfig();
     const debugInfo = {};
@@ -317,7 +317,7 @@ router.get('/debug/user/:email', async (req, res) => {
       debugInfo[groupName] = {};
       
       try {
-        console.log(`🔍 Checking ${groupName} servers for ${email}...`);
+        console.log(`?? Checking ${groupName} servers for ${email}...`);
         
         // Check regular server
         const regularUsers = await plexService.getAllSharedUsersFromServer(groupConfig.regular);
@@ -399,19 +399,19 @@ router.post('/debug/test-update/:email', async (req, res) => {
       });
     }
     
-    console.log(`🧪 DEBUG: Testing library update for ${email} on ${serverGroup}`);
-    console.log(`📋 Test libraries:`, libraries);
+    console.log(`?? DEBUG: Testing library update for ${email} on ${serverGroup}`);
+    console.log(`?? Test libraries:`, libraries);
     
     // Get current access first
     const currentAccess = await plexService.getUserCurrentAccess(email);
-    console.log(`📊 Current access:`, currentAccess);
+    console.log(`?? Current access:`, currentAccess);
     
     // Perform the update
     const result = await plexService.shareLibrariesWithUserEnhanced(email, serverGroup, libraries);
     
     // Get new access after update
     const newAccess = await plexService.getUserCurrentAccess(email);
-    console.log(`📊 New access:`, newAccess);
+    console.log(`?? New access:`, newAccess);
     
     res.json({
       email: email,
@@ -439,9 +439,9 @@ router.get('/invite-status/:userEmail', async (req, res) => {
       return res.status(400).json({ error: 'Missing userEmail parameter' });
     }
     
-    console.log(`🔍 API: Checking invite status for ${userEmail}`);
+    console.log(`?? API: Checking invite status for ${userEmail}`);
     
-    const pythonPlexService = require('../python-plex-wrapper');
+    const pythonPlexService = require('./python-plex-wrapper');
     const result = await pythonPlexService.checkInviteStatus(userEmail);
     
     if (result.success) {
@@ -464,14 +464,14 @@ router.post('/remove-access-enhanced', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields: userEmail, serverGroups (array)' });
     }
     
-    console.log(`🗑️ API: Enhanced removal for ${userEmail} from:`, serverGroups);
+    console.log(`??? API: Enhanced removal for ${userEmail} from:`, serverGroups);
     
-    const pythonPlexService = require('../python-plex-wrapper');
-    const plexService = require('../plex-service');
+    const pythonPlexService = require('./python-plex-wrapper');
+    const plexService = require('./plex-service');
     
     // First check current invite status
     const inviteStatus = await pythonPlexService.checkInviteStatus(userEmail);
-    console.log(`🔍 Current invite status:`, inviteStatus);
+    console.log(`?? Current invite status:`, inviteStatus);
     
     // Use enhanced complete removal
     const result = await pythonPlexService.removeUserCompletely(userEmail, serverGroups);
@@ -481,7 +481,7 @@ router.post('/remove-access-enhanced', async (req, res) => {
       const emptyAccess = { plex1: { regular: [], fourk: [] }, plex2: { regular: [], fourk: [] } };
       await plexService.updateUserLibraryAccessInDatabase(userEmail, emptyAccess);
       
-      console.log(`✅ Enhanced removal completed:`, result.summary);
+      console.log(`? Enhanced removal completed:`, result.summary);
       
       res.json({
         ...result,
@@ -510,10 +510,10 @@ router.get('/user-access-with-status/:userEmail', async (req, res) => {
       return res.status(400).json({ error: 'Missing userEmail parameter' });
     }
     
-    console.log(`📋 API: Getting access and invite status for ${userEmail}`);
+    console.log(`?? API: Getting access and invite status for ${userEmail}`);
     
-    const pythonPlexService = require('../python-plex-wrapper');
-    const plexService = require('../plex-service');
+    const pythonPlexService = require('./python-plex-wrapper');
+    const plexService = require('./plex-service');
     
     // Get current access
     const currentAccess = await plexService.getUserCurrentAccess(userEmail);

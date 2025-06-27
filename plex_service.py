@@ -554,11 +554,15 @@ def check_invite_status_all_servers(user_email):
                     invite = next((invite for invite in invitations if invite.email.lower() == user_email.lower()), None)
                     
                     if invite:
+                        invite_id = getattr(invite, 'id', None)
+                        if invite_id is None or str(invite_id) == 'nan':
+                            invite_id = None
+                        
                         results[server_group_name][server_type] = {
                             "status": "pending",
                             "server": server_config['name'],
                             "email": user_email,
-                            "invite_id": getattr(invite, 'id', None)
+                            "invite_id": invite_id
                         }
                         log_info(f"Found pending invite for {user_email} on {server_config['name']}")
                     else:

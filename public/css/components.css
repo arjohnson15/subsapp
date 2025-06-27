@@ -537,3 +537,209 @@ th.sortable .sort-arrow {
     background: linear-gradient(45deg, #ff9800, #ffb74d);
     /* ... rest of CSS ... */
 }
+
+/* CSS additions for invite status indicators - Add these to components.css */
+
+/* Invite Status Indicators */
+.invite-pending-indicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+    animation: pulse-orange 2s infinite;
+}
+
+@keyframes pulse-orange {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+.invite-warning {
+    background: linear-gradient(45deg, #ff9800, #ffb74d);
+    color: white;
+    padding: 12px;
+    border-radius: 6px;
+    margin: 10px 0;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    animation: pulse 2s infinite;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    border-left: 4px solid #ff6f00;
+}
+
+.invite-warning i {
+    font-size: 1.1em;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.invite-warning strong {
+    color: #fff;
+}
+
+.invite-warning small {
+    opacity: 0.9;
+    display: block;
+    margin-top: 4px;
+}
+
+/* Enhanced connection status containers */
+.connection-status {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    min-height: 40px;
+    justify-content: center;
+}
+
+/* Invite status in user modal */
+.info-item.invite-status-warning {
+    background: rgba(255, 152, 0, 0.1);
+    border: 1px solid rgba(255, 152, 0, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 8px 0;
+}
+
+.info-item.invite-status-success {
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 8px 0;
+}
+
+/* Enhanced tag styling with status indicators */
+.tag {
+    display: inline-flex;
+    align-items: center;
+    background: linear-gradient(45deg, #8e24aa, #3f51b5);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    margin: 2px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.tag.tag-plex1 {
+    background: linear-gradient(45deg, #ff9800, #ffc107);
+}
+
+.tag.tag-plex2 {
+    background: linear-gradient(45deg, #2196f3, #03a9f4);
+}
+
+.tag.tag-iptv {
+    background: linear-gradient(45deg, #4caf50, #8bc34a);
+}
+
+/* Partial access status styling */
+.connection-status div:first-child {
+    font-weight: bold;
+}
+
+.connection-status div:not(:first-child) {
+    font-size: 0.85em;
+    opacity: 0.9;
+}
+
+/* Status icons */
+.connection-status i {
+    margin-right: 4px;
+}
+
+/* Loading state for invite status checks */
+.invite-status-loading {
+    display: inline-flex;
+    align-items: center;
+    color: #4fc3f7;
+    font-size: 0.8em;
+    margin-left: 4px;
+}
+
+.invite-status-loading i {
+    animation: spin 1s linear infinite;
+    margin-right: 4px;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Enhanced user table styling for invite status */
+#usersTable td:nth-child(4) {
+    /* Tags column - ensure adequate space for status indicators */
+    min-width: 120px;
+}
+
+/* Responsive adjustments for invite status */
+@media (max-width: 768px) {
+    .connection-status {
+        font-size: 0.8rem;
+        padding: 6px;
+    }
+    
+    .invite-warning {
+        font-size: 0.8rem;
+        padding: 10px;
+    }
+    
+    .tag {
+        font-size: 0.7rem;
+        padding: 3px 6px;
+    }
+    
+    .invite-pending-indicator i {
+        font-size: 0.7em;
+    }
+}
+
+/* Enhanced info item styling for user modal */
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    font-weight: bold;
+    color: #4fc3f7;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.info-value {
+    text-align: right;
+    flex: 1;
+    margin-left: 20px;
+}
+
+/* Special styling for invite status info items */
+.info-item.invite-status-warning .info-value,
+.info-item.invite-status-success .info-value {
+    text-align: left;
+    margin-left: 0;
+}
+
+/* Pulsing animation for pending statuses */
+@keyframes pulse {
+    0% { box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    50% { box-shadow: 0 4px 16px rgba(255, 152, 0, 0.4); }
+    100% { box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+}

@@ -217,17 +217,99 @@ window.Users = {
         }
     },
     
-    renderUsersTable() {
+// Enhanced renderUsersTable with invite status checking
+    async renderUsersTable() {
         const tbody = document.getElementById('usersTableBody');
         if (!tbody) return;
-        
+
         const users = window.AppState.users;
         
         if (users.length === 0) {
             tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No users found</td></tr>';
             return;
         }
+
+        // Check if we should use enhanced rendering (with invite status)
+        const shouldCheckInviteStatus = users.some(user => 
+            user.tags && user.tags.some(tag => tag.includes('Plex')) && (user.plex_email || user.email)
+        );
         
+        if (shouldCheckInviteStatus) {
+            console.log('🔍 Rendering users table with invite status checks...');
+            await this.renderUsersTableWithInviteStatus();
+        } else {
+            console.log('📋 Rendering users table (no Plex users to check)...');
+            this.renderUsersTableBasic();
+        }
+    },
+
+    // New method: Enhanced rendering with invite status
+    async renderUsersTableWithInviteStatus() {
+        const tbody = document.getElementById('usersTableBody');
+        if (!tbody) return;
+
+        const users = window.AppState.users;
+
+        // Check invite status for users with Plex tags
+        const usersWithInviteStatus = await Promise.all(users.map(async (user) => {
+            // Clone user object to avoid modifying original
+            const userWithStatus = { ...user };
+            
+            // Check if user has Plex tags and plex_email
+            const plexTags = user.tags ? user.tags.filter(tag => tag.includes('Plex')) : [];
+            if (plexTags.length > 0 && (user.plex_email || user.email)) {
+                try {
+                    const email = user.plex_email || user.email;
+                    const response = await API.call(`/plex/invite-status/${encodeURIComponent(email)}`);
+                    
+                    if (response.success && response.summary) {
+                        userWithStatus.inviteStatus = response.summary;
+                        userWithStatus.hasPendingInvites = response.summary.has_pending_invites;
+                        userWithStatus.pendingServers = response.summary.pending_servers || [];
+                    }
+                } catch (error) {
+                    console.warn(`Could not check invite status for ${user.name}:`, error);
+                    userWithStatus.inviteStatus = null;
+                    userWithStatus.hasPendingInvites = false;
+                }
+            } else {
+                userWithStatus.hasPendingInvites = false;
+            }
+            
+            return userWithStatus;
+        }));
+
+        tbody.innerHTML = usersWithInviteStatus.map(user => `
+            <tr>
+                <td>${user.name}</td>
+                <td>${user.email}</td>
+                <td>${user.owner_name || 'N/A'}</td>
+                <td>
+                    ${this.renderTagsWithInviteStatus(user)}
+                </td>
+                <td style="color: ${user.plex_expiration === 'FREE' ? '#4fc3f7' : (user.plex_expiration ? Utils.isDateExpired(user.plex_expiration) ? '#f44336' : '#4caf50' : '#666')}">
+                    ${user.plex_expiration === 'FREE' ? 'FREE' : (user.plex_expiration ? Utils.formatDate(user.plex_expiration) : '')}
+                </td>
+                <td style="color: ${user.iptv_expiration === 'FREE' ? '#4fc3f7' : (user.iptv_expiration ? Utils.isDateExpired(user.iptv_expiration) ? '#f44336' : '#4caf50' : '#666')}">
+                    ${user.iptv_expiration === 'FREE' ? 'FREE' : (user.iptv_expiration ? Utils.formatDate(user.iptv_expiration) : '')}
+                </td>
+                <td>
+                    <button class="btn btn-small btn-view" onclick="Users.viewUser(${user.id})">View</button>
+                    <button class="btn btn-small btn-edit" onclick="Users.editUser(${user.id})">Edit</button>
+                    <button class="btn btn-small btn-email" onclick="Users.emailUser('${user.name}', '${user.email}')">Email</button>
+                    <button class="btn btn-small btn-delete" onclick="Users.deleteUser(${user.id})">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    },
+
+    // New method: Basic rendering without invite status (for performance when not needed)
+    renderUsersTableBasic() {
+        const tbody = document.getElementById('usersTableBody');
+        if (!tbody) return;
+
+        const users = window.AppState.users;
+
         tbody.innerHTML = users.map(user => `
             <tr>
                 <td>${user.name}</td>
@@ -251,6 +333,31 @@ window.Users = {
                 </td>
             </tr>
         `).join('');
+    },
+
+    // New method: Enhanced tag rendering with invite status indicators
+    renderTagsWithInviteStatus(user) {
+        if (!user.tags || user.tags.length === 0) {
+            return '';
+        }
+        
+        return user.tags.map(tag => {
+            let tagHtml = `<span class="tag tag-${tag.toLowerCase().replace(' ', '')}">${tag}</span>`;
+            
+            // Add pending invite indicator for Plex tags
+            if (tag.includes('Plex') && user.hasPendingInvites) {
+                const serverGroup = tag === 'Plex 1' ? 'plex1' : 'plex2';
+                const hasPendingForThisServer = user.pendingServers.some(server => server.includes(serverGroup));
+                
+                if (hasPendingForThisServer) {
+                    tagHtml += `<span class="invite-pending-indicator" title="Pending invite acceptance">
+                        <i class="fas fa-clock" style="color: #ff9800; margin-left: 4px; font-size: 0.8em;"></i>
+                    </span>`;
+                }
+            }
+            
+            return tagHtml;
+        }).join('');
     },
     
     filterUsers() {
@@ -910,6 +1017,150 @@ window.Users = {
         if (statusContainer && statusContainer.parentNode) {
             statusContainer.parentNode.insertBefore(warningDiv, statusContainer.nextSibling);
         }
+    },
+	
+	// Enhanced displayInviteStatusForServer to show more detailed status
+    displayInviteStatusForServer(serverGroup, inviteResponse, userEmail) {
+        const serverData = inviteResponse.servers?.[serverGroup];
+        if (!serverData) return;
+        
+        const statusContainer = document.getElementById(`${serverGroup}Status`);
+        if (!statusContainer) return;
+        
+        let hasPendingInvites = false;
+        let hasAccess = false;
+        let hasPartialAccess = false;
+        const pendingServers = [];
+        const accessServers = [];
+        
+        // Check both regular and 4K servers
+        for (const [serverType, serverInfo] of Object.entries(serverData)) {
+            if (serverInfo.status === 'pending') {
+                hasPendingInvites = true;
+                pendingServers.push(serverType);
+            } else if (serverInfo.status === 'accepted') {
+                hasAccess = true;
+                accessServers.push(serverType);
+            }
+        }
+        
+        // Determine if user has partial access (some servers accepted, some pending)
+        hasPartialAccess = hasAccess && hasPendingInvites;
+        
+        // Create enhanced status indicator
+        let statusHtml = '';
+        let statusClass = 'connection-status';
+        
+        if (hasPartialAccess) {
+            statusHtml = `
+                <div class="${statusClass}" style="color: #ff9800; display: flex; flex-direction: column; gap: 4px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-exclamation-triangle" style="color: #ff9800;"></i>
+                        <span>Partial Access</span>
+                    </div>
+                    <div style="font-size: 0.8em; color: #ffb74d;">
+                        ✓ Access: ${accessServers.join(', ')}
+                    </div>
+                    <div style="font-size: 0.8em; color: #ff9800;">
+                        ⏳ Pending: ${pendingServers.join(', ')}
+                    </div>
+                </div>
+            `;
+            
+            // Add warning to library sections
+            this.addInviteWarningToLibrariesEnhanced(serverGroup, pendingServers, 'partial');
+            
+        } else if (hasPendingInvites) {
+            statusHtml = `
+                <div class="${statusClass}" style="color: #ff9800; display: flex; flex-direction: column; gap: 4px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-clock" style="color: #ff9800;"></i>
+                        <span>Pending Invite Acceptance</span>
+                    </div>
+                    <div style="font-size: 0.8em; color: #ffb74d;">
+                        User needs to accept invites for: ${pendingServers.join(', ')}
+                    </div>
+                </div>
+            `;
+            
+            // Add warning to library sections
+            this.addInviteWarningToLibrariesEnhanced(serverGroup, pendingServers, 'full_pending');
+            
+        } else if (hasAccess) {
+            statusHtml = `
+                <div class="${statusClass}" style="color: #4caf50; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-check-circle" style="color: #4caf50;"></i>
+                    <span>Access Granted</span>
+                    <small style="color: #81c784;">(${accessServers.join(', ')})</small>
+                </div>
+            `;
+        } else {
+            statusHtml = `
+                <div class="${statusClass}" style="color: #9e9e9e; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-user-slash" style="color: #9e9e9e;"></i>
+                    <span>No Access</span>
+                </div>
+            `;
+        }
+        
+        statusContainer.innerHTML = statusHtml;
+        
+        console.log(`📊 ${serverGroup} status: pending=${hasPendingInvites}, access=${hasAccess}, partial=${hasPartialAccess}`);
+    },
+
+    // Enhanced warning message for library sections with different types
+    addInviteWarningToLibrariesEnhanced(serverGroup, pendingServers, warningType = 'full_pending') {
+        const libraryGroup = document.getElementById(`${serverGroup}LibraryGroup`);
+        if (!libraryGroup) return;
+        
+        // Remove existing warning
+        const existingWarning = libraryGroup.querySelector('.invite-warning');
+        if (existingWarning) existingWarning.remove();
+        
+        // Create appropriate warning based on type
+        const warningDiv = document.createElement('div');
+        warningDiv.className = 'invite-warning';
+        
+        let warningContent = '';
+        let backgroundColor = '';
+        
+        if (warningType === 'partial') {
+            backgroundColor = 'linear-gradient(45deg, #ff9800, #ffb74d)';
+            warningContent = `
+                <i class="fas fa-exclamation-triangle"></i>
+                <div>
+                    <strong>Partial Access:</strong> User has pending invites on ${pendingServers.join(', ')} server${pendingServers.length > 1 ? 's' : ''}.
+                    <br><small>Library changes will only affect servers where user has accepted invites.</small>
+                </div>
+            `;
+        } else {
+            backgroundColor = 'linear-gradient(45deg, #f44336, #ff6b6b)';
+            warningContent = `
+                <i class="fas fa-clock"></i>
+                <div>
+                    <strong>Pending Invites:</strong> User must accept invites on ${pendingServers.join(', ')} server${pendingServers.length > 1 ? 's' : ''} before library access will work.
+                    <br><small>Library selections below will take effect once invites are accepted.</small>
+                </div>
+            `;
+        }
+        
+        warningDiv.style.cssText = `
+            background: ${backgroundColor};
+            color: white;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            animation: pulse 2s infinite;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        `;
+        warningDiv.innerHTML = warningContent;
+        
+        // Insert warning at the top of the library group
+        libraryGroup.insertBefore(warningDiv, libraryGroup.firstChild);
     },
 
     // Enhanced remove all Plex access for current user
