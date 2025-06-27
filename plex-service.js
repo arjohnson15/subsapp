@@ -195,47 +195,53 @@ class PlexService {
   }
 
   // Get user's current access across all servers (kept - reading only)
-  async getUserCurrentAccess(userEmail) {
-    try {
-      console.log(`🔍 Getting current access for user: ${userEmail}`);
+async getUserCurrentAccess(userEmail) {
+  try {
+    console.log(`🔍 Getting current access for user: ${userEmail}`);
+    
+    const serverConfigs = this.getServerConfig();
+    const access = {};
+    
+    for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
+      // Get ALL shared users from regular server and find our user
+      const regularSharedUsers = await this.getAllSharedUsersFromServer(groupConfig.regular);
+      const regularUserAccess = regularSharedUsers.find(user => user.email.toLowerCase() === userEmail.toLowerCase());
       
-      const serverConfigs = this.getServerConfig();
-      const access = {};
+      // CRITICAL FIX: Sort the library IDs to ensure consistent comparison
+      const regularLibraryIds = regularUserAccess 
+        ? regularUserAccess.libraries.map(lib => lib.id).sort()  // Added .sort()
+        : [];
       
-      for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
-        // Get ALL shared users from regular server and find our user
-        const regularSharedUsers = await this.getAllSharedUsersFromServer(groupConfig.regular);
-        const regularUserAccess = regularSharedUsers.find(user => user.email.toLowerCase() === userEmail.toLowerCase());
-        const regularLibraryIds = regularUserAccess ? regularUserAccess.libraries.map(lib => lib.id) : [];
+      // Get ALL shared users from 4K server and find our user
+      let fourkLibraryIds = [];
+      try {
+        const fourkSharedUsers = await this.getAllSharedUsersFromServer(groupConfig.fourk);
+        const fourkUserAccess = fourkSharedUsers.find(user => user.email.toLowerCase() === userEmail.toLowerCase());
         
-        // Get ALL shared users from 4K server and find our user
-        let fourkLibraryIds = [];
-        try {
-          const fourkSharedUsers = await this.getAllSharedUsersFromServer(groupConfig.fourk);
-          const fourkUserAccess = fourkSharedUsers.find(user => user.email.toLowerCase() === userEmail.toLowerCase());
-          
-          // If user has any access to 4K server, give them the hardcoded libraries
-          if (fourkUserAccess && fourkUserAccess.libraries.length > 0) {
-            fourkLibraryIds = groupConfig.fourk.libraries.map(lib => lib.id);
-          }
-        } catch (error) {
-          // No 4K access - this is normal, don't log error
+        // If user has any access to 4K server, give them the hardcoded libraries
+        if (fourkUserAccess && fourkUserAccess.libraries.length > 0) {
+          // CRITICAL FIX: Sort the 4K library IDs too
+          fourkLibraryIds = groupConfig.fourk.libraries.map(lib => lib.id).sort();  // Added .sort()
         }
-        
-        access[groupName] = {
-          regular: regularLibraryIds,
-          fourk: fourkLibraryIds
-        };
-        
-        console.log(`📊 ${groupName} access for ${userEmail}: ${regularLibraryIds.length} regular + ${fourkLibraryIds.length} 4K libraries`);
+      } catch (error) {
+        // No 4K access - this is normal, don't log error
       }
       
-      return access;
-    } catch (error) {
-      console.error('❌ Error getting user current access:', error);
-      return {};
+      access[groupName] = {
+        regular: regularLibraryIds,  // Now sorted
+        fourk: fourkLibraryIds       // Now sorted
+      };
+      
+      console.log(`📊 ${groupName} access for ${userEmail}: ${regularLibraryIds.length} regular + ${fourkLibraryIds.length} 4K libraries`);
     }
+    
+    console.log(`📋 Current access (sorted):`, access);
+    return access;
+  } catch (error) {
+    console.error('❌ Error getting user current access:', error);
+    return {};
   }
+}
 
   // REPLACED: Enhanced sharing method now uses Python
   async shareLibrariesWithUserEnhanced(userEmail, serverGroup, newLibraries) {
@@ -333,15 +339,13 @@ async updateUserLibraryAccessInDatabase(userEmail, libraryAccess) {
         WHERE id = ?
       `, [JSON.stringify(sortedLibraryAccess), user.id]);
       
-      console.log(`✅ Database updated for user: ${user.name} (ID: ${user.id})`);
-      console.log(`📊 Stored sorted access: ${JSON.stringify(sortedLibraryAccess)}`);
-      return true;
+      console.log(`✅ Database updated for user: ${user.name}`);
     } else {
       console.log(`⚠️ User not found in database: ${userEmail}`);
-      return false;
     }
+    
   } catch (error) {
-    console.error(`❌ Error updating database:`, error);
+    console.error('❌ Error updating user library access in database:', error);
     throw error;
   }
 }

@@ -1,4 +1,4 @@
-// Enhanced User Management Functions with Background Task System
+// Enhanced User Management Functions with Background Task System and Fixed Baseline Updates
 
 window.Users = {
     currentSortField: 'name',
@@ -70,6 +70,7 @@ window.Users = {
         }
     },
     
+    // FIXED: Updated handleTaskCompletion with baseline update
     handleTaskCompletion(taskId, task, result) {
         console.log(`✅ Background task completed: ${taskId}`, result);
         
@@ -85,6 +86,11 @@ window.Users = {
         // Hide any loading indicators
         Utils.hideLoading();
         
+        // CRITICAL FIX: Update user baselines after successful Plex operations
+        if (task.type === 'plex_update' && result.data && result.data.success) {
+            this.updateUserBaselinesAfterPlexOperation(task.data);
+        }
+        
         // Refresh users list if it was a user operation
         if (task.type === 'plex_update') {
             this.loadUsers();
@@ -98,6 +104,81 @@ window.Users = {
         Utils.showNotification(message, 'error');
         
         Utils.hideLoading();
+    },
+    
+    // NEW: Update user baselines after successful Plex operations
+    async updateUserBaselinesAfterPlexOperation(taskData) {
+        try {
+            console.log('🔄 Updating user baselines after successful Plex operation...');
+            
+            if (!taskData || !taskData.userEmail) {
+                console.log('⚠️ No task data available for baseline update');
+                return;
+            }
+            
+            // Find the user by email to get their current state from database
+            const users = window.AppState.users || [];
+            const user = users.find(u => u.plex_email === taskData.userEmail);
+            
+            if (!user) {
+                console.log('⚠️ User not found for baseline update');
+                return;
+            }
+            
+            // CRITICAL: If this user is currently being edited, update their baselines
+            if (window.AppState.editingUserId && 
+                window.AppState.editingUserId == user.id && 
+                window.AppState.currentUserData) {
+                
+                console.log(`📋 Updating baselines for currently edited user: ${user.name}`);
+                
+                // Update the current user data with fresh info from database
+                const freshUserData = await API.User.getById(user.id);
+                window.AppState.currentUserData = freshUserData;
+                
+                // Update baselines to reflect the NEW current state after Plex operations
+                this.originalLibraryBaseline = this.deepClone(freshUserData.plex_libraries || {});
+                this.originalTagsBaseline = [...(freshUserData.tags || [])];
+                
+                console.log('✅ Updated library baseline:', this.originalLibraryBaseline);
+                console.log('✅ Updated tags baseline:', this.originalTagsBaseline);
+                
+            } else {
+                console.log('💡 User not currently being edited - no baseline update needed');
+            }
+            
+        } catch (error) {
+            console.error('❌ Error updating user baselines:', error);
+            // Don't throw - this is not critical enough to break the flow
+        }
+    },
+    
+    // NEW: Reload user data with fresh baselines for editing
+    async reloadUserDataForEditing(userId) {
+        try {
+            console.log(`🔄 Reloading fresh user data for editing user ${userId}...`);
+            
+            // Always get fresh data from database
+            const freshUser = await API.User.getById(userId);
+            
+            // Update global state
+            window.AppState.currentUserData = freshUser;
+            
+            // Set NEW baselines based on current database state
+            this.originalLibraryBaseline = this.deepClone(freshUser.plex_libraries || {});
+            this.originalTagsBaseline = [...(freshUser.tags || [])];
+            
+            console.log('✅ Fresh baselines set:', {
+                libraries: this.originalLibraryBaseline,
+                tags: this.originalTagsBaseline
+            });
+            
+            return freshUser;
+            
+        } catch (error) {
+            console.error('❌ Error reloading user data:', error);
+            throw error;
+        }
     },
     
     createBackgroundTask(type, description, data = {}) {
@@ -316,27 +397,16 @@ window.Users = {
         }
     },
     
+    // UPDATED: Use new baseline reloader for editing
     async editUser(userId) {
         try {
             console.log(`📝 Starting edit for user ID: ${userId}`);
             
-            // Set editing state FIRST
+            // Set editing state
             window.AppState.editingUserId = userId;
             
-            // Load the user data
-            const user = await API.User.getById(userId);
-            console.log(`📊 Loaded user for editing:`, user);
-            
-            // Store user data globally
-            window.AppState.currentUserData = user;
-            
-            // CRITICAL: Store baseline library state for change detection
-            this.originalLibraryBaseline = this.deepClone(user.plex_libraries || {});
-            console.log('📋 Stored original library baseline:', this.originalLibraryBaseline);
-
-            // Also store original tags for comparison
-            this.originalTagsBaseline = [...(user.tags || [])];
-            console.log('🏷️ Stored original tags baseline:', this.originalTagsBaseline);
+            // Use our new baseline reloader
+            const user = await this.reloadUserDataForEditing(userId);
             
             // Navigate to user form
             await showPage('user-form');
@@ -375,193 +445,192 @@ window.Users = {
         }
     },
     
-// REPLACE the saveUser function in your users.js with this fixed version
-
-async saveUser(event) {
-    event.preventDefault();
-    console.log('🎯 Form submission triggered - starting save process');
-    
-    try {
-        console.log('💾 Starting optimized user save with smart change detection...');
+    // Enhanced saveUser function with smart change detection and baseline management
+    async saveUser(event) {
+        event.preventDefault();
+        console.log('🎯 Form submission triggered - starting save process');
         
-        // Collect form data properly
-        const formData = new FormData(event.target);
-        const userData = {};
-
-        // Collect text inputs
-        userData.name = formData.get('name');
-        userData.email = formData.get('email');
-        userData.owner_id = formData.get('owner_id') || null;
-        userData.plex_email = formData.get('plex_email');
-        userData.iptv_username = formData.get('iptv_username');
-        userData.iptv_password = formData.get('iptv_password');
-        userData.implayer_code = formData.get('implayer_code');
-        userData.device_count = parseInt(formData.get('device_count')) || 1;
-        userData.bcc_owner_renewal = document.getElementById('bccOwnerRenewal')?.checked || false;
-
-        // Collect checked tags
-        userData.tags = [];
-        document.querySelectorAll('input[name="tags"]:checked').forEach(checkbox => {
-            userData.tags.push(checkbox.value);
-        });
-
-        // Collect current Plex library selections
-        const currentPlexLibraries = this.collectPlexLibrarySelections();
-        userData.plex_libraries = currentPlexLibraries;
-        
-        // CRITICAL: Collect subscription data
-        const plexSubscription = document.getElementById('plexSubscription')?.value;
-        const plexExpiration = document.getElementById('plexExpiration')?.value;
-        const iptvSubscription = document.getElementById('iptvSubscription')?.value;
-        const iptvExpiration = document.getElementById('iptvExpiration')?.value;
-        
-        // Handle Plex subscription
-        if (plexSubscription === 'free') {
-            userData.plex_subscription = 'free';
-            userData.plex_expiration = null; // FREE users have no expiration
-            userData.plex_is_free = true;
-        } else if (plexSubscription && plexSubscription !== '') {
-            userData.plex_subscription = parseInt(plexSubscription);
-            userData.plex_expiration = plexExpiration || null;
-            userData.plex_is_free = false;
-        } else {
-            userData.plex_subscription = null;
-            userData.plex_expiration = null;
-            userData.plex_is_free = false;
-        }
-        
-        // Handle IPTV subscription
-        if (iptvSubscription && iptvSubscription !== '') {
-            userData.iptv_subscription = parseInt(iptvSubscription);
-            userData.iptv_expiration = iptvExpiration || null;
-            userData.iptv_is_free = false;
-        } else {
-            userData.iptv_subscription = null;
-            userData.iptv_expiration = null;
-            userData.iptv_is_free = false;
-        }
-        
-        console.log('🔍 Current form data with subscriptions:', userData);
-        
-        // OPTIMIZED CHANGE DETECTION
-        let shouldUpdatePlexAccess = false;
-        const isEditing = window.AppState?.editingUserId;
-        
-        if (isEditing) {
-            // Use stored baseline instead of database fetch
-            const originalLibraries = this.originalLibraryBaseline || {};
-            const originalUserData = window.AppState.currentUserData || {};
+        try {
+            console.log('💾 Starting optimized user save with smart change detection...');
             
-            // Check ONLY library-related changes that require API calls
-const normalizedCurrent = this.normalizeLibrariesForComparison(currentPlexLibraries);
-const normalizedOriginal = this.normalizeLibrariesForComparison(originalLibraries);
-const librarySelectionsChanged = !this.deepEqual(normalizedCurrent, normalizedOriginal);
+            // Collect form data properly
+            const formData = new FormData(event.target);
+            const userData = {};
 
-if (librarySelectionsChanged) {
-    console.log('📊 Library change comparison:');
-    console.log('   Original normalized:', normalizedOriginal);
-    console.log('   Current normalized:', normalizedCurrent);
-}
-            const plexEmailChanged = userData.plex_email !== (originalUserData.plex_email || '');
+            // Collect text inputs
+            userData.name = formData.get('name');
+            userData.email = formData.get('email');
+            userData.owner_id = formData.get('owner_id') || null;
+            userData.plex_email = formData.get('plex_email');
+            userData.iptv_username = formData.get('iptv_username');
+            userData.iptv_password = formData.get('iptv_password');
+            userData.implayer_code = formData.get('implayer_code');
+            userData.device_count = parseInt(formData.get('device_count')) || 1;
+            userData.bcc_owner_renewal = document.getElementById('bccOwnerRenewal')?.checked || false;
+
+            // Collect checked tags
+            userData.tags = [];
+            document.querySelectorAll('input[name="tags"]:checked').forEach(checkbox => {
+                userData.tags.push(checkbox.value);
+            });
+
+            // Collect current Plex library selections
+            const currentPlexLibraries = this.collectPlexLibrarySelections();
+            userData.plex_libraries = currentPlexLibraries;
             
-            // FIXED: Check if Plex tags changed (Plex 1, Plex 2) - only compare RELEVANT tags
-            const currentPlexTags = userData.tags.filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
-            const originalPlexTags = (this.originalTagsBaseline || []).filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
-            const plexTagsChanged = !this.deepEqual(currentPlexTags, originalPlexTags);
+            // CRITICAL: Collect subscription data
+            const plexSubscription = document.getElementById('plexSubscription')?.value;
+            const plexExpiration = document.getElementById('plexExpiration')?.value;
+            const iptvSubscription = document.getElementById('iptvSubscription')?.value;
+            const iptvExpiration = document.getElementById('iptvExpiration')?.value;
             
-            // Only trigger API calls for actual Plex access changes
-            if (librarySelectionsChanged || plexEmailChanged || plexTagsChanged) {
-                console.log('🔄 Plex access changes detected:');
-                if (librarySelectionsChanged) {
-                    console.log('   - Library selections changed:', {from: originalLibraries, to: currentPlexLibraries});
-                }
-                if (plexEmailChanged) {
-                    console.log('   - Plex email changed:', {from: originalUserData.plex_email, to: userData.plex_email});
-                }
-                if (plexTagsChanged) {
-                    console.log('   - Plex tags changed:', {from: originalPlexTags, to: currentPlexTags});
-                }
-                shouldUpdatePlexAccess = true;
+            // Handle Plex subscription
+            if (plexSubscription === 'free') {
+                userData.plex_subscription = 'free';
+                userData.plex_expiration = null; // FREE users have no expiration
+                userData.plex_is_free = true;
+            } else if (plexSubscription && plexSubscription !== '') {
+                userData.plex_subscription = parseInt(plexSubscription);
+                userData.plex_expiration = plexExpiration || null;
+                userData.plex_is_free = false;
             } else {
-                console.log('✅ No Plex access changes detected - skipping API calls');
-                
-                // ADDITIONAL CHECK: Make sure we really have the same libraries selected vs available
-                const hasPlexTagsNow = currentPlexTags.length > 0;
-                const hasPlexLibrariesSelected = Object.values(currentPlexLibraries).some(serverGroup => 
-                    (serverGroup.regular && serverGroup.regular.length > 0) || 
-                    (serverGroup.fourk && serverGroup.fourk.length > 0)
-                );
-                
-                // If user has Plex tags but no libraries selected, or vice versa, we need to update
-                if (hasPlexTagsNow !== hasPlexLibrariesSelected) {
-                    console.log('🔄 Plex tag/library mismatch detected - need to sync');
-                    shouldUpdatePlexAccess = true;
-                } else {
-                    shouldUpdatePlexAccess = false;
-                }
+                userData.plex_subscription = null;
+                userData.plex_expiration = null;
+                userData.plex_is_free = false;
             }
             
-            // Tell backend NOT to process tags automatically 
-            userData._skipTagProcessing = true;
-        } else {
-            // New user - check if they have Plex access to share
-            const hasPlexTags = userData.tags.some(tag => tag === 'Plex 1' || tag === 'Plex 2');
-            const hasPlexLibraries = Object.keys(currentPlexLibraries).length > 0;
-            shouldUpdatePlexAccess = hasPlexTags && hasPlexLibraries && userData.plex_email;
-            console.log('👤 New user - will update Plex access:', shouldUpdatePlexAccess);
-        }
-        
-        const method = isEditing ? 'PUT' : 'POST';
-        const endpoint = isEditing ? `/users/${window.AppState.editingUserId}` : '/users';
-        
-        // Save user data to database FIRST
-        console.log('💾 Saving user to database...');
-        await API.call(endpoint, {
-            method,
-            body: JSON.stringify(userData)
-        });
-        
-        // Show immediate success message
-        Utils.showNotification(isEditing ? 'User updated successfully' : 'User created successfully', 'success');
+            // Handle IPTV subscription
+            if (iptvSubscription && iptvSubscription !== '') {
+                userData.iptv_subscription = parseInt(iptvSubscription);
+                userData.iptv_expiration = iptvExpiration || null;
+                userData.iptv_is_free = false;
+            } else {
+                userData.iptv_subscription = null;
+                userData.iptv_expiration = null;
+                userData.iptv_is_free = false;
+            }
+            
+            console.log('🔍 Current form data with subscriptions:', userData);
+            
+            // OPTIMIZED CHANGE DETECTION
+            let shouldUpdatePlexAccess = false;
+            const isEditing = window.AppState?.editingUserId;
+            
+            if (isEditing) {
+                // Use stored baseline instead of database fetch
+                const originalLibraries = this.originalLibraryBaseline || {};
+                const originalUserData = window.AppState.currentUserData || {};
+                
+                // Check ONLY library-related changes that require API calls
+                const normalizedCurrent = this.normalizeLibrariesForComparison(currentPlexLibraries);
+                const normalizedOriginal = this.normalizeLibrariesForComparison(originalLibraries);
+                const librarySelectionsChanged = !this.deepEqual(normalizedCurrent, normalizedOriginal);
 
-        // Clear baselines after successful save
-        if (isEditing) {
-            this.originalLibraryBaseline = null;
-            this.originalTagsBaseline = null;
-        }
+                if (librarySelectionsChanged) {
+                    console.log('📊 Library change comparison:');
+                    console.log('   Original normalized:', normalizedOriginal);
+                    console.log('   Current normalized:', normalizedCurrent);
+                }
+                const plexEmailChanged = userData.plex_email !== (originalUserData.plex_email || '');
+                
+                // FIXED: Check if Plex tags changed (Plex 1, Plex 2) - only compare RELEVANT tags
+                const currentPlexTags = userData.tags.filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
+                const originalPlexTags = (this.originalTagsBaseline || []).filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
+                const plexTagsChanged = !this.deepEqual(currentPlexTags, originalPlexTags);
+                
+                // Only trigger API calls for actual Plex access changes
+                if (librarySelectionsChanged || plexEmailChanged || plexTagsChanged) {
+                    console.log('🔄 Plex access changes detected:');
+                    if (librarySelectionsChanged) {
+                        console.log('   - Library selections changed:', {from: originalLibraries, to: currentPlexLibraries});
+                    }
+                    if (plexEmailChanged) {
+                        console.log('   - Plex email changed:', {from: originalUserData.plex_email, to: userData.plex_email});
+                    }
+                    if (plexTagsChanged) {
+                        console.log('   - Plex tags changed:', {from: originalPlexTags, to: currentPlexTags});
+                    }
+                    shouldUpdatePlexAccess = true;
+                } else {
+                    console.log('✅ No Plex access changes detected - skipping API calls');
+                    
+                    // ADDITIONAL CHECK: Make sure we really have the same libraries selected vs available
+                    const hasPlexTagsNow = currentPlexTags.length > 0;
+                    const hasPlexLibrariesSelected = Object.values(currentPlexLibraries).some(serverGroup => 
+                        (serverGroup.regular && serverGroup.regular.length > 0) || 
+                        (serverGroup.fourk && serverGroup.fourk.length > 0)
+                    );
+                    
+                    // If user has Plex tags but no libraries selected, or vice versa, we need to update
+                    if (hasPlexTagsNow !== hasPlexLibrariesSelected) {
+                        console.log('🔄 Plex tag/library mismatch detected - need to sync');
+                        shouldUpdatePlexAccess = true;
+                    } else {
+                        shouldUpdatePlexAccess = false;
+                    }
+                }
+                
+                // Tell backend NOT to process tags automatically 
+                userData._skipTagProcessing = true;
+            } else {
+                // New user - check if they have Plex access to share
+                const hasPlexTags = userData.tags.some(tag => tag === 'Plex 1' || tag === 'Plex 2');
+                const hasPlexLibraries = Object.keys(currentPlexLibraries).length > 0;
+                shouldUpdatePlexAccess = hasPlexTags && hasPlexLibraries && userData.plex_email;
+                console.log('👤 New user - will update Plex access:', shouldUpdatePlexAccess);
+            }
+            
+            const method = isEditing ? 'PUT' : 'POST';
+            const endpoint = isEditing ? `/users/${window.AppState.editingUserId}` : '/users';
+            
+            // Save user data to database FIRST
+            console.log('💾 Saving user to database...');
+            await API.call(endpoint, {
+                method,
+                body: JSON.stringify(userData)
+            });
+            
+            // Show immediate success message
+            Utils.showNotification(isEditing ? 'User updated successfully' : 'User created successfully', 'success');
 
-        // CRITICAL: Navigate away IMMEDIATELY after database save - before Plex operations
-        console.log('🚀 Navigating back to users page immediately...');
-        setTimeout(async () => {
-            await showPage('users');
-            await this.loadUsers();
-        }, 100);
-        
-        // Handle Plex operations in background ONLY if needed
-        if (shouldUpdatePlexAccess && userData.plex_email) {
-            // Create background task
-            const taskId = this.createBackgroundTask(
-                'plex_update',
-                `Updating Plex access for ${userData.name}`,
-                { userEmail: userData.plex_email, plexLibraries: userData.plex_libraries }
-            );
+            // Clear baselines after successful save
+            if (isEditing) {
+                this.originalLibraryBaseline = null;
+                this.originalTagsBaseline = null;
+            }
+
+            // CRITICAL: Navigate away IMMEDIATELY after database save - before Plex operations
+            console.log('🚀 Navigating back to users page immediately...');
+            setTimeout(async () => {
+                await showPage('users');
+                await this.loadUsers();
+            }, 100);
             
-            // Show background task notification
-            this.showBackgroundTaskIndicator('Background job started: Updating Plex access...');
-            Utils.showNotification('Background job started: Updating Plex access', 'info');
+            // Handle Plex operations in background ONLY if needed
+            if (shouldUpdatePlexAccess && userData.plex_email) {
+                // Create background task
+                const taskId = this.createBackgroundTask(
+                    'plex_update',
+                    `Updating Plex access for ${userData.name}`,
+                    { userEmail: userData.plex_email, plexLibraries: userData.plex_libraries }
+                );
+                
+                // Show background task notification
+                this.showBackgroundTaskIndicator('Background job started: Updating Plex access...');
+                Utils.showNotification('Background job started: Updating Plex access', 'info');
+                
+                // Process in background
+                this.processPlexLibrariesInBackground(taskId, userData.plex_email, userData.plex_libraries, !isEditing);
+                
+            } else if (!shouldUpdatePlexAccess && isEditing) {
+                console.log('⏭️ Skipping Plex API calls - no Plex access changes detected');
+            }
             
-            // Process in background
-            this.processPlexLibrariesInBackground(taskId, userData.plex_email, userData.plex_libraries, !isEditing);
-            
-        } else if (!shouldUpdatePlexAccess && isEditing) {
-            console.log('⏭️ Skipping Plex API calls - no Plex access changes detected');
+        } catch (error) {
+            console.error('Error saving user:', error);
+            Utils.handleError(error, 'Saving user');
         }
-        
-    } catch (error) {
-        console.error('Error saving user:', error);
-        Utils.handleError(error, 'Saving user');
-    }
-},
+    },
 
     // Background task processing for Plex operations
     async processPlexLibrariesInBackground(taskId, userEmail, plexLibraries, isNewUser) {
@@ -893,56 +962,56 @@ if (librarySelectionsChanged) {
         return true;
     },
 	
-	// Normalize library objects for comparison - ensures consistent sorting
-normalizeLibrariesForComparison(libraries) {
-    if (!libraries) return {};
-    const normalized = {};
-    for (const [serverGroup, access] of Object.entries(libraries)) {
-        if (access) {
-            normalized[serverGroup] = {
-                regular: (access.regular || []).slice().sort(),
-                fourk: (access.fourk || []).slice().sort()
-            };
+    // Normalize library objects for comparison - ensures consistent sorting
+    normalizeLibrariesForComparison(libraries) {
+        if (!libraries) return {};
+        const normalized = {};
+        for (const [serverGroup, access] of Object.entries(libraries)) {
+            if (access) {
+                normalized[serverGroup] = {
+                    regular: (access.regular || []).slice().sort(),
+                    fourk: (access.fourk || []).slice().sort()
+                };
+            }
         }
-    }
-    return normalized;
-},
+        return normalized;
+    },
 
-// Enhanced collectPlexLibrarySelections function that only includes selected libraries and sorts arrays
-collectPlexLibrarySelections() {
-    const plexLibraries = {};
-    
-    // Check if Plex 1 tag is selected AND get its libraries
-    if (document.getElementById('tag-plex1')?.checked) {
-        const regularChecked = Array.from(document.querySelectorAll('input[name="plex1_regular"]:checked')).map(cb => cb.value);
-        const fourkChecked = Array.from(document.querySelectorAll('input[name="plex1_fourk"]:checked')).map(cb => cb.value);
+    // Enhanced collectPlexLibrarySelections function that only includes selected libraries and sorts arrays
+    collectPlexLibrarySelections() {
+        const plexLibraries = {};
         
-        // Only add if there are actually selected libraries
-        if (regularChecked.length > 0 || fourkChecked.length > 0) {
-            plexLibraries.plex1 = {
-                regular: regularChecked.sort(), // CRITICAL: Sort to ensure consistent comparison
-                fourk: fourkChecked.sort()      // CRITICAL: Sort to ensure consistent comparison
-            };
+        // Check if Plex 1 tag is selected AND get its libraries
+        if (document.getElementById('tag-plex1')?.checked) {
+            const regularChecked = Array.from(document.querySelectorAll('input[name="plex1_regular"]:checked')).map(cb => cb.value);
+            const fourkChecked = Array.from(document.querySelectorAll('input[name="plex1_fourk"]:checked')).map(cb => cb.value);
+            
+            // Only add if there are actually selected libraries
+            if (regularChecked.length > 0 || fourkChecked.length > 0) {
+                plexLibraries.plex1 = {
+                    regular: regularChecked.sort(), // CRITICAL: Sort to ensure consistent comparison
+                    fourk: fourkChecked.sort()      // CRITICAL: Sort to ensure consistent comparison
+                };
+            }
         }
-    }
-    
-    // Check if Plex 2 tag is selected AND get its libraries
-    if (document.getElementById('tag-plex2')?.checked) {
-        const regularChecked = Array.from(document.querySelectorAll('input[name="plex2_regular"]:checked')).map(cb => cb.value);
-        const fourkChecked = Array.from(document.querySelectorAll('input[name="plex2_fourk"]:checked')).map(cb => cb.value);
         
-        // Only add if there are actually selected libraries
-        if (regularChecked.length > 0 || fourkChecked.length > 0) {
-            plexLibraries.plex2 = {
-                regular: regularChecked.sort(), // CRITICAL: Sort to ensure consistent comparison
-                fourk: fourkChecked.sort()      // CRITICAL: Sort to ensure consistent comparison
-            };
+        // Check if Plex 2 tag is selected AND get its libraries
+        if (document.getElementById('tag-plex2')?.checked) {
+            const regularChecked = Array.from(document.querySelectorAll('input[name="plex2_regular"]:checked')).map(cb => cb.value);
+            const fourkChecked = Array.from(document.querySelectorAll('input[name="plex2_fourk"]:checked')).map(cb => cb.value);
+            
+            // Only add if there are actually selected libraries
+            if (regularChecked.length > 0 || fourkChecked.length > 0) {
+                plexLibraries.plex2 = {
+                    regular: regularChecked.sort(), // CRITICAL: Sort to ensure consistent comparison
+                    fourk: fourkChecked.sort()      // CRITICAL: Sort to ensure consistent comparison
+                };
+            }
         }
-    }
-    
-    console.log('📋 Collected library selections (sorted):', plexLibraries);
-    return plexLibraries;
-},
+        
+        console.log('📋 Collected library selections (sorted):', plexLibraries);
+        return plexLibraries;
+    },
 	
     // Check if any Plex libraries are selected
     hasPlexLibrariesSelected(plexLibraries) {
