@@ -896,43 +896,6 @@ def check_invite_status_all_servers(user_email):
             "email": user_email
         }
 
-def cancel_pending_invite(server_config, user_email):
-    """Cancel a pending invite for a user on a specific server"""
-    try:
-        signal.alarm(60)
-        account = MyPlexAccount(token=server_config["token"])
-        invitations = account.pendingInvites()
-        signal.alarm(0)
-        
-        # Find the invite for this user
-        invite = next((invite for invite in invitations if invite.email.lower() == user_email.lower()), None)
-        
-        if invite:
-            signal.alarm(30)
-            invite.delete()  # Cancel the invite
-            signal.alarm(0)
-            log_info(f"Cancelled pending invite for {user_email} on {server_config['name']}")
-            return {
-                "success": True,
-                "action": "invite_cancelled",
-                "server": server_config['name']
-            }
-        else:
-            log_info(f"No pending invite found for {user_email} on {server_config['name']}")
-            return {
-                "success": True,
-                "action": "no_invite_found",
-                "server": server_config['name']
-            }
-            
-    except Exception as e:
-        signal.alarm(0)
-        log_error(f"Error cancelling invite for {user_email} on {server_config['name']}: {str(e)}")
-        return {
-            "success": False,
-            "error": str(e),
-            "server": server_config['name']
-        }
 
 def remove_user_from_server_enhanced(server_config, user_email):
     """Enhanced removal that handles both pending invites and existing users"""
