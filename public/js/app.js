@@ -47,17 +47,16 @@ async function loadInitialData() {
     try {
         console.log('?? Loading initial data...');
         
-        // Load all initial data in parallel
-        const [users, owners, subscriptions] = await Promise.all([
-            API.User.getAll(),
-            API.Owner.getAll(),
-            API.Subscription.getAll()
-        ]);
-        
-        // Update global state
-        window.AppState.users = users;
-        window.AppState.owners = owners;
-        window.AppState.subscriptionTypes = subscriptions;
+// Load only essential initial data (not users - they load when navigating to users page)
+const [owners, subscriptions] = await Promise.all([
+    API.Owner.getAll(),
+    API.Subscription.getAll()
+]);
+
+// Update global state
+window.AppState.owners = owners;
+window.AppState.subscriptionTypes = subscriptions;
+// Users will be loaded by the Users module when needed
         
         console.log('?? Initial data loaded:', {
             users: users.length,
