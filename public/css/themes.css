@@ -48,6 +48,89 @@
     transform: scale(1.05);
 }
 
+/* Coming Soon Actions Grid */
+.coming-soon-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin: 30px 0;
+}
+
+.coming-soon-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 30px 20px;
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: default;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.coming-soon-card:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.08) 100%);
+}
+
+.coming-soon-card h4 {
+    color: #4fc3f7;
+    margin-bottom: 10px;
+    font-size: 1.2rem;
+}
+
+.coming-soon-card p {
+    color: rgba(255, 255, 255, 0.6);
+    font-style: italic;
+    margin: 0;
+}
+
+/* Plex Split Container Styles */
+.plex-split-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 10px 0;
+    min-height: 60px;
+}
+
+.plex-split-left,
+.plex-split-right {
+    flex: 1;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.plex-split-divider {
+    width: 2px;
+    height: 50px;
+    background: linear-gradient(180deg, transparent 0%, #4fc3f7 20%, #4fc3f7 80%, transparent 100%);
+    margin: 0 15px;
+    opacity: 0.6;
+}
+
+.plex-split-label {
+    font-size: 0.9rem;
+    color: #4fc3f7;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.plex-split-number {
+    font-size: 2rem;
+    font-weight: bold;
+    background: linear-gradient(45deg, #ff00ff, #00ffff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+}
+
 .expiring-soon {
     background: rgba(255, 152, 0, 0.1);
     border: 1px solid rgba(255, 152, 0, 0.3);
@@ -265,6 +348,10 @@ td:nth-child(2) {
     .quick-actions {
         grid-template-columns: 1fr;
     }
+
+    .coming-soon-actions {
+        grid-template-columns: 1fr;
+    }
     
     .plex-actions {
         flex-direction: column;
@@ -277,5 +364,23 @@ td:nth-child(2) {
     
     .subscription-stats {
         grid-template-columns: 1fr;
+    }
+
+    /* Responsive adjustments for split layout */
+    .plex-split-container {
+        min-height: 50px;
+    }
+    
+    .plex-split-number {
+        font-size: 1.5rem;
+    }
+    
+    .plex-split-label {
+        font-size: 0.8rem;
+    }
+    
+    .plex-split-divider {
+        height: 40px;
+        margin: 0 10px;
     }
 }

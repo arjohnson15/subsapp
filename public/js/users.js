@@ -484,31 +484,56 @@ window.Users = {
             const iptvSubscription = document.getElementById('iptvSubscription')?.value;
             const iptvExpiration = document.getElementById('iptvExpiration')?.value;
             
-            // Handle Plex subscription
-            if (plexSubscription === 'free') {
-                userData.plex_subscription = 'free';
-                userData.plex_expiration = null; // FREE users have no expiration
-                userData.plex_is_free = true;
-            } else if (plexSubscription && plexSubscription !== '') {
-                userData.plex_subscription = parseInt(plexSubscription);
-                userData.plex_expiration = plexExpiration || null;
-                userData.plex_is_free = false;
-            } else {
-                userData.plex_subscription = null;
-                userData.plex_expiration = null;
-                userData.plex_is_free = false;
-            }
-            
-            // Handle IPTV subscription
-            if (iptvSubscription && iptvSubscription !== '') {
-                userData.iptv_subscription = parseInt(iptvSubscription);
-                userData.iptv_expiration = iptvExpiration || null;
-                userData.iptv_is_free = false;
-            } else {
-                userData.iptv_subscription = null;
-                userData.iptv_expiration = null;
-                userData.iptv_is_free = false;
-            }
+// FIXED: Handle Plex subscription with proper "remove" case
+console.log('🔍 Raw subscription values:', {
+    plexSubscription, plexExpiration, iptvSubscription, iptvExpiration
+});
+
+if (plexSubscription === 'free') {
+    userData.plex_subscription = 'free';
+    userData.plex_expiration = null;
+    userData.plex_is_free = true;
+} else if (plexSubscription === 'remove') {
+    // FIXED: Properly handle remove case
+    userData.plex_subscription = 'remove';
+    userData.plex_expiration = null;
+    userData.plex_is_free = false;
+} else if (plexSubscription && plexSubscription !== '') {
+    // Paid subscription
+    userData.plex_subscription = parseInt(plexSubscription);
+    userData.plex_expiration = plexExpiration || null;
+    userData.plex_is_free = false;
+} else {
+    // Keep current (no change)
+    userData.plex_subscription = null;
+    userData.plex_expiration = null;
+    userData.plex_is_free = false;
+}
+
+// FIXED: Handle IPTV subscription with proper "remove" case
+if (iptvSubscription === 'remove') {
+    // FIXED: Properly handle remove case
+    userData.iptv_subscription = 'remove';
+    userData.iptv_expiration = null;
+    userData.iptv_is_free = false;
+} else if (iptvSubscription && iptvSubscription !== '') {
+    // Paid subscription
+    userData.iptv_subscription = parseInt(iptvSubscription);
+    userData.iptv_expiration = iptvExpiration || null;
+    userData.iptv_is_free = false;
+} else {
+    // Keep current (no change)
+    userData.iptv_subscription = null;
+    userData.iptv_expiration = null;
+    userData.iptv_is_free = false;
+}
+
+console.log('🔍 Processed subscription data:', {
+    plex_subscription: userData.plex_subscription,
+    plex_expiration: userData.plex_expiration,
+    iptv_subscription: userData.iptv_subscription,
+    iptv_expiration: userData.iptv_expiration
+});
             
             console.log('🔍 Current form data with subscriptions:', userData);
             

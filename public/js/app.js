@@ -10,7 +10,7 @@ window.addEventListener('hashchange', handleHashChange);
 
 async function initializeApp() {
     try {
-        console.log('🚀 Initializing JohnsonFlix Manager...');
+        console.log('?? Initializing JohnsonFlix Manager...');
         
         // Initialize global state
         if (!window.AppState) {
@@ -36,16 +36,16 @@ async function initializeApp() {
         
         checkModulesLoaded();
 
-         console.log('✅ JohnsonFlix Manager initialized successfully');
+         console.log('? JohnsonFlix Manager initialized successfully');
     } catch (error) {
-        console.error('❌ Failed to initialize app:', error);
+        console.error('? Failed to initialize app:', error);
         Utils.showNotification('Failed to initialize application: ' + error.message, 'error');
     }
 }
 
 async function loadInitialData() {
     try {
-        console.log('📊 Loading initial data...');
+        console.log('?? Loading initial data...');
         
         // Load all initial data in parallel
         const [users, owners, subscriptions] = await Promise.all([
@@ -59,7 +59,7 @@ async function loadInitialData() {
         window.AppState.owners = owners;
         window.AppState.subscriptionTypes = subscriptions;
         
-        console.log('📊 Initial data loaded:', {
+        console.log('?? Initial data loaded:', {
             users: users.length,
             owners: owners.length,
             subscriptions: subscriptions.length
@@ -75,9 +75,9 @@ function checkModulesLoaded() {
     const modules = ['Utils', 'API', 'Plex', 'Users', 'Email', 'Settings', 'Subscriptions'];
     modules.forEach(module => {
         if (window[module]) {
-            console.log(`✅ ${module} module loaded`);
+            console.log(`? ${module} module loaded`);
         } else {
-            console.error(`❌ ${module} module NOT loaded`);
+            console.error(`? ${module} module NOT loaded`);
         }
     });
 }
@@ -85,7 +85,7 @@ function checkModulesLoaded() {
 // Page navigation with hash routing
 async function showPage(pageId) {
     try {
-        console.log(`📄 Navigating to page: ${pageId}`);
+        console.log(`?? Navigating to page: ${pageId}`);
         
         // Update hash
         Utils.updateUrlHash(pageId);
@@ -100,7 +100,7 @@ async function showPage(pageId) {
         // Update current page state
         window.AppState.currentPage = pageId;
         
-        console.log(`✅ Loaded page: ${pageId}`);
+        console.log(`? Loaded page: ${pageId}`);
     } catch (error) {
         console.error(`Error loading page ${pageId}:`, error);
         Utils.handleError(error, `Loading ${pageId} page`);
@@ -108,7 +108,7 @@ async function showPage(pageId) {
 }
 
 async function initializePage(pageId) {
-    console.log(`🔧 Initializing page: ${pageId}`);
+    console.log(`?? Initializing page: ${pageId}`);
     
     switch (pageId) {
         case 'dashboard':
@@ -124,7 +124,7 @@ async function initializePage(pageId) {
             break;
             
         case 'user-form':
-            console.log('🔧 Initializing user form page...');
+            console.log('?? Initializing user form page...');
             // Initialize the user form with proper setup
             await initUserFormPage();
             break;
@@ -136,11 +136,11 @@ async function initializePage(pageId) {
             break;
             
         case 'management':
-            console.log('🔧 Initializing management page...');
+            console.log('?? Initializing management page...');
             if (window.Management && window.Management.init) {
                 await window.Management.init();
             } else {
-                console.error('❌ Management module not available');
+                console.error('? Management module not available');
             }
             break;
             
@@ -158,7 +158,7 @@ async function initializePage(pageId) {
 // Initialize user form page specifically
 async function initUserFormPage() {
     try {
-        console.log('📝 Setting up user form page...');
+        console.log('?? Setting up user form page...');
         
         // Wait a bit for the HTML to be fully loaded
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -179,16 +179,16 @@ async function initUserFormPage() {
             }, 500);
         }
         
-        console.log('✅ User form page setup complete');
+        console.log('? User form page setup complete');
     } catch (error) {
-        console.error('❌ Error setting up user form:', error);
+        console.error('? Error setting up user form:', error);
         Utils.handleError(error, 'Setting up user form');
     }
 }
 
 // Setup user form event listeners
 function setupUserFormEventListeners() {
-    console.log('🎧 Setting up user form event listeners...');
+    console.log('?? Setting up user form event listeners...');
     
     // Tag change listeners
     const tagCheckboxes = document.querySelectorAll('input[name="tags"]');
@@ -197,7 +197,7 @@ function setupUserFormEventListeners() {
             const tagValue = e.target.value;
             const isChecked = e.target.checked;
             
-            console.log(`🏷️ Tag ${tagValue} changed to ${isChecked}`);
+            console.log(`??? Tag ${tagValue} changed to ${isChecked}`);
             
             if (tagValue === 'Plex 1') {
                 togglePlexLibrariesByTag('plex1', isChecked);
@@ -219,13 +219,13 @@ function setupUserFormEventListeners() {
         iptvSub.addEventListener('change', calculateNewIptvExpiration);
     }
     
-    console.log('✅ User form event listeners setup');
+    console.log('? User form event listeners setup');
 }
 
 // Load data for user form
 async function loadUserFormData() {
     try {
-        console.log('📊 Loading user form data...');
+        console.log('?? Loading user form data...');
         
         // Use existing data if already loaded, otherwise fetch
         let owners = window.AppState.owners;
@@ -245,9 +245,9 @@ async function loadUserFormData() {
         updateOwnerDropdown(owners);
         updateSubscriptionDropdowns(subscriptions);
         
-        console.log('✅ User form data loaded');
+        console.log('? User form data loaded');
     } catch (error) {
-        console.error('❌ Error loading user form data:', error);
+        console.error('? Error loading user form data:', error);
         Utils.handleError(error, 'Loading user form data');
     }
 }
@@ -262,12 +262,12 @@ function updateOwnerDropdown(owners) {
 }
 
 function updateSubscriptionDropdowns(subscriptions) {
-    console.log('📋 Updating subscription dropdowns with:', subscriptions);
+    console.log('?? Updating subscription dropdowns with:', subscriptions);
     
     // Update Plex subscription dropdown
     const plexSelect = document.getElementById('plexSubscription');
     if (plexSelect) {
-        console.log('📋 Found Plex subscription dropdown');
+        console.log('?? Found Plex subscription dropdown');
         
         const plexOptions = subscriptions
             .filter(sub => sub.type === 'plex' && sub.active)
@@ -278,19 +278,19 @@ function updateSubscriptionDropdowns(subscriptions) {
         plexSelect.innerHTML = `
             <option value="">-- Keep Current Plex Subscription --</option>
             <option value="free">FREE Plex Access</option>
-            <option value="remove">🗑️ Remove Plex Subscription</option>
+            <option value="remove">??? Remove Plex Subscription</option>
             ${plexOptions}
         `;
         
-        console.log('✅ Plex dropdown updated with preserve, FREE, remove, and', plexOptions.length, 'paid options');
+        console.log('? Plex dropdown updated with preserve, FREE, remove, and', plexOptions.length, 'paid options');
     } else {
-        console.warn('⚠️ Plex subscription dropdown not found');
+        console.warn('?? Plex subscription dropdown not found');
     }
     
     // Update IPTV subscription dropdown
     const iptvSelect = document.getElementById('iptvSubscription');
     if (iptvSelect) {
-        console.log('📋 Found IPTV subscription dropdown');
+        console.log('?? Found IPTV subscription dropdown');
         
         const iptvOptions = subscriptions
             .filter(sub => sub.type === 'iptv' && sub.active)
@@ -300,18 +300,18 @@ function updateSubscriptionDropdowns(subscriptions) {
         // UPDATED: Add preserve and remove options
         iptvSelect.innerHTML = `
             <option value="">-- Keep Current IPTV Subscription --</option>
-            <option value="remove">🗑️ Remove IPTV Subscription</option>
+            <option value="remove">??? Remove IPTV Subscription</option>
             ${iptvOptions}
         `;
         
-        console.log('✅ IPTV dropdown updated with preserve, remove, and', iptvOptions.length, 'paid options');
+        console.log('? IPTV dropdown updated with preserve, remove, and', iptvOptions.length, 'paid options');
     } else {
-        console.warn('⚠️ IPTV subscription dropdown not found');
+        console.warn('?? IPTV subscription dropdown not found');
     }
 }
 
 function debugSubscriptionDropdowns() {
-    console.log('🔍 Debugging subscription dropdowns...');
+    console.log('?? Debugging subscription dropdowns...');
     
     const plexSelect = document.getElementById('plexSubscription');
     const iptvSelect = document.getElementById('iptvSubscription');
@@ -330,7 +330,7 @@ function debugSubscriptionDropdowns() {
 
 // Load Plex libraries for user form
 async function loadPlexLibrariesForUserForm() {
-    console.log('📚 Loading Plex libraries for user form...');
+    console.log('?? Loading Plex libraries for user form...');
     
     try {
         // Load libraries for both groups
@@ -339,19 +339,19 @@ async function loadPlexLibrariesForUserForm() {
             loadPlexLibrariesForGroup('plex2')
         ]);
         
-        console.log('✅ Plex libraries loaded for user form');
+        console.log('? Plex libraries loaded for user form');
     } catch (error) {
-        console.error('❌ Error loading Plex libraries for user form:', error);
+        console.error('? Error loading Plex libraries for user form:', error);
     }
 }
 
 // Load libraries for a specific group
 async function loadPlexLibrariesForGroup(serverGroup) {
     try {
-        console.log(`📚 Loading ${serverGroup} libraries...`);
+        console.log(`?? Loading ${serverGroup} libraries...`);
         
         const data = await API.Plex.getLibraries(serverGroup);
-        console.log(`📊 ${serverGroup} data:`, data);
+        console.log(`?? ${serverGroup} data:`, data);
         
         // Store in global state
         window.AppState.plexLibraries[serverGroup] = data;
@@ -362,22 +362,22 @@ async function loadPlexLibrariesForGroup(serverGroup) {
             renderPlexLibrariesForGroup(serverGroup, data);
         }
         
-        console.log(`✅ ${serverGroup} libraries loaded`);
+        console.log(`? ${serverGroup} libraries loaded`);
     } catch (error) {
-        console.error(`❌ Error loading ${serverGroup} libraries:`, error);
+        console.error(`? Error loading ${serverGroup} libraries:`, error);
         showLibraryLoadError(serverGroup);
     }
 }
 
 // Render Plex libraries for a group
 function renderPlexLibrariesForGroup(serverGroup, data) {
-    console.log(`🎨 Rendering ${serverGroup} libraries:`, data);
+    console.log(`?? Rendering ${serverGroup} libraries:`, data);
     
     const regularList = document.getElementById(`${serverGroup}RegularLibrariesList`);
     const fourkList = document.getElementById(`${serverGroup}FourkLibrariesList`);
     
     if (!regularList || !fourkList) {
-        console.error(`❌ Library list elements not found for ${serverGroup}`);
+        console.error(`? Library list elements not found for ${serverGroup}`);
         return;
     }
     
@@ -420,12 +420,12 @@ function togglePlexLibrariesByTag(serverGroup, isChecked) {
     const libraryGroup = document.getElementById(`${serverGroup}LibraryGroup`);
     
     if (!libraryGroup) {
-        console.error(`❌ Library group not found: ${serverGroup}LibraryGroup`);
+        console.error(`? Library group not found: ${serverGroup}LibraryGroup`);
         return;
     }
     
     if (isChecked) {
-        console.log(`✅ Showing ${serverGroup} libraries`);
+        console.log(`? Showing ${serverGroup} libraries`);
         libraryGroup.style.display = 'block';
         
         // Load and render libraries if not already done
@@ -444,7 +444,7 @@ function togglePlexLibrariesByTag(serverGroup, isChecked) {
         // Test connection quietly
         testPlexConnectionQuiet(serverGroup);
     } else {
-        console.log(`❌ Hiding ${serverGroup} libraries`);
+        console.log(`? Hiding ${serverGroup} libraries`);
         libraryGroup.style.display = 'none';
         clearAllLibrariesForGroup(serverGroup);
     }
@@ -452,7 +452,7 @@ function togglePlexLibrariesByTag(serverGroup, isChecked) {
 
 // NEW: Pre-select libraries based on user's current access
 function preSelectUserLibraries(serverGroup) {
-    console.log(`🔧 Pre-selecting libraries for ${serverGroup}...`);
+    console.log(`?? Pre-selecting libraries for ${serverGroup}...`);
     
     // Get the current user being edited
     if (!window.AppState.editingUserId || !window.AppState.currentUserData) {
@@ -468,7 +468,7 @@ function preSelectUserLibraries(serverGroup) {
     }
     
     const userAccess = user.plex_libraries[serverGroup];
-    console.log(`📋 Pre-selecting based on cached access:`, userAccess);
+    console.log(`?? Pre-selecting based on cached access:`, userAccess);
     
     // Select regular libraries
     if (userAccess.regular && Array.isArray(userAccess.regular)) {
@@ -476,9 +476,9 @@ function preSelectUserLibraries(serverGroup) {
             const checkbox = document.querySelector(`input[name="${serverGroup}_regular"][value="${libId}"]`);
             if (checkbox) {
                 checkbox.checked = true;
-                console.log(`✅ Pre-selected regular library: ${libId}`);
+                console.log(`? Pre-selected regular library: ${libId}`);
             } else {
-                console.log(`⚠️ Could not find checkbox for regular library: ${libId}`);
+                console.log(`?? Could not find checkbox for regular library: ${libId}`);
             }
         });
     }
@@ -489,9 +489,9 @@ function preSelectUserLibraries(serverGroup) {
             const checkbox = document.querySelector(`input[name="${serverGroup}_fourk"][value="${libId}"]`);
             if (checkbox) {
                 checkbox.checked = true;
-                console.log(`✅ Pre-selected 4K library: ${libId}`);
+                console.log(`? Pre-selected 4K library: ${libId}`);
             } else {
-                console.log(`⚠️ Could not find checkbox for 4K library: ${libId}`);
+                console.log(`?? Could not find checkbox for 4K library: ${libId}`);
             }
         });
     }
@@ -536,24 +536,24 @@ function clearAllLibrariesForGroup(serverGroup) {
 // Load and populate user for editing with enhanced library pre-selection
 async function loadAndPopulateUser(userId) {
     try {
-        console.log(`👤 Loading user ${userId} for editing...`);
+        console.log(`?? Loading user ${userId} for editing...`);
         
         const user = await API.User.getById(userId);
-        console.log('📝 User loaded:', user);
+        console.log('?? User loaded:', user);
         
         // Store user data globally for library pre-selection
         window.AppState.currentUserData = user;
         
         populateUserForm(user);
     } catch (error) {
-        console.error('❌ Error loading user for editing:', error);
+        console.error('? Error loading user for editing:', error);
         Utils.handleError(error, 'Loading user for editing');
     }
 }
 
 // Populate form with user data
 function populateUserForm(user) {
-    console.log('📝 Populating form with user:', user);
+    console.log('?? Populating form with user:', user);
     
     // Basic fields
     const fieldMapping = {
@@ -616,12 +616,12 @@ function populateUserForm(user) {
         }
     }
     
-    console.log('📅 Populated subscription dates:', {
+    console.log('?? Populated subscription dates:', {
         plex: user.plex_expiration,
         iptv: user.iptv_expiration
     });
     
-    console.log('✅ Form populated with user data');
+    console.log('? Form populated with user data');
 }
 
 function handleHashChange() {
@@ -653,17 +653,34 @@ window.Dashboard = {
         try {
             const users = window.AppState.users;
             
-            // Update stats
-            document.getElementById('totalUsers').textContent = users.length;
+            // Calculate total unique users (users with any Plex or IPTV tags)
+            const uniqueUsers = users.filter(u => {
+                if (!u.tags || !Array.isArray(u.tags)) return false;
+                return u.tags.some(tag => tag === 'Plex 1' || tag === 'Plex 2' || tag === 'IPTV');
+            });
             
-            const plexUsers = users.filter(u => u.tags && (u.tags.includes('Plex 1') || u.tags.includes('Plex 2')));
+            // Update total users count
+            document.getElementById('totalUsers').textContent = uniqueUsers.length;
+            
+            // Calculate individual Plex user counts
+            const plex1Users = users.filter(u => u.tags && u.tags.includes('Plex 1'));
+            const plex2Users = users.filter(u => u.tags && u.tags.includes('Plex 2'));
+            
+            // Update individual Plex counts in the split layout
+            document.getElementById('plex1Count').textContent = plex1Users.length;
+            document.getElementById('plex2Count').textContent = plex2Users.length;
+            
+            // Calculate IPTV users
             const iptvUsers = users.filter(u => u.tags && u.tags.includes('IPTV'));
-            
-            document.getElementById('plexUsers').textContent = plexUsers.length;
             document.getElementById('iptvUsers').textContent = iptvUsers.length;
             
-            // Calculate revenue (placeholder)
-            document.getElementById('monthlyRevenue').textContent = '$0';
+            console.log('📊 Dashboard stats updated:', {
+                totalUnique: uniqueUsers.length,
+                plex1: plex1Users.length,
+                plex2: plex2Users.length,
+                totalPlex: plex1Users.length + plex2Users.length,
+                iptv: iptvUsers.length
+            });
             
         } catch (error) {
             console.error('Error loading stats:', error);
@@ -685,6 +702,7 @@ window.Dashboard = {
                     </div>
                 `).join('');
             }
+            
         } catch (error) {
             console.error('Error loading expiring users:', error);
         }
@@ -700,35 +718,35 @@ window.preSelectUserLibraries = preSelectUserLibraries;
 
 // Auto-calculation functions for subscriptions
 window.calculateNewPlexExpiration = function() {
-    console.log('📅 Calculating new Plex expiration...');
+    console.log('?? Calculating new Plex expiration...');
     
     const subscription = document.getElementById('plexSubscription')?.value;
     const expirationField = document.getElementById('plexExpiration');
     
     if (!expirationField) {
-        console.warn('⚠️ Plex expiration field not found');
+        console.warn('?? Plex expiration field not found');
         return;
     }
     
-    console.log('📅 Selected subscription:', subscription);
+    console.log('?? Selected subscription:', subscription);
     
     if (subscription === 'free') {
         // FREE subscription - clear the date field (backend will handle as FREE)
         expirationField.value = '';
-        console.log('✅ Set Plex to FREE - cleared expiration date');
+        console.log('? Set Plex to FREE - cleared expiration date');
         return;
     }
     
     if (subscription === 'remove') {
         // Remove subscription - clear the date field
         expirationField.value = '';
-        console.log('✅ Set Plex to REMOVE - cleared expiration date');
+        console.log('? Set Plex to REMOVE - cleared expiration date');
         return;
     }
     
     if (!subscription || subscription === '') {
         // Keep current or no subscription selected - don't change the date
-        console.log('✅ Keep current Plex subscription - no date change');
+        console.log('? Keep current Plex subscription - no date change');
         return;
     }
     
@@ -739,36 +757,36 @@ window.calculateNewPlexExpiration = function() {
         const expiration = new Date();
         expiration.setMonth(today.getMonth() + selectedSub.duration_months);
         expirationField.value = expiration.toISOString().split('T')[0];
-        console.log(`✅ Set Plex expiration to: ${expirationField.value} (${selectedSub.duration_months} months from today)`);
+        console.log(`? Set Plex expiration to: ${expirationField.value} (${selectedSub.duration_months} months from today)`);
     } else {
-        console.warn('⚠️ Subscription type not found for ID:', subscription);
+        console.warn('?? Subscription type not found for ID:', subscription);
         expirationField.value = '';
     }
 };
 
 window.calculateNewIptvExpiration = function() {
-    console.log('📅 Calculating new IPTV expiration...');
+    console.log('?? Calculating new IPTV expiration...');
     
     const subscription = document.getElementById('iptvSubscription')?.value;
     const expirationField = document.getElementById('iptvExpiration');
     
     if (!expirationField) {
-        console.warn('⚠️ IPTV expiration field not found');
+        console.warn('?? IPTV expiration field not found');
         return;
     }
     
-    console.log('📅 Selected subscription:', subscription);
+    console.log('?? Selected subscription:', subscription);
     
     if (subscription === 'remove') {
         // Remove subscription - clear the date field
         expirationField.value = '';
-        console.log('✅ Set IPTV to REMOVE - cleared expiration date');
+        console.log('? Set IPTV to REMOVE - cleared expiration date');
         return;
     }
     
     if (!subscription || subscription === '') {
         // Keep current or no subscription selected - don't change the date
-        console.log('✅ Keep current IPTV subscription - no date change');
+        console.log('? Keep current IPTV subscription - no date change');
         return;
     }
     
@@ -779,9 +797,9 @@ window.calculateNewIptvExpiration = function() {
         const expiration = new Date();
         expiration.setMonth(today.getMonth() + selectedSub.duration_months);
         expirationField.value = expiration.toISOString().split('T')[0];
-        console.log(`✅ Set IPTV expiration to: ${expirationField.value} (${selectedSub.duration_months} months from today)`);
+        console.log(`? Set IPTV expiration to: ${expirationField.value} (${selectedSub.duration_months} months from today)`);
     } else {
-        console.warn('⚠️ Subscription type not found for ID:', subscription);
+        console.warn('?? Subscription type not found for ID:', subscription);
         expirationField.value = '';
     }
 };
@@ -816,7 +834,7 @@ window.collectPlexLibrarySelections = function() {
         }
     }
     
-    console.log('📋 Collected library selections:', plexLibraries);
+    console.log('?? Collected library selections:', plexLibraries);
     return plexLibraries;
 };
 
