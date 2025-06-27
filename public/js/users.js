@@ -217,7 +217,6 @@ window.Users = {
         }
     },
     
-// Enhanced renderUsersTable with performance optimization
 async renderUsersTable() {
     const tbody = document.getElementById('usersTableBody');
     if (!tbody) return;
@@ -229,8 +228,8 @@ async renderUsersTable() {
         return;
     }
 
-    // PERFORMANCE FIX: Always use basic rendering - no invite status checks
-    console.log('📋 Rendering users table (fast mode)...');
+    // PERFORMANCE FIX: Always use basic rendering - no API calls
+    console.log('📋 Rendering users table (super fast mode)...');
     this.renderUsersTableBasic();
 },
 
@@ -269,30 +268,6 @@ renderUsersTableBasic() {
     console.log(`✅ Basic users table rendered with ${users.length} users`);
 },
 
-    // New method: Enhanced tag rendering with invite status indicators
-    renderTagsWithInviteStatus(user) {
-        if (!user.tags || user.tags.length === 0) {
-            return '';
-        }
-        
-        return user.tags.map(tag => {
-            let tagHtml = `<span class="tag tag-${tag.toLowerCase().replace(' ', '')}">${tag}</span>`;
-            
-            // Add pending invite indicator for Plex tags
-            if (tag.includes('Plex') && user.hasPendingInvites) {
-                const serverGroup = tag === 'Plex 1' ? 'plex1' : 'plex2';
-                const hasPendingForThisServer = user.pendingServers.some(server => server.includes(serverGroup));
-                
-                if (hasPendingForThisServer) {
-                    tagHtml += `<span class="invite-pending-indicator" title="Pending invite acceptance">
-                        <i class="fas fa-clock" style="color: #ff9800; margin-left: 4px; font-size: 0.8em;"></i>
-                    </span>`;
-                }
-            }
-            
-            return tagHtml;
-        }).join('');
-    },
     
     filterUsers() {
         const searchTerm = document.getElementById('userSearch')?.value.toLowerCase() || '';
@@ -396,49 +371,51 @@ renderUsersTableBasic() {
         `;
         
         // Load user's current Plex access
-        if (user.plex_email) {
-            this.loadUserPlexAccess(user.plex_email);
-        } else {
-            document.getElementById('userLibraryAccess').innerHTML = '<p>No Plex email configured</p>';
-        }
+this.displayStoredLibraryAccess(user);
         
         document.getElementById('viewUserModal').classList.add('active');
     },
+	
+	// NEW METHOD - Add this right here, after showUserModal()
+	displayStoredLibraryAccess(user) {
+    const accessDiv = document.getElementById('userLibraryAccess');
     
-    async loadUserPlexAccess(plexEmail) {
-        try {
-            const access = await API.Plex.getUserAccess(plexEmail);
-            const accessDiv = document.getElementById('userLibraryAccess');
-            
-            let accessHtml = '';
-            
-            for (const [serverGroup, serverAccess] of Object.entries(access)) {
-                accessHtml += `<div class="library-group">
-                    <h5>${serverGroup.toUpperCase()}</h5>
-                    <div class="library-list">`;
-                
-                if (serverAccess.regular && serverAccess.regular.length > 0) {
-                    accessHtml += `<div>Regular Libraries: ${serverAccess.regular.length} libraries</div>`;
-                }
-                
-                if (serverAccess.fourk && serverAccess.fourk.length > 0) {
-                    accessHtml += `<div>4K Libraries: ${serverAccess.fourk.length} libraries</div>`;
-                }
-                
-                if ((!serverAccess.regular || serverAccess.regular.length === 0) && 
-                    (!serverAccess.fourk || serverAccess.fourk.length === 0)) {
-                    accessHtml += `<div>No access</div>`;
-                }
-                
-                accessHtml += `</div></div>`;
-            }
-            
-            accessDiv.innerHTML = accessHtml || '<p>No Plex access found</p>';
-        } catch (error) {
-            document.getElementById('userLibraryAccess').innerHTML = '<p>Error loading Plex access</p>';
-            console.error('Error loading user Plex access:', error);
+    if (!user.plex_email) {
+        accessDiv.innerHTML = '<p>No Plex email configured</p>';
+        return;
+    }
+    
+    if (!user.plex_libraries || Object.keys(user.plex_libraries).length === 0) {
+        accessDiv.innerHTML = '<p>No Plex access configured</p>';
+        return;
+    }
+    
+    let accessHtml = '';
+    
+    for (const [serverGroup, serverAccess] of Object.entries(user.plex_libraries)) {
+        accessHtml += `<div class="library-group">
+            <h5>${serverGroup.toUpperCase()}</h5>
+            <div class="library-list">`;
+        
+        if (serverAccess.regular && serverAccess.regular.length > 0) {
+            accessHtml += `<div>Regular Libraries: ${serverAccess.regular.length} libraries</div>`;
         }
-    },
+        
+        if (serverAccess.fourk && serverAccess.fourk.length > 0) {
+            accessHtml += `<div>4K Libraries: ${serverAccess.fourk.length} libraries</div>`;
+        }
+        
+        if ((!serverAccess.regular || serverAccess.regular.length === 0) && 
+            (!serverAccess.fourk || serverAccess.fourk.length === 0)) {
+            accessHtml += `<div>No access</div>`;
+        }
+        
+        accessHtml += `</div></div>`;
+    }
+    
+    accessDiv.innerHTML = accessHtml || '<p>No library access found</p>';
+},
+    
     
     // UPDATED: Use new baseline reloader for editing - FIXED function references
     async editUser(userId) {
@@ -886,111 +863,6 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
     }
 },
 
-// New method: Enhance already-rendered table with invite status (non-blocking)
-async enhanceTableWithInviteStatus(plexUsers) {
-    try {
-        console.log('🔍 Enhancing table with invite status checks...');
-        
-        // Process users in small batches to avoid overwhelming the server
-        const batchSize = 3; // Check 3 users at a time
-        
-        for (let i = 0; i < plexUsers.length; i += batchSize) {
-            const batch = plexUsers.slice(i, i + batchSize);
-            
-            // Process batch in parallel
-            const statusPromises = batch.map(async (user) => {
-                try {
-                    const userEmail = user.plex_email || user.email;
-                    const plexTags = user.tags.filter(tag => tag.includes('Plex'));
-                    
-                    const response = await API.call(`/plex/invite-status/${encodeURIComponent(userEmail)}`);
-                    
-                    if (response.success) {
-                        // Update the table row with status indicators
-                        this.updateUserRowWithInviteStatus(user.id, response, plexTags);
-                    }
-                } catch (error) {
-                    console.warn(`⚠️ Could not check invite status for ${user.name}:`, error.message);
-                }
-            });
-            
-            await Promise.all(statusPromises);
-            
-            // Small delay between batches to be gentle on the server
-            if (i + batchSize < plexUsers.length) {
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-        }
-        
-        console.log('✅ Invite status enhancement completed');
-        
-    } catch (error) {
-        console.error('❌ Error enhancing table with invite status:', error);
-    }
-},
-
-// New method: Update specific user row with invite status
-updateUserRowWithInviteStatus(userId, inviteResponse, plexTags) {
-    const userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
-    if (!userRow) return;
-    
-    // Find the tags cell and add invite status indicators
-    const tagsCell = userRow.querySelector('.tags-cell');
-    if (!tagsCell) return;
-    
-    // Clear any existing status indicators
-    const existingStatus = tagsCell.querySelectorAll('.invite-status');
-    existingStatus.forEach(el => el.remove());
-    
-    // Add status indicators for each Plex server group
-    plexTags.forEach(serverTag => {
-        const serverGroup = serverTag === 'Plex 1' ? 'plex1' : 'plex2';
-        const serverData = inviteResponse.servers?.[serverGroup];
-        
-        if (serverData) {
-            const statusIndicator = this.createInviteStatusIndicator(serverData, serverGroup);
-            if (statusIndicator) {
-                tagsCell.appendChild(statusIndicator);
-            }
-        }
-    });
-},
-
-// Create compact status indicator for table
-createInviteStatusIndicator(serverData, serverGroup) {
-    let hasPendingInvites = false;
-    let hasAccess = false;
-    const pendingServers = [];
-    
-    for (const [serverType, serverInfo] of Object.entries(serverData)) {
-        if (serverInfo.status === 'pending') {
-            hasPendingInvites = true;
-            pendingServers.push(serverType);
-        } else if (serverInfo.status === 'accepted') {
-            hasAccess = true;
-        }
-    }
-    
-    if (!hasPendingInvites && !hasAccess) return null;
-    
-    const indicator = document.createElement('div');
-    indicator.className = 'invite-status';
-    indicator.style.cssText = 'font-size: 0.8em; margin-top: 4px; display: flex; align-items: center; gap: 4px;';
-    
-    if (hasPendingInvites) {
-        indicator.innerHTML = `
-            <i class="fas fa-clock" style="color: #ff9800; font-size: 0.9em;"></i>
-            <span style="color: #ff9800;">${serverGroup.toUpperCase()}: Pending</span>
-        `;
-    } else if (hasAccess) {
-        indicator.innerHTML = `
-            <i class="fas fa-check-circle" style="color: #4caf50; font-size: 0.9em;"></i>
-            <span style="color: #4caf50;">${serverGroup.toUpperCase()}: Active</span>
-        `;
-    }
-    
-    return indicator;
-},
 
     // Display invite status indicator for a specific server
     displayInviteStatusForServer(serverGroup, inviteResponse, userEmail) {
