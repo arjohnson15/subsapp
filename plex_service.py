@@ -649,9 +649,38 @@ def cancel_pending_invite(server_config, user_email):
         
         if invite:
             signal.alarm(30)
-            account.cancelInvite(user_email)
+            # TRY MULTIPLE METHODS TO CANCEL THE INVITE
+            try:
+                # Method 1: Use the invite ID with cancelInvite
+                if hasattr(invite, 'id') and invite.id:
+                    account.cancelInvite(invite.id)
+                    log_info(f"Cancelled pending invite for {user_email} on {server_config['name']} using invite ID")
+                else:
+                    # Method 2: Use email with cancelInvite  
+                    account.cancelInvite(user_email)
+                    log_info(f"Cancelled pending invite for {user_email} on {server_config['name']} using email")
+            except Exception as cancel_error:
+                # Method 3: Try direct API call
+                log_info(f"cancelInvite failed ({str(cancel_error)}), trying direct API...")
+                try:
+                    import requests
+                    url = f"https://plex.tv/api/servers/{server_config.get('server_id', '')}/shared_servers/{invite.id}"
+                    headers = {'X-Plex-Token': server_config['token']}
+                    response = requests.delete(url, headers=headers, timeout=30)
+                    if response.status_code in [200, 204]:
+                        log_info(f"Cancelled pending invite for {user_email} on {server_config['name']} using direct API")
+                    else:
+                        raise Exception(f"Direct API cancel failed: HTTP {response.status_code}")
+                except Exception as api_error:
+                    signal.alarm(0)
+                    log_error(f"All cancellation methods failed for {user_email}: {str(api_error)}")
+                    return {
+                        "success": False,
+                        "error": f"Failed to cancel invite: {str(cancel_error)}",
+                        "server": server_config['name']
+                    }
+            
             signal.alarm(0)
-            log_info(f"Cancelled pending invite for {user_email} on {server_config['name']}")
             return {
                 "success": True,
                 "action": "invite_cancelled",
