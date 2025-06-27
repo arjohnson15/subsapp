@@ -532,3 +532,8 @@ th.sortable .sort-arrow {
         font-size: 0.9rem;
     }
 }
+
+.invite-warning {
+    background: linear-gradient(45deg, #ff9800, #ffb74d);
+    /* ... rest of CSS ... */
+}

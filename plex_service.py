@@ -533,6 +533,506 @@ def remove_user_from_server_group(user_email, server_group):
             "error": str(e),
             "server_group": server_group
         }
+        
+def check_invite_status_all_servers(user_email):
+    """Check invite status across all Plex servers"""
+    try:
+        results = {}
+        for server_group_name, server_group in PLEX_SERVERS.items():
+            results[server_group_name] = {}
+            
+            for server_type, server_config in server_group.items():
+                try:
+                    log_info(f"Checking invites for {server_config['name']}")
+                    
+                    signal.alarm(60)  # 60 second timeout
+                    account = MyPlexAccount(token=server_config["token"])
+                    invitations = account.pendingInvites()
+                    signal.alarm(0)
+                    
+                    # Find invite for this user
+                    invite = next((invite for invite in invitations if invite.email.lower() == user_email.lower()), None)
+                    
+                    if invite:
+                        results[server_group_name][server_type] = {
+                            "status": "pending",
+                            "server": server_config['name'],
+                            "email": user_email,
+                            "invite_id": getattr(invite, 'id', None)
+                        }
+                        log_info(f"Found pending invite for {user_email} on {server_config['name']}")
+                    else:
+                        # Check if user exists (accepted)
+                        try:
+                            signal.alarm(30)
+                            user = account.user(user_email)
+                            signal.alarm(0)
+                            if user:
+                                results[server_group_name][server_type] = {
+                                    "status": "accepted",
+                                    "server": server_config['name'],
+                                    "email": user_email
+                                }
+                            else:
+                                results[server_group_name][server_type] = {
+                                    "status": "none",
+                                    "server": server_config['name'],
+                                    "email": user_email
+                                }
+                        except NotFound:
+                            signal.alarm(0)
+                            results[server_group_name][server_type] = {
+                                "status": "none",
+                                "server": server_config['name'],
+                                "email": user_email
+                            }
+                        except Exception:
+                            signal.alarm(0)
+                            results[server_group_name][server_type] = {
+                                "status": "error",
+                                "server": server_config['name'],
+                                "email": user_email
+                            }
+                            
+                except Exception as e:
+                    signal.alarm(0)
+                    log_error(f"Error checking invites for {server_config['name']}: {str(e)}")
+                    results[server_group_name][server_type] = {
+                        "status": "error",
+                        "server": server_config['name'],
+                        "email": user_email,
+                        "error": str(e)
+                    }
+        
+        # Create summary
+        has_pending_invites = False
+        pending_servers = []
+        for server_group, servers in results.items():
+            for server_type, server_info in servers.items():
+                if server_info.get("status") == "pending":
+                    has_pending_invites = True
+                    pending_servers.append(f"{server_group} {server_type}")
+        
+        return {
+            "success": True,
+            "email": user_email,
+            "servers": results,
+            "summary": {
+                "has_pending_invites": has_pending_invites,
+                "pending_servers": pending_servers,
+                "total_servers_checked": len(results) * 2
+            }
+        }
+        
+    except Exception as e:
+        signal.alarm(0)
+        return {
+            "success": False,
+            "error": str(e),
+            "email": user_email
+        }
+
+def cancel_pending_invite(server_config, user_email):
+    """Cancel a pending invite for a user on a specific server"""
+    try:
+        signal.alarm(60)
+        account = MyPlexAccount(token=server_config["token"])
+        invitations = account.pendingInvites()
+        signal.alarm(0)
+        
+        # Find the invite for this user
+        invite = next((invite for invite in invitations if invite.email.lower() == user_email.lower()), None)
+        
+        if invite:
+            signal.alarm(30)
+            invite.delete()  # Cancel the invite
+            signal.alarm(0)
+            log_info(f"Cancelled pending invite for {user_email} on {server_config['name']}")
+            return {
+                "success": True,
+                "action": "invite_cancelled",
+                "server": server_config['name']
+            }
+        else:
+            log_info(f"No pending invite found for {user_email} on {server_config['name']}")
+            return {
+                "success": True,
+                "action": "no_invite_found",
+                "server": server_config['name']
+            }
+            
+    except Exception as e:
+        signal.alarm(0)
+        log_error(f"Error cancelling invite for {user_email} on {server_config['name']}: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "server": server_config['name']
+        }
+
+def remove_user_from_server_enhanced(server_config, user_email):
+    """Enhanced removal that handles both pending invites and existing users"""
+    try:
+        log_info(f"Enhanced removal for {user_email} from {server_config['name']}")
+        
+        signal.alarm(60)
+        account = MyPlexAccount(token=server_config["token"])
+        
+        # First, cancel any pending invites
+        invite_result = cancel_pending_invite(server_config, user_email)
+        
+        # Then try to remove the user if they exist
+        user_removed = False
+        try:
+            signal.alarm(30)
+            user = account.user(user_email)
+            if user:
+                account.removeFriend(user_email)
+                user_removed = True
+                log_info(f"Removed user {user_email} from {server_config['name']}")
+            signal.alarm(0)
+        except NotFound:
+            signal.alarm(0)
+            log_info(f"User {user_email} not found on {server_config['name']} (normal if they had pending invite)")
+        except Exception as e:
+            signal.alarm(0)
+            log_error(f"Error removing user from {server_config['name']}: {str(e)}")
+        
+        return {
+            "success": True,
+            "server": server_config['name'],
+            "invite_cancelled": invite_result.get("action") == "invite_cancelled",
+            "user_removed": user_removed,
+            "actions": [
+                invite_result.get("action", "no_action"),
+                "user_removed" if user_removed else "user_not_found"
+            ]
+        }
+        
+    except Exception as e:
+        signal.alarm(0)
+        log_error(f"Error in enhanced removal from {server_config['name']}: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "server": server_config['name']
+        }
+
+def remove_user_completely(user_email, server_groups):
+    """Completely remove user from specified server groups with invite cancellation"""
+    try:
+        log_info(f"Complete removal for {user_email} from server groups: {server_groups}")
+        
+        results = {
+            "success": True,
+            "user_email": user_email,
+            "server_groups": server_groups,
+            "details": {},
+            "summary": {
+                "invites_cancelled": 0,
+                "users_removed": 0,
+                "servers_processed": 0
+            }
+        }
+        
+        for server_group in server_groups:
+            if server_group not in PLEX_SERVERS:
+                results["details"][server_group] = {
+                    "success": False,
+                    "error": f"Invalid server group: {server_group}"
+                }
+                results["success"] = False
+                continue
+            
+            group_config = PLEX_SERVERS[server_group]
+            results["details"][server_group] = {}
+            
+            # Remove from regular server
+            regular_result = remove_user_from_server_enhanced(group_config['regular'], user_email)
+            results["details"][server_group]['regular'] = regular_result
+            
+            if regular_result.get("invite_cancelled"):
+                results["summary"]["invites_cancelled"] += 1
+            if regular_result.get("user_removed"):
+                results["summary"]["users_removed"] += 1
+            results["summary"]["servers_processed"] += 1
+            
+            # Remove from 4K server
+            fourk_result = remove_user_from_server_enhanced(group_config['fourk'], user_email)
+            results["details"][server_group]['fourk'] = fourk_result
+            
+            if fourk_result.get("invite_cancelled"):
+                results["summary"]["invites_cancelled"] += 1
+            if fourk_result.get("user_removed"):
+                results["summary"]["users_removed"] += 1
+            results["summary"]["servers_processed"] += 1
+            
+            if not regular_result['success'] or not fourk_result['success']:
+                results['success'] = False
+        
+        log_info(f"Complete removal summary: {results['summary']}")
+        return results
+        
+    except Exception as e:
+        signal.alarm(0)
+        return {
+            "success": False,
+            "error": str(e),
+            "user_email": user_email,
+            "server_groups": server_groups
+        }        
+
+# ADD these functions to your existing plex_service.py file
+# Place them before the main() function
+
+def check_invite_status_all_servers(user_email):
+    """Check invite status across all Plex servers"""
+    try:
+        results = {}
+        for server_group_name, server_group in PLEX_SERVERS.items():
+            results[server_group_name] = {}
+            
+            for server_type, server_config in server_group.items():
+                try:
+                    log_info(f"Checking invites for {server_config['name']}")
+                    
+                    signal.alarm(60)  # 60 second timeout
+                    account = MyPlexAccount(token=server_config["token"])
+                    invitations = account.pendingInvites()
+                    signal.alarm(0)
+                    
+                    # Find invite for this user
+                    invite = next((invite for invite in invitations if invite.email.lower() == user_email.lower()), None)
+                    
+                    if invite:
+                        results[server_group_name][server_type] = {
+                            "status": "pending",
+                            "server": server_config['name'],
+                            "email": user_email,
+                            "invite_id": getattr(invite, 'id', None)
+                        }
+                        log_info(f"Found pending invite for {user_email} on {server_config['name']}")
+                    else:
+                        # Check if user exists (accepted)
+                        try:
+                            signal.alarm(30)
+                            user = account.user(user_email)
+                            signal.alarm(0)
+                            if user:
+                                results[server_group_name][server_type] = {
+                                    "status": "accepted",
+                                    "server": server_config['name'],
+                                    "email": user_email
+                                }
+                            else:
+                                results[server_group_name][server_type] = {
+                                    "status": "none",
+                                    "server": server_config['name'],
+                                    "email": user_email
+                                }
+                        except NotFound:
+                            signal.alarm(0)
+                            results[server_group_name][server_type] = {
+                                "status": "none",
+                                "server": server_config['name'],
+                                "email": user_email
+                            }
+                        except Exception:
+                            signal.alarm(0)
+                            results[server_group_name][server_type] = {
+                                "status": "error",
+                                "server": server_config['name'],
+                                "email": user_email
+                            }
+                            
+                except Exception as e:
+                    signal.alarm(0)
+                    log_error(f"Error checking invites for {server_config['name']}: {str(e)}")
+                    results[server_group_name][server_type] = {
+                        "status": "error",
+                        "server": server_config['name'],
+                        "email": user_email,
+                        "error": str(e)
+                    }
+        
+        # Create summary
+        has_pending_invites = False
+        pending_servers = []
+        for server_group, servers in results.items():
+            for server_type, server_info in servers.items():
+                if server_info.get("status") == "pending":
+                    has_pending_invites = True
+                    pending_servers.append(f"{server_group} {server_type}")
+        
+        return {
+            "success": True,
+            "email": user_email,
+            "servers": results,
+            "summary": {
+                "has_pending_invites": has_pending_invites,
+                "pending_servers": pending_servers,
+                "total_servers_checked": len(results) * 2
+            }
+        }
+        
+    except Exception as e:
+        signal.alarm(0)
+        return {
+            "success": False,
+            "error": str(e),
+            "email": user_email
+        }
+
+def cancel_pending_invite(server_config, user_email):
+    """Cancel a pending invite for a user on a specific server"""
+    try:
+        signal.alarm(60)
+        account = MyPlexAccount(token=server_config["token"])
+        invitations = account.pendingInvites()
+        signal.alarm(0)
+        
+        # Find the invite for this user
+        invite = next((invite for invite in invitations if invite.email.lower() == user_email.lower()), None)
+        
+        if invite:
+            signal.alarm(30)
+            invite.delete()  # Cancel the invite
+            signal.alarm(0)
+            log_info(f"Cancelled pending invite for {user_email} on {server_config['name']}")
+            return {
+                "success": True,
+                "action": "invite_cancelled",
+                "server": server_config['name']
+            }
+        else:
+            log_info(f"No pending invite found for {user_email} on {server_config['name']}")
+            return {
+                "success": True,
+                "action": "no_invite_found",
+                "server": server_config['name']
+            }
+            
+    except Exception as e:
+        signal.alarm(0)
+        log_error(f"Error cancelling invite for {user_email} on {server_config['name']}: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "server": server_config['name']
+        }
+
+def remove_user_from_server_enhanced(server_config, user_email):
+    """Enhanced removal that handles both pending invites and existing users"""
+    try:
+        log_info(f"Enhanced removal for {user_email} from {server_config['name']}")
+        
+        signal.alarm(60)
+        account = MyPlexAccount(token=server_config["token"])
+        
+        # First, cancel any pending invites
+        invite_result = cancel_pending_invite(server_config, user_email)
+        
+        # Then try to remove the user if they exist
+        user_removed = False
+        try:
+            signal.alarm(30)
+            user = account.user(user_email)
+            if user:
+                account.removeFriend(user_email)
+                user_removed = True
+                log_info(f"Removed user {user_email} from {server_config['name']}")
+            signal.alarm(0)
+        except NotFound:
+            signal.alarm(0)
+            log_info(f"User {user_email} not found on {server_config['name']} (normal if they had pending invite)")
+        except Exception as e:
+            signal.alarm(0)
+            log_error(f"Error removing user from {server_config['name']}: {str(e)}")
+        
+        return {
+            "success": True,
+            "server": server_config['name'],
+            "invite_cancelled": invite_result.get("action") == "invite_cancelled",
+            "user_removed": user_removed,
+            "actions": [
+                invite_result.get("action", "no_action"),
+                "user_removed" if user_removed else "user_not_found"
+            ]
+        }
+        
+    except Exception as e:
+        signal.alarm(0)
+        log_error(f"Error in enhanced removal from {server_config['name']}: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "server": server_config['name']
+        }
+
+def remove_user_completely(user_email, server_groups):
+    """Completely remove user from specified server groups with invite cancellation"""
+    try:
+        log_info(f"Complete removal for {user_email} from server groups: {server_groups}")
+        
+        results = {
+            "success": True,
+            "user_email": user_email,
+            "server_groups": server_groups,
+            "details": {},
+            "summary": {
+                "invites_cancelled": 0,
+                "users_removed": 0,
+                "servers_processed": 0
+            }
+        }
+        
+        for server_group in server_groups:
+            if server_group not in PLEX_SERVERS:
+                results["details"][server_group] = {
+                    "success": False,
+                    "error": f"Invalid server group: {server_group}"
+                }
+                results["success"] = False
+                continue
+            
+            group_config = PLEX_SERVERS[server_group]
+            results["details"][server_group] = {}
+            
+            # Remove from regular server
+            regular_result = remove_user_from_server_enhanced(group_config['regular'], user_email)
+            results["details"][server_group]['regular'] = regular_result
+            
+            if regular_result.get("invite_cancelled"):
+                results["summary"]["invites_cancelled"] += 1
+            if regular_result.get("user_removed"):
+                results["summary"]["users_removed"] += 1
+            results["summary"]["servers_processed"] += 1
+            
+            # Remove from 4K server
+            fourk_result = remove_user_from_server_enhanced(group_config['fourk'], user_email)
+            results["details"][server_group]['fourk'] = fourk_result
+            
+            if fourk_result.get("invite_cancelled"):
+                results["summary"]["invites_cancelled"] += 1
+            if fourk_result.get("user_removed"):
+                results["summary"]["users_removed"] += 1
+            results["summary"]["servers_processed"] += 1
+            
+            if not regular_result['success'] or not fourk_result['success']:
+                results['success'] = False
+        
+        log_info(f"Complete removal summary: {results['summary']}")
+        return results
+        
+    except Exception as e:
+        signal.alarm(0)
+        return {
+            "success": False,
+            "error": str(e),
+            "user_email": user_email,
+            "server_groups": server_groups
+        }
+
 
 def main():
     """Main CLI interface with global timeout"""
@@ -561,12 +1061,28 @@ def main():
             result = remove_user_from_server_group(user_email, server_group)
             print(json.dumps(result, indent=2))
             
+        # NEW COMMANDS - ADD THESE:
+        elif command == "check_invite_status" and len(sys.argv) >= 3:
+            user_email = sys.argv[2]
+            
+            result = check_invite_status_all_servers(user_email)
+            print(json.dumps(result, indent=2))
+            
+        elif command == "remove_user_completely" and len(sys.argv) >= 4:
+            user_email = sys.argv[2]
+            server_groups = json.loads(sys.argv[3])  # Array of server groups
+            
+            result = remove_user_completely(user_email, server_groups)
+            print(json.dumps(result, indent=2))
+            
         else:
             print(json.dumps({
                 "error": "Invalid command or arguments",
                 "usage": {
                     "share_libraries": "python plex_service.py share_libraries user@email.com plex1 '{\"regular\":[\"22\",\"1\"],\"fourk\":[\"1\"]}'",
-                    "remove_user": "python plex_service.py remove_user user@email.com plex1"
+                    "remove_user": "python plex_service.py remove_user user@email.com plex1",
+                    "check_invite_status": "python plex_service.py check_invite_status user@email.com",
+                    "remove_user_completely": "python plex_service.py remove_user_completely user@email.com '[\"plex1\", \"plex2\"]'"
                 }
             }))
             

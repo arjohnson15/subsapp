@@ -201,6 +201,69 @@ class PythonPlexService {
       };
     }
   }
+  
+    /**
+   * Check invite status for a user across all Plex servers
+   * 
+   * @param {string} userEmail - User's email address
+   * @returns {Promise<object>} Invite status across all servers
+   */
+  async checkInviteStatus(userEmail) {
+    try {
+      console.log(`🔍 Checking invite status for: ${userEmail}`);
+      
+      const args = [
+        'check_invite_status',
+        userEmail
+      ];
+      
+      const result = await this.executePythonCommand(args);
+      
+      console.log(`📊 Invite status result:`, result);
+      return result;
+      
+    } catch (error) {
+      console.error(`❌ Error checking invite status:`, error);
+      return {
+        success: false,
+        error: error.message,
+        email: userEmail
+      };
+    }
+  }
+
+  /**
+   * Completely remove user from multiple server groups with invite cancellation
+   * 
+   * @param {string} userEmail - User's email address
+   * @param {string[]} serverGroups - Array of server groups ['plex1', 'plex2']
+   * @returns {Promise<object>} Complete removal result
+   */
+  async removeUserCompletely(userEmail, serverGroups) {
+    try {
+      console.log(`🗑️ Complete removal for ${userEmail} from:`, serverGroups);
+      
+      const args = [
+        'remove_user_completely',
+        userEmail,
+        JSON.stringify(serverGroups)
+      ];
+      
+      const result = await this.executePythonCommand(args);
+      
+      console.log(`📊 Complete removal result:`, result);
+      return result;
+      
+    } catch (error) {
+      console.error(`❌ Complete removal failed:`, error);
+      return {
+        success: false,
+        error: error.message,
+        user_email: userEmail,
+        server_groups: serverGroups
+      };
+    }
+  }
 }
 
 module.exports = new PythonPlexService();

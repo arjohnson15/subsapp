@@ -430,4 +430,117 @@ router.post('/debug/test-update/:email', async (req, res) => {
   }
 });
 
+// Check invite status for a user across all Plex servers
+router.get('/invite-status/:userEmail', async (req, res) => {
+  try {
+    const { userEmail } = req.params;
+    
+    if (!userEmail) {
+      return res.status(400).json({ error: 'Missing userEmail parameter' });
+    }
+    
+    console.log(`🔍 API: Checking invite status for ${userEmail}`);
+    
+    const pythonPlexService = require('../python-plex-wrapper');
+    const result = await pythonPlexService.checkInviteStatus(userEmail);
+    
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  } catch (error) {
+    console.error('Error checking invite status:', error);
+    res.status(500).json({ error: 'Failed to check invite status' });
+  }
+});
+
+// Enhanced remove access with invite cancellation
+router.post('/remove-access-enhanced', async (req, res) => {
+  try {
+    const { userEmail, serverGroups } = req.body;
+    
+    if (!userEmail || !serverGroups || !Array.isArray(serverGroups)) {
+      return res.status(400).json({ error: 'Missing required fields: userEmail, serverGroups (array)' });
+    }
+    
+    console.log(`🗑️ API: Enhanced removal for ${userEmail} from:`, serverGroups);
+    
+    const pythonPlexService = require('../python-plex-wrapper');
+    const plexService = require('../plex-service');
+    
+    // First check current invite status
+    const inviteStatus = await pythonPlexService.checkInviteStatus(userEmail);
+    console.log(`🔍 Current invite status:`, inviteStatus);
+    
+    // Use enhanced complete removal
+    const result = await pythonPlexService.removeUserCompletely(userEmail, serverGroups);
+    
+    if (result.success) {
+      // Update database to reflect removal
+      const emptyAccess = { plex1: { regular: [], fourk: [] }, plex2: { regular: [], fourk: [] } };
+      await plexService.updateUserLibraryAccessInDatabase(userEmail, emptyAccess);
+      
+      console.log(`✅ Enhanced removal completed:`, result.summary);
+      
+      res.json({
+        ...result,
+        inviteStatus: inviteStatus,
+        enhanced: true,
+        message: `Enhanced removal completed - ${result.summary.invites_cancelled} invites cancelled, ${result.summary.users_removed} users removed from ${result.summary.servers_processed} servers`
+      });
+    } else {
+      res.status(500).json({
+        ...result,
+        inviteStatus: inviteStatus
+      });
+    }
+  } catch (error) {
+    console.error('Error in enhanced user removal:', error);
+    res.status(500).json({ error: 'Failed to remove user access' });
+  }
+});
+
+// Get current user access with invite status
+router.get('/user-access-with-status/:userEmail', async (req, res) => {
+  try {
+    const { userEmail } = req.params;
+    
+    if (!userEmail) {
+      return res.status(400).json({ error: 'Missing userEmail parameter' });
+    }
+    
+    console.log(`📋 API: Getting access and invite status for ${userEmail}`);
+    
+    const pythonPlexService = require('../python-plex-wrapper');
+    const plexService = require('../plex-service');
+    
+    // Get current access
+    const currentAccess = await plexService.getUserCurrentAccess(userEmail);
+    
+    // Get invite status
+    const inviteStatus = await pythonPlexService.checkInviteStatus(userEmail);
+    
+    res.json({
+      success: true,
+      userEmail: userEmail,
+      currentAccess: currentAccess,
+      inviteStatus: inviteStatus,
+      summary: {
+        has_any_access: Object.values(currentAccess).some(serverAccess => 
+          serverAccess.regular.length > 0 || serverAccess.fourk.length > 0
+        ),
+        has_pending_invites: inviteStatus.summary?.has_pending_invites || false,
+        total_libraries: Object.values(currentAccess).reduce((total, serverAccess) => 
+          total + serverAccess.regular.length + serverAccess.fourk.length, 0
+        )
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error getting user access with status:', error);
+    res.status(500).json({ error: 'Failed to get user access and invite status' });
+  }
+});
+
 module.exports = router;

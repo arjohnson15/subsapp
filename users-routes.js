@@ -653,4 +653,189 @@ router.post('/:id/sync-plex', async (req, res) => {
   }
 });
 
+// Enhanced remove all Plex access for a user
+router.post('/:id/remove-plex-access', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    console.log(`🗑️ API: Complete Plex removal request for user ID: ${userId}`);
+    
+    // Get user data
+    const [user] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const userEmail = user.plex_email || user.email;
+    
+    if (!userEmail) {
+      return res.status(400).json({ error: 'User has no email configured for Plex removal' });
+    }
+    
+    console.log(`📧 Using email for Plex removal: ${userEmail}`);
+    
+    // Get current user tags to determine which server groups to remove from
+    const currentTags = user.tags ? JSON.parse(user.tags) : [];
+    const serverGroupsToRemove = [];
+    
+    if (currentTags.includes('Plex 1')) {
+      serverGroupsToRemove.push('plex1');
+    }
+    if (currentTags.includes('Plex 2')) {
+      serverGroupsToRemove.push('plex2');
+    }
+    
+    // If user has no Plex tags, still try to remove from all servers for safety
+    if (serverGroupsToRemove.length === 0) {
+      serverGroupsToRemove.push('plex1', 'plex2');
+      console.log(`⚠️ User has no Plex tags, will attempt removal from all servers for safety`);
+    }
+    
+    console.log(`🎯 Will remove from server groups:`, serverGroupsToRemove);
+    
+    // Step 1: Remove from Plex servers (including pending invites)
+    const pythonPlexService = require('../python-plex-wrapper');
+    const plexRemovalResult = await pythonPlexService.removeUserCompletely(userEmail, serverGroupsToRemove);
+    
+    console.log(`🗑️ Plex removal result:`, plexRemovalResult);
+    
+    // Step 2: Clear Plex-related data from database
+    const updateData = {
+      plex_email: null,
+      plex_libraries: JSON.stringify({ plex1: { regular: [], fourk: [] }, plex2: { regular: [], fourk: [] } })
+    };
+    
+    // Step 3: Remove Plex tags
+    const updatedTags = currentTags.filter(tag => !['Plex 1', 'Plex 2'].includes(tag));
+    updateData.tags = JSON.stringify(updatedTags);
+    
+    // Step 4: Remove Plex subscriptions
+    await db.query('DELETE FROM subscriptions WHERE user_id = ? AND subscription_type_id IN (SELECT id FROM subscription_types WHERE name LIKE "%Plex%")', [userId]);
+    
+    // Step 5: Update user record
+    const updateFields = Object.keys(updateData).map(key => `${key} = ?`).join(', ');
+    const updateValues = Object.values(updateData);
+    updateValues.push(userId);
+    
+    await db.query(`UPDATE users SET ${updateFields}, updated_at = NOW() WHERE id = ?`, updateValues);
+    
+    console.log(`💾 Database updated - removed Plex data and subscriptions`);
+    
+    // Prepare response
+    const removedTags = currentTags.filter(tag => ['Plex 1', 'Plex 2'].includes(tag));
+    const invitesCancelled = plexRemovalResult.summary?.invites_cancelled || 0;
+    const usersRemoved = plexRemovalResult.summary?.users_removed || 0;
+    
+    res.json({
+      success: plexRemovalResult.success,
+      message: `Complete Plex removal ${plexRemovalResult.success ? 'completed' : 'completed with some issues'}`,
+      details: {
+        plexRemoval: plexRemovalResult,
+        databaseUpdated: true,
+        subscriptionsRemoved: true,
+        serverGroupsProcessed: serverGroupsToRemove,
+        invitesCancelled: invitesCancelled,
+        usersRemoved: usersRemoved,
+        removedTags: removedTags,
+        clearedPlexEmail: !!user.plex_email,
+        clearedLibraryAccess: true
+      },
+      summary: {
+        totalActions: invitesCancelled + usersRemoved + (removedTags.length > 0 ? 1 : 0) + 1, // +1 for database update
+        serverGroupsProcessed: serverGroupsToRemove.length,
+        invitesCancelled: invitesCancelled,
+        usersRemoved: usersRemoved,
+        removedTags: removedTags
+      },
+      user: {
+        id: userId,
+        name: user.name,
+        email: userEmail,
+        previousTags: currentTags,
+        newTags: updatedTags
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error in complete Plex removal:', error);
+    res.status(500).json({ 
+      error: 'Failed to remove Plex access completely',
+      details: error.message 
+    });
+  }
+});
+
+// Get user with enhanced Plex status (invite status + current access)
+router.get('/:id/plex-status', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    console.log(`🔍 API: Getting enhanced Plex status for user ID: ${userId}`);
+    
+    // Get user data
+    const [user] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const userEmail = user.plex_email || user.email;
+    
+    if (!userEmail) {
+      return res.json({
+        success: true,
+        user: { id: userId, name: user.name },
+        hasEmail: false,
+        message: 'User has no email configured for Plex'
+      });
+    }
+    
+    // Get current library access
+    const plexService = require('../plex-service');
+    const currentAccess = await plexService.getUserCurrentAccess(userEmail);
+    
+    // Get invite status
+    const pythonPlexService = require('../python-plex-wrapper');
+    const inviteStatus = await pythonPlexService.checkInviteStatus(userEmail);
+    
+    // Analyze the data
+    const hasAnyAccess = Object.values(currentAccess).some(serverAccess => 
+      serverAccess.regular.length > 0 || serverAccess.fourk.length > 0
+    );
+    
+    const hasPendingInvites = inviteStatus.summary?.has_pending_invites || false;
+    const pendingServers = inviteStatus.summary?.pending_servers || [];
+    
+    res.json({
+      success: true,
+      user: {
+        id: userId,
+        name: user.name,
+        email: userEmail,
+        tags: user.tags ? JSON.parse(user.tags) : []
+      },
+      hasEmail: true,
+      currentAccess: currentAccess,
+      inviteStatus: inviteStatus,
+      summary: {
+        hasAnyAccess: hasAnyAccess,
+        hasPendingInvites: hasPendingInvites,
+        pendingServers: pendingServers,
+        totalLibraries: Object.values(currentAccess).reduce((total, serverAccess) => 
+          total + serverAccess.regular.length + serverAccess.fourk.length, 0
+        ),
+        status: hasPendingInvites ? 'pending_invites' : (hasAnyAccess ? 'has_access' : 'no_access')
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error getting user Plex status:', error);
+    res.status(500).json({ 
+      error: 'Failed to get user Plex status',
+      details: error.message 
+    });
+  }
+});
+
 module.exports = router;

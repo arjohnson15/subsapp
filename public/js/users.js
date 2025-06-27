@@ -789,7 +789,124 @@ console.log('🔍 Processed subscription data:', {
         }
     },
     
-    // Remove all Plex access for current user
+	
+    // Check invite status and display appropriate indicators
+    async checkAndDisplayInviteStatus(userEmail, plexTags) {
+        try {
+            console.log(`🔍 Checking invite status for ${userEmail} on servers:`, plexTags);
+            
+            const response = await API.call(`/plex/invite-status/${encodeURIComponent(userEmail)}`);
+            
+            if (response.success) {
+                // Display invite status for each server group
+                plexTags.forEach(serverGroup => {
+                    this.displayInviteStatusForServer(serverGroup, response, userEmail);
+                });
+            } else {
+                console.warn(`⚠️ Could not check invite status:`, response.error);
+            }
+            
+        } catch (error) {
+            console.error('❌ Error checking invite status:', error);
+        }
+    },
+
+    // Display invite status indicator for a specific server
+    displayInviteStatusForServer(serverGroup, inviteResponse, userEmail) {
+        const serverData = inviteResponse.servers?.[serverGroup];
+        if (!serverData) return;
+        
+        const statusContainer = document.getElementById(`${serverGroup}Status`);
+        if (!statusContainer) return;
+        
+        let hasPendingInvites = false;
+        let hasAccess = false;
+        const pendingServers = [];
+        
+        // Check both regular and 4K servers
+        for (const [serverType, serverInfo] of Object.entries(serverData)) {
+            if (serverInfo.status === 'pending') {
+                hasPendingInvites = true;
+                pendingServers.push(serverType);
+            } else if (serverInfo.status === 'accepted') {
+                hasAccess = true;
+            }
+        }
+        
+        // Create status indicator
+        let statusHtml = '';
+        let statusClass = 'connection-status';
+        
+        if (hasPendingInvites) {
+            statusHtml = `
+                <span class="${statusClass}" style="color: #ff9800; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-clock" style="color: #ff9800;"></i>
+                    <span>Needs to Accept Invite</span>
+                    <small style="color: #ffb74d;">(${pendingServers.join(', ')} server${pendingServers.length > 1 ? 's' : ''})</small>
+                </span>
+            `;
+            
+            // Also add warning to library sections
+            this.addInviteWarningToLibraries(serverGroup, pendingServers);
+            
+        } else if (hasAccess) {
+            statusHtml = `
+                <span class="${statusClass}" style="color: #4caf50; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-check-circle" style="color: #4caf50;"></i>
+                    <span>Access Granted</span>
+                </span>
+            `;
+        } else {
+            statusHtml = `
+                <span class="${statusClass}" style="color: #9e9e9e; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-user-slash" style="color: #9e9e9e;"></i>
+                    <span>No Access</span>
+                </span>
+            `;
+        }
+        
+        statusContainer.innerHTML = statusHtml;
+        
+        console.log(`📊 ${serverGroup} status: pending=${hasPendingInvites}, access=${hasAccess}`);
+    },
+
+    // Add warning message to library sections when user has pending invites
+    addInviteWarningToLibraries(serverGroup, pendingServers) {
+        const libraryGroup = document.getElementById(`${serverGroup}LibraryGroup`);
+        if (!libraryGroup) return;
+        
+        // Remove existing warning
+        const existingWarning = libraryGroup.querySelector('.invite-warning');
+        if (existingWarning) existingWarning.remove();
+        
+        // Add new warning
+        const warningDiv = document.createElement('div');
+        warningDiv.className = 'invite-warning';
+        warningDiv.style.cssText = `
+            background: linear-gradient(45deg, #ff9800, #ffb74d);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: pulse 2s infinite;
+        `;
+        warningDiv.innerHTML = `
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>User has pending invites on ${pendingServers.join(', ')} server${pendingServers.length > 1 ? 's' : ''}. Library access cannot be updated until invite is accepted.</span>
+        `;
+        
+        // Insert after the status container
+        const statusContainer = document.getElementById(`${serverGroup}Status`);
+        if (statusContainer && statusContainer.parentNode) {
+            statusContainer.parentNode.insertBefore(warningDiv, statusContainer.nextSibling);
+        }
+    },
+
+    // Enhanced remove all Plex access for current user
     async removePlexAccess() {
         const userId = window.AppState.editingUserId;
         const userData = window.AppState.currentUserData;
@@ -799,7 +916,7 @@ console.log('🔍 Processed subscription data:', {
             return;
         }
         
-        const confirmMessage = `Are you sure you want to COMPLETELY REMOVE all Plex access for ${userData.name}?\n\nThis will:\n- Remove them from all Plex servers\n- Clear all library access\n- Remove Plex tags\n- Clear Plex email\n\nThis action cannot be undone!`;
+        const confirmMessage = `Are you sure you want to COMPLETELY REMOVE all Plex access for ${userData.name}?\n\nThis will:\n- Cancel any pending invites\n- Remove them from all Plex servers\n- Clear all library access\n- Remove Plex tags from user\n- Clear Plex email\n- Remove Plex subscriptions\n\nThis action cannot be undone!`;
         
         if (!confirm(confirmMessage)) return;
         
@@ -812,8 +929,12 @@ console.log('🔍 Processed subscription data:', {
             });
             
             if (result.success) {
+                const summary = result.summary;
                 Utils.showNotification(
-                    `All Plex access removed for ${userData.name}. Removed tags: ${result.removedTags.join(', ')}`,
+                    `Complete Plex removal successful for ${userData.name}! ` +
+                    `${summary.invitesCancelled} invites cancelled, ` +
+                    `${summary.usersRemoved} users removed, ` +
+                    `${summary.removedTags.length} tags removed.`,
                     'success'
                 );
                 
@@ -833,6 +954,114 @@ console.log('🔍 Processed subscription data:', {
             Utils.hideLoading();
         }
     },
+
+    // Remove user from specific Plex server group
+    async removePlexServerAccess(serverGroup) {
+        const userId = window.AppState.editingUserId;
+        const userData = window.AppState.currentUserData;
+        
+        if (!userId || !userData) {
+            Utils.showNotification('No user selected for Plex removal', 'error');
+            return;
+        }
+        
+        const confirmMessage = `Remove ${userData.name} from ${serverGroup.toUpperCase()}?\n\nThis will:\n- Cancel any pending invites on ${serverGroup}\n- Remove them from ${serverGroup} servers\n- Clear ${serverGroup} library access\n- Remove ${serverGroup} tag if no other access\n\nThis action cannot be undone!`;
+        
+        if (!confirm(confirmMessage)) return;
+        
+        try {
+            Utils.showLoading();
+            console.log(`🗑️ Removing ${serverGroup} access for user ID: ${userId}`);
+            
+            const userEmail = userData.plex_email || userData.email;
+            if (!userEmail) {
+                Utils.showNotification('User has no email configured for Plex removal', 'error');
+                return;
+            }
+            
+            // Remove from specific server group using enhanced removal
+            const result = await API.call('/plex/remove-access-enhanced', {
+                method: 'POST',
+                body: JSON.stringify({
+                    userEmail: userEmail,
+                    serverGroups: [serverGroup]
+                })
+            });
+            
+            if (result.success) {
+                const summary = result.summary;
+                Utils.showNotification(
+                    `${serverGroup.toUpperCase()} removal successful! ` +
+                    `${summary.invites_cancelled} invites cancelled, ` +
+                    `${summary.users_removed} users removed.`,
+                    'success'
+                );
+                
+                // Clear the relevant checkboxes
+                this.clearServerGroupCheckboxes(serverGroup);
+                
+                // Update status
+                const statusContainer = document.getElementById(`${serverGroup}Status`);
+                if (statusContainer) {
+                    statusContainer.innerHTML = '<span class="connection-status" style="color: #9e9e9e;">Access Removed</span>';
+                }
+                
+                // Reload user data to reflect changes
+                await this.loadUsers();
+            } else {
+                Utils.showNotification('Failed to remove access: ' + (result.error || 'Unknown error'), 'error');
+            }
+            
+        } catch (error) {
+            console.error('❌ Error removing server group access:', error);
+            Utils.handleError(error, 'Removing server group access');
+        } finally {
+            Utils.hideLoading();
+        }
+    },
+
+    // Clear checkboxes for a specific server group
+    clearServerGroupCheckboxes(serverGroup) {
+        // Clear regular library checkboxes
+        const regularCheckboxes = document.querySelectorAll(`input[name="${serverGroup}_regular"]`);
+        regularCheckboxes.forEach(checkbox => checkbox.checked = false);
+        
+        // Clear 4K library checkboxes
+        const fourkCheckboxes = document.querySelectorAll(`input[name="${serverGroup}_fourk"]`);
+        fourkCheckboxes.forEach(checkbox => checkbox.checked = false);
+        
+        // Uncheck the tag
+        const tagCheckbox = document.querySelector(`input[name="tags"][value="Plex ${serverGroup === 'plex1' ? '1' : '2'}"]`);
+        if (tagCheckbox) tagCheckbox.checked = false;
+        
+        console.log(`🧹 Cleared ${serverGroup} checkboxes`);
+    },
+
+    // Refresh form after complete Plex removal
+    refreshFormAfterPlexRemoval(result) {
+        // Clear Plex email
+        const plexEmailField = document.getElementById('plexEmail');
+        if (plexEmailField) plexEmailField.value = '';
+        
+        // Clear all Plex tags
+        const plexTags = ['Plex 1', 'Plex 2'];
+        plexTags.forEach(tag => {
+            const checkbox = document.querySelector(`input[name="tags"][value="${tag}"]`);
+            if (checkbox) checkbox.checked = false;
+        });
+        
+        // Clear all library checkboxes
+        this.clearServerGroupCheckboxes('plex1');
+        this.clearServerGroupCheckboxes('plex2');
+        
+        // Hide library sections
+        const plex1Group = document.getElementById('plex1LibraryGroup');
+        const plex2Group = document.getElementById('plex2LibraryGroup');
+        if (plex1Group) plex1Group.style.display = 'none';
+        if (plex2Group) plex2Group.style.display = 'none';
+        
+        console.log(`🔄 Form refreshed after Plex removal`);
+    },	
     
     // Remove user from specific Plex server group
     async removePlexServerAccess(serverGroup) {
@@ -1194,23 +1423,31 @@ function populateFormForEditing(user) {
         managementSection.style.display = hasPlexAccess ? 'block' : 'none';
     }
     
-    if (user.tags && Array.isArray(user.tags)) {
-        user.tags.forEach(tag => {
-            const checkbox = document.querySelector(`input[name="tags"][value="${tag}"]`);
-            if (checkbox) {
-                checkbox.checked = true;
-                console.log(`✅ Checked tag: ${tag}`);
-                
-                // Show library sections for Plex tags and pre-select libraries
-                if (tag === 'Plex 1') {
-                    showPlexLibrariesAndPreSelect('plex1', user);
-                }
-                if (tag === 'Plex 2') {
-                    showPlexLibrariesAndPreSelect('plex2', user);
-                }
+const plexTags = []; // ADD THIS LINE
+if (user.tags && Array.isArray(user.tags)) {
+    user.tags.forEach(tag => {
+        const checkbox = document.querySelector(`input[name="tags"][value="${tag}"]`);
+        if (checkbox) {
+            checkbox.checked = true;
+            
+            // Show library sections for Plex tags
+            if (tag === 'Plex 1') {
+                plexTags.push('plex1'); // ADD THIS LINE
+                // existing code for Plex 1
             }
-        });
-    }
+            if (tag === 'Plex 2') {
+                plexTags.push('plex2'); // ADD THIS LINE
+                // existing code for Plex 2
+            }
+        }
+    });
+}
+
+// ADD THESE LINES AT THE END OF THE FUNCTION:
+// If user has Plex tags, check invite status and show appropriate indicators
+if (plexTags.length > 0 && user.plex_email) {
+    await this.checkAndDisplayInviteStatus(user.plex_email, plexTags);
+}
     
     console.log(`✅ Form population completed for ${user.name}`);
 }
