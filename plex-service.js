@@ -537,17 +537,20 @@ class PlexService {
     }
   }
 
-  // Update sync timestamp
+
+// Update the sync timestamp setting
   async updateSyncTimestamp() {
     try {
       const timestamp = new Date().toISOString();
       await db.query(`
         INSERT INTO settings (setting_key, setting_value, setting_type)
-        VALUES ('last_plex_sync', ?, 'datetime')
+        VALUES ('last_plex_sync', ?, 'string')
         ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = NOW()
       `, [timestamp, timestamp]);
+      
+      console.log('✅ Sync timestamp updated successfully');
     } catch (error) {
-      console.error('Error updating sync timestamp:', error);
+      console.error('❌ Error updating sync timestamp:', error);
     }
   }
 

@@ -2,46 +2,66 @@
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
+    console.log('🚀 JohnsonFlix Manager starting...');
+    
+    // Initialize global state
+    if (!window.AppState) {
+        window.AppState = {
+            currentPage: 'dashboard',
+            editingUserId: null,
+            currentUserData: null,
+            users: [],
+            owners: [],
+            subscriptionTypes: [],
+            plexLibraries: {
+                plex1: { regular: [], fourk: [] },
+                plex2: { regular: [], fourk: [] }
+            },
+            sortOrder: {},
+            filters: {}
+        };
+    }
+    
+    // Initialize new utility modules
+    window.ResponsiveUtils.init();
+    window.AccessibilityUtils.enhanceAccessibility();
+    
+    // Load initial data and then show dashboard
+    loadInitialData().then(() => {
+        showPage('dashboard');
+        console.log('✅ JohnsonFlix Manager initialized');
+    }).catch(error => {
+        console.error('❌ Failed to initialize app:', error);
+        Utils.showNotification('Failed to initialize application: ' + error.message, 'error');
+        // Still show dashboard even if initial data fails
+        showPage('dashboard');
+    });
+    
+    // Set up global error handlers
+    window.addEventListener('error', (e) => {
+        console.error('Global error:', e.error);
+        Utils.showNotification('An unexpected error occurred', 'error');
+    });
+    
+    window.addEventListener('unhandledrejection', function(event) {
+        console.error('Unhandled promise rejection:', event.reason);
+        Utils.handleError(event.reason, 'Promise rejection');
+        event.preventDefault();
+    });
+    
+    // Set up online/offline handlers
+    window.addEventListener('online', () => {
+        Utils.showNotification('Connection restored', 'success');
+    });
+    
+    window.addEventListener('offline', () => {
+        Utils.showNotification('Connection lost - some features may not work', 'warning');
+    });
+    
+    // Set up hash change handler
+    window.addEventListener('hashchange', handleHashChange);
 });
 
-// Handle browser back/forward
-window.addEventListener('hashchange', handleHashChange);
-
-async function initializeApp() {
-    try {
-        console.log('?? Initializing JohnsonFlix Manager...');
-        
-        // Initialize global state
-        if (!window.AppState) {
-            window.AppState = {
-                users: [],
-                owners: [],
-                subscriptionTypes: [],
-                plexLibraries: {
-                    plex1: { regular: [], fourk: [] },
-                    plex2: { regular: [], fourk: [] }
-                },
-                currentTemplate: '',
-                editingUserId: null,
-                currentPage: 'dashboard'
-            };
-        }
-        
-        // Load initial data
-        await loadInitialData();
-        
-        // Set up page routing
-        handleHashChange();
-        
-        checkModulesLoaded();
-
-         console.log('? JohnsonFlix Manager initialized successfully');
-    } catch (error) {
-        console.error('? Failed to initialize app:', error);
-        Utils.showNotification('Failed to initialize application: ' + error.message, 'error');
-    }
-}
 
 async function loadInitialData() {
     try {
@@ -68,17 +88,6 @@ async function loadInitialData() {
     }
 }
 
-// Debug: Check if all modules are loaded
-function checkModulesLoaded() {
-    const modules = ['Utils', 'API', 'Plex', 'Users', 'Email', 'Settings', 'Subscriptions'];
-    modules.forEach(module => {
-        if (window[module]) {
-            console.log(`? ${module} module loaded`);
-        } else {
-            console.error(`? ${module} module NOT loaded`);
-        }
-    });
-}
 
 // Page navigation with hash routing
 async function showPage(pageId) {
@@ -415,15 +424,16 @@ function showLibraryLoadError(serverGroup) {
 
 // Toggle Plex library sections based on tag selection
 function togglePlexLibrariesByTag(serverGroup, isChecked) {
-    const libraryGroup = document.getElementById(`${serverGroup}LibraryGroup`);
+    console.log(`🔧 Toggling ${serverGroup} libraries: ${isChecked}`);
     
+    const libraryGroup = document.getElementById(`${serverGroup}LibraryGroup`);
     if (!libraryGroup) {
-        console.error(`? Library group not found: ${serverGroup}LibraryGroup`);
+        console.error(`❌ Library group not found: ${serverGroup}LibraryGroup`);
         return;
     }
     
     if (isChecked) {
-        console.log(`? Showing ${serverGroup} libraries`);
+        console.log(`✅ Showing ${serverGroup} libraries`);
         libraryGroup.style.display = 'block';
         
         // Load and render libraries if not already done
@@ -432,25 +442,34 @@ function togglePlexLibrariesByTag(serverGroup, isChecked) {
             renderPlexLibrariesForGroup(serverGroup, data);
             
             // IMPORTANT: Pre-select libraries if editing a user
-            if (window.AppState.editingUserId) {
-                setTimeout(() => preSelectUserLibraries(serverGroup), 200);
+            if (window.AppState.editingUserId && window.AppState.currentUserData) {
+                setTimeout(() => preSelectUserLibraries(serverGroup), 300);
             }
         } else {
-            loadPlexLibrariesForGroup(serverGroup);
+            loadPlexLibrariesForGroup(serverGroup).then(() => {
+                // Pre-select after loading
+                if (window.AppState.editingUserId && window.AppState.currentUserData) {
+                    setTimeout(() => preSelectUserLibraries(serverGroup), 300);
+                }
+            });
         }
         
         // Test connection quietly
-        testPlexConnectionQuiet(serverGroup);
+        if (window.testPlexConnectionQuiet) {
+            testPlexConnectionQuiet(serverGroup);
+        }
     } else {
-        console.log(`? Hiding ${serverGroup} libraries`);
+        console.log(`❌ Hiding ${serverGroup} libraries`);
         libraryGroup.style.display = 'none';
-        clearAllLibrariesForGroup(serverGroup);
+        if (window.clearAllLibrariesForGroup) {
+            clearAllLibrariesForGroup(serverGroup);
+        }
     }
 }
 
 // NEW: Pre-select libraries based on user's current access
 function preSelectUserLibraries(serverGroup) {
-    console.log(`?? Pre-selecting libraries for ${serverGroup}...`);
+    console.log(`🔧 Pre-selecting libraries for ${serverGroup}...`);
     
     // Get the current user being edited
     if (!window.AppState.editingUserId || !window.AppState.currentUserData) {
@@ -466,7 +485,9 @@ function preSelectUserLibraries(serverGroup) {
     }
     
     const userAccess = user.plex_libraries[serverGroup];
-    console.log(`?? Pre-selecting based on cached access:`, userAccess);
+    console.log(`🔧 Pre-selecting based on cached access:`, userAccess);
+    
+    let selectedCount = 0;
     
     // Select regular libraries
     if (userAccess.regular && Array.isArray(userAccess.regular)) {
@@ -474,9 +495,10 @@ function preSelectUserLibraries(serverGroup) {
             const checkbox = document.querySelector(`input[name="${serverGroup}_regular"][value="${libId}"]`);
             if (checkbox) {
                 checkbox.checked = true;
-                console.log(`? Pre-selected regular library: ${libId}`);
+                selectedCount++;
+                console.log(`✅ Pre-selected regular library: ${libId}`);
             } else {
-                console.log(`?? Could not find checkbox for regular library: ${libId}`);
+                console.log(`⚠️ Could not find checkbox for regular library: ${libId}`);
             }
         });
     }
@@ -487,12 +509,15 @@ function preSelectUserLibraries(serverGroup) {
             const checkbox = document.querySelector(`input[name="${serverGroup}_fourk"][value="${libId}"]`);
             if (checkbox) {
                 checkbox.checked = true;
-                console.log(`? Pre-selected 4K library: ${libId}`);
+                selectedCount++;
+                console.log(`✅ Pre-selected 4K library: ${libId}`);
             } else {
-                console.log(`?? Could not find checkbox for 4K library: ${libId}`);
+                console.log(`⚠️ Could not find checkbox for 4K library: ${libId}`);
             }
         });
     }
+    
+    console.log(`🔧 Pre-selected ${selectedCount} libraries for ${serverGroup}`);
 }
 
 // Test Plex connection quietly
@@ -534,18 +559,72 @@ function clearAllLibrariesForGroup(serverGroup) {
 // Load and populate user for editing with enhanced library pre-selection
 async function loadAndPopulateUser(userId) {
     try {
-        console.log(`?? Loading user ${userId} for editing...`);
+        console.log(`🔧 Loading user data for ID: ${userId}`);
         
-        const user = await API.User.getById(userId);
-        console.log('?? User loaded:', user);
+        // Fetch user data from API
+        const response = await fetch(`/api/users/${userId}`);
+        const user = await response.json();
         
-        // Store user data globally for library pre-selection
+        if (!user) {
+            throw new Error('User not found');
+        }
+        
+        // Store user data in global state for pre-selection
         window.AppState.currentUserData = user;
         
-        populateUserForm(user);
+        console.log(`📋 Loaded user data:`, user);
+        
+        // Populate basic form fields
+        document.getElementById('userName').value = user.name || '';
+        document.getElementById('userEmail').value = user.email || '';
+        document.getElementById('plexEmail').value = user.plex_email || '';
+        document.getElementById('userOwner').value = user.owner_id || '';
+        document.getElementById('iptvUsername').value = user.iptv_username || '';
+        document.getElementById('iptvPassword').value = user.iptv_password || '';
+        document.getElementById('implayerCode').value = user.implayer_code || '';
+        document.getElementById('deviceCount').value = user.device_count || 1;
+        
+        // Set expiration dates
+        if (user.plex_expiration) {
+            const plexDate = new Date(user.plex_expiration);
+            if (!isNaN(plexDate.getTime())) {
+                document.getElementById('plexExpiration').value = plexDate.toISOString().split('T')[0];
+            }
+        }
+        
+        if (user.iptv_expiration) {
+            const iptvDate = new Date(user.iptv_expiration);
+            if (!isNaN(iptvDate.getTime())) {
+                document.getElementById('iptvExpiration').value = iptvDate.toISOString().split('T')[0];
+            }
+        }
+        
+        // Set checkboxes
+        document.getElementById('bccOwnerRenewal').checked = user.bcc_owner_renewal === 1;
+        
+        // Handle tags and show appropriate library sections
+        if (user.tags && Array.isArray(user.tags)) {
+            user.tags.forEach(tag => {
+                const checkbox = document.querySelector(`input[name="tags"][value="${tag}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    
+                    // Show library sections for Plex tags and trigger pre-selection
+                    if (tag === 'Plex 1') {
+                        togglePlexLibrariesByTag('plex1', true);
+                    }
+                    if (tag === 'Plex 2') {
+                        togglePlexLibrariesByTag('plex2', true);
+                    }
+                }
+            });
+        }
+        
+        console.log(`✅ Form population completed for ${user.name}`);
+        
     } catch (error) {
-        console.error('? Error loading user for editing:', error);
-        Utils.handleError(error, 'Loading user for editing');
+        console.error('❌ Error loading user data:', error);
+        Utils.handleError(error, 'Loading user data');
     }
 }
 
@@ -627,18 +706,6 @@ function handleHashChange() {
     showPage(page);
 }
 
-// Global error handler
-window.addEventListener('error', function(event) {
-    console.error('Global error:', event.error);
-    Utils.handleError(event.error, 'Application error');
-});
-
-// Global unhandled promise rejection handler
-window.addEventListener('unhandledrejection', function(event) {
-    console.error('Unhandled promise rejection:', event.reason);
-    Utils.handleError(event.reason, 'Promise rejection');
-    event.preventDefault();
-});
 
 // Dashboard functionality
 window.Dashboard = {
@@ -855,10 +922,339 @@ window.collectPlexLibrarySelections = function() {
     return plexLibraries;
 };
 
-// Export for use in other modules
-window.App = {
-    init: initializeApp,
-    showPage,
-    initializePage,
-    loadInitialData
+window.ResponsiveUtils = {
+    // Get current screen size category
+    getScreenSize() {
+        const width = window.innerWidth;
+        if (width <= 480) return 'mobile';
+        if (width <= 768) return 'tablet';
+        if (width <= 1024) return 'desktop';
+        return 'large';
+    },
+    
+    // Adjust table for mobile
+    adjustTableForMobile() {
+        const tables = document.querySelectorAll('table');
+        const isMobile = this.getScreenSize() === 'mobile';
+        
+        tables.forEach(table => {
+            if (isMobile) {
+                table.style.fontSize = 'var(--font-xs)';
+                // Hide less important columns on mobile
+                const cells = table.querySelectorAll('th:nth-child(3), td:nth-child(3)'); // Owner column
+                cells.forEach(cell => cell.style.display = 'none');
+            } else {
+                table.style.fontSize = '';
+                const cells = table.querySelectorAll('th:nth-child(3), td:nth-child(3)');
+                cells.forEach(cell => cell.style.display = '');
+            }
+        });
+    },
+    
+    // Adjust library checkboxes layout
+    adjustLibraryLayout() {
+        const libraryLists = document.querySelectorAll('.library-list');
+        const screenSize = this.getScreenSize();
+        
+        libraryLists.forEach(list => {
+            switch(screenSize) {
+                case 'mobile':
+                    list.style.gridTemplateColumns = '1fr';
+                    break;
+                case 'tablet':
+                    list.style.gridTemplateColumns = 'repeat(auto-fit, minmax(140px, 1fr))';
+                    break;
+                default:
+                    list.style.gridTemplateColumns = 'repeat(auto-fit, minmax(180px, 1fr))';
+            }
+        });
+    },
+    
+    // Initialize responsive handlers
+    init() {
+        // Initial adjustments
+        this.adjustTableForMobile();
+        this.adjustLibraryLayout();
+        
+        // Listen for resize events with debouncing
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                this.adjustTableForMobile();
+                this.adjustLibraryLayout();
+            }, 250);
+        });
+    }
 };
+
+window.FormValidation = {
+    // Show responsive error messages
+    showError(fieldId, message) {
+        const field = document.getElementById(fieldId);
+        if (!field) return;
+        
+        // Remove existing error
+        this.clearError(fieldId);
+        
+        // Create error element
+        const error = document.createElement('div');
+        error.className = 'field-error';
+        error.style.cssText = `
+            color: var(--error-color);
+            font-size: var(--font-xs);
+            margin-top: var(--spacing-xs);
+            padding: var(--spacing-xs);
+            background: rgba(244, 67, 54, 0.1);
+            border-radius: 4px;
+            border-left: 3px solid var(--error-color);
+        `;
+        error.textContent = message;
+        
+        // Insert after field
+        field.parentNode.insertBefore(error, field.nextSibling);
+        
+        // Add error styling to field
+        field.style.borderColor = 'var(--error-color)';
+        field.style.boxShadow = '0 0 0 2px rgba(244, 67, 54, 0.2)';
+    },
+    
+    // Clear error for field
+    clearError(fieldId) {
+        const field = document.getElementById(fieldId);
+        if (!field) return;
+        
+        // Remove error message
+        const error = field.parentNode.querySelector('.field-error');
+        if (error) error.remove();
+        
+        // Reset field styling
+        field.style.borderColor = '';
+        field.style.boxShadow = '';
+    },
+    
+    // Clear all errors
+    clearAllErrors() {
+        document.querySelectorAll('.field-error').forEach(error => error.remove());
+        document.querySelectorAll('input, select, textarea').forEach(field => {
+            field.style.borderColor = '';
+            field.style.boxShadow = '';
+        });
+    },
+    
+    // Validate email format
+    validateEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    },
+    
+    // Validate required fields
+    validateRequired(fieldId, fieldName) {
+        const field = document.getElementById(fieldId);
+        if (!field || !field.value.trim()) {
+            this.showError(fieldId, `${fieldName} is required`);
+            return false;
+        }
+        this.clearError(fieldId);
+        return true;
+    }
+};
+
+window.AccessibilityUtils = {
+    // Add ARIA labels and roles
+    enhanceAccessibility() {
+        // Add roles to tables
+        document.querySelectorAll('table').forEach(table => {
+            table.setAttribute('role', 'table');
+            table.querySelectorAll('th').forEach(th => th.setAttribute('role', 'columnheader'));
+            table.querySelectorAll('td').forEach(td => td.setAttribute('role', 'cell'));
+        });
+        
+        // Add aria-labels to buttons
+        document.querySelectorAll('.btn-small').forEach(btn => {
+            if (btn.textContent.includes('View')) btn.setAttribute('aria-label', 'View user details');
+            if (btn.textContent.includes('Edit')) btn.setAttribute('aria-label', 'Edit user');
+            if (btn.textContent.includes('Email')) btn.setAttribute('aria-label', 'Send email to user');
+            if (btn.textContent.includes('Delete')) btn.setAttribute('aria-label', 'Delete user');
+        });
+        
+        // Add skip links for keyboard navigation
+        this.addSkipLinks();
+    },
+    
+    // Add skip navigation links
+    addSkipLinks() {
+        const skipLink = document.createElement('a');
+        skipLink.href = '#main-content';
+        skipLink.textContent = 'Skip to main content';
+        skipLink.style.cssText = `
+            position: absolute;
+            top: -40px;
+            left: 6px;
+            background: var(--primary-color);
+            color: white;
+            padding: 8px;
+            text-decoration: none;
+            border-radius: 4px;
+            z-index: 1000;
+            transition: top 0.2s ease;
+        `;
+        
+        skipLink.addEventListener('focus', () => {
+            skipLink.style.top = '6px';
+        });
+        
+        skipLink.addEventListener('blur', () => {
+            skipLink.style.top = '-40px';
+        });
+        
+        document.body.insertBefore(skipLink, document.body.firstChild);
+        
+        // Add main content ID if not exists
+        const pageContent = document.getElementById('pageContent');
+        if (pageContent && !pageContent.id.includes('main')) {
+            pageContent.setAttribute('id', 'main-content');
+            pageContent.setAttribute('role', 'main');
+        }
+    },
+    
+    // Focus management for modals
+    trapFocus(modal) {
+        const focusableElements = modal.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        
+        if (focusableElements.length === 0) return;
+        
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+        
+        // Focus first element when modal opens
+        firstElement.focus();
+        
+        modal.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+                if (e.shiftKey && document.activeElement === firstElement) {
+                    e.preventDefault();
+                    lastElement.focus();
+                } else if (!e.shiftKey && document.activeElement === lastElement) {
+                    e.preventDefault();
+                    firstElement.focus();
+                }
+            } else if (e.key === 'Escape') {
+                const closeBtn = modal.querySelector('.close-btn');
+                if (closeBtn) closeBtn.click();
+            }
+        });
+    }
+};
+
+window.ModalManager = {
+    // Open modal with accessibility enhancements
+    openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+        
+        // Store previous focus
+        this.previousFocus = document.activeElement;
+        
+        // Show modal
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+        
+        // Add body class to prevent scrolling
+        document.body.style.overflow = 'hidden';
+        
+        // Enhance accessibility
+        window.AccessibilityUtils.trapFocus(modal);
+        
+        // Adjust for mobile
+        if (window.ResponsiveUtils.getScreenSize() === 'mobile') {
+            const modalContent = modal.querySelector('.modal-content');
+            if (modalContent) {
+                modalContent.style.width = '95vw';
+                modalContent.style.height = '90vh';
+                modalContent.style.margin = 'auto';
+                modalContent.style.overflow = 'auto';
+            }
+        }
+    },
+    
+    // Close modal and restore focus
+    closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+        
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+        
+        // Restore body scrolling
+        document.body.style.overflow = '';
+        
+        // Restore focus
+        if (this.previousFocus) {
+            this.previousFocus.focus();
+        }
+        
+        // Reset mobile styling
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.style.width = '';
+            modalContent.style.height = '';
+            modalContent.style.margin = '';
+            modalContent.style.overflow = '';
+        }
+    }
+};
+
+// NEW: Force load libraries function (for the "Force Load Libraries" button)
+window.forceLoadLibraries = async function() {
+    console.log('🔄 Force loading Plex libraries...');
+    
+    try {
+        Utils.showNotification('Reloading Plex libraries...', 'info');
+        
+        // Clear existing library data
+        window.AppState.plexLibraries = {
+            plex1: { regular: [], fourk: [] },
+            plex2: { regular: [], fourk: [] }
+        };
+        
+        // Force reload libraries for both groups
+        await Promise.all([
+            loadPlexLibrariesForGroup('plex1'),
+            loadPlexLibrariesForGroup('plex2')
+        ]);
+        
+        // Re-trigger pre-selection if editing a user
+        if (window.AppState.editingUserId && window.AppState.currentUserData) {
+            const user = window.AppState.currentUserData;
+            if (user.tags && Array.isArray(user.tags)) {
+                user.tags.forEach(tag => {
+                    if (tag === 'Plex 1' && document.getElementById('tag-plex1').checked) {
+                        setTimeout(() => preSelectUserLibraries('plex1'), 500);
+                    }
+                    if (tag === 'Plex 2' && document.getElementById('tag-plex2').checked) {
+                        setTimeout(() => preSelectUserLibraries('plex2'), 500);
+                    }
+                });
+            }
+        }
+        
+        Utils.showNotification('Plex libraries reloaded successfully!', 'success');
+        console.log('✅ Force load libraries completed');
+        
+    } catch (error) {
+        console.error('❌ Error force loading libraries:', error);
+        Utils.showNotification('Failed to reload libraries: ' + error.message, 'error');
+    }
+};
+
+// Update existing modal functions to use new manager
+function closeModal(modalId) {
+    window.ModalManager.closeModal(modalId);
+}
+
+function openModal(modalId) {
+    window.ModalManager.openModal(modalId);
+}
