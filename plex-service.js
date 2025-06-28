@@ -599,7 +599,7 @@ class PlexService {
     }
   }
 
-  // Get libraries from database for frontend (kept)
+// FIXED: Get libraries from database OR fetch from API if database is empty
   async getLibrariesForGroup(serverGroup) {
     try {
       const serverConfigs = this.getServerConfig();
@@ -609,23 +609,42 @@ class PlexService {
         throw new Error(`Invalid server group: ${serverGroup}`);
       }
 
+      // Try to get from database first
       const [regularLibsSetting] = await db.query(
         'SELECT setting_value FROM settings WHERE setting_key = ?',
         [`plex_libraries_${serverGroup}_regular`]
       );
-
-      const regularLibs = regularLibsSetting 
-        ? JSON.parse(regularLibsSetting.setting_value) 
-        : [];
 
       const [fourkLibsSetting] = await db.query(
         'SELECT setting_value FROM settings WHERE setting_key = ?',
         [`plex_libraries_${serverGroup}_fourk`]
       );
 
-      const fourkLibs = fourkLibsSetting 
+      let regularLibs = regularLibsSetting 
+        ? JSON.parse(regularLibsSetting.setting_value) 
+        : [];
+
+      let fourkLibs = fourkLibsSetting 
         ? JSON.parse(fourkLibsSetting.setting_value) 
         : config.fourk.libraries || [];
+
+      // FIXED: If no regular libraries in database, try to fetch from API
+      if (!regularLibs || regularLibs.length === 0) {
+        console.log(`📚 No libraries in database for ${serverGroup}, trying to fetch from API...`);
+        try {
+          regularLibs = await this.getServerLibraries(config.regular);
+          
+          // Store in database for next time
+          if (regularLibs && regularLibs.length > 0) {
+            await this.updateLibrariesInDatabase(serverGroup, 'regular', regularLibs);
+            console.log(`✅ Fetched and stored ${regularLibs.length} regular libraries for ${serverGroup}`);
+          }
+        } catch (error) {
+          console.error(`❌ Failed to fetch libraries from API for ${serverGroup}:`, error.message);
+          // Return empty array rather than failing
+          regularLibs = [];
+        }
+      }
 
       return {
         regular: regularLibs,
@@ -637,7 +656,19 @@ class PlexService {
       };
     } catch (error) {
       console.error('Error getting libraries for group:', error);
-      throw error;
+      
+      // FIXED: Return a safe fallback instead of throwing
+      const serverConfigs = this.getServerConfig();
+      const config = serverConfigs[serverGroup];
+      
+      return {
+        regular: [],
+        fourk: config?.fourk?.libraries || [{ id: '1', title: '4K Movies', type: 'movie' }],
+        serverNames: {
+          regular: config?.regular?.name || `${serverGroup} Regular`,
+          fourk: config?.fourk?.name || `${serverGroup} 4K`
+        }
+      };
     }
   }
 
