@@ -68,15 +68,19 @@ async function loadInitialData() {
         console.log('🔄 Loading initial data...');
         
         // Load only essential initial data (not users - they load when navigating to users page)
-        const [owners, subscriptions] = await Promise.all([
+        const [owners, subscriptions, settings] = await Promise.all([
             API.Owner.getAll(),
-            API.Subscription.getAll()
+            API.Subscription.getAll(),
+            API.Settings.getAll()  // <-- ADD THIS LINE
         ]);
 
         // Update global state
         window.AppState.owners = owners;
         window.AppState.subscriptionTypes = subscriptions;
         // Users will be loaded by the Users module when needed
+        
+        // APPLY BRANDING GLOBALLY - ADD THIS LINE
+        await applyGlobalBranding(settings);
         
         console.log('🔄 Initial data loaded:', {
             owners: owners.length,
@@ -86,6 +90,59 @@ async function loadInitialData() {
         console.error('Error loading initial data:', error);
         throw error;
     }
+}
+
+// Global branding application function
+async function applyGlobalBranding(settings) {
+    try {
+        console.log('🎨 Applying global branding...', settings);
+        
+        // Apply page title
+        if (settings.app_title && settings.app_subtitle) {
+            document.title = `${settings.app_title} - ${settings.app_subtitle}`;
+        } else if (settings.app_title) {
+            document.title = settings.app_title;
+        }
+        
+        // Apply favicon
+        if (settings.app_favicon) {
+            updateGlobalFavicon(settings.app_favicon);
+        }
+        
+        // Apply logo/title in header
+        const logoElement = document.querySelector('.logo');
+        if (logoElement) {
+            if (settings.app_logo) {
+                logoElement.innerHTML = `<img src="${settings.app_logo}" alt="${settings.app_title || 'Logo'}" style="max-height: 60px; max-width: 300px; object-fit: contain;">`;
+            } else if (settings.app_title) {
+                logoElement.textContent = settings.app_title;
+            }
+        }
+        
+        // Apply subtitle
+        const subtitleElement = document.querySelector('.subtitle');
+        if (subtitleElement && settings.app_subtitle) {
+            subtitleElement.textContent = settings.app_subtitle;
+        }
+        
+        console.log('✅ Global branding applied successfully');
+    } catch (error) {
+        console.error('❌ Error applying global branding:', error);
+    }
+}
+
+// Helper function for favicon updates
+function updateGlobalFavicon(faviconUrl) {
+    // Remove existing favicon links
+    const existingFavicons = document.querySelectorAll('link[rel*="icon"]');
+    existingFavicons.forEach(link => link.remove());
+    
+    // Add new favicon
+    const favicon = document.createElement('link');
+    favicon.rel = 'icon';
+    favicon.type = 'image/x-icon';
+    favicon.href = faviconUrl;
+    document.head.appendChild(favicon);
 }
 
 
