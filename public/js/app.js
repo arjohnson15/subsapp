@@ -1110,11 +1110,11 @@ window.AccessibilityUtils = {
         
         document.body.insertBefore(skipLink, document.body.firstChild);
         
-        // Add main content ID if not exists
+        // Add main content role without changing ID
         const pageContent = document.getElementById('pageContent');
-        if (pageContent && !pageContent.id.includes('main')) {
-            pageContent.setAttribute('id', 'main-content');
+        if (pageContent) {
             pageContent.setAttribute('role', 'main');
+            // Don't change the ID - keep it as 'pageContent' for compatibility
         }
     },
     
