@@ -459,6 +459,48 @@ window.Settings = {
         }
     },
 
+    // MISSING FUNCTION: Test Plex Connection
+    async testPlexConnection(serverGroup) {
+        // Look for the settings page status elements first
+        const statusElement = document.getElementById(`${serverGroup}ServerStatus`) || 
+                             document.getElementById(`${serverGroup}Status`);
+        
+        if (statusElement) {
+            statusElement.textContent = 'Testing...';
+            statusElement.className = 'connection-status';
+        }
+        
+        try {
+            const result = await API.Plex.testConnection(serverGroup);
+            
+            if (statusElement) {
+                if (result.success) {
+                    statusElement.textContent = 'Connected';
+                    statusElement.className = 'connection-status status-connected';
+                } else {
+                    statusElement.textContent = 'Failed';
+                    statusElement.className = 'connection-status status-disconnected';
+                }
+            }
+            
+            if (result.success) {
+                Utils.showNotification(`${serverGroup.toUpperCase()} connection successful!`, 'success');
+            } else {
+                Utils.showNotification(`${serverGroup.toUpperCase()} connection failed: ${result.error}`, 'error');
+            }
+            
+            return result;
+        } catch (error) {
+            console.error(`Error testing ${serverGroup} connection:`, error);
+            if (statusElement) {
+                statusElement.textContent = 'Error';
+                statusElement.className = 'connection-status status-disconnected';
+            }
+            Utils.showNotification(`Connection test failed: ${error.message}`, 'error');
+            throw error;
+        }
+    },
+
 async saveAllSettings() {
     try {
         const settingsData = {
@@ -589,5 +631,8 @@ window.addOwner = window.Settings.addOwner.bind(window.Settings);
 window.saveSettings = window.Settings.saveAllSettings.bind(window.Settings);
 window.testEmailConnection = window.Settings.testEmailConnection.bind(window.Settings);
 window.syncAllPlexLibraries = window.Settings.syncAllPlexLibraries.bind(window.Settings);
+
+// FIXED: Add the missing global testPlexConnection function
+window.testPlexConnection = window.Settings.testPlexConnection.bind(window.Settings);
 
 console.log('✅ Enhanced Settings.js loaded successfully');
