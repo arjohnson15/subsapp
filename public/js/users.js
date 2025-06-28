@@ -469,16 +469,17 @@ this.displayStoredLibraryAccess(user);
         }
     },
 	
-	// NEW: Render Plex status with pending invites support
+// FIXED: Render Plex status - ONLY show pending invites (what you care about)
 renderPlexStatus(user) {
     const pendingInvites = user.pending_plex_invites || null;
     
-    // Only show indicator if user has pending invites
+    // ONLY show indicator if user has pending invites - this is what you want to see
     if (pendingInvites && Object.keys(pendingInvites).length > 0) {
-        return '<span class="pending-invite-indicator">⏳ Pending Invite</span>';
+        const serverGroups = Object.keys(pendingInvites);
+        return `<span class="pending-invite-indicator" style="color: #ff9800; font-weight: bold;">⏳ Pending Invites (${serverGroups.join(', ')})</span>`;
     }
     
-    // Return empty string if no pending invites (no indicator needed)
+    // Return empty string if no pending invites - no need to clutter the table
     return '';
 },
     
@@ -880,64 +881,73 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
 },
 
 
-    // Display invite status indicator for a specific server
-    displayInviteStatusForServer(serverGroup, inviteResponse, userEmail) {
-        const serverData = inviteResponse.servers?.[serverGroup];
-        if (!serverData) return;
-        
-        const statusContainer = document.getElementById(`${serverGroup}Status`);
-        if (!statusContainer) return;
-        
-        let hasPendingInvites = false;
-        let hasAccess = false;
-        const pendingServers = [];
-        
-        // Check both regular and 4K servers
-        for (const [serverType, serverInfo] of Object.entries(serverData)) {
-            if (serverInfo.status === 'pending') {
-                hasPendingInvites = true;
-                pendingServers.push(serverType);
-            } else if (serverInfo.status === 'accepted') {
-                hasAccess = true;
-            }
+// FIXED: Display invite status indicator - PENDING INVITES ALWAYS WIN
+displayInviteStatusForServer(serverGroup, inviteResponse, userEmail) {
+    const serverData = inviteResponse.servers?.[serverGroup];
+    if (!serverData) return;
+    
+    const statusContainer = document.getElementById(`${serverGroup}Status`);
+    if (!statusContainer) return;
+    
+    let hasPendingInvites = false;
+    let hasAccess = false;
+    const pendingServers = [];
+    const accessServers = [];
+    
+    // Check both regular and 4K servers
+    for (const [serverType, serverInfo] of Object.entries(serverData)) {
+        if (serverInfo.status === 'pending') {
+            hasPendingInvites = true;
+            pendingServers.push(serverType);
+        } else if (serverInfo.status === 'accepted') {
+            hasAccess = true;
+            accessServers.push(serverType);
         }
-        
-        // Create status indicator
-        let statusHtml = '';
-        let statusClass = 'connection-status';
-        
-        if (hasPendingInvites) {
-            statusHtml = `
-                <span class="${statusClass}" style="color: #ff9800; display: flex; align-items: center; gap: 8px;">
+    }
+    
+    let statusHtml = '';
+    
+    // PRIORITY 1: ALWAYS show pending invites first - this is what you care about!
+    if (hasPendingInvites) {
+        statusHtml = `
+            <div style="color: #ff9800; display: flex; flex-direction: column; gap: 4px;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: bold;">
                     <i class="fas fa-clock" style="color: #ff9800;"></i>
-                    <span>Needs to Accept Invite</span>
-                    <small style="color: #ffb74d;">(${pendingServers.join(', ')} server${pendingServers.length > 1 ? 's' : ''})</small>
-                </span>
-            `;
-            
-            // Also add warning to library sections
-            this.addInviteWarningToLibraries(serverGroup, pendingServers);
-            
-        } else if (hasAccess) {
-            statusHtml = `
-                <span class="${statusClass}" style="color: #4caf50; display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-check-circle" style="color: #4caf50;"></i>
-                    <span>Access Granted</span>
-                </span>
-            `;
-        } else {
-            statusHtml = `
-                <span class="${statusClass}" style="color: #9e9e9e; display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-user-slash" style="color: #9e9e9e;"></i>
-                    <span>No Access</span>
-                </span>
-            `;
-        }
+                    <span>PENDING INVITES</span>
+                </div>
+                <div style="font-size: 0.9em; color: #ffb74d;">
+                    User must accept: ${pendingServers.join(', ')}
+                </div>
+                ${hasAccess ? `<div style="font-size: 0.8em; color: #81c784;">✓ Has access: ${accessServers.join(', ')}</div>` : ''}
+            </div>
+        `;
         
-        statusContainer.innerHTML = statusHtml;
+        // Add warning to library sections
+        this.addInviteWarningToLibraries(serverGroup, pendingServers);
         
-        console.log(`📊 ${serverGroup} status: pending=${hasPendingInvites}, access=${hasAccess}`);
-    },
+    } else if (hasAccess) {
+        // PRIORITY 2: Only show access if NO pending invites
+        statusHtml = `
+            <div style="color: #4caf50; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-check-circle" style="color: #4caf50;"></i>
+                <span>Access Granted</span>
+                <small style="color: #81c784;">(${accessServers.join(', ')})</small>
+            </div>
+        `;
+    } else {
+        // PRIORITY 3: No access at all
+        statusHtml = `
+            <div style="color: #9e9e9e; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-user-slash" style="color: #9e9e9e;"></i>
+                <span>No Access</span>
+            </div>
+        `;
+    }
+    
+    statusContainer.innerHTML = statusHtml;
+    
+    console.log(`📊 ${serverGroup} status: pending=${hasPendingInvites}, access=${hasAccess}`);
+},
 
     // Add warning message to library sections when user has pending invites
     addInviteWarningToLibraries(serverGroup, pendingServers) {
