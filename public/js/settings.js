@@ -429,6 +429,57 @@ window.Settings = {
             Utils.hideLoading();
         }
     },
+	
+	// Test email connection  
+    async testEmailConnection() {
+        try {
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = 'Testing...';
+            button.disabled = true;
+            
+            const result = await API.Email.testConnection();
+            
+            button.textContent = originalText;
+            button.disabled = false;
+            
+            if (result.success) {
+                Utils.showNotification('Test email sent successfully!', 'success');
+            } else {
+                Utils.showNotification(`Email test failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error testing email:', error);
+            const button = event.target;
+            button.textContent = 'Send Test Email';
+            button.disabled = false;
+            Utils.showNotification('Error testing email: ' + error.message, 'error');
+        }
+    },
+
+    // Enhanced save function with branding support
+    async saveAllSettings() {
+        try {
+            const settingsData = {
+                // Email settings
+                smtp_host: document.getElementById('smtpHost')?.value || 'smtp.gmail.com',
+                smtp_port: parseInt(document.getElementById('smtpPort')?.value) || 587,
+                smtp_user: document.getElementById('smtpUser')?.value || '',
+                smtp_pass: document.getElementById('smtpPass')?.value || '',
+                
+                // Payment settings
+                paypal_link: document.getElementById('paypalLink')?.value || '',
+                venmo_link: document.getElementById('venmoLink')?.value || '',
+                cashapp_link: document.getElementById('cashappLink')?.value || ''
+            };
+            
+            await API.Settings.update(settingsData);
+            Utils.showNotification('Settings saved successfully!', 'success');
+            
+        } catch (error) {
+            Utils.handleError(error, 'Saving settings');
+        }
+    },
     
     async saveSettings() {
         try {
@@ -452,6 +503,7 @@ window.Settings = {
 
 // Make functions globally available for onclick handlers
 window.addOwner = window.Settings.addOwner.bind(window.Settings);
-window.saveSettings = window.Settings.saveSettings.bind(window.Settings);
+window.saveSettings = window.Settings.saveAllSettings.bind(window.Settings);
+window.testEmailConnection = window.Settings.testEmailConnection.bind(window.Settings);
 
 console.log('✅ Enhanced Settings.js loaded successfully');
