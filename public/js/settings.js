@@ -1,4 +1,4 @@
-// Enhanced Settings Management Functions with Subscription Management
+// Enhanced Settings Management Functions with Subscription Management + File Upload
 console.log('📋 Loading enhanced Settings.js...');
 
 window.Settings = {
@@ -37,35 +37,35 @@ window.Settings = {
         }
     },
     
-async loadSettings() {
-    try {
-        const settings = await API.Settings.getAll();
-        
-        // Load existing settings into form fields
-        this.populateSettingFields(settings);
-        // Load branding settings into form fields
-        this.loadBrandingSettings(settings);
-        
-        // FIXED: Apply branding to the page immediately after loading
-        this.applyBranding(settings);
-        
-        // Load last sync time
-        if (settings.last_plex_sync) {
-            const syncDate = new Date(settings.last_plex_sync);
-            const lastSyncElement = document.getElementById('lastSyncTime');
-            if (lastSyncElement) {
-                lastSyncElement.textContent = syncDate.toLocaleString();
+    async loadSettings() {
+        try {
+            const settings = await API.Settings.getAll();
+            
+            // Load existing settings into form fields
+            this.populateSettingFields(settings);
+            // Load branding settings into form fields
+            this.loadBrandingSettings(settings);
+            
+            // FIXED: Apply branding to the page immediately after loading
+            this.applyBranding(settings);
+            
+            // Load last sync time
+            if (settings.last_plex_sync) {
+                const syncDate = new Date(settings.last_plex_sync);
+                const lastSyncElement = document.getElementById('lastSyncTime');
+                if (lastSyncElement) {
+                    lastSyncElement.textContent = syncDate.toLocaleString();
+                }
+            } else {
+                const lastSyncElement = document.getElementById('lastSyncTime');
+                if (lastSyncElement) {
+                    lastSyncElement.textContent = 'Never';
+                }
             }
-        } else {
-            const lastSyncElement = document.getElementById('lastSyncTime');
-            if (lastSyncElement) {
-                lastSyncElement.textContent = 'Never';
-            }
+        } catch (error) {
+            Utils.handleError(error, 'Loading settings');
         }
-    } catch (error) {
-        Utils.handleError(error, 'Loading settings');
-    }
-},
+    },
     
     populateSettingFields(settings) {
         const fieldMapping = {
@@ -434,8 +434,8 @@ async loadSettings() {
             Utils.hideLoading();
         }
     },
-	
-	// Test email connection  
+    
+    // Test email connection  
     async testEmailConnection() {
         try {
             const button = event.target;
@@ -462,7 +462,7 @@ async loadSettings() {
         }
     },
 
-    // MISSING FUNCTION: Test Plex Connection
+    // Test Plex Connection
     async testPlexConnection(serverGroup) {
         // Look for the settings page status elements first
         const statusElement = document.getElementById(`${serverGroup}ServerStatus`) || 
@@ -504,129 +504,262 @@ async loadSettings() {
         }
     },
 
-async saveAllSettings() {
-    try {
-        const settingsData = {
-            // Branding settings
-            app_title: document.getElementById('appTitle')?.value?.trim() || '',
-            app_subtitle: document.getElementById('appSubtitle')?.value?.trim() || '',
-            app_logo: document.getElementById('appLogo')?.value?.trim() || '',
-            app_favicon: document.getElementById('appFavicon')?.value?.trim() || '',
+    // UPDATED: Save all settings with file upload support
+    async saveAllSettings() {
+        try {
+            const settingsData = {
+                // Branding settings (text only - files handled separately)
+                app_title: document.getElementById('appTitle')?.value?.trim() || '',
+                app_subtitle: document.getElementById('appSubtitle')?.value?.trim() || '',
+                
+                // Email settings
+                smtp_host: document.getElementById('smtpHost')?.value || 'smtp.gmail.com',
+                smtp_port: parseInt(document.getElementById('smtpPort')?.value) || 587,
+                smtp_user: document.getElementById('smtpUser')?.value || '',
+                smtp_pass: document.getElementById('smtpPass')?.value || '',
+                
+                // Payment settings
+                paypal_link: document.getElementById('paypalLink')?.value || '',
+                venmo_link: document.getElementById('venmoLink')?.value || '',
+                cashapp_link: document.getElementById('cashappLink')?.value || ''
+            };
             
-            // Email settings
-            smtp_host: document.getElementById('smtpHost')?.value || 'smtp.gmail.com',
-            smtp_port: parseInt(document.getElementById('smtpPort')?.value) || 587,
-            smtp_user: document.getElementById('smtpUser')?.value || '',
-            smtp_pass: document.getElementById('smtpPass')?.value || '',
+            // Save regular settings
+            await API.Settings.update(settingsData);
             
-            // Payment settings
-            paypal_link: document.getElementById('paypalLink')?.value || '',
-            venmo_link: document.getElementById('venmoLink')?.value || '',
-            cashapp_link: document.getElementById('cashappLink')?.value || ''
+            // Upload any pending files
+            await this.uploadPendingFiles();
+            
+            Utils.showNotification('Settings saved successfully!', 'success');
+            
+            // Apply branding immediately
+            const allSettings = await API.Settings.getAll();
+            this.applyBranding(allSettings);
+            
+        } catch (error) {
+            Utils.handleError(error, 'Saving settings');
+        }
+    },
+
+    // NEW: Upload pending files
+    async uploadPendingFiles() {
+        const logoFile = document.getElementById('logoFile')?.files[0];
+        const faviconFile = document.getElementById('faviconFile')?.files[0];
+        
+        if (!logoFile && !faviconFile) {
+            return; // No files to upload
+        }
+
+        const formData = new FormData();
+        if (logoFile) {
+            formData.append('logo', logoFile);
+        }
+        if (faviconFile) {
+            formData.append('favicon', faviconFile);
+        }
+
+        try {
+            const response = await fetch('/api/settings/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`Upload failed: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log('✅ Files uploaded successfully:', result);
+            
+            // Clear file inputs
+            if (document.getElementById('logoFile')) document.getElementById('logoFile').value = '';
+            if (document.getElementById('faviconFile')) document.getElementById('faviconFile').value = '';
+            
+            // Refresh the settings to show new files
+            await this.loadSettings();
+            
+        } catch (error) {
+            console.error('❌ Error uploading files:', error);
+            throw error;
+        }
+    },
+
+    // NEW: Preview file before upload
+    previewFile(type) {
+        const fileInput = document.getElementById(`${type}File`);
+        const file = fileInput?.files[0];
+        
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            Utils.showNotification('Please select an image file', 'error');
+            fileInput.value = '';
+            return;
+        }
+
+        // Validate file size (5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            Utils.showNotification('File size must be less than 5MB', 'error');
+            fileInput.value = '';
+            return;
+        }
+
+        // Update button text to show selected file
+        const buttonText = document.getElementById(`${type}ButtonText`);
+        if (buttonText) {
+            buttonText.textContent = `Selected: ${file.name}`;
+        }
+
+        console.log(`📁 ${type} file selected:`, file.name);
+    },
+
+    // NEW: Delete branding file
+    async deleteBrandingFile(type) {
+        try {
+            const response = await fetch(`/api/settings/upload/${type}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                throw new Error(`Delete failed: ${response.statusText}`);
+            }
+
+            Utils.showNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} deleted successfully!`, 'success');
+            
+            // Refresh settings to hide preview
+            await this.loadSettings();
+            
+            // Apply branding to remove deleted file
+            const settings = await API.Settings.getAll();
+            this.applyBranding(settings);
+            
+        } catch (error) {
+            Utils.handleError(error, `Deleting ${type}`);
+        }
+    },
+
+    // UPDATED: Load branding settings with file upload support
+    loadBrandingSettings(settings) {
+        const brandingFields = {
+            'appTitle': 'app_title',
+            'appSubtitle': 'app_subtitle'
         };
         
-        await API.Settings.update(settingsData);
-        Utils.showNotification('Settings saved successfully!', 'success');
-        
-        // Apply branding immediately
-        this.applyBranding(settingsData);
-        
-    } catch (error) {
-        Utils.handleError(error, 'Saving settings');
-    }
-},
+        Object.keys(brandingFields).forEach(fieldId => {
+            const element = document.getElementById(fieldId);
+            const settingKey = brandingFields[fieldId];
+            if (element && settings[settingKey] !== undefined) {
+                element.value = settings[settingKey] || '';
+            }
+        });
 
-// Load branding settings into form fields
-loadBrandingSettings(settings) {
-    const brandingFields = {
-        'appTitle': 'app_title',
-        'appSubtitle': 'app_subtitle', 
-        'appLogo': 'app_logo',
-        'appFavicon': 'app_favicon'
-    };
-    
-    Object.keys(brandingFields).forEach(fieldId => {
-        const element = document.getElementById(fieldId);
-        const settingKey = brandingFields[fieldId];
-        if (element && settings[settingKey] !== undefined) {  // <-- FIXED: check for undefined instead of truthy
-            element.value = settings[settingKey] || '';  // <-- FIXED: handle empty strings properly
-        }
-    });
-},
-
-// Apply branding to the page
-applyBranding(settings) {
-    // Update page title
-    if (settings.app_title && settings.app_subtitle) {
-        document.title = `${settings.app_title} - ${settings.app_subtitle}`;
-    } else if (settings.app_title) {
-        document.title = settings.app_title;
-    }
-    
-    // Update favicon
-    if (settings.app_favicon) {
-        this.updateFavicon(settings.app_favicon);
-    }
-    
-    // Update logo/title in header
-    const logoElement = document.querySelector('.logo');
-    if (logoElement) {
-        if (settings.app_logo) {
-            logoElement.innerHTML = `<img src="${settings.app_logo}" alt="${settings.app_title || 'Logo'}" style="max-height: 60px; max-width: 300px; object-fit: contain;">`;
-        } else if (settings.app_title) {
-            logoElement.textContent = settings.app_title;
-        }
-    }
-    
-    // Update subtitle
-    const subtitleElement = document.querySelector('.subtitle');
-    if (subtitleElement && settings.app_subtitle) {
-        subtitleElement.textContent = settings.app_subtitle;
-    }
-},
-
-// Update favicon
-updateFavicon(faviconUrl) {
-    // Remove existing favicon links
-    const existingFavicons = document.querySelectorAll('link[rel*="icon"]');
-    existingFavicons.forEach(link => link.remove());
-    
-    // Add new favicon
-    const favicon = document.createElement('link');
-    favicon.rel = 'icon';
-    favicon.type = 'image/x-icon';
-    favicon.href = faviconUrl;
-    document.head.appendChild(favicon);
-},
-
-// Sync all Plex libraries
-async syncAllPlexLibraries() {
-    try {
-        const button = event.target;
-        const originalText = button.textContent;
-        button.textContent = 'Syncing...';
-        button.disabled = true;
+        // Handle logo preview
+        this.updateFilePreview('logo', settings.app_logo);
         
-        const result = await API.Plex.syncLibraries();
+        // Handle favicon preview
+        this.updateFilePreview('favicon', settings.app_favicon);
+    },
+
+    // NEW: Update file preview display
+    updateFilePreview(type, filePath) {
+        const previewDiv = document.getElementById(`${type}Preview`);
+        const imageElement = document.getElementById(`${type}Image`);
+        const buttonText = document.getElementById(`${type}ButtonText`);
         
-        button.textContent = originalText;
-        button.disabled = false;
-        
-        if (result.success) {
-            Utils.showNotification('Libraries synced successfully!', 'success');
-            await this.loadSettings(); // Reload to update last sync time
+        if (filePath && filePath.trim()) {
+            // Show preview
+            if (previewDiv) previewDiv.style.display = 'flex';
+            if (imageElement) imageElement.src = filePath;
+            if (buttonText) buttonText.textContent = `Change ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+            
+            // For favicon, also update the filename display
+            if (type === 'favicon') {
+                const fileNameElement = document.getElementById('faviconFileName');
+                if (fileNameElement) {
+                    const fileName = filePath.split('/').pop();
+                    fileNameElement.textContent = fileName;
+                }
+            }
         } else {
-            Utils.showNotification(`Sync failed: ${result.error}`, 'error');
+            // Hide preview
+            if (previewDiv) previewDiv.style.display = 'none';
+            if (buttonText) buttonText.textContent = `Choose ${type.charAt(0).toUpperCase() + type.slice(1)}${type === 'logo' ? ' Image' : ''}`;
         }
-    } catch (error) {
-        console.error('Error syncing libraries:', error);
-        const button = event.target;
-        button.textContent = 'Sync All Libraries';
-        button.disabled = false;
-        Utils.showNotification('Error syncing libraries: ' + error.message, 'error');
-    }
-}
+    },
 
+    // Apply branding to the page
+    applyBranding(settings) {
+        // Update page title
+        if (settings.app_title && settings.app_subtitle) {
+            document.title = `${settings.app_title} - ${settings.app_subtitle}`;
+        } else if (settings.app_title) {
+            document.title = settings.app_title;
+        }
+        
+        // Update favicon
+        if (settings.app_favicon) {
+            this.updateFavicon(settings.app_favicon);
+        }
+        
+        // Update logo/title in header
+        const logoElement = document.querySelector('.logo');
+        if (logoElement) {
+            if (settings.app_logo) {
+                logoElement.innerHTML = `<img src="${settings.app_logo}" alt="${settings.app_title || 'Logo'}" style="max-height: 60px; max-width: 300px; object-fit: contain;">`;
+            } else if (settings.app_title) {
+                logoElement.textContent = settings.app_title;
+            }
+        }
+        
+        // Update subtitle
+        const subtitleElement = document.querySelector('.subtitle');
+        if (subtitleElement && settings.app_subtitle) {
+            subtitleElement.textContent = settings.app_subtitle;
+        }
+    },
+
+    // Update favicon
+    updateFavicon(faviconUrl) {
+        // Remove existing favicon links
+        const existingFavicons = document.querySelectorAll('link[rel*="icon"]');
+        existingFavicons.forEach(link => link.remove());
+        
+        // Add new favicon
+        const favicon = document.createElement('link');
+        favicon.rel = 'icon';
+        favicon.type = 'image/x-icon';
+        favicon.href = faviconUrl;
+        document.head.appendChild(favicon);
+    },
+
+    // Sync all Plex libraries
+    async syncAllPlexLibraries() {
+        try {
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = 'Syncing...';
+            button.disabled = true;
+            
+            const result = await API.Plex.syncLibraries();
+            
+            button.textContent = originalText;
+            button.disabled = false;
+            
+            if (result.success) {
+                Utils.showNotification('Libraries synced successfully!', 'success');
+                await this.loadSettings(); // Reload to update last sync time
+            } else {
+                Utils.showNotification(`Sync failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error syncing libraries:', error);
+            const button = event.target;
+            button.textContent = 'Sync All Libraries';
+            button.disabled = false;
+            Utils.showNotification('Error syncing libraries: ' + error.message, 'error');
+        }
+    }
 };
 
 // Make functions globally available for onclick handlers
@@ -634,8 +767,6 @@ window.addOwner = window.Settings.addOwner.bind(window.Settings);
 window.saveSettings = window.Settings.saveAllSettings.bind(window.Settings);
 window.testEmailConnection = window.Settings.testEmailConnection.bind(window.Settings);
 window.syncAllPlexLibraries = window.Settings.syncAllPlexLibraries.bind(window.Settings);
-
-// FIXED: Add the missing global testPlexConnection function
 window.testPlexConnection = window.Settings.testPlexConnection.bind(window.Settings);
 
-console.log('✅ Enhanced Settings.js loaded successfully');
+console.log('✅ Enhanced Settings.js with file upload support loaded successfully');

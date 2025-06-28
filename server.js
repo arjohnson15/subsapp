@@ -14,6 +14,7 @@ const emailRoutes = require('./routes-email');
 const plexRoutes = require('./routes-plex');
 const settingsRoutes = require('./routes-settings');
 const ownerRoutes = require('./routes-owners');
+const multer = require('multer');
 const emailService = require('./email-service');
 
 const app = express();
@@ -40,6 +41,8 @@ app.use(cors());
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));

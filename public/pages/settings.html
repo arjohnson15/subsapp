@@ -16,16 +16,74 @@
             <input type="text" id="appSubtitle" placeholder="e.g. Subscription Management System">
             <small style="color: #4fc3f7;">The subtitle text below the main title</small>
         </div>
+        
+        <!-- Logo Upload Section -->
         <div class="form-group">
-            <label for="appLogo">Logo URL:</label>
-            <input type="url" id="appLogo" placeholder="https://example.com/logo.png">
-            <small style="color: #4fc3f7;">URL to your logo image (replaces text title)</small>
+            <label>Logo:</label>
+            <div class="file-upload-section">
+                <div class="current-file-display" id="logoPreview" style="display: none;">
+                    <img id="logoImage" src="" alt="Current Logo" style="max-height: 60px; max-width: 200px; object-fit: contain; border: 1px solid #4fc3f7; border-radius: 4px;">
+                    <button type="button" class="btn btn-delete" onclick="Settings.deleteBrandingFile('logo')" style="margin-left: 10px;">Delete Logo</button>
+                </div>
+                <div class="file-upload-controls">
+                    <input type="file" id="logoFile" accept="image/*" style="display: none;" onchange="Settings.previewFile('logo')">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('logoFile').click()">
+                        <span id="logoButtonText">Choose Logo Image</span>
+                    </button>
+                    <small style="color: #4fc3f7; display: block; margin-top: 5px;">Upload an image file (PNG, JPG, GIF, SVG). Replaces text title when set.</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Favicon Upload Section -->
+        <div class="form-group">
+            <label>Favicon:</label>
+            <div class="file-upload-section">
+                <div class="current-file-display" id="faviconPreview" style="display: none;">
+                    <img id="faviconImage" src="" alt="Current Favicon" style="max-height: 32px; max-width: 32px; object-fit: contain; border: 1px solid #4fc3f7; border-radius: 4px;">
+                    <span id="faviconFileName" style="margin-left: 10px; color: #4fc3f7;"></span>
+                    <button type="button" class="btn btn-delete" onclick="Settings.deleteBrandingFile('favicon')" style="margin-left: 10px;">Delete Favicon</button>
+                </div>
+                <div class="file-upload-controls">
+                    <input type="file" id="faviconFile" accept="image/*,.ico" style="display: none;" onchange="Settings.previewFile('favicon')">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('faviconFile').click()">
+                        <span id="faviconButtonText">Choose Favicon</span>
+                    </button>
+                    <small style="color: #4fc3f7; display: block; margin-top: 5px;">Upload favicon file (ICO, PNG, JPG). Shows in browser tab.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Email Configuration -->
+<div class="settings-section">
+    <h3>Email Configuration</h3>
+    <p style="color: #4fc3f7; margin-bottom: 20px;">Configure SMTP settings for sending emails. Use Gmail App Password, not your regular password.</p>
+    
+    <div class="form-grid">
+        <div class="form-group">
+            <label for="smtpHost">SMTP Host:</label>
+            <input type="text" id="smtpHost" placeholder="smtp.gmail.com">
         </div>
         <div class="form-group">
-            <label for="appFavicon">Favicon URL:</label>
-            <input type="url" id="appFavicon" placeholder="https://example.com/favicon.ico">
-            <small style="color: #4fc3f7;">URL to your favicon (browser tab icon)</small>
+            <label for="smtpPort">SMTP Port:</label>
+            <input type="number" id="smtpPort" placeholder="587">
         </div>
+        <div class="form-group">
+            <label for="smtpUser">Email Address:</label>
+            <input type="email" id="smtpUser" placeholder="your-email@gmail.com">
+        </div>
+        <div class="form-group">
+            <label for="smtpPass">Gmail App Password:</label>
+            <input type="password" id="smtpPass" placeholder="Your Gmail App Password">
+            <small style="color: #4fc3f7;">Generate an App Password in your Google Account settings</small>
+        </div>
+    </div>
+    
+    <div style="margin-top: 20px;">
+        <button class="btn btn-test" onclick="Settings.sendTestEmail()">Send Test Email</button>
+        <small style="color: #4fc3f7; margin-left: 15px;">Send a test email to verify configuration</small>
     </div>
 </div>
 
@@ -39,192 +97,219 @@
             <label>Plex 1 Status:</label>
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span id="plex1ServerStatus" class="connection-status">Click Test Connection</span>
-                <button type="button" class="btn btn-test" onclick="testPlexConnection('plex1')">Test Connection</button>
+                <button type="button" class="btn btn-test" onclick="Settings.testPlexConnection('plex1')">Test Connection</button>
             </div>
         </div>
         <div class="form-group">
             <label>Plex 2 Status:</label>
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span id="plex2ServerStatus" class="connection-status">Click Test Connection</span>
-                <button type="button" class="btn btn-test" onclick="testPlexConnection('plex2')">Test Connection</button>
+                <button type="button" class="btn btn-test" onclick="Settings.testPlexConnection('plex2')">Test Connection</button>
             </div>
         </div>
     </div>
     
     <div style="margin-top: 20px;">
-        <button class="btn btn-sync" onclick="syncAllPlexLibraries()">Sync All Libraries</button>
-        <small style="color: #4fc3f7; margin-left: 15px;">Last sync: <span id="lastSyncTime">Never</span></small>
+        <button class="btn btn-sync" onclick="Settings.syncAllPlexLibraries()">Sync All Libraries</button>
+        <small style="color: #4fc3f7; margin-left: 15px;">Update library information from all Plex servers</small>
     </div>
 </div>
 
-<!-- Owner Management -->
-<div class="settings-section">
-    <h3>Owner Management</h3>
-    <p style="color: #4fc3f7; margin-bottom: 20px;">Owners are responsible for renewing subscriptions and can receive BCC notifications.</p>
-    
-    <div class="form-grid" style="margin-bottom: 20px;">
-        <div class="form-group">
-            <label for="ownerName">Owner Name:</label>
-            <input type="text" id="ownerName" placeholder="Owner's full name">
-        </div>
-        <div class="form-group">
-            <label for="ownerEmail">Owner Email:</label>
-            <input type="email" id="ownerEmail" placeholder="owner@example.com">
-        </div>
-    </div>
-    <div style="margin-bottom: 20px;">
-        <button class="btn" onclick="addOwner()">Add Owner</button>
-    </div>
-
-    <div class="table-container" style="margin-bottom: 0;">
-        <table>
-            <thead>
-                <tr>
-                    <th>Owner Name</th>
-                    <th>Email Address</th>
-                    <th>User Count</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="ownersTableBody">
-                <tr><td colspan="4" style="text-align: center;">Loading owners...</td></tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- Subscription Management -->
-<div class="settings-section">
-    <h3>Subscription Management</h3>
-    <p style="color: #4fc3f7; margin-bottom: 20px;">Configure available subscription types for Plex and IPTV services.</p>
-    
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <button class="btn" onclick="Settings.showSubscriptionForm()">Create New Subscription Type</button>
-    </div>
-
-    <!-- Subscription Form -->
-    <div class="form-container" id="subscriptionFormContainer" style="display: none; margin-bottom: 30px; background: rgba(255, 255, 255, 0.05);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h4 style="color: #4fc3f7;" id="subscriptionFormTitle">Create Subscription Type</h4>
-            <button class="btn btn-secondary" onclick="Settings.hideSubscriptionForm()">Cancel</button>
-        </div>
-        
-        <form id="subscriptionForm" onsubmit="Settings.saveSubscription(event)">
-            <div class="form-grid">
-                <div class="form-group">
-                    <label for="subscriptionName">Subscription Name:</label>
-                    <input type="text" id="subscriptionName" name="name" required placeholder="e.g., Plex 12 Month">
-                </div>
-                <div class="form-group">
-                    <label for="subscriptionType">Service Type:</label>
-                    <select id="subscriptionType" name="type" required>
-                        <option value="">-- Select Type --</option>
-                        <option value="plex">Plex</option>
-                        <option value="iptv">IPTV</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="form-grid">
-                <div class="form-group">
-                    <label for="subscriptionDuration">Duration (Months):</label>
-                    <input type="number" id="subscriptionDuration" name="duration_months" required min="1" max="120" placeholder="e.g., 12">
-                </div>
-                <div class="form-group">
-                    <label for="subscriptionPrice">Price ($):</label>
-                    <input type="number" id="subscriptionPrice" name="price" required min="0" step="0.01" placeholder="e.g., 120.00">
-                </div>
-            </div>
-            
-            <div class="form-group" id="streamCountGroup" style="display: none;">
-                <label for="subscriptionStreams">Number of Streams:</label>
-                <input type="number" id="subscriptionStreams" name="streams" min="1" max="10" placeholder="e.g., 2">
-                <small style="color: #4fc3f7;">Leave blank if not applicable</small>
-            </div>
-            
-            <div class="form-group">
-                <label>Status:</label>
-                <div class="checkbox-group">
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="subscriptionActive" name="active" checked>
-                        <label for="subscriptionActive">Active (available for new users)</label>
-                    </div>
-                </div>
-            </div>
-            
-            <div style="text-align: center; margin-top: 30px;">
-                <button type="submit" class="btn">Save Subscription Type</button>
-                <button type="button" class="btn btn-secondary" onclick="Settings.hideSubscriptionForm()">Cancel</button>
-            </div>
-        </form>
-    </div>
-
-    <!-- Subscriptions Table -->
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th onclick="Settings.sortSubscriptions('name')">Name ▼</th>
-                    <th onclick="Settings.sortSubscriptions('type')">Type ▼</th>
-                    <th onclick="Settings.sortSubscriptions('duration_months')">Duration ▼</th>
-                    <th>Streams</th>
-                    <th onclick="Settings.sortSubscriptions('price')">Price ▼</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="subscriptionsTableBody">
-                <tr><td colspan="7" style="text-align: center;">Loading subscriptions...</td></tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- Email Configuration -->
-<div class="settings-section">
-    <h3>Email Configuration</h3>
-    <div class="form-grid">
-        <div class="form-group">
-            <label for="smtpHost">SMTP Host:</label>
-            <input type="text" id="smtpHost" value="smtp.gmail.com">
-        </div>
-        <div class="form-group">
-            <label for="smtpPort">SMTP Port:</label>
-            <input type="number" id="smtpPort" value="587">
-        </div>
-        <div class="form-group">
-            <label for="smtpUser">Email Address:</label>
-            <input type="email" id="smtpUser" placeholder="your-email@gmail.com">
-        </div>
-        <div class="form-group">
-            <label for="smtpPass">App Password:</label>
-            <input type="password" id="smtpPass" placeholder="Your Gmail app password">
-        </div>
-    </div>
-    <div style="margin-top: 15px;">
-        <button class="btn" onclick="testEmailConnection()">Send Test Email</button>
-    </div>
-</div>
-
-<!-- Payment Settings -->
+<!-- Payment & Links -->
 <div class="settings-section">
     <h3>Payment & Links</h3>
+    <p style="color: #4fc3f7; margin-bottom: 20px;">Configure payment method links for renewal notifications.</p>
+    
     <div class="form-grid">
         <div class="form-group">
-            <label for="paypalLink">PayPal Payment Link:</label>
+            <label for="paypalLink">PayPal Link:</label>
             <input type="url" id="paypalLink" placeholder="https://paypal.me/yourusername">
         </div>
         <div class="form-group">
-            <label for="venmoLink">Venmo Payment Link:</label>
+            <label for="venmoLink">Venmo Link:</label>
             <input type="url" id="venmoLink" placeholder="https://venmo.com/yourusername">
         </div>
         <div class="form-group">
-            <label for="cashappLink">CashApp Payment Link:</label>
+            <label for="cashappLink">Cash App Link:</label>
             <input type="url" id="cashappLink" placeholder="https://cash.app/$yourusername">
         </div>
     </div>
 </div>
 
-<div style="text-align: center; margin-top: 40px;">
-    <button class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a); font-size: 1.1rem; padding: 15px 30px;" onclick="saveSettings()">Save All Settings</button>
+<!-- Save Button -->
+<div style="margin-top: 40px; text-align: center;">
+    <button class="btn btn-primary" onclick="Settings.saveAllSettings()" style="padding: 15px 40px; font-size: 16px;">
+        Save All Settings
+    </button>
 </div>
+
+<style>
+.settings-section {
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid #4caf50;
+    border-radius: 8px;
+    padding: 25px;
+    margin-bottom: 30px;
+}
+
+.settings-section h3 {
+    color: #4caf50;
+    margin-bottom: 15px;
+    font-size: 1.4em;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    color: #fff;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.form-group input {
+    padding: 10px;
+    border: 1px solid #4fc3f7;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    font-size: 14px;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #4caf50;
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+}
+
+.form-group small {
+    margin-top: 5px;
+    font-size: 12px;
+}
+
+.file-upload-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.current-file-display {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background: rgba(79, 195, 247, 0.1);
+    border: 1px solid #4fc3f7;
+    border-radius: 4px;
+}
+
+.file-upload-controls {
+    display: flex;
+    flex-direction: column;
+}
+
+.connection-status {
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 120px;
+    text-align: center;
+}
+
+.status-connected {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+    border: 1px solid #4caf50;
+}
+
+.status-disconnected {
+    background: rgba(244, 67, 54, 0.2);
+    color: #f44336;
+    border: 1px solid #f44336;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+}
+
+.btn-primary {
+    background: linear-gradient(45deg, #8e24aa, #3f51b5);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(142, 36, 170, 0.4);
+}
+
+.btn-secondary {
+    background: rgba(79, 195, 247, 0.2);
+    color: #4fc3f7;
+    border: 1px solid #4fc3f7;
+}
+
+.btn-secondary:hover {
+    background: rgba(79, 195, 247, 0.3);
+}
+
+.btn-test {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
+    border: 1px solid #ffc107;
+}
+
+.btn-test:hover {
+    background: rgba(255, 193, 7, 0.3);
+}
+
+.btn-sync {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+    border: 1px solid #4caf50;
+}
+
+.btn-sync:hover {
+    background: rgba(76, 175, 80, 0.3);
+}
+
+.btn-delete {
+    background: rgba(244, 67, 54, 0.2);
+    color: #f44336;
+    border: 1px solid #f44336;
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+.btn-delete:hover {
+    background: rgba(244, 67, 54, 0.3);
+}
+
+@media (max-width: 768px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .current-file-display {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+}
+</style>
