@@ -515,7 +515,7 @@ class PlexService {
       console.log(`✅ Users without pending invites: ${usersWithoutPendingInvites}`);
       
     } catch (error) {
-      console.error('❌ Error syncing user library access:', error);
+      console.error('❌ Error syncing pending invites:', error);
       throw error;
     }
   }
@@ -588,68 +588,6 @@ class PlexService {
       };
     } catch (error) {
       console.error('Error removing user from Plex:', error);
-      throw error;
-    }
-  }
-}
-
-module.exports = new PlexService(); pending invites:', error);
-      throw error;
-    }
-  }
-
-  // Update user library access in database (kept but enhanced with pending invite check)
-  async updateUserLibraryAccessInDatabase(userEmail, libraryAccess) {
-    try {
-      console.log(`📝 Updating library access for: ${userEmail}`);
-      
-      // Sort library access for consistent storage
-      const sortedLibraryAccess = {};
-      for (const [serverGroup, access] of Object.entries(libraryAccess)) {
-        sortedLibraryAccess[serverGroup] = {
-          regular: (access.regular || []).sort((a, b) => a.id.localeCompare(b.id)),
-          fourk: (access.fourk || []).sort((a, b) => a.id.localeCompare(b.id))
-        };
-      }
-      
-      // Find user by plex_email or email
-      const [user] = await db.query(`
-        SELECT id, name FROM users 
-        WHERE plex_email = ?
-           OR plex_email = ?
-      `, [userEmail, userEmail]);
-      
-      if (user) {
-        await db.query(`
-          UPDATE users 
-          SET plex_libraries = ?, updated_at = NOW()
-          WHERE id = ?
-        `, [JSON.stringify(sortedLibraryAccess), user.id]);
-        
-        console.log(`✅ Database updated for user: ${user.name}`);
-        
-        // Also check and update pending invites for this user
-        try {
-          const pendingInvites = await this.checkUserPendingInvites(userEmail);
-          await db.query(`
-            UPDATE users 
-            SET pending_plex_invites = ?, updated_at = NOW()
-            WHERE id = ?
-          `, [pendingInvites ? JSON.stringify(pendingInvites) : null, user.id]);
-          
-          if (pendingInvites) {
-            console.log(`⏳ Updated pending invites for ${user.name}`);
-          }
-        } catch (error) {
-          console.error(`⚠️ Could not update pending invites for ${user.name}:`, error.message);
-        }
-        
-      } else {
-        console.log(`⚠️ User not found in database: ${userEmail}`);
-      }
-      
-    } catch (error) {
-      console.error('❌ Error updating user library access in database:', error);
       throw error;
     }
   }
@@ -800,7 +738,6 @@ module.exports = new PlexService(); pending invites:', error);
         updatedUsers++;
       }
       
-      // Final summary
       console.log(`\n📊 SYNC SUMMARY:`);
       console.log(`📊 Database users updated: ${updatedUsers}`);
       console.log(`✅ Users with Plex access: ${usersWithAccess}`);
@@ -808,4 +745,10 @@ module.exports = new PlexService(); pending invites:', error);
       console.log(`📊 Total unique Plex users found: ${allPlexUsers.size}`);
       
     } catch (error) {
-      console.error('❌ Error syncing
+      console.error('❌ Error syncing user library access:', error);
+      throw error;
+    }
+  }
+}
+
+module.exports = new PlexService();
