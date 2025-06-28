@@ -37,32 +37,35 @@ window.Settings = {
         }
     },
     
-    async loadSettings() {
-        try {
-            const settings = await API.Settings.getAll();
-            
-            // Load existing settings into form fields
-            this.populateSettingFields(settings);
-			// Load branding settings into form fields
-			this.loadBrandingSettings(settings);
-            
-            // Load last sync time
-            if (settings.last_plex_sync) {
-                const syncDate = new Date(settings.last_plex_sync);
-                const lastSyncElement = document.getElementById('lastSyncTime');
-                if (lastSyncElement) {
-                    lastSyncElement.textContent = syncDate.toLocaleString();
-                }
-            } else {
-                const lastSyncElement = document.getElementById('lastSyncTime');
-                if (lastSyncElement) {
-                    lastSyncElement.textContent = 'Never';
-                }
+async loadSettings() {
+    try {
+        const settings = await API.Settings.getAll();
+        
+        // Load existing settings into form fields
+        this.populateSettingFields(settings);
+        // Load branding settings into form fields
+        this.loadBrandingSettings(settings);
+        
+        // FIXED: Apply branding to the page immediately after loading
+        this.applyBranding(settings);
+        
+        // Load last sync time
+        if (settings.last_plex_sync) {
+            const syncDate = new Date(settings.last_plex_sync);
+            const lastSyncElement = document.getElementById('lastSyncTime');
+            if (lastSyncElement) {
+                lastSyncElement.textContent = syncDate.toLocaleString();
             }
-        } catch (error) {
-            Utils.handleError(error, 'Loading settings');
+        } else {
+            const lastSyncElement = document.getElementById('lastSyncTime');
+            if (lastSyncElement) {
+                lastSyncElement.textContent = 'Never';
+            }
         }
-    },
+    } catch (error) {
+        Utils.handleError(error, 'Loading settings');
+    }
+},
     
     populateSettingFields(settings) {
         const fieldMapping = {
@@ -545,8 +548,8 @@ loadBrandingSettings(settings) {
     Object.keys(brandingFields).forEach(fieldId => {
         const element = document.getElementById(fieldId);
         const settingKey = brandingFields[fieldId];
-        if (element && settings[settingKey]) {
-            element.value = settings[settingKey];
+        if (element && settings[settingKey] !== undefined) {  // <-- FIXED: check for undefined instead of truthy
+            element.value = settings[settingKey] || '';  // <-- FIXED: handle empty strings properly
         }
     });
 },
