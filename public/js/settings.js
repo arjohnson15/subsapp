@@ -504,42 +504,43 @@ window.Settings = {
         }
     },
 
-    // UPDATED: Save all settings with file upload support
-    async saveAllSettings() {
-        try {
-            const settingsData = {
-                // Branding settings (text only - files handled separately)
-                app_title: document.getElementById('appTitle')?.value?.trim() || '',
-                app_subtitle: document.getElementById('appSubtitle')?.value?.trim() || '',
-                
-                // Email settings
-                smtp_host: document.getElementById('smtpHost')?.value || 'smtp.gmail.com',
-                smtp_port: parseInt(document.getElementById('smtpPort')?.value) || 587,
-                smtp_user: document.getElementById('smtpUser')?.value || '',
-                smtp_pass: document.getElementById('smtpPass')?.value || '',
-                
-                // Payment settings
-                paypal_link: document.getElementById('paypalLink')?.value || '',
-                venmo_link: document.getElementById('venmoLink')?.value || '',
-                cashapp_link: document.getElementById('cashappLink')?.value || ''
-            };
+async saveAllSettings() {
+    try {
+        // First upload any pending files
+        await this.uploadPendingFiles();
+        
+        const settingsData = {
+            // Branding settings (text only - files already uploaded above)
+            app_title: document.getElementById('appTitle')?.value?.trim() || '',
+            app_subtitle: document.getElementById('appSubtitle')?.value?.trim() || '',
             
-            // Save regular settings
+            // Email settings
+            smtp_host: document.getElementById('smtpHost')?.value || 'smtp.gmail.com',
+            smtp_port: parseInt(document.getElementById('smtpPort')?.value) || 587,
+            smtp_user: document.getElementById('smtpUser')?.value || '',
+            smtp_pass: document.getElementById('smtpPass')?.value || '',
+            
+            // Payment settings
+            paypal_link: document.getElementById('paypalLink')?.value || '',
+            venmo_link: document.getElementById('venmoLink')?.value || '',
+            cashapp_link: document.getElementById('cashappLink')?.value || ''
+        };
+        
+        // Save text settings (only if there are any changes)
+        if (Object.values(settingsData).some(value => value !== '')) {
             await API.Settings.update(settingsData);
-            
-            // Upload any pending files
-            await this.uploadPendingFiles();
-            
-            Utils.showNotification('Settings saved successfully!', 'success');
-            
-            // Apply branding immediately
-            const allSettings = await API.Settings.getAll();
-            this.applyBranding(allSettings);
-            
-        } catch (error) {
-            Utils.handleError(error, 'Saving settings');
         }
-    },
+        
+        Utils.showNotification('Settings saved successfully!', 'success');
+        
+        // Apply branding immediately
+        const allSettings = await API.Settings.getAll();
+        this.applyBranding(allSettings);
+        
+    } catch (error) {
+        Utils.handleError(error, 'Saving settings');
+    }
+},
 
     // NEW: Upload pending files
     async uploadPendingFiles() {
