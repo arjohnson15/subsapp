@@ -25,7 +25,7 @@ class PlexService {
       this.syncAllLibrariesSafely(); // Use safe version
     }, 60 * 60 * 1000); // 1 hour
     
-    console.log('✅ Plex sync scheduled - will run every hour');
+    console.log('? Plex sync scheduled - will run every hour');
   }
 
   // FIXED: Safe version that won't crash the app
@@ -33,7 +33,7 @@ class PlexService {
     try {
       await this.syncAllLibraries();
     } catch (error) {
-      console.error('❌ Scheduled Plex sync failed (non-fatal):', error.message);
+      console.error('? Scheduled Plex sync failed (non-fatal):', error.message);
       // Don't throw - just log and continue
     }
   }
@@ -80,7 +80,7 @@ class PlexService {
   async makePlexTvRequest(serverId, token, endpoint) {
     try {
       const url = `https://plex.tv/api/servers/${serverId}${endpoint}`;
-      console.log(`🌐 Plex.tv API request to: ${url}`);
+      console.log(`?? Plex.tv API request to: ${url}`);
       
       const response = await axios.get(url, {
         headers: {
@@ -92,7 +92,7 @@ class PlexService {
       
       return response.data;
     } catch (error) {
-      console.error(`❌ Plex.tv API request failed for ${endpoint}:`, error.message);
+      console.error(`? Plex.tv API request failed for ${endpoint}:`, error.message);
       throw error;
     }
   }
@@ -100,7 +100,7 @@ class PlexService {
   // FIXED: Get server libraries with better error handling and direct server fallback
   async getServerLibraries(serverConfig) {
     try {
-      console.log(`📚 Fetching libraries for ${serverConfig.name}...`);
+      console.log(`?? Fetching libraries for ${serverConfig.name}...`);
       
       // OPTION 1: Try Plex.tv API first
       try {
@@ -122,17 +122,17 @@ class PlexService {
             language: dir.$.language || 'en'
           }));
           
-          console.log(`✅ Found ${libraries.length} libraries via Plex.tv API for ${serverConfig.name}`);
+          console.log(`? Found ${libraries.length} libraries via Plex.tv API for ${serverConfig.name}`);
           return libraries;
         }
       } catch (error) {
-        console.log(`⚠️ Plex.tv API failed for ${serverConfig.name}, trying direct server connection...`);
+        console.log(`?? Plex.tv API failed for ${serverConfig.name}, trying direct server connection...`);
       }
       
       // OPTION 2: Try direct server connection as fallback
       try {
         const directUrl = `${serverConfig.url}/library/sections`;
-        console.log(`🔗 Trying direct connection: ${directUrl}`);
+        console.log(`?? Trying direct connection: ${directUrl}`);
         
         const response = await axios.get(directUrl, {
           headers: {
@@ -159,15 +159,15 @@ class PlexService {
             language: dir.$.language || 'en'
           }));
           
-          console.log(`✅ Found ${libraries.length} libraries via direct connection for ${serverConfig.name}`);
+          console.log(`? Found ${libraries.length} libraries via direct connection for ${serverConfig.name}`);
           return libraries;
         }
       } catch (error) {
-        console.log(`⚠️ Direct server connection also failed for ${serverConfig.name}: ${error.message}`);
+        console.log(`?? Direct server connection also failed for ${serverConfig.name}: ${error.message}`);
       }
       
       // OPTION 3: Return hardcoded fallback libraries
-      console.log(`⚠️ Both API methods failed, using hardcoded fallback libraries for ${serverConfig.name}`);
+      console.log(`?? Both API methods failed, using hardcoded fallback libraries for ${serverConfig.name}`);
       return [
         { id: '1', title: 'Movies', type: 'movie' },
         { id: '2', title: 'TV Shows', type: 'show' },
@@ -175,7 +175,7 @@ class PlexService {
       ];
       
     } catch (error) {
-      console.error(`❌ Error fetching libraries for ${serverConfig.name}:`, error.message);
+      console.error(`? Error fetching libraries for ${serverConfig.name}:`, error.message);
       // Return empty array rather than throwing
       return [];
     }
@@ -191,7 +191,7 @@ class PlexService {
         throw new Error(`Invalid server group: ${serverGroup}`);
       }
 
-      console.log(`📚 Getting libraries for ${serverGroup}...`);
+      console.log(`?? Getting libraries for ${serverGroup}...`);
 
       // Try to get from database first
       const [regularLibsSetting] = await db.query(
@@ -211,9 +211,9 @@ class PlexService {
       if (regularLibsSetting && regularLibsSetting.setting_value) {
         try {
           regularLibs = JSON.parse(regularLibsSetting.setting_value);
-          console.log(`📖 Found ${regularLibs.length} regular libraries in database for ${serverGroup}`);
+          console.log(`?? Found ${regularLibs.length} regular libraries in database for ${serverGroup}`);
         } catch (parseError) {
-          console.log(`⚠️ Could not parse regular libraries from database for ${serverGroup}`);
+          console.log(`?? Could not parse regular libraries from database for ${serverGroup}`);
           regularLibs = [];
         }
       }
@@ -224,33 +224,33 @@ class PlexService {
           const parsedFourkLibs = JSON.parse(fourkLibsSetting.setting_value);
           if (parsedFourkLibs && parsedFourkLibs.length > 0) {
             fourkLibs = parsedFourkLibs;
-            console.log(`📖 Found ${fourkLibs.length} 4K libraries in database for ${serverGroup}`);
+            console.log(`?? Found ${fourkLibs.length} 4K libraries in database for ${serverGroup}`);
           }
         } catch (parseError) {
-          console.log(`⚠️ Could not parse 4K libraries from database for ${serverGroup}, using hardcoded`);
+          console.log(`?? Could not parse 4K libraries from database for ${serverGroup}, using hardcoded`);
         }
       }
 
       // FIXED: If no regular libraries in database, try to fetch from API
       if (!regularLibs || regularLibs.length === 0) {
-        console.log(`📚 No regular libraries in database for ${serverGroup}, trying to fetch from API...`);
+        console.log(`?? No regular libraries in database for ${serverGroup}, trying to fetch from API...`);
         try {
           regularLibs = await this.getServerLibraries(config.regular);
           
           // Store in database for next time
           if (regularLibs && regularLibs.length > 0) {
             await this.updateLibrariesInDatabase(serverGroup, 'regular', regularLibs);
-            console.log(`✅ Fetched and stored ${regularLibs.length} regular libraries for ${serverGroup}`);
+            console.log(`? Fetched and stored ${regularLibs.length} regular libraries for ${serverGroup}`);
           }
         } catch (error) {
-          console.error(`❌ Failed to fetch libraries from API for ${serverGroup}:`, error.message);
+          console.error(`? Failed to fetch libraries from API for ${serverGroup}:`, error.message);
           // Use fallback libraries
           regularLibs = [
             { id: '1', title: 'Movies', type: 'movie' },
             { id: '2', title: 'TV Shows', type: 'show' },
             { id: '3', title: 'Music', type: 'artist' }
           ];
-          console.log(`⚠️ Using fallback libraries for ${serverGroup}`);
+          console.log(`?? Using fallback libraries for ${serverGroup}`);
         }
       }
 
@@ -263,11 +263,11 @@ class PlexService {
         }
       };
 
-      console.log(`✅ Returning ${result.regular.length} regular + ${result.fourk.length} 4K libraries for ${serverGroup}`);
+      console.log(`? Returning ${result.regular.length} regular + ${result.fourk.length} 4K libraries for ${serverGroup}`);
       return result;
       
     } catch (error) {
-      console.error(`❌ Error getting libraries for group ${serverGroup}:`, error.message);
+      console.error(`? Error getting libraries for group ${serverGroup}:`, error.message);
       
       // FIXED: Return a safe fallback instead of throwing
       const serverConfigs = this.getServerConfig();
@@ -298,10 +298,10 @@ class PlexService {
       }
 
       await this.makePlexTvRequest(config.regular.serverId, config.regular.token, '');
-      console.log(`✅ Regular server connection successful: ${config.regular.name}`);
+      console.log(`? Regular server connection successful: ${config.regular.name}`);
 
       await this.makePlexTvRequest(config.fourk.serverId, config.fourk.token, '');
-      console.log(`✅ 4K server connection successful: ${config.fourk.name}`);
+      console.log(`? 4K server connection successful: ${config.fourk.name}`);
 
       return { 
         success: true, 
@@ -310,26 +310,27 @@ class PlexService {
         fourk: config.fourk.name
       };
     } catch (error) {
-      console.error(`❌ Connection test failed for ${serverGroup}:`, error.message);
+      console.error(`? Connection test failed for ${serverGroup}:`, error.message);
       throw error;
     }
   }
 
-  // Get all shared users from a specific server using Python
-  async getAllSharedUsersFromServer(serverConfig) {
-    try {
-      const result = await pythonPlexService.getSharedUsers(serverConfig);
-      return result.users || [];
-    } catch (error) {
-      console.error(`Error getting shared users from ${serverConfig.name}:`, error);
-      return [];
-    }
+async getAllSharedUsersFromServer(serverConfig) {
+  try {
+    // TEMPORARY FIX: getSharedUsers method doesn't exist in python-plex-wrapper
+    // Return empty array until we implement this properly
+    console.log(`⚠️ getAllSharedUsersFromServer temporarily disabled for ${serverConfig.name}`);
+    return [];
+  } catch (error) {
+    console.error(`Error getting shared users from ${serverConfig.name}:`, error);
+    return [];
   }
+}
 
   // Get user's current access across all servers using Python
   async getUserCurrentAccess(userEmail) {
     try {
-      console.log(`🔍 Getting current access for: ${userEmail}`);
+      console.log(`?? Getting current access for: ${userEmail}`);
       
       const serverConfigs = this.getServerConfig();
       const result = {};
@@ -351,7 +352,7 @@ class PlexService {
         };
       }
       
-      console.log(`✅ Current access for ${userEmail}:`, result);
+      console.log(`? Current access for ${userEmail}:`, result);
       return result;
     } catch (error) {
       console.error('Error getting user current access:', error);
@@ -362,8 +363,8 @@ class PlexService {
   // Share libraries using Python script
   async shareLibrariesWithUser(userEmail, serverGroup, libraries) {
     try {
-      console.log(`🔄 Sharing libraries with ${userEmail} on ${serverGroup}`);
-      console.log(`📚 Libraries to share:`, libraries);
+      console.log(`?? Sharing libraries with ${userEmail} on ${serverGroup}`);
+      console.log(`?? Libraries to share:`, libraries);
       
       const serverConfigs = this.getServerConfig();
       const config = serverConfigs[serverGroup];
@@ -375,27 +376,16 @@ class PlexService {
       const results = {};
       let totalChanges = 0;
 
-      // Share regular libraries
-      if (libraries.regular && libraries.regular.length > 0) {
-        const regularResult = await pythonPlexService.shareLibraries(
-          userEmail,
-          config.regular,
-          libraries.regular
-        );
-        results.regular = regularResult;
-        if (regularResult.success) totalChanges++;
-      }
+// Use the Python wrapper's shareLibrariesWithUser method
+// This handles both regular and 4K servers automatically
+const result = await pythonPlexService.shareLibrariesWithUser(userEmail, serverGroup, libraries);
 
-      // Share 4K libraries
-      if (libraries.fourk && libraries.fourk.length > 0) {
-        const fourkResult = await pythonPlexService.shareLibraries(
-          userEmail,
-          config.fourk,
-          libraries.fourk
-        );
-        results.fourk = fourkResult;
-        if (fourkResult.success) totalChanges++;
-      }
+// Extract the detailed results
+results = result.details || {};
+totalChanges = result.changes_made || 0;
+
+// Log the results for debugging
+console.log(`📊 Python sharing detailed results:`, result);
 
       return {
         success: totalChanges > 0,
@@ -412,12 +402,12 @@ class PlexService {
   // Check user pending invites using Python
   async checkUserPendingInvites(userEmail) {
     try {
-      console.log(`🔍 Checking pending invites for: ${userEmail}`);
+      console.log(`?? Checking pending invites for: ${userEmail}`);
       
       const result = await pythonPlexService.checkInviteStatus(userEmail);
       
       if (!result.success) {
-        console.log(`⚠️ Failed to check invites for ${userEmail}`);
+        console.log(`?? Failed to check invites for ${userEmail}`);
         return null;
       }
       
@@ -443,11 +433,11 @@ class PlexService {
         }
       }
       
-      console.log(`📋 Pending invites for ${userEmail}:`, Object.keys(pendingInvites).length > 0 ? pendingInvites : 'None');
+      console.log(`?? Pending invites for ${userEmail}:`, Object.keys(pendingInvites).length > 0 ? pendingInvites : 'None');
       
       return Object.keys(pendingInvites).length > 0 ? pendingInvites : null;
     } catch (error) {
-      console.error(`❌ Error checking pending invites for ${userEmail}:`, error);
+      console.error(`? Error checking pending invites for ${userEmail}:`, error);
       return null;
     }
   }
@@ -455,7 +445,7 @@ class PlexService {
   // NEW: Sync pending invites for all users with Plex access
   async syncPendingInvites() {
     try {
-      console.log('\n🔄 Starting pending invites sync...');
+      console.log('\n?? Starting pending invites sync...');
       
       // Get all users who have Plex library access or Plex email
       const users = await db.query(`
@@ -465,7 +455,7 @@ class PlexService {
            OR (plex_libraries IS NOT NULL AND plex_libraries != '{}' AND plex_libraries != 'null')
       `);
       
-      console.log(`📊 Found ${users.length} users with Plex access to check`);
+      console.log(`?? Found ${users.length} users with Plex access to check`);
       
       let usersChecked = 0;
       let usersWithPendingInvites = 0;
@@ -476,7 +466,7 @@ class PlexService {
           const userEmail = user.plex_email || user.email;
           
           if (!userEmail) {
-            console.log(`⚠️ Skipping ${user.name} - no email configured`);
+            console.log(`?? Skipping ${user.name} - no email configured`);
             continue;
           }
           
@@ -492,10 +482,10 @@ class PlexService {
           
           if (pendingInvites) {
             const serverGroups = Object.keys(pendingInvites);
-            console.log(`⏳ ${user.name} has pending invites for: ${serverGroups.join(', ')}`);
+            console.log(`? ${user.name} has pending invites for: ${serverGroups.join(', ')}`);
             usersWithPendingInvites++;
           } else {
-            console.log(`✅ ${user.name} has no pending invites`);
+            console.log(`? ${user.name} has no pending invites`);
             usersWithoutPendingInvites++;
           }
           
@@ -505,17 +495,17 @@ class PlexService {
           await new Promise(resolve => setTimeout(resolve, 500));
           
         } catch (error) {
-          console.error(`❌ Error checking pending invites for ${user.name}:`, error.message);
+          console.error(`? Error checking pending invites for ${user.name}:`, error.message);
         }
       }
       
-      console.log(`\n📊 PENDING INVITES SYNC SUMMARY:`);
-      console.log(`📊 Users checked: ${usersChecked}`);
-      console.log(`⏳ Users with pending invites: ${usersWithPendingInvites}`);
-      console.log(`✅ Users without pending invites: ${usersWithoutPendingInvites}`);
+      console.log(`\n?? PENDING INVITES SYNC SUMMARY:`);
+      console.log(`?? Users checked: ${usersChecked}`);
+      console.log(`? Users with pending invites: ${usersWithPendingInvites}`);
+      console.log(`? Users without pending invites: ${usersWithoutPendingInvites}`);
       
     } catch (error) {
-      console.error('❌ Error syncing pending invites:', error);
+      console.error('? Error syncing pending invites:', error);
       throw error;
     }
   }
@@ -548,16 +538,16 @@ class PlexService {
         ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = NOW()
       `, [timestamp, timestamp]);
       
-      console.log('✅ Sync timestamp updated successfully');
+      console.log('? Sync timestamp updated successfully');
     } catch (error) {
-      console.error('❌ Error updating sync timestamp:', error);
+      console.error('? Error updating sync timestamp:', error);
     }
   }
 
   // Remove user from Plex using Python
   async removeUserFromPlex(userEmail, serverGroup) {
     try {
-      console.log(`🗑️ Removing ${userEmail} from ${serverGroup}`);
+      console.log(`??? Removing ${userEmail} from ${serverGroup}`);
       
       const serverConfigs = this.getServerConfig();
       const config = serverConfigs[serverGroup];
@@ -568,21 +558,21 @@ class PlexService {
 
       const results = {};
       
-      // Remove from regular server
-      try {
-        const regularResult = await pythonPlexService.removeUser(userEmail, config.regular);
-        results.regular = regularResult;
-      } catch (error) {
-        results.regular = { success: false, error: error.message };
-      }
-      
-      // Remove from 4K server
-      try {
-        const fourkResult = await pythonPlexService.removeUser(userEmail, config.fourk);
-        results.fourk = fourkResult;
-      } catch (error) {
-        results.fourk = { success: false, error: error.message };
-      }
+// Use the Python wrapper's removeUserFromServerGroup method
+// This handles both regular and 4K servers automatically
+try {
+  const result = await pythonPlexService.removeUserFromServerGroup(userEmail, serverGroup);
+  
+  // Extract the detailed results (should have regular and fourk details)
+  results = result.details || result;
+  
+  console.log(`📊 Python removal detailed results:`, result);
+} catch (error) {
+  results = { 
+    regular: { success: false, error: error.message },
+    fourk: { success: false, error: error.message }
+  };
+}
       
       return {
         success: true,
@@ -598,36 +588,36 @@ class PlexService {
   // Sync all libraries and store in database (enhanced to include pending invites sync)
   async syncAllLibraries() {
     try {
-      console.log('🔄 Syncing Plex libraries using Plex.tv API...');
+      console.log('?? Syncing Plex libraries using Plex.tv API...');
       
       const serverConfigs = this.getServerConfig();
       
       for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
-        console.log(`🔄 Syncing group: ${groupName}`);
+        console.log(`?? Syncing group: ${groupName}`);
         
         // Sync regular server libraries
         const regularLibs = await this.getServerLibraries(groupConfig.regular);
         await this.updateLibrariesInDatabase(groupName, 'regular', regularLibs);
-        console.log(`✅ Synced ${regularLibs.length} regular libraries for ${groupName}`);
+        console.log(`? Synced ${regularLibs.length} regular libraries for ${groupName}`);
         
         // Use hardcoded 4K libraries
         const fourkLibs = groupConfig.fourk.libraries || [];
         await this.updateLibrariesInDatabase(groupName, 'fourk', fourkLibs);
-        console.log(`✅ Using ${fourkLibs.length} hardcoded 4K libraries for ${groupName}`);
+        console.log(`? Using ${fourkLibs.length} hardcoded 4K libraries for ${groupName}`);
       }
       
       // Sync user access to match current state
-      console.log('\n🔄 Syncing user library access...');
+      console.log('\n?? Syncing user library access...');
       await this.syncUserLibraryAccess();
       
       // NEW: Sync pending invites for all users
-      console.log('\n🔄 Syncing pending invites...');
+      console.log('\n?? Syncing pending invites...');
       await this.syncPendingInvites();
       
       // Update the last sync timestamp
       await this.updateSyncTimestamp();
       
-      console.log('\n✅ Complete Plex sync finished successfully!');
+      console.log('\n? Complete Plex sync finished successfully!');
       
       return {
         success: true,
@@ -636,7 +626,7 @@ class PlexService {
       };
       
     } catch (error) {
-      console.error('❌ Error syncing all libraries:', error);
+      console.error('? Error syncing all libraries:', error);
       return {
         success: false,
         error: error.message,
@@ -648,7 +638,7 @@ class PlexService {
   // Sync user library access (enhanced version)
   async syncUserLibraryAccess() {
     try {
-      console.log('\n🔄 Syncing user library access...');
+      console.log('\n?? Syncing user library access...');
       
       // Get all users from database who have Plex access
       const users = await db.query(`
@@ -657,14 +647,14 @@ class PlexService {
         WHERE plex_email IS NOT NULL AND plex_email != ''
       `);
       
-      console.log(`📊 Found ${users.length} users with Plex access to sync`);
+      console.log(`?? Found ${users.length} users with Plex access to sync`);
       
       // Get all Plex users from all servers
       const serverConfigs = this.getServerConfig();
       const allPlexUsers = new Map();
       
       for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
-        console.log(`📡 Getting shared users from ${groupName}...`);
+        console.log(`?? Getting shared users from ${groupName}...`);
         
         // Get users from regular server
         const regularUsers = await this.getAllSharedUsersFromServer(groupConfig.regular);
@@ -704,7 +694,7 @@ class PlexService {
         }
         
         if (foundPlexUser) {
-          console.log(`✅ FOUND: ${dbUser.name} (${emailsToCheck.join(', ')}) in Plex servers`);
+          console.log(`? FOUND: ${dbUser.name} (${emailsToCheck.join(', ')}) in Plex servers`);
           
           // Build library access object
           const libraryAccess = foundPlexUser.groups;
@@ -726,7 +716,7 @@ class PlexService {
           
           usersWithAccess++;
         } else {
-          console.log(`❌ NO ACCESS: ${dbUser.name} (${emailsToCheck.join(', ')}) - not found in Plex`);
+          console.log(`? NO ACCESS: ${dbUser.name} (${emailsToCheck.join(', ')}) - not found in Plex`);
           
           // Clear their library access
           await db.query(`
@@ -741,14 +731,14 @@ class PlexService {
         updatedUsers++;
       }
       
-      console.log(`\n📊 SYNC SUMMARY:`);
-      console.log(`📊 Database users updated: ${updatedUsers}`);
-      console.log(`✅ Users with Plex access: ${usersWithAccess}`);
-      console.log(`❌ Users without Plex access: ${usersWithoutAccess}`);
-      console.log(`📊 Total unique Plex users found: ${allPlexUsers.size}`);
+      console.log(`\n?? SYNC SUMMARY:`);
+      console.log(`?? Database users updated: ${updatedUsers}`);
+      console.log(`? Users with Plex access: ${usersWithAccess}`);
+      console.log(`? Users without Plex access: ${usersWithoutAccess}`);
+      console.log(`?? Total unique Plex users found: ${allPlexUsers.size}`);
       
     } catch (error) {
-      console.error('❌ Error syncing user library access:', error);
+      console.error('? Error syncing user library access:', error);
       throw error;
     }
   }
