@@ -315,14 +315,69 @@ class PlexService {
     }
   }
 
+// Get all shared users from a specific server using Plex.tv API
 async getAllSharedUsersFromServer(serverConfig) {
   try {
-    // TEMPORARY FIX: getSharedUsers method doesn't exist in python-plex-wrapper
-    // Return empty array until we implement this properly
-    console.log(`⚠️ getAllSharedUsersFromServer temporarily disabled for ${serverConfig.name}`);
-    return [];
+    console.log(`📡 Getting shared users from ${serverConfig.name}...`);
+    
+    const url = `https://plex.tv/api/servers/${serverConfig.serverId}/shared_servers`;
+    const response = await axios.get(url, {
+      headers: {
+        'X-Plex-Token': serverConfig.token,
+        'Accept': 'application/xml'
+      },
+      timeout: 15000
+    });
+    
+    if (response.status !== 200) {
+      console.log(`⚠️ No shared users found on ${serverConfig.name} (HTTP ${response.status})`);
+      return [];
+    }
+    
+    const result = await this.parser.parseStringPromise(response.data);
+    const users = [];
+    
+    if (result && result.MediaContainer && result.MediaContainer.SharedServer) {
+      let sharedServers = result.MediaContainer.SharedServer;
+      if (!Array.isArray(sharedServers)) {
+        sharedServers = [sharedServers];
+      }
+      
+      for (const sharedServer of sharedServers) {
+        if (sharedServer.$ && sharedServer.$.email) {
+          const libraries = [];
+          
+          // Get shared library sections
+          if (sharedServer.Section) {
+            let sections = sharedServer.Section;
+            if (!Array.isArray(sections)) {
+              sections = [sections];
+            }
+            
+            for (const section of sections) {
+              if (section.$ && section.$.shared === '1') {
+                libraries.push({
+                  id: section.$.key,
+                  title: section.$.title || 'Unknown Library'
+                });
+              }
+            }
+          }
+          
+          users.push({
+            email: sharedServer.$.email,
+            username: sharedServer.$.username || sharedServer.$.email,
+            libraries: libraries
+          });
+        }
+      }
+    }
+    
+    console.log(`✅ Found ${users.length} shared users on ${serverConfig.name}`);
+    return users;
+    
   } catch (error) {
-    console.error(`Error getting shared users from ${serverConfig.name}:`, error);
+    console.error(`❌ Error getting shared users from ${serverConfig.name}:`, error.message);
     return [];
   }
 }
@@ -373,7 +428,7 @@ async getAllSharedUsersFromServer(serverConfig) {
         throw new Error(`Invalid server group: ${serverGroup}`);
       }
 
-      const results = {};
+let results = {}; // CHANGED: const to let
       let totalChanges = 0;
 
 // Use the Python wrapper's shareLibrariesWithUser method
@@ -385,7 +440,7 @@ results = result.details || {};
 totalChanges = result.changes_made || 0;
 
 // Log the results for debugging
-console.log(`📊 Python sharing detailed results:`, result);
+console.log(`?? Python sharing detailed results:`, result);
 
       return {
         success: totalChanges > 0,
@@ -566,7 +621,7 @@ try {
   // Extract the detailed results (should have regular and fourk details)
   results = result.details || result;
   
-  console.log(`📊 Python removal detailed results:`, result);
+  console.log(`?? Python removal detailed results:`, result);
 } catch (error) {
   results = { 
     regular: { success: false, error: error.message },
