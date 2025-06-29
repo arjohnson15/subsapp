@@ -403,66 +403,6 @@ tbody tr:hover {
     background: rgba(255, 255, 255, 0.05);
 }
 
-/* Dynamic Column Widths - Mobile First Approach */
-th:nth-child(1), td:nth-child(1) { 
-    width: clamp(80px, 12%, 120px); 
-    min-width: 80px; 
-}
-
-th:nth-child(2), td:nth-child(2) { 
-    width: clamp(120px, 20%, 200px); 
-    min-width: 120px;
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-th:nth-child(3), td:nth-child(3) { 
-    width: clamp(60px, 10%, 100px); 
-    min-width: 60px;
-}
-
-th:nth-child(4), td:nth-child(4) { 
-    width: clamp(100px, 18%, 180px); 
-    min-width: 100px;
-}
-
-th:nth-child(5), td:nth-child(5) { 
-    width: clamp(90px, 15%, 140px); 
-    min-width: 90px;
-}
-
-th:nth-child(6), td:nth-child(6) { 
-    width: clamp(90px, 15%, 140px); 
-    min-width: 90px;
-}
-
-th:nth-child(7), td:nth-child(7) { 
-    width: clamp(120px, 20%, 200px); 
-    min-width: 120px;
-    text-align: center;
-}
-
-/* Actions Column Specific Styling */
-th:nth-child(7) {
-    text-align: center;
-    padding: var(--spacing-sm);
-}
-
-td:nth-child(7) {
-    text-align: center;
-    padding: var(--spacing-xs);
-    white-space: nowrap;
-}
-
-td:nth-child(7) .btn-small {
-    display: inline-block;
-    margin: 1px 2px;
-    vertical-align: middle;
-    padding: var(--spacing-xs) var(--spacing-sm);
-    font-size: var(--font-xs);
-}
 
 /* ==========================================
    TAG SYSTEM
