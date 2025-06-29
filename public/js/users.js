@@ -1593,7 +1593,7 @@ window.populateFormForEditing = async function(user) {
     console.log(`✅ Form population completed for ${user.name}`);
 };
 
-// Show Plex libraries and pre-select user's current access - MOVED TO GLOBAL SCOPE
+// Show Plex libraries and pre-select user's current access - ENHANCED WITH MULTIPLE RETRIES
 window.showPlexLibrariesAndPreSelect = function(serverGroup, user) {
     console.log(`📚 Showing ${serverGroup} libraries for editing...`);
     
@@ -1601,13 +1601,25 @@ window.showPlexLibrariesAndPreSelect = function(serverGroup, user) {
     if (libraryGroup) {
         libraryGroup.style.display = 'block';
         
-        // Load libraries first, then pre-select
+        // Load libraries first, then pre-select with multiple attempts
         if (window.Plex) {
             window.Plex.loadLibrariesForGroup(serverGroup).then(() => {
-                // Wait a bit for rendering, then pre-select
+                // Multiple attempts at different intervals to ensure checkboxes are rendered
                 setTimeout(() => {
+                    console.log(`🎯 First pre-selection attempt for ${serverGroup}`);
                     window.preSelectUserLibraries(serverGroup, user);
-                }, 800);
+                }, 500);
+                
+                setTimeout(() => {
+                    console.log(`🎯 Second pre-selection attempt for ${serverGroup}`);
+                    window.preSelectUserLibraries(serverGroup, user);
+                }, 1200);
+                
+                setTimeout(() => {
+                    console.log(`🎯 Final pre-selection attempt for ${serverGroup}`);
+                    window.preSelectUserLibraries(serverGroup, user);
+                }, 2500);
+                
             }).catch(error => {
                 console.error(`Error loading libraries for ${serverGroup}:`, error);
             });
@@ -1620,7 +1632,7 @@ window.showPlexLibrariesAndPreSelect = function(serverGroup, user) {
     }
 };
 
-// Pre-select user's current library access - MOVED TO GLOBAL SCOPE
+// Pre-select user's current library access - ENHANCED WITH RETRY MECHANISM
 window.preSelectUserLibraries = function(serverGroup, user) {
     console.log(`🔧 Pre-selecting libraries for ${serverGroup}:`, user.plex_libraries);
     
@@ -1631,17 +1643,30 @@ window.preSelectUserLibraries = function(serverGroup, user) {
     
     const userLibraries = user.plex_libraries[serverGroup];
     let selectedCount = 0;
+    let notFoundCount = 0;
     
     // Pre-select regular libraries
     if (userLibraries.regular && Array.isArray(userLibraries.regular)) {
         userLibraries.regular.forEach(libId => {
-            const checkbox = document.querySelector(`input[name="${serverGroup}_regular"][value="${libId}"]`);
+            // Try multiple selection methods
+            let checkbox = document.querySelector(`input[name="${serverGroup}_regular"][value="${libId}"]`);
+            
+            if (!checkbox) {
+                // Try alternative ID-based selection
+                checkbox = document.getElementById(`${serverGroup}_regular_${libId}`);
+            }
+            
             if (checkbox) {
                 checkbox.checked = true;
                 selectedCount++;
                 console.log(`✅ Pre-selected regular library: ${libId}`);
             } else {
+                notFoundCount++;
                 console.log(`⚠️ Regular library checkbox not found: ${libId}`);
+                
+                // Debug: show what checkboxes exist
+                const allRegularBoxes = document.querySelectorAll(`input[name="${serverGroup}_regular"]`);
+                console.log(`🔍 Available regular checkboxes for ${serverGroup}:`, Array.from(allRegularBoxes).map(cb => cb.value));
             }
         });
     }
@@ -1649,18 +1674,66 @@ window.preSelectUserLibraries = function(serverGroup, user) {
     // Pre-select 4K libraries
     if (userLibraries.fourk && Array.isArray(userLibraries.fourk)) {
         userLibraries.fourk.forEach(libId => {
-            const checkbox = document.querySelector(`input[name="${serverGroup}_fourk"][value="${libId}"]`);
+            // Try multiple selection methods
+            let checkbox = document.querySelector(`input[name="${serverGroup}_fourk"][value="${libId}"]`);
+            
+            if (!checkbox) {
+                // Try alternative ID-based selection
+                checkbox = document.getElementById(`${serverGroup}_fourk_${libId}`);
+            }
+            
             if (checkbox) {
                 checkbox.checked = true;
                 selectedCount++;
                 console.log(`✅ Pre-selected 4K library: ${libId}`);
             } else {
+                notFoundCount++;
                 console.log(`⚠️ 4K library checkbox not found: ${libId}`);
+                
+                // Debug: show what checkboxes exist
+                const allFourkBoxes = document.querySelectorAll(`input[name="${serverGroup}_fourk"]`);
+                console.log(`🔍 Available 4K checkboxes for ${serverGroup}:`, Array.from(allFourkBoxes).map(cb => cb.value));
             }
         });
     }
     
-    console.log(`📊 Pre-selected ${selectedCount} total libraries for ${serverGroup}`);
+    console.log(`📊 Pre-selected ${selectedCount} libraries, ${notFoundCount} not found for ${serverGroup}`);
+    
+    // If checkboxes weren't found, try again after a short delay
+    if (notFoundCount > 0) {
+        console.log(`🔄 Retrying pre-selection in 1 second for ${serverGroup}...`);
+        setTimeout(() => {
+            let retrySelected = 0;
+            
+            // Retry regular libraries
+            if (userLibraries.regular && Array.isArray(userLibraries.regular)) {
+                userLibraries.regular.forEach(libId => {
+                    const checkbox = document.querySelector(`input[name="${serverGroup}_regular"][value="${libId}"]`) ||
+                                   document.getElementById(`${serverGroup}_regular_${libId}`);
+                    if (checkbox && !checkbox.checked) {
+                        checkbox.checked = true;
+                        retrySelected++;
+                        console.log(`🔄 RETRY: Pre-selected regular library: ${libId}`);
+                    }
+                });
+            }
+            
+            // Retry 4K libraries
+            if (userLibraries.fourk && Array.isArray(userLibraries.fourk)) {
+                userLibraries.fourk.forEach(libId => {
+                    const checkbox = document.querySelector(`input[name="${serverGroup}_fourk"][value="${libId}"]`) ||
+                                   document.getElementById(`${serverGroup}_fourk_${libId}`);
+                    if (checkbox && !checkbox.checked) {
+                        checkbox.checked = true;
+                        retrySelected++;
+                        console.log(`🔄 RETRY: Pre-selected 4K library: ${libId}`);
+                    }
+                });
+            }
+            
+            console.log(`🔄 Retry completed: ${retrySelected} additional libraries selected for ${serverGroup}`);
+        }, 1000);
+    }
 };
 
 // Export for global access
