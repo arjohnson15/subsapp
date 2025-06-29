@@ -93,9 +93,8 @@ window.Users = {
         }
         
         // Refresh users list if it was a user operation
-        if (task.type === 'plex_update') {
-            this.loadUsers();
-        }
+// REMOVED: Duplicate loadUsers() call that was causing rate limits
+// The users list is already reloaded when navigating back to users page
     },
     
     handleTaskFailure(taskId, task, result) {
@@ -563,27 +562,13 @@ displayEnhancedLibraryAccess(user) {
 	
 // Enhanced Plex status rendering with better pending invite indicators
 renderPlexStatus(user) {
-    console.log(`🔍 Checking pending status for ${user.name}:`, user.pending_plex_invites);
-    
     const pendingInvites = user.pending_plex_invites || null;
     
-    // Show indicator if user has pending invites - MORE PROMINENT
+    // Show simple pending indicator
     if (pendingInvites && Object.keys(pendingInvites).length > 0) {
-        const serverGroups = Object.keys(pendingInvites);
-        const serversText = serverGroups.map(sg => sg.toUpperCase()).join(', ');
-        
-        // Count total pending invites
-        let totalPending = 0;
-        Object.values(pendingInvites).forEach(serverGroup => {
-            totalPending += Object.keys(serverGroup).length;
-        });
-        
-        return `<br><span class="pending-invite-indicator" title="User must accept ${totalPending} pending invite(s) before library access will work">
-            ⏳ PENDING: ${serversText} (${totalPending} invite${totalPending > 1 ? 's' : ''})
-        </span>`;
+        return `<br><span class="pending-invite-simple" title="User has pending Plex invites">⏳ Pending Plex Invite</span>`;
     }
     
-    // Return empty string if no pending invites
     return '';
 },
 
