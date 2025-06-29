@@ -355,26 +355,121 @@ renderUsersTableBasic() {
         }
     },
     
-    showUserModal(user) {
-        const userDetailsDiv = document.getElementById('userDetails');
-        if (!userDetailsDiv) return;
+// Enhanced user modal with better invite status and library access display
+showUserModal(user) {
+    const userDetailsDiv = document.getElementById('userDetails');
+    if (!userDetailsDiv) return;
+    
+    // Check if user has pending invites
+    const hasPendingInvites = this.userHasPendingInvites(user);
+    const inviteStatusHtml = this.showDetailedInviteStatus(user);
+    
+    userDetailsDiv.innerHTML = `
+        <div class="info-item"><div class="info-label">Name</div><div class="info-value">${user.name}</div></div>
+        <div class="info-item"><div class="info-label">Email</div><div class="info-value">${user.email}</div></div>
+        <div class="info-item"><div class="info-label">Owner</div><div class="info-value">${user.owner_name || 'N/A'}</div></div>
+        <div class="info-item"><div class="info-label">Tags</div><div class="info-value">${user.tags ? user.tags.join(', ') : 'None'}</div></div>
+        <div class="info-item"><div class="info-label">Plex Email</div><div class="info-value">${user.plex_email || 'N/A'}</div></div>
         
-        userDetailsDiv.innerHTML = `
-            <div class="info-item"><div class="info-label">Name</div><div class="info-value">${user.name}</div></div>
-            <div class="info-item"><div class="info-label">Email</div><div class="info-value">${user.email}</div></div>
-            <div class="info-item"><div class="info-label">Owner</div><div class="info-value">${user.owner_name || 'N/A'}</div></div>
-            <div class="info-item"><div class="info-label">Tags</div><div class="info-value">${user.tags ? user.tags.join(', ') : 'None'}</div></div>
-            <div class="info-item"><div class="info-label">Plex Email</div><div class="info-value">${user.plex_email || 'N/A'}</div></div>
-            <div class="info-item"><div class="info-label">IPTV Username</div><div class="info-value">${user.iptv_username || 'N/A'}</div></div>
-            <div class="info-item"><div class="info-label">iMPlayer Code</div><div class="info-value">${user.implayer_code || 'N/A'}</div></div>
-            <div class="info-item"><div class="info-label">Device Count</div><div class="info-value">${user.device_count || 'N/A'}</div></div>
+        ${hasPendingInvites ? `
+        <div class="info-item invite-status-warning">
+            <div class="info-label"><i class="fas fa-exclamation-triangle"></i> Invite Status</div>
+            <div class="info-value">${inviteStatusHtml}</div>
+        </div>
+        ` : ''}
+        
+        <div class="info-item"><div class="info-label">IPTV Username</div><div class="info-value">${user.iptv_username || 'N/A'}</div></div>
+        <div class="info-item"><div class="info-label">iMPlayer Code</div><div class="info-value">${user.implayer_code || 'N/A'}</div></div>
+        <div class="info-item"><div class="info-label">Device Count</div><div class="info-value">${user.device_count || 'N/A'}</div></div>
+    `;
+    
+    // Show enhanced library access display
+    this.displayEnhancedLibraryAccess(user);
+    
+    document.getElementById('viewUserModal').classList.add('active');
+},
+
+// NEW: Enhanced library access display that shows both stored access AND pending status
+displayEnhancedLibraryAccess(user) {
+    const accessDiv = document.getElementById('userLibraryAccess');
+    
+    if (!user.plex_email) {
+        accessDiv.innerHTML = '<p>No Plex email configured</p>';
+        return;
+    }
+    
+    const hasPendingInvites = this.userHasPendingInvites(user);
+    const pendingInvites = user.pending_plex_invites || {};
+    
+    if (!user.plex_libraries || Object.keys(user.plex_libraries).length === 0) {
+        if (hasPendingInvites) {
+            accessDiv.innerHTML = `
+                <div class="invite-warning">
+                    <i class="fas fa-clock"></i>
+                    <div>
+                        <strong>Pending Setup:</strong> User has pending invites but no library access configured yet.
+                        <br><small>Configure library access after user accepts invites.</small>
+                    </div>
+                </div>
+            `;
+        } else {
+            accessDiv.innerHTML = '<p>No Plex access configured</p>';
+        }
+        return;
+    }
+    
+    let accessHtml = '';
+    
+    if (hasPendingInvites) {
+        accessHtml += `
+            <div class="invite-warning" style="margin-bottom: 15px;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <div>
+                    <strong>Pending Invites:</strong> User must accept Plex invites before library access will work.
+                    <br><small>Library configuration below will take effect once invites are accepted.</small>
+                </div>
+            </div>
         `;
+    }
+    
+    for (const [serverGroup, serverAccess] of Object.entries(user.plex_libraries)) {
+        const serverPending = pendingInvites[serverGroup] || null;
+        const hasPendingForServer = serverPending && Object.keys(serverPending).length > 0;
         
-        // Load user's current Plex access
-this.displayStoredLibraryAccess(user);
+        accessHtml += `<div class="library-group">
+            <h5>${serverGroup.toUpperCase()} 
+                ${hasPendingForServer ? 
+                    `<span style="color: #ff9800; font-size: 0.8em;">⏳ Pending</span>` : 
+                    `<span style="color: #4caf50; font-size: 0.8em;">✓ Active</span>`
+                }
+            </h5>
+            <div class="library-list">`;
         
-        document.getElementById('viewUserModal').classList.add('active');
-    },
+        if (serverAccess.regular && serverAccess.regular.length > 0) {
+            accessHtml += `<div><strong>Regular Libraries:</strong> ${serverAccess.regular.length} libraries configured</div>`;
+        }
+        
+        if (serverAccess.fourk && serverAccess.fourk.length > 0) {
+            accessHtml += `<div><strong>4K Libraries:</strong> ${serverAccess.fourk.length} libraries configured</div>`;
+        }
+        
+        if ((!serverAccess.regular || serverAccess.regular.length === 0) && 
+            (!serverAccess.fourk || serverAccess.fourk.length === 0)) {
+            accessHtml += `<div style="color: #9e9e9e;">No libraries configured</div>`;
+        }
+        
+        if (hasPendingForServer) {
+            const pendingServers = Object.keys(serverPending);
+            accessHtml += `<div style="color: #ff9800; font-size: 0.9em; margin-top: 5px;">
+                <i class="fas fa-clock"></i> Pending: ${pendingServers.join(', ')}
+            </div>`;
+        }
+        
+        accessHtml += `</div></div>`;
+    }
+    
+    accessDiv.innerHTML = accessHtml || '<p>No library access found</p>';
+},
 	
 	// NEW METHOD - Add this right here, after showUserModal()
 	displayStoredLibraryAccess(user) {
@@ -466,17 +561,62 @@ this.displayStoredLibraryAccess(user);
         }
     },
 	
+// Enhanced Plex status rendering with better pending invite indicators
 renderPlexStatus(user) {
+    console.log(`🔍 Checking pending status for ${user.name}:`, user.pending_plex_invites);
+    
     const pendingInvites = user.pending_plex_invites || null;
     
-    // ONLY show indicator if user has pending invites - this is what you want to see
+    // Show indicator if user has pending invites - MORE PROMINENT
     if (pendingInvites && Object.keys(pendingInvites).length > 0) {
         const serverGroups = Object.keys(pendingInvites);
-        return `<br><span class="tag" style="background: linear-gradient(45deg, #ff9800, #ffb74d); color: white; font-size: 0.8rem;">⏳ Pending Invites (${serverGroups.join(', ')})</span>`;
+        const serversText = serverGroups.map(sg => sg.toUpperCase()).join(', ');
+        
+        // Count total pending invites
+        let totalPending = 0;
+        Object.values(pendingInvites).forEach(serverGroup => {
+            totalPending += Object.keys(serverGroup).length;
+        });
+        
+        return `<br><span class="pending-invite-indicator" title="User must accept ${totalPending} pending invite(s) before library access will work">
+            ⏳ PENDING: ${serversText} (${totalPending} invite${totalPending > 1 ? 's' : ''})
+        </span>`;
     }
     
-    // Return empty string if no pending invites - no need to clutter the table
+    // Return empty string if no pending invites
     return '';
+},
+
+// NEW: Enhanced function to show detailed invite status in user modal
+showDetailedInviteStatus(user) {
+    const pendingInvites = user.pending_plex_invites || null;
+    
+    if (!pendingInvites || Object.keys(pendingInvites).length === 0) {
+        return '<div style="color: #4caf50;"><i class="fas fa-check-circle"></i> No pending invites</div>';
+    }
+    
+    let statusHtml = '<div class="invite-status-warning">';
+    statusHtml += '<div style="color: #ff9800; font-weight: bold; margin-bottom: 8px;"><i class="fas fa-exclamation-triangle"></i> Pending Invites Detected</div>';
+    
+    for (const [serverGroup, servers] of Object.entries(pendingInvites)) {
+        const serverNames = Object.keys(servers);
+        statusHtml += `<div style="margin-bottom: 4px;">`;
+        statusHtml += `<strong>${serverGroup.toUpperCase()}:</strong> ${serverNames.join(', ')}`;
+        statusHtml += `</div>`;
+    }
+    
+    statusHtml += '<div style="font-size: 0.9em; color: #ffb74d; margin-top: 8px;">';
+    statusHtml += 'User must accept these invites in their Plex app before library access will work.';
+    statusHtml += '</div>';
+    statusHtml += '</div>';
+    
+    return statusHtml;
+},
+
+// NEW: Check if user has any pending invites (utility function)
+userHasPendingInvites(user) {
+    const pendingInvites = user.pending_plex_invites || null;
+    return pendingInvites && Object.keys(pendingInvites).length > 0;
 },
     
     // Enhanced saveUser function with smart change detection and baseline management
@@ -1589,7 +1729,7 @@ window.populateFormForEditing = async function(user) {
     console.log(`✅ Form population completed for ${user.name}`);
 };
 
-// Show Plex libraries and pre-select user's current access - ENHANCED WITH MULTIPLE RETRIES
+// Show Plex libraries and pre-select user's current access - FIXED MODULE REFERENCE
 window.showPlexLibrariesAndPreSelect = function(serverGroup, user) {
     console.log(`📚 Showing ${serverGroup} libraries for editing...`);
     
@@ -1598,8 +1738,9 @@ window.showPlexLibrariesAndPreSelect = function(serverGroup, user) {
         libraryGroup.style.display = 'block';
         
         // Load libraries first, then pre-select with multiple attempts
-        if (window.Plex) {
-            window.Plex.loadLibrariesForGroup(serverGroup).then(() => {
+        // FIXED: Call the function directly instead of through window.Plex
+        if (window.loadPlexLibrariesForGroup) {
+            window.loadPlexLibrariesForGroup(serverGroup).then(() => {
                 // Multiple attempts at different intervals to ensure checkboxes are rendered
                 setTimeout(() => {
                     console.log(`🎯 First pre-selection attempt for ${serverGroup}`);
@@ -1619,38 +1760,94 @@ window.showPlexLibrariesAndPreSelect = function(serverGroup, user) {
             }).catch(error => {
                 console.error(`Error loading libraries for ${serverGroup}:`, error);
             });
+        } else {
+            console.error(`loadPlexLibrariesForGroup function not found`);
+            // Try the app.js version instead
+            if (window.loadPlexLibrariesForGroup) {
+                window.loadPlexLibrariesForGroup(serverGroup);
+            }
+            
+            // Still try pre-selection in case libraries are already loaded
+            setTimeout(() => {
+                window.preSelectUserLibraries(serverGroup, user);
+            }, 500);
         }
         
-        // Test connection
-        if (window.testPlexConnection) {
-            window.testPlexConnection(serverGroup);
+        // Test connection if function exists
+        if (window.testPlexConnectionQuiet) {
+            window.testPlexConnectionQuiet(serverGroup);
         }
     }
 };
 
-// Pre-select user's current library access - ENHANCED WITH RETRY MECHANISM
-window.preSelectUserLibraries = function(serverGroup, user) {
-    console.log(`🔧 Pre-selecting libraries for ${serverGroup}:`, user.plex_libraries);
+// Pre-select user's current library access - COMPLETE ENHANCED VERSION
+window.preSelectUserLibraries = function(serverGroup, user = null) {
+    console.log(`🔧 Pre-selecting libraries for ${serverGroup}...`);
     
-    if (!user.plex_libraries || !user.plex_libraries[serverGroup]) {
+    // Get user data - prefer passed parameter, fall back to global state
+    let currentUserData = user;
+    if (!currentUserData && window.AppState && window.AppState.currentUserData) {
+        currentUserData = window.AppState.currentUserData;
+    }
+    
+    if (!currentUserData) {
+        console.log('❌ No user data available for pre-selection');
+        return;
+    }
+    
+    if (!currentUserData.plex_libraries || !currentUserData.plex_libraries[serverGroup]) {
         console.log(`ℹ️ No library data for ${serverGroup}`);
         return;
     }
     
-    const userLibraries = user.plex_libraries[serverGroup];
+    const userLibraries = currentUserData.plex_libraries[serverGroup];
     let selectedCount = 0;
     let notFoundCount = 0;
     
+    console.log(`📋 User libraries for ${serverGroup}:`, userLibraries);
+    
+    // Helper function to extract library ID from various formats
+    const extractLibraryId = (lib) => {
+        if (typeof lib === 'object' && lib !== null) {
+            // Try multiple property names that could contain the ID
+            return lib.id || lib.key || lib.ratingKey || lib.libraryId || lib.value || lib.library_id || lib.sectionId;
+        }
+        return lib; // Assume it's already a string/number ID
+    };
+    
+    // Helper function to find checkbox by ID
+    const findCheckbox = (serverGroup, type, libId) => {
+        // Try multiple selector methods
+        let checkbox = document.querySelector(`input[name="${serverGroup}_${type}"][value="${libId}"]`);
+        
+        if (!checkbox) {
+            checkbox = document.getElementById(`${serverGroup}_${type}_${libId}`);
+        }
+        
+        if (!checkbox) {
+            // Try with string conversion
+            checkbox = document.querySelector(`input[name="${serverGroup}_${type}"][value="${String(libId)}"]`);
+        }
+        
+        return checkbox;
+    };
+    
     // Pre-select regular libraries
     if (userLibraries.regular && Array.isArray(userLibraries.regular)) {
-        userLibraries.regular.forEach(libId => {
-            // Try multiple selection methods
-            let checkbox = document.querySelector(`input[name="${serverGroup}_regular"][value="${libId}"]`);
+        console.log(`🔄 Processing ${userLibraries.regular.length} regular libraries...`);
+        
+        userLibraries.regular.forEach((lib, index) => {
+            const libId = extractLibraryId(lib);
             
-            if (!checkbox) {
-                // Try alternative ID-based selection
-                checkbox = document.getElementById(`${serverGroup}_regular_${libId}`);
+            if (!libId) {
+                console.log(`⚠️ Could not extract ID from regular library at index ${index}:`, lib);
+                notFoundCount++;
+                return;
             }
+            
+            console.log(`🔍 Looking for regular library checkbox with ID: ${libId} (type: ${typeof libId})`);
+            
+            const checkbox = findCheckbox(serverGroup, 'regular', libId);
             
             if (checkbox) {
                 checkbox.checked = true;
@@ -1658,25 +1855,37 @@ window.preSelectUserLibraries = function(serverGroup, user) {
                 console.log(`✅ Pre-selected regular library: ${libId}`);
             } else {
                 notFoundCount++;
-                console.log(`⚠️ Regular library checkbox not found: ${libId}`);
+                console.log(`❌ Regular library checkbox NOT FOUND for ID: ${libId}`);
                 
-                // Debug: show what checkboxes exist
+                // Debug: show what checkboxes are actually available
                 const allRegularBoxes = document.querySelectorAll(`input[name="${serverGroup}_regular"]`);
-                console.log(`🔍 Available regular checkboxes for ${serverGroup}:`, Array.from(allRegularBoxes).map(cb => cb.value));
+                console.log(`🔍 Available regular checkboxes for ${serverGroup}:`, 
+                    Array.from(allRegularBoxes).map(cb => ({
+                        value: cb.value, 
+                        id: cb.id,
+                        type: typeof cb.value
+                    }))
+                );
             }
         });
     }
     
     // Pre-select 4K libraries
     if (userLibraries.fourk && Array.isArray(userLibraries.fourk)) {
-        userLibraries.fourk.forEach(libId => {
-            // Try multiple selection methods
-            let checkbox = document.querySelector(`input[name="${serverGroup}_fourk"][value="${libId}"]`);
+        console.log(`🔄 Processing ${userLibraries.fourk.length} 4K libraries...`);
+        
+        userLibraries.fourk.forEach((lib, index) => {
+            const libId = extractLibraryId(lib);
             
-            if (!checkbox) {
-                // Try alternative ID-based selection
-                checkbox = document.getElementById(`${serverGroup}_fourk_${libId}`);
+            if (!libId) {
+                console.log(`⚠️ Could not extract ID from 4K library at index ${index}:`, lib);
+                notFoundCount++;
+                return;
             }
+            
+            console.log(`🔍 Looking for 4K library checkbox with ID: ${libId} (type: ${typeof libId})`);
+            
+            const checkbox = findCheckbox(serverGroup, 'fourk', libId);
             
             if (checkbox) {
                 checkbox.checked = true;
@@ -1684,53 +1893,150 @@ window.preSelectUserLibraries = function(serverGroup, user) {
                 console.log(`✅ Pre-selected 4K library: ${libId}`);
             } else {
                 notFoundCount++;
-                console.log(`⚠️ 4K library checkbox not found: ${libId}`);
+                console.log(`❌ 4K library checkbox NOT FOUND for ID: ${libId}`);
                 
-                // Debug: show what checkboxes exist
+                // Debug: show what checkboxes are actually available
                 const allFourkBoxes = document.querySelectorAll(`input[name="${serverGroup}_fourk"]`);
-                console.log(`🔍 Available 4K checkboxes for ${serverGroup}:`, Array.from(allFourkBoxes).map(cb => cb.value));
+                console.log(`🔍 Available 4K checkboxes for ${serverGroup}:`, 
+                    Array.from(allFourkBoxes).map(cb => ({
+                        value: cb.value, 
+                        id: cb.id,
+                        type: typeof cb.value
+                    }))
+                );
             }
         });
     }
     
-    console.log(`📊 Pre-selected ${selectedCount} libraries, ${notFoundCount} not found for ${serverGroup}`);
+    console.log(`📊 Pre-selection completed for ${serverGroup}: ${selectedCount} selected, ${notFoundCount} not found`);
     
-    // If checkboxes weren't found, try again after a short delay
+    // If some checkboxes weren't found, try again after DOM settles
     if (notFoundCount > 0) {
-        console.log(`🔄 Retrying pre-selection in 1 second for ${serverGroup}...`);
+        console.log(`🔄 ${notFoundCount} checkboxes not found, retrying in 1 second...`);
         setTimeout(() => {
-            let retrySelected = 0;
-            
-            // Retry regular libraries
-            if (userLibraries.regular && Array.isArray(userLibraries.regular)) {
-                userLibraries.regular.forEach(libId => {
-                    const checkbox = document.querySelector(`input[name="${serverGroup}_regular"][value="${libId}"]`) ||
-                                   document.getElementById(`${serverGroup}_regular_${libId}`);
-                    if (checkbox && !checkbox.checked) {
-                        checkbox.checked = true;
-                        retrySelected++;
-                        console.log(`🔄 RETRY: Pre-selected regular library: ${libId}`);
-                    }
-                });
-            }
-            
-            // Retry 4K libraries
-            if (userLibraries.fourk && Array.isArray(userLibraries.fourk)) {
-                userLibraries.fourk.forEach(libId => {
-                    const checkbox = document.querySelector(`input[name="${serverGroup}_fourk"][value="${libId}"]`) ||
-                                   document.getElementById(`${serverGroup}_fourk_${libId}`);
-                    if (checkbox && !checkbox.checked) {
-                        checkbox.checked = true;
-                        retrySelected++;
-                        console.log(`🔄 RETRY: Pre-selected 4K library: ${libId}`);
-                    }
-                });
-            }
-            
-            console.log(`🔄 Retry completed: ${retrySelected} additional libraries selected for ${serverGroup}`);
+            retryPreSelection(serverGroup, userLibraries, extractLibraryId, findCheckbox);
         }, 1000);
     }
+    
+    // If still having issues after initial attempt, try one more time with longer delay
+    if (notFoundCount > 0) {
+        setTimeout(() => {
+            retryPreSelection(serverGroup, userLibraries, extractLibraryId, findCheckbox);
+        }, 3000);
+    }
 };
+
+// Helper function for retry logic
+function retryPreSelection(serverGroup, userLibraries, extractLibraryId, findCheckbox) {
+    console.log(`🔄 RETRY: Attempting pre-selection again for ${serverGroup}...`);
+    let retrySelected = 0;
+    
+    // Retry regular libraries
+    if (userLibraries.regular && Array.isArray(userLibraries.regular)) {
+        userLibraries.regular.forEach(lib => {
+            const libId = extractLibraryId(lib);
+            if (!libId) return;
+            
+            const checkbox = findCheckbox(serverGroup, 'regular', libId);
+            if (checkbox && !checkbox.checked) {
+                checkbox.checked = true;
+                retrySelected++;
+                console.log(`🔄 RETRY SUCCESS: Pre-selected regular library: ${libId}`);
+            }
+        });
+    }
+    
+    // Retry 4K libraries
+    if (userLibraries.fourk && Array.isArray(userLibraries.fourk)) {
+        userLibraries.fourk.forEach(lib => {
+            const libId = extractLibraryId(lib);
+            if (!libId) return;
+            
+            const checkbox = findCheckbox(serverGroup, 'fourk', libId);
+            if (checkbox && !checkbox.checked) {
+                checkbox.checked = true;
+                retrySelected++;
+                console.log(`🔄 RETRY SUCCESS: Pre-selected 4K library: ${libId}`);
+            }
+        });
+    }
+    
+    console.log(`🔄 Retry completed for ${serverGroup}: ${retrySelected} additional libraries selected`);
+    
+    // Final debug if still having issues
+    if (retrySelected === 0) {
+        console.log(`⚠️ RETRY FAILED: Still unable to select libraries for ${serverGroup}`);
+        console.log(`🔍 Final debug - checking DOM state...`);
+        
+        // Show current state of DOM
+        const regularBoxes = document.querySelectorAll(`input[name="${serverGroup}_regular"]`);
+        const fourkBoxes = document.querySelectorAll(`input[name="${serverGroup}_fourk"]`);
+        
+        console.log(`📋 Current DOM state for ${serverGroup}:`);
+        console.log(`   Regular checkboxes (${regularBoxes.length}):`, Array.from(regularBoxes).map(cb => cb.value));
+        console.log(`   4K checkboxes (${fourkBoxes.length}):`, Array.from(fourkBoxes).map(cb => cb.value));
+        console.log(`   User library IDs:`, {
+            regular: userLibraries.regular?.map(lib => extractLibraryId(lib)),
+            fourk: userLibraries.fourk?.map(lib => extractLibraryId(lib))
+        });
+    }
+}
+
+// Helper function for retry logic
+function retryPreSelection(serverGroup, userLibraries, extractLibraryId, findCheckbox) {
+    console.log(`🔄 RETRY: Attempting pre-selection again for ${serverGroup}...`);
+    let retrySelected = 0;
+    
+    // Retry regular libraries
+    if (userLibraries.regular && Array.isArray(userLibraries.regular)) {
+        userLibraries.regular.forEach(lib => {
+            const libId = extractLibraryId(lib);
+            if (!libId) return;
+            
+            const checkbox = findCheckbox(serverGroup, 'regular', libId);
+            if (checkbox && !checkbox.checked) {
+                checkbox.checked = true;
+                retrySelected++;
+                console.log(`🔄 RETRY SUCCESS: Pre-selected regular library: ${libId}`);
+            }
+        });
+    }
+    
+    // Retry 4K libraries
+    if (userLibraries.fourk && Array.isArray(userLibraries.fourk)) {
+        userLibraries.fourk.forEach(lib => {
+            const libId = extractLibraryId(lib);
+            if (!libId) return;
+            
+            const checkbox = findCheckbox(serverGroup, 'fourk', libId);
+            if (checkbox && !checkbox.checked) {
+                checkbox.checked = true;
+                retrySelected++;
+                console.log(`🔄 RETRY SUCCESS: Pre-selected 4K library: ${libId}`);
+            }
+        });
+    }
+    
+    console.log(`🔄 Retry completed for ${serverGroup}: ${retrySelected} additional libraries selected`);
+    
+    // Final debug if still having issues
+    if (retrySelected === 0) {
+        console.log(`⚠️ RETRY FAILED: Still unable to select libraries for ${serverGroup}`);
+        console.log(`🔍 Final debug - checking DOM state...`);
+        
+        // Show current state of DOM
+        const regularBoxes = document.querySelectorAll(`input[name="${serverGroup}_regular"]`);
+        const fourkBoxes = document.querySelectorAll(`input[name="${serverGroup}_fourk"]`);
+        
+        console.log(`📋 Current DOM state for ${serverGroup}:`);
+        console.log(`   Regular checkboxes (${regularBoxes.length}):`, Array.from(regularBoxes).map(cb => cb.value));
+        console.log(`   4K checkboxes (${fourkBoxes.length}):`, Array.from(fourkBoxes).map(cb => cb.value));
+        console.log(`   User library IDs:`, {
+            regular: userLibraries.regular?.map(lib => extractLibraryId(lib)),
+            fourk: userLibraries.fourk?.map(lib => extractLibraryId(lib))
+        });
+    }
+}
 
 // Export for global access
 window.Users.loadUsers = window.Users.loadUsers.bind(window.Users);

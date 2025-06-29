@@ -120,50 +120,46 @@ router.get('/', async (req, res) => {
         SELECT s.*, st.name as subscription_name, st.type, st.price
         FROM subscriptions s
         JOIN subscription_types st ON s.subscription_type_id = st.id
-        WHERE s.user_id = ? AND s.status = 'active'
+        WHERE s.user_id = ?
+        ORDER BY s.expiration_date DESC
       `, [user.id]);
 
-      // Safe JSON parsing
-      user.tags = safeJsonParse(user.tags, []);
-      user.plex_libraries = safeJsonParse(user.plex_libraries, {});
-	  user.pending_plex_invites = safeJsonParse(user.pending_plex_invites, null);
-      user.subscriptions = subscriptions;
+      // Parse JSON fields safely
+      const tags = safeJsonParse(user.tags, []);
+      const plexLibraries = safeJsonParse(user.plex_libraries, {});
+      const pendingPlexInvites = safeJsonParse(user.pending_plex_invites, null); // ADD THIS LINE
 
-      // Add subscription expiration dates to user object for frontend compatibility
-      user.plex_expiration = null;
-      user.iptv_expiration = null;
+      // Calculate subscription expirations
+      let plexExpiration = null;
+      let iptvExpiration = null;
 
-      subscriptions.forEach(sub => {
+      for (const sub of subscriptions) {
         if (sub.type === 'plex') {
           if (sub.is_free) {
-            user.plex_expiration = 'FREE';
-          } else {
-            // Format date to YYYY-MM-DD only (remove time)
-            user.plex_expiration = sub.expiration_date ? 
-              new Date(sub.expiration_date).toISOString().split('T')[0] : 
-              null;
+            plexExpiration = 'FREE';
+            break;
+          } else if (!plexExpiration || new Date(sub.expiration_date) > new Date(plexExpiration)) {
+            plexExpiration = sub.expiration_date;
           }
         } else if (sub.type === 'iptv') {
           if (sub.is_free) {
-            user.iptv_expiration = 'FREE';
-          } else {
-            // Format date to YYYY-MM-DD only (remove time)
-            user.iptv_expiration = sub.expiration_date ? 
-              new Date(sub.expiration_date).toISOString().split('T')[0] : 
-              null;
+            iptvExpiration = 'FREE';
+            break;
+          } else if (!iptvExpiration || new Date(sub.expiration_date) > new Date(iptvExpiration)) {
+            iptvExpiration = sub.expiration_date;
           }
         }
-      });
-
-      // If no subscriptions found, leave as null (will display as empty in frontend)
-      if (user.plex_expiration === null) {
-        user.plex_expiration = null;
-      }
-      if (user.iptv_expiration === null) {
-        user.iptv_expiration = null;
       }
 
-      return user;
+      return {
+        ...user,
+        tags,
+        plex_libraries: plexLibraries,
+        pending_plex_invites: pendingPlexInvites, // ADD THIS LINE
+        subscriptions,
+        plex_expiration: plexExpiration,
+        iptv_expiration: iptvExpiration
+      };
     }));
 
     res.json(processedUsers);

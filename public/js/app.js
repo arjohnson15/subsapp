@@ -479,7 +479,7 @@ function showLibraryLoadError(serverGroup) {
     if (fourkList) fourkList.innerHTML = '<div style="color: #f44336;">Error loading libraries</div>';
 }
 
-// Toggle Plex library sections based on tag selection
+// Update the togglePlexLibrariesByTag function to pass user data
 function togglePlexLibrariesByTag(serverGroup, isChecked) {
     console.log(`🔧 Toggling ${serverGroup} libraries: ${isChecked}`);
     
@@ -498,15 +498,15 @@ function togglePlexLibrariesByTag(serverGroup, isChecked) {
         if (data && (data.regular || data.fourk)) {
             renderPlexLibrariesForGroup(serverGroup, data);
             
-            // IMPORTANT: Pre-select libraries if editing a user
+            // FIXED: Pass current user data to pre-selection
             if (window.AppState.editingUserId && window.AppState.currentUserData) {
-                setTimeout(() => preSelectUserLibraries(serverGroup), 300);
+                setTimeout(() => preSelectUserLibraries(serverGroup, window.AppState.currentUserData), 300);
             }
         } else {
             loadPlexLibrariesForGroup(serverGroup).then(() => {
-                // Pre-select after loading
+                // FIXED: Pass current user data to pre-selection after loading
                 if (window.AppState.editingUserId && window.AppState.currentUserData) {
-                    setTimeout(() => preSelectUserLibraries(serverGroup), 300);
+                    setTimeout(() => preSelectUserLibraries(serverGroup, window.AppState.currentUserData), 300);
                 }
             });
         }
@@ -524,57 +524,13 @@ function togglePlexLibrariesByTag(serverGroup, isChecked) {
     }
 }
 
-// NEW: Pre-select libraries based on user's current access
-function preSelectUserLibraries(serverGroup) {
-    console.log(`🔧 Pre-selecting libraries for ${serverGroup}...`);
-    
-    // Get the current user being edited
-    if (!window.AppState.editingUserId || !window.AppState.currentUserData) {
-        console.log('No user data available for pre-selection');
-        return;
+function preSelectUserLibraries(serverGroup, user = null) {
+    // Call the enhanced version from users.js
+    if (window.preSelectUserLibraries) {
+        return window.preSelectUserLibraries(serverGroup, user);
+    } else {
+        console.error('Main preSelectUserLibraries function not available');
     }
-    
-    const user = window.AppState.currentUserData;
-    
-    if (!user.plex_libraries || !user.plex_libraries[serverGroup]) {
-        console.log(`No cached library access found for ${serverGroup}`);
-        return;
-    }
-    
-    const userAccess = user.plex_libraries[serverGroup];
-    console.log(`🔧 Pre-selecting based on cached access:`, userAccess);
-    
-    let selectedCount = 0;
-    
-    // Select regular libraries
-    if (userAccess.regular && Array.isArray(userAccess.regular)) {
-        userAccess.regular.forEach(libId => {
-            const checkbox = document.querySelector(`input[name="${serverGroup}_regular"][value="${libId}"]`);
-            if (checkbox) {
-                checkbox.checked = true;
-                selectedCount++;
-                console.log(`✅ Pre-selected regular library: ${libId}`);
-            } else {
-                console.log(`⚠️ Could not find checkbox for regular library: ${libId}`);
-            }
-        });
-    }
-    
-    // Select 4K libraries
-    if (userAccess.fourk && Array.isArray(userAccess.fourk)) {
-        userAccess.fourk.forEach(libId => {
-            const checkbox = document.querySelector(`input[name="${serverGroup}_fourk"][value="${libId}"]`);
-            if (checkbox) {
-                checkbox.checked = true;
-                selectedCount++;
-                console.log(`✅ Pre-selected 4K library: ${libId}`);
-            } else {
-                console.log(`⚠️ Could not find checkbox for 4K library: ${libId}`);
-            }
-        });
-    }
-    
-    console.log(`🔧 Pre-selected ${selectedCount} libraries for ${serverGroup}`);
 }
 
 // Test Plex connection quietly

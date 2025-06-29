@@ -38,6 +38,7 @@ CREATE TABLE users (
   bcc_owner_renewal BOOLEAN DEFAULT FALSE,
   tags JSON,
   plex_libraries JSON,
+  pending_plex_invites JSON DEFAULT NULL COMMENT 'Tracks pending Plex server invitations for this user',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE SET NULL
