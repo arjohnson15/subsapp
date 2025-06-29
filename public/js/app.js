@@ -493,23 +493,30 @@ function togglePlexLibrariesByTag(serverGroup, isChecked) {
         console.log(`✅ Showing ${serverGroup} libraries`);
         libraryGroup.style.display = 'block';
         
-        // Load and render libraries if not already done
-        const data = window.AppState.plexLibraries[serverGroup];
-        if (data && (data.regular || data.fourk)) {
-            renderPlexLibrariesForGroup(serverGroup, data);
-            
-            // FIXED: Pass current user data to pre-selection
-            if (window.AppState.editingUserId && window.AppState.currentUserData) {
-                setTimeout(() => preSelectUserLibraries(serverGroup, window.AppState.currentUserData), 300);
+const data = window.AppState.plexLibraries[serverGroup];
+if (data && (data.regular || data.fourk)) {
+    renderPlexLibrariesForGroup(serverGroup, data);
+    
+    // FIXED: Pass current user data to pre-selection
+    if (window.AppState.editingUserId && window.AppState.currentUserData) {
+        setTimeout(() => {
+            if (window.preSelectUserLibraries) {
+                window.preSelectUserLibraries(serverGroup, window.AppState.currentUserData);
             }
-        } else {
-            loadPlexLibrariesForGroup(serverGroup).then(() => {
-                // FIXED: Pass current user data to pre-selection after loading
-                if (window.AppState.editingUserId && window.AppState.currentUserData) {
-                    setTimeout(() => preSelectUserLibraries(serverGroup, window.AppState.currentUserData), 300);
+        }, 300);
+    }
+} else {
+    loadPlexLibrariesForGroup(serverGroup).then(() => {
+        // FIXED: Pass current user data to pre-selection after loading
+        if (window.AppState.editingUserId && window.AppState.currentUserData) {
+            setTimeout(() => {
+                if (window.preSelectUserLibraries) {
+                    window.preSelectUserLibraries(serverGroup, window.AppState.currentUserData);
                 }
-            });
+            }, 300);
         }
+    });
+}
         
         // Test connection quietly
         if (window.testPlexConnectionQuiet) {
@@ -521,15 +528,6 @@ function togglePlexLibrariesByTag(serverGroup, isChecked) {
         if (window.clearAllLibrariesForGroup) {
             clearAllLibrariesForGroup(serverGroup);
         }
-    }
-}
-
-function preSelectUserLibraries(serverGroup, user = null) {
-    // Call the enhanced version from users.js
-    if (window.preSelectUserLibraries) {
-        return window.preSelectUserLibraries(serverGroup, user);
-    } else {
-        console.error('Main preSelectUserLibraries function not available');
     }
 }
 

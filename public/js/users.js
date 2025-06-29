@@ -1753,9 +1753,9 @@ window.showPlexLibrariesAndPreSelect = function(serverGroup, user) {
                 }, 1200);
                 
                 setTimeout(() => {
-                    console.log(`🎯 Final pre-selection attempt for ${serverGroup}`);
-                    window.preSelectUserLibraries(serverGroup, user);
-                }, 2500);
+					console.log(`🎯 Final pre-selection attempt for ${serverGroup}`);
+					window.preSelectUserLibraries(serverGroup, user);
+				}, 2500);
                 
             }).catch(error => {
                 console.error(`Error loading libraries for ${serverGroup}:`, error);
