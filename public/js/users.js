@@ -234,7 +234,6 @@ async renderUsersTable() {
 },
 
 
-// Updated renderUsersTableBasic with Plex status column
 renderUsersTableBasic() {
     const tbody = document.getElementById('usersTableBody');
     if (!tbody) return;
@@ -249,8 +248,6 @@ renderUsersTableBasic() {
             <td class="tags-cell">
                 ${user.tags && user.tags.length > 0 ? 
                     user.tags.map(tag => `<span class="tag tag-${tag.toLowerCase().replace(' ', '')}">${tag}</span>`).join('') : ''}
-            </td>
-            <td class="plex-status-cell">
                 ${this.renderPlexStatus(user)}
             </td>
             <td style="color: ${user.plex_expiration === 'FREE' ? '#4fc3f7' : (user.plex_expiration ? Utils.isDateExpired(user.plex_expiration) ? '#f44336' : '#4caf50' : '#666')}">
@@ -268,7 +265,7 @@ renderUsersTableBasic() {
         </tr>
     `).join('');
     
-    console.log(`✅ Basic users table rendered with ${users.length} users (including Plex status)`);
+    console.log(`✅ Basic users table rendered with ${users.length} users`);
 },
 
     
@@ -469,14 +466,13 @@ this.displayStoredLibraryAccess(user);
         }
     },
 	
-// FIXED: Render Plex status - ONLY show pending invites (what you care about)
 renderPlexStatus(user) {
     const pendingInvites = user.pending_plex_invites || null;
     
     // ONLY show indicator if user has pending invites - this is what you want to see
     if (pendingInvites && Object.keys(pendingInvites).length > 0) {
         const serverGroups = Object.keys(pendingInvites);
-        return `<span class="pending-invite-indicator" style="color: #ff9800; font-weight: bold;">⏳ Pending Invites (${serverGroups.join(', ')})</span>`;
+        return `<br><span class="tag" style="background: linear-gradient(45deg, #ff9800, #ffb74d); color: white; font-size: 0.8rem;">⏳ Pending Invites (${serverGroups.join(', ')})</span>`;
     }
     
     // Return empty string if no pending invites - no need to clutter the table
