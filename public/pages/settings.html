@@ -93,24 +93,24 @@
     <p style="color: #4fc3f7; margin-bottom: 20px;">Test connections and sync library information from Plex servers.</p>
     
     <div class="form-grid">
-        <div class="form-group">
-            <label>Plex 1 Status:</label>
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <span id="plex1ServerStatus" class="connection-status">Click to test</span>
-                <button class="btn btn-test" onclick="Settings.testPlexConnection('plex1')">Test Connection</button>
-            </div>
-        </div>
-        <div class="form-group">
-            <label>Plex 2 Status:</label>
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <span id="plex2ServerStatus" class="connection-status">Click to test</span>
-                <button class="btn btn-test" onclick="Settings.testPlexConnection('plex2')">Test Connection</button>
-            </div>
-        </div>
+<div class="form-group">
+    <label>Plex 1 Status:</label>
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <span id="plex1Status" class="connection-status"></span>
+        <button class="btn btn-test" onclick="testPlexConnection('plex1')">Test Connection</button>
+    </div>
+</div>
+<div class="form-group">
+    <label>Plex 2 Status:</label>
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <span id="plex2Status" class="connection-status"></span>
+        <button class="btn btn-test" onclick="testPlexConnection('plex2')">Test Connection</button>
+    </div>
+</div>
     </div>
     
     <div style="margin-top: 20px;">
-        <button class="btn btn-sync" onclick="Settings.syncPlexLibraries()">Sync All Libraries</button>
+        <button class="btn btn-sync" onclick="syncAllPlexLibraries()">Sync All Libraries</button>
         <small style="color: #4fc3f7; margin-left: 15px;">
             Last sync: <span id="lastSyncTime">Never</span>
         </small>

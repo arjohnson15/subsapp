@@ -94,21 +94,21 @@ window.Settings = {
         });
     },
     
-    loadPlexStatus() {
-        // Just set initial status text, don't auto-test connections
-        const plex1Status = document.getElementById('plex1ServerStatus');
-        const plex2Status = document.getElementById('plex2ServerStatus');
-        
-        if (plex1Status) {
-            plex1Status.textContent = 'Click Test Connection';
-            plex1Status.className = 'connection-status';
-        }
-        
-        if (plex2Status) {
-            plex2Status.textContent = 'Click Test Connection';
-            plex2Status.className = 'connection-status';
-        }
-    },
+loadPlexStatus() {
+    // Just set initial status text, don't auto-test connections
+    const plex1Status = document.getElementById('plex1Status');
+    const plex2Status = document.getElementById('plex2Status');
+    
+    if (plex1Status) {
+        plex1Status.textContent = '';
+        plex1Status.className = 'connection-status';
+    }
+    
+    if (plex2Status) {
+        plex2Status.textContent = '';
+        plex2Status.className = 'connection-status';
+    }
+},
     
     async loadOwners() {
         try {
@@ -119,27 +119,30 @@ window.Settings = {
         }
     },
     
-    renderOwnersTable(owners) {
-        const tbody = document.getElementById('ownersTableBody');
-        if (!tbody) return;
-        
-        if (owners.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No owners found</td></tr>';
-            return;
-        }
-        
-        tbody.innerHTML = owners.map(owner => `
-            <tr>
-                <td>${owner.name}</td>
-                <td>${owner.email}</td>
-                <td>${owner.user_count || 0}</td>
-                <td>
-                    <button class="btn btn-small btn-edit" onclick="Settings.editOwner(${owner.id})">Edit</button>
-                    <button class="btn btn-small btn-delete" onclick="Settings.deleteOwner(${owner.id})">Delete</button>
-                </td>
-            </tr>
-        `).join('');
-    },
+renderOwnersTable(owners) {
+    const tbody = document.getElementById('ownersTableBody');
+    if (!tbody) {
+        console.log('⚠️ Owners table body not found - probably not on management page');
+        return;
+    }
+    
+    if (owners.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No owners found</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = owners.map(owner => `
+        <tr>
+            <td>${owner.name}</td>
+            <td>${owner.email}</td>
+            <td>${owner.user_count || 0}</td>
+            <td>
+                <button class="btn btn-small btn-edit" onclick="Settings.editOwner(${owner.id})">Edit</button>
+                <button class="btn btn-small btn-delete" onclick="Settings.deleteOwner(${owner.id})">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+},
     
     async addOwner() {
         const name = document.getElementById('ownerName')?.value;
@@ -210,46 +213,46 @@ window.Settings = {
         }
     },
     
-    renderSubscriptionsTable() {
-        const tbody = document.getElementById('subscriptionsTableBody');
-        if (!tbody) {
-            console.log('⚠️ Subscriptions table body not found');
-            return;
-        }
-        
-        const subscriptions = window.AppState.subscriptionTypes || [];
-        console.log('🎨 Rendering', subscriptions.length, 'subscriptions');
-        
-        if (subscriptions.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No subscription types found</td></tr>';
-            return;
-        }
-        
-        tbody.innerHTML = subscriptions.map(sub => `
-            <tr>
-                <td>${sub.name}</td>
-                <td>
-                    <span class="tag tag-${sub.type}">${sub.type.toUpperCase()}</span>
-                </td>
-                <td>${sub.duration_months} month${sub.duration_months > 1 ? 's' : ''}</td>
-                <td>${sub.streams || 'N/A'}</td>
-                <td>$${parseFloat(sub.price).toFixed(2)}</td>
-                <td>
-                    <span class="tag ${sub.active ? 'tag-plex1' : 'tag-free'}">
-                        ${sub.active ? 'Active' : 'Inactive'}
-                    </span>
-                </td>
-                <td>
-                    <button class="btn btn-small btn-edit" onclick="Settings.editSubscription(${sub.id})">Edit</button>
-                    <button class="btn btn-small btn-delete" onclick="Settings.toggleSubscription(${sub.id})">
-                        ${sub.active ? 'Deactivate' : 'Activate'}
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-        
-        console.log('✅ Subscriptions table rendered');
-    },
+renderSubscriptionsTable() {
+    const tbody = document.getElementById('subscriptionsTableBody');
+    if (!tbody) {
+        console.log('⚠️ Subscriptions table body not found - probably not on management page');
+        return;
+    }
+    
+    const subscriptions = window.AppState.subscriptionTypes || [];
+    console.log('🎨 Rendering', subscriptions.length, 'subscriptions');
+    
+    if (subscriptions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No subscription types found</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = subscriptions.map(sub => `
+        <tr>
+            <td>${sub.name}</td>
+            <td>
+                <span class="tag tag-${sub.type}">${sub.type.toUpperCase()}</span>
+            </td>
+            <td>${sub.duration_months} month${sub.duration_months > 1 ? 's' : ''}</td>
+            <td>${sub.streams || 'N/A'}</td>
+            <td>$${parseFloat(sub.price).toFixed(2)}</td>
+            <td>
+                <span class="tag ${sub.active ? 'tag-plex1' : 'tag-free'}">
+                    ${sub.active ? 'Active' : 'Inactive'}
+                </span>
+            </td>
+            <td>
+                <button class="btn btn-small btn-edit" onclick="Settings.editSubscription(${sub.id})">Edit</button>
+                <button class="btn btn-small btn-delete" onclick="Settings.toggleSubscription(${sub.id})">
+                    ${sub.active ? 'Deactivate' : 'Activate'}
+                </button>
+            </td>
+        </tr>
+    `).join('');
+    
+    console.log('✅ Subscriptions table rendered');
+},
     
     sortSubscriptions(field) {
         if (this.currentSortField === field) {
@@ -767,14 +770,60 @@ async syncPlexLibraries() {
     // This is an alias for syncAllPlexLibraries to match the HTML onclick
     return await this.syncAllPlexLibraries();
 },
+
+// Owner form management
+showOwnerForm() {
+    console.log('📝 Showing owner form...');
+    const formContainer = document.getElementById('ownerFormContainer');
+    const formTitle = document.getElementById('ownerFormTitle');
+    
+    if (formContainer) formContainer.style.display = 'block';
+    if (formTitle) formTitle.textContent = 'Add New Owner';
+    
+    // Clear form
+    const form = document.getElementById('ownerForm');
+    if (form) form.reset();
+    
+    // Scroll to form
+    if (formContainer) formContainer.scrollIntoView({ behavior: 'smooth' });
+},
+
+hideOwnerForm() {
+    console.log('❌ Hiding owner form...');
+    const formContainer = document.getElementById('ownerFormContainer');
+    if (formContainer) formContainer.style.display = 'none';
+},
+
+async saveOwner(event) {
+    event.preventDefault();
+    return await this.addOwner();
+},
+
+// Email alias
+async sendTestEmail() {
+    return await this.testEmailConnection();
+}
 };
 
-// Make functions globally available for onclick handlers
+// Make functions globally available for onclick handlers (excluding Plex functions that conflict with plex.js)
 window.addOwner = window.Settings.addOwner.bind(window.Settings);
 window.saveSettings = window.Settings.saveAllSettings.bind(window.Settings);
 window.testEmailConnection = window.Settings.testEmailConnection.bind(window.Settings);
-window.syncAllPlexLibraries = window.Settings.syncAllPlexLibraries.bind(window.Settings);
-window.testPlexConnection = window.Settings.testPlexConnection.bind(window.Settings);
-window.syncPlexLibraries = window.Settings.syncPlexLibraries.bind(window.Settings);
+
+// Owner management functions
+window.showOwnerForm = window.Settings.showOwnerForm.bind(window.Settings);
+window.hideOwnerForm = window.Settings.hideOwnerForm.bind(window.Settings);
+window.saveOwner = window.Settings.saveOwner.bind(window.Settings);
+
+// Subscription management functions  
+window.sortSubscriptions = window.Settings.sortSubscriptions.bind(window.Settings);
+window.showSubscriptionForm = window.Settings.showSubscriptionForm.bind(window.Settings);
+window.hideSubscriptionForm = window.Settings.hideSubscriptionForm.bind(window.Settings);
+window.saveSubscription = window.Settings.saveSubscription.bind(window.Settings);
+
+// Email function alias
+window.sendTestEmail = window.Settings.sendTestEmail.bind(window.Settings);
+
+// Note: testPlexConnection and syncPlexLibraries are handled by plex.js to avoid conflicts
 
 console.log('✅ Enhanced Settings.js with file upload support loaded successfully');

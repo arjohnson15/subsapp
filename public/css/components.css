@@ -970,3 +970,30 @@ th.sortable .sort-arrow {
     padding: 6px 8px !important;
     vertical-align: middle !important;
 }
+
+/* Connection Status Styling for Settings Page */
+.connection-status {
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    min-width: 80px;
+    text-align: center;
+    background: #2a2a2a;
+    color: #666;
+}
+
+.connection-status.status-connected {
+    background: #4caf50;
+    color: white;
+}
+
+.connection-status.status-disconnected {
+    background: #f44336;
+    color: white;
+}
+
+.connection-status:empty {
+    background: transparent;
+    border: 1px dashed #666;
+}
