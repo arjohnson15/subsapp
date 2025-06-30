@@ -707,29 +707,7 @@ router.delete('/:id', async (req, res) => {
 
     // Parse Plex libraries to determine which users to unshare
     const plexLibraries = safeJsonParse(user.plex_libraries, {});
-    
-    try {
-      // Unshare from Plex servers if they have access
-      if (plexLibraries && Object.keys(plexLibraries).length > 0) {
-        console.log(`🔄 Unsharing user ${user.name} (${user.plex_email}) from Plex servers...`);
-        
-        for (const serverGroup of Object.keys(plexLibraries)) {
-          const access = plexLibraries[serverGroup];
-          if (access && (access.regular?.length > 0 || access.fourk?.length > 0)) {
-            try {
-              await plexService.unshareUser(serverGroup, user.plex_email);
-              console.log(`✅ Unshared from ${serverGroup}`);
-            } catch (unshareError) {
-              console.error(`❌ Failed to unshare from ${serverGroup}:`, unshareError.message);
-              // Continue with deletion even if unsharing fails
-            }
-          }
-        }
-      }
-    } catch (plexError) {
-      console.error('Error during Plex unsharing:', plexError);
-      // Continue with deletion even if Plex operations fail
-    }
+   
 
     // Delete user and related data using transaction
     const transactionQueries = [
