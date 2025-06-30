@@ -792,9 +792,148 @@ try {
       console.log(`? Users without Plex access: ${usersWithoutAccess}`);
       console.log(`?? Total unique Plex users found: ${allPlexUsers.size}`);
       
-    } catch (error) {
+} catch (error) {
       console.error('? Error syncing user library access:', error);
       throw error;
+    }
+  }
+
+  // FIXED: updateUserLibraryAccess - This should be called when editing a user
+  async updateUserLibraryAccess(userEmail) {
+    try {
+      console.log(`🔄 Updating library access for: ${userEmail}`);
+      
+      // Get current access from Plex servers
+      const currentAccess = await this.getUserCurrentAccess(userEmail);
+      console.log(`📊 Current Plex access:`, currentAccess);
+      
+      // Check pending invites
+      const pendingInvites = await this.checkUserPendingInvites(userEmail);
+      console.log(`📧 Pending invites:`, pendingInvites);
+      
+      // Find user in database
+      const [dbUser] = await db.query(`
+        SELECT id, name, email, plex_email, plex_libraries, pending_plex_invites
+        FROM users 
+        WHERE email = ? OR plex_email = ?
+      `, [userEmail, userEmail]);
+      
+      if (!dbUser) {
+        console.log(`⚠️ User not found in database: ${userEmail}`);
+        return { success: false, error: 'User not found' };
+      }
+      
+      // Parse existing data
+      let existingLibraries = {};
+try {
+  existingLibraries = dbUser.plex_libraries ? JSON.parse(dbUser.plex_libraries) : {};
+} catch (parseError) {
+  console.log(`⚠️ Could not parse plex_libraries for ${dbUser.name}, using empty object:`, parseError.message);
+  existingLibraries = {};
+}
+      const existingInvites = dbUser.pending_plex_invites ? JSON.parse(dbUser.pending_plex_invites) : null;
+      
+      // Check if updates are needed
+      const librariesChanged = JSON.stringify(existingLibraries) !== JSON.stringify(currentAccess);
+      const invitesChanged = JSON.stringify(existingInvites) !== JSON.stringify(pendingInvites);
+      
+      if (librariesChanged || invitesChanged) {
+        console.log(`💾 Updating database for ${dbUser.name}:`);
+        if (librariesChanged) console.log(`   📚 Libraries changed`);
+        if (invitesChanged) console.log(`   📧 Pending invites changed`);
+        
+        await db.query(`
+          UPDATE users 
+          SET plex_libraries = ?, pending_plex_invites = ?, updated_at = NOW()
+          WHERE id = ?
+        `, [
+          JSON.stringify(currentAccess),
+          pendingInvites ? JSON.stringify(pendingInvites) : null,
+          dbUser.id
+        ]);
+        
+        return {
+          success: true,
+          updated: true,
+          changes: {
+            libraries: librariesChanged,
+            pendingInvites: invitesChanged
+          },
+          data: {
+            libraries: currentAccess,
+            pendingInvites: pendingInvites
+          }
+        };
+      } else {
+        console.log(`✅ No changes needed for ${dbUser.name}`);
+        return {
+          success: true,
+          updated: false,
+          data: {
+            libraries: currentAccess,
+            pendingInvites: pendingInvites
+          }
+        };
+      }
+      
+    } catch (error) {
+      console.error(`❌ Error updating user library access for ${userEmail}:`, error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // NEW: This should be called from the frontend when editing a user
+  async refreshUserDataForEditing(userEmail) {
+    try {
+      console.log(`🔄 Refreshing user data for editing: ${userEmail}`);
+      
+      // Update their current access and pending status
+      const updateResult = await this.updateUserLibraryAccess(userEmail);
+      
+      // Get the fresh user data from database
+      const [freshUser] = await db.query(`
+        SELECT * FROM users 
+        WHERE email = ? OR plex_email = ?
+        LIMIT 1
+      `, [userEmail, userEmail]);
+      
+      if (!freshUser) {
+        throw new Error('User not found after refresh');
+      }
+      
+      // Parse JSON fields
+try {
+  freshUser.tags = freshUser.tags ? JSON.parse(freshUser.tags) : [];
+} catch (e) {
+  console.log(`⚠️ Could not parse tags for ${freshUser.name}:`, e.message);
+  freshUser.tags = [];
+}
+
+try {
+  freshUser.plex_libraries = freshUser.plex_libraries ? JSON.parse(freshUser.plex_libraries) : {};
+} catch (e) {
+  console.log(`⚠️ Could not parse plex_libraries for ${freshUser.name}:`, e.message);
+  freshUser.plex_libraries = {};
+}
+
+try {
+  freshUser.pending_plex_invites = freshUser.pending_plex_invites ? JSON.parse(freshUser.pending_plex_invites) : null;
+} catch (e) {
+  console.log(`⚠️ Could not parse pending_plex_invites for ${freshUser.name}:`, e.message);
+  freshUser.pending_plex_invites = null;
+}
+      
+      console.log(`✅ Refreshed user data for ${freshUser.name}`);
+      
+      return {
+        success: true,
+        user: freshUser,
+        updateResult: updateResult
+      };
+      
+    } catch (error) {
+      console.error(`❌ Error refreshing user data:`, error);
+      return { success: false, error: error.message };
     }
   }
 }

@@ -193,8 +193,16 @@ const PlexAPI = {
         return await apiCall('/plex/sync', {
             method: 'POST'
         });
+    },
+	
+	async refreshUserData(userEmail) {
+        return await apiCall('/plex/refresh-user-data', {
+            method: 'POST',
+            body: JSON.stringify({ userEmail })
+        });
     }
 };
+
 
 // Settings API calls
 const SettingsAPI = {

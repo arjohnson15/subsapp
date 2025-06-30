@@ -469,4 +469,31 @@ router.post('/refresh-libraries/:serverGroup', async (req, res) => {
   }
 });
 
+// Refresh user data for editing (updates their current access and pending status)
+router.post('/refresh-user-data', async (req, res) => {
+  try {
+    const { userEmail } = req.body;
+    
+    if (!userEmail) {
+      return res.status(400).json({ error: 'Missing userEmail' });
+    }
+    
+    console.log(`🔄 API: Refreshing user data for editing: ${userEmail}`);
+    
+    const result = await plexService.refreshUserDataForEditing(userEmail);
+    
+    if (result.success) {
+      console.log(`✅ API: User data refreshed successfully for ${userEmail}`);
+      res.json(result);
+    } else {
+      console.log(`❌ API: Failed to refresh user data for ${userEmail}:`, result.error);
+      res.status(500).json({ error: result.error });
+    }
+    
+  } catch (error) {
+    console.error('❌ Error in refresh user data route:', error);
+    res.status(500).json({ error: 'Failed to refresh user data' });
+  }
+});
+
 module.exports = router;
