@@ -236,6 +236,49 @@ class EmailService {
       return { success: false, error: error.message };
     }
   }
+  
+  async sendBulkEmail(tags, subject, htmlBody, options = {}) {
+  try {
+    const whereClause = tags.map(() => 'JSON_CONTAINS(tags, ?)').join(' OR ');
+    const tagParams = tags.map(tag => JSON.stringify(tag));
+    
+    const users = await db.query(`
+      SELECT u.*, o.name as owner_name, o.email as owner_email
+      FROM users u
+      LEFT JOIN owners o ON u.owner_id = o.id
+      WHERE (${whereClause}) AND exclude_bulk_emails = FALSE
+    `, tagParams);
+
+    let sentCount = 0;
+    const errors = [];
+
+    for (const user of users) {
+      try {
+        const personalizedBody = await this.processTemplate(htmlBody, user);
+        const bccList = options.bcc || [];
+        
+        // Add owner BCC if enabled
+        if (user.bcc_owner_renewal && user.owner_email) {
+          bccList.push(user.owner_email);
+        }
+
+        await this.sendEmail(user.email, subject, personalizedBody, {
+          userId: user.id,
+          templateName: options.templateName,
+          bcc: bccList
+        });
+        sentCount++;
+      } catch (error) {
+        errors.push({ user: user.email, error: error.message });
+      }
+    }
+
+    return { success: true, sent: sentCount, errors };
+  } catch (error) {
+    console.error('Bulk email error:', error);
+    return { success: false, error: error.message };
+  }
+}
 
   async testEmailConnection() {
     try {

@@ -110,4 +110,114 @@ router.get('/logs', async (req, res) => {
   }
 });
 
+// Send bulk email
+router.post('/send-bulk', [
+  body('tags').isArray().withMessage('Tags must be an array'),
+  body('subject').notEmpty(),
+  body('body').notEmpty()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { tags, subject, body, templateName, bcc } = req.body;
+
+    const result = await emailService.sendBulkEmail(tags, subject, body, {
+      templateName,
+      bcc: bcc ? bcc.split(',').map(email => email.trim()).filter(email => email) : []
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error sending bulk email:', error);
+    res.status(500).json({ error: 'Failed to send bulk email' });
+  }
+});
+
+// Get user data for email personalization
+router.get('/user-data/:userId', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    
+    const users = await db.query(`
+      SELECT u.*, o.name as owner_name, o.email as owner_email,
+             GROUP_CONCAT(CONCAT(st.name, ':', s.expiration_date) SEPARATOR '|') as subscriptions
+      FROM users u
+      LEFT JOIN owners o ON u.owner_id = o.id
+      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
+      LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
+      WHERE u.id = ?
+      GROUP BY u.id
+    `, [userId]);
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = users[0];
+    
+    // Parse subscription data
+    if (user.subscriptions) {
+      const subscriptionPairs = user.subscriptions.split('|');
+      subscriptionPairs.forEach(pair => {
+        const [type, expiration] = pair.split(':');
+        if (type.toLowerCase().includes('plex')) {
+          user.plex_expiration = expiration;
+          user.subscription_type = type;
+        } else if (type.toLowerCase().includes('iptv')) {
+          user.iptv_expiration = expiration;
+          if (!user.subscription_type) user.subscription_type = type;
+        }
+      });
+    }
+
+    res.json(user);
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    res.status(500).json({ error: 'Failed to fetch user data' });
+  }
+});
+
+// Send test email
+router.post('/send-test', async (req, res) => {
+  try {
+    const { to } = req.body;
+    if (!to) {
+      return res.status(400).json({ error: 'Recipient email is required' });
+    }
+
+    const testSubject = 'JohnsonFlix - Test Email';
+    const testBody = `
+      <h2 style="color: #8e24aa;">Test Email Successful!</h2>
+      <p>This is a test email from your JohnsonFlix Manager application.</p>
+      <p>If you received this email, your email configuration is working correctly.</p>
+      <p>Sent at: ${new Date().toLocaleString()}</p>
+      <br>
+      <p>Best regards,<br>JohnsonFlix Team</p>
+    `;
+
+    const result = await emailService.sendEmail(to, testSubject, testBody, {
+      templateName: 'Test Email'
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error sending test email:', error);
+    res.status(500).json({ error: 'Failed to send test email' });
+  }
+});
+
+// Trigger manual renewal reminders
+router.post('/send-renewal-reminders', async (req, res) => {
+  try {
+    const result = await emailService.sendRenewalReminders();
+    res.json(result);
+  } catch (error) {
+    console.error('Error sending renewal reminders:', error);
+    res.status(500).json({ error: 'Failed to send renewal reminders' });
+  }
+});
+
 module.exports = router;

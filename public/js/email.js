@@ -234,6 +234,32 @@ window.Email = {
             Utils.hideLoading();
         }
     },
+	
+	async prepopulateRecipient(userId) {
+    try {
+        this.recipientUserId = userId;
+        const userData = await API.Email.getUserData(userId);
+        
+        if (userData) {
+            document.getElementById('emailRecipient').value = userData.email;
+            // Update preview with real user data
+            this.updateEmailPreview(userData);
+        }
+    } catch (error) {
+        console.error('Error prepopulating recipient:', error);
+    }
+},
+
+emailUser(userId) {
+    // Navigate to email page with pre-populated recipient
+    showPage('email');
+    // Wait for page to load then prepopulate
+    setTimeout(() => {
+        if (window.Email) {
+            window.Email.prepopulateRecipient(userId);
+        }
+    }, 500);
+}
     
     async testEmailConnection() {
         try {

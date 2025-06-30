@@ -149,6 +149,30 @@ const EmailAPI = {
             method: 'POST'
         });
     },
+	
+	async sendBulk(bulkEmailData) {
+    return await apiCall('/email/send-bulk', {
+        method: 'POST',
+        body: JSON.stringify(bulkEmailData)
+    });
+},
+
+async getUserData(userId) {
+    return await apiCall(`/email/user-data/${userId}`);
+},
+
+async sendTestEmail(recipientEmail) {
+    return await apiCall('/email/send-test', {
+        method: 'POST',
+        body: JSON.stringify({ to: recipientEmail })
+    });
+},
+
+async sendRenewalReminders() {
+    return await apiCall('/email/send-renewal-reminders', {
+        method: 'POST'
+    });
+},
     
     async getLogs() {
         return await apiCall('/email/logs');

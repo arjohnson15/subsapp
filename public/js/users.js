@@ -1722,6 +1722,10 @@ window.populateFormForEditing = async function(user) {
     if (bccCheckbox) {
         bccCheckbox.checked = user.bcc_owner_renewal || false;
     }
+	
+	// Handle email preference checkboxes
+document.getElementById('excludeBulkEmails').checked = user.exclude_bulk_emails || false;
+document.getElementById('excludeAutomatedEmails').checked = user.exclude_automated_emails || false;
     
     // Clear all tags first, then set user's tags
     console.log(`🏷️ Setting tags:`, user.tags);
