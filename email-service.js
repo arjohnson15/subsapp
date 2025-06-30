@@ -237,7 +237,7 @@ class EmailService {
     }
   }
   
-  async sendBulkEmail(tags, subject, htmlBody, options = {}) {
+async sendBulkEmail(tags, subject, htmlBody, options = {}) {
   try {
     const whereClause = tags.map(() => 'JSON_CONTAINS(tags, ?)').join(' OR ');
     const tagParams = tags.map(tag => JSON.stringify(tag));
@@ -249,31 +249,48 @@ class EmailService {
       WHERE (${whereClause}) AND exclude_bulk_emails = FALSE
     `, tagParams);
 
-    let sentCount = 0;
-    const errors = [];
-
-    for (const user of users) {
-      try {
-        const personalizedBody = await this.processTemplate(htmlBody, user);
-        const bccList = options.bcc || [];
-        
-        // Add owner BCC if enabled
-        if (user.bcc_owner_renewal && user.owner_email) {
-          bccList.push(user.owner_email);
-        }
-
-        await this.sendEmail(user.email, subject, personalizedBody, {
-          userId: user.id,
-          templateName: options.templateName,
-          bcc: bccList
-        });
-        sentCount++;
-      } catch (error) {
-        errors.push({ user: user.email, error: error.message });
-      }
+    if (users.length === 0) {
+      return { success: true, sent: 0, message: 'No users found with selected tags' };
     }
 
-    return { success: true, sent: sentCount, errors };
+    // Collect all user emails for BCC
+    const userEmails = users.map(user => user.email);
+    
+    // Collect unique owner emails for BCC (if they want to be notified)
+    const ownerEmails = [...new Set(
+      users
+        .filter(user => user.bcc_owner_renewal && user.owner_email)
+        .map(user => user.owner_email)
+    )];
+
+    // Combine all BCC recipients
+    const allBccEmails = [...userEmails, ...ownerEmails, ...(options.bcc || [])];
+
+    // Get settings for "from" email
+    const settings = await this.getEmailSettings();
+    const fromEmail = settings.smtp_user || process.env.SMTP_USER;
+
+    // Send ONE email with everyone BCC'd
+    const result = await this.sendEmail(
+      fromEmail, // Send to yourself as the main recipient
+      subject,
+      htmlBody,
+      {
+        bcc: allBccEmails,
+        templateName: options.templateName
+      }
+    );
+
+    if (result.success) {
+      return { 
+        success: true, 
+        sent: userEmails.length, 
+        message: `Bulk email sent to ${userEmails.length} users via BCC` 
+      };
+    } else {
+      return { success: false, error: result.error };
+    }
+
   } catch (error) {
     console.error('Bulk email error:', error);
     return { success: false, error: error.message };
