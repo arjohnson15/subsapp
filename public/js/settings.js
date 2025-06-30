@@ -761,6 +761,12 @@ async saveAllSettings() {
             Utils.showNotification('Error syncing libraries: ' + error.message, 'error');
         }
     }
+	
+	// Add this function after syncAllPlexLibraries
+async syncPlexLibraries() {
+    // This is an alias for syncAllPlexLibraries to match the HTML onclick
+    return await this.syncAllPlexLibraries();
+},
 };
 
 // Make functions globally available for onclick handlers
@@ -769,5 +775,6 @@ window.saveSettings = window.Settings.saveAllSettings.bind(window.Settings);
 window.testEmailConnection = window.Settings.testEmailConnection.bind(window.Settings);
 window.syncAllPlexLibraries = window.Settings.syncAllPlexLibraries.bind(window.Settings);
 window.testPlexConnection = window.Settings.testPlexConnection.bind(window.Settings);
+window.syncPlexLibraries = window.Settings.syncPlexLibraries.bind(window.Settings);
 
 console.log('✅ Enhanced Settings.js with file upload support loaded successfully');
