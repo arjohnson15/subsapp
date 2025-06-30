@@ -635,3 +635,94 @@ textarea:focus {
         background: #f0f0f0 !important;
     }
 }
+
+/* Enhanced Email Template Editor */
+.template-preview-large {
+    background: white;
+    color: black;
+    padding: 30px;
+    border-radius: 12px;
+    min-height: 400px;
+    font-size: 14px;
+    line-height: 1.6;
+    border: 2px solid rgba(79, 195, 247, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 100%;
+    overflow-y: auto;
+    max-height: 600px;
+}
+
+.template-preview-large h1,
+.template-preview-large h2,
+.template-preview-large h3 {
+    margin-top: 0;
+}
+
+.template-preview-large p {
+    margin-bottom: 15px;
+}
+
+/* Tag Selector */
+.tag-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+/* Form Section Styling */
+.form-section {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    border: 1px solid rgba(79, 195, 247, 0.2);
+}
+
+.form-section h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #4fc3f7;
+    font-size: 16px;
+}
+
+/* Enhanced Checkbox Styles */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 8px;
+}
+
+.checkbox-label input[type="checkbox"] {
+    margin-right: 10px;
+    width: 18px;
+    height: 18px;
+    accent-color: #8e24aa;
+}
+
+.checkbox-label .checkmark {
+    margin-left: 5px;
+}
+
+/* Email Recipients Styling */
+.form-group input[type="email"],
+.form-group input[type="text"] {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid rgba(79, 195, 247, 0.3);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: white;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.form-group input[type="email"]:focus,
+.form-group input[type="text"]:focus {
+    border-color: #4fc3f7;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(79, 195, 247, 0.2);
+}

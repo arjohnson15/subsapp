@@ -677,6 +677,8 @@ userHasPendingInvites(user) {
             userData.implayer_code = formData.get('implayer_code');
             userData.device_count = parseInt(formData.get('device_count')) || 1;
             userData.bcc_owner_renewal = document.getElementById('bccOwnerRenewal')?.checked || false;
+			userData.exclude_bulk_emails = document.getElementById('excludeBulkEmails')?.checked || false;
+			userData.exclude_automated_emails = document.getElementById('excludeAutomatedEmails')?.checked || false;
 
             // Collect checked tags
             userData.tags = [];
@@ -1717,13 +1719,13 @@ window.populateFormForEditing = async function(user) {
         }
     });
     
-    // Handle BCC checkbox
-    const bccCheckbox = document.getElementById('bccOwnerRenewal');
-    if (bccCheckbox) {
-        bccCheckbox.checked = user.bcc_owner_renewal || false;
-    }
-	
-	// Handle email preference checkboxes
+// Handle BCC checkbox
+const bccCheckbox = document.getElementById('bccOwnerRenewal');
+if (bccCheckbox) {
+    bccCheckbox.checked = user.bcc_owner_renewal || false;
+}
+
+// Handle email preference checkboxes
 document.getElementById('excludeBulkEmails').checked = user.exclude_bulk_emails || false;
 document.getElementById('excludeAutomatedEmails').checked = user.exclude_automated_emails || false;
     

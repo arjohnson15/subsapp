@@ -48,7 +48,7 @@ router.post('/templates', [
   body('name').notEmpty().trim(),
   body('subject').notEmpty(),
   body('body').notEmpty(),
-  body('template_type').isIn(['welcome', 'renewal-7day', 'renewal-2day', 'expired', 'manual'])
+  body('template_type').isIn(['welcome', 'renewal-7day', 'renewal-2day', 'expired', 'manual', 'custom'])
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -71,6 +71,34 @@ router.post('/templates', [
   }
 });
 
+// Update existing template
+router.put('/templates/:name', [
+  body('subject').notEmpty(),
+  body('body').notEmpty(),
+  body('template_type').isIn(['welcome', 'renewal-7day', 'renewal-2day', 'expired', 'manual', 'custom'])
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { subject, body, template_type } = req.body;
+    const templateName = req.params.name;
+
+    await db.query(`
+      UPDATE email_templates 
+      SET subject = ?, body = ?, template_type = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE name = ?
+    `, [subject, body, template_type, templateName]);
+
+    res.json({ message: 'Template updated successfully' });
+  } catch (error) {
+    console.error('Error updating template:', error);
+    res.status(500).json({ error: 'Failed to update template' });
+  }
+});
+
 // Delete email template
 router.delete('/templates/:name', async (req, res) => {
   try {
@@ -90,6 +118,35 @@ router.post('/test', async (req, res) => {
   } catch (error) {
     console.error('Error testing email:', error);
     res.status(500).json({ error: 'Failed to test email connection' });
+  }
+});
+
+// Send test email
+router.post('/send-test', async (req, res) => {
+  try {
+    const { to } = req.body;
+    if (!to) {
+      return res.status(400).json({ error: 'Recipient email is required' });
+    }
+
+    const testSubject = 'JohnsonFlix - Test Email';
+    const testBody = `
+      <h2 style="color: #8e24aa;">Test Email Successful!</h2>
+      <p>This is a test email from your JohnsonFlix Manager application.</p>
+      <p>If you received this email, your email configuration is working correctly.</p>
+      <p>Sent at: ${new Date().toLocaleString()}</p>
+      <br>
+      <p>Best regards,<br>JohnsonFlix Team</p>
+    `;
+
+    const result = await emailService.sendEmail(to, testSubject, testBody, {
+      templateName: 'Test Email'
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error sending test email:', error);
+    res.status(500).json({ error: 'Failed to send test email' });
   }
 });
 
@@ -177,35 +234,6 @@ router.get('/user-data/:userId', async (req, res) => {
   } catch (error) {
     console.error('Error fetching user data:', error);
     res.status(500).json({ error: 'Failed to fetch user data' });
-  }
-});
-
-// Send test email
-router.post('/send-test', async (req, res) => {
-  try {
-    const { to } = req.body;
-    if (!to) {
-      return res.status(400).json({ error: 'Recipient email is required' });
-    }
-
-    const testSubject = 'JohnsonFlix - Test Email';
-    const testBody = `
-      <h2 style="color: #8e24aa;">Test Email Successful!</h2>
-      <p>This is a test email from your JohnsonFlix Manager application.</p>
-      <p>If you received this email, your email configuration is working correctly.</p>
-      <p>Sent at: ${new Date().toLocaleString()}</p>
-      <br>
-      <p>Best regards,<br>JohnsonFlix Team</p>
-    `;
-
-    const result = await emailService.sendEmail(to, testSubject, testBody, {
-      templateName: 'Test Email'
-    });
-
-    res.json(result);
-  } catch (error) {
-    console.error('Error sending test email:', error);
-    res.status(500).json({ error: 'Failed to send test email' });
   }
 });
 

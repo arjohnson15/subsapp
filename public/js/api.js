@@ -137,6 +137,13 @@ const EmailAPI = {
             body: JSON.stringify(templateData)
         });
     },
+	
+	async updateTemplate(templateName, templateData) {
+    return await apiCall(`/email/templates/${templateName}`, {
+        method: 'PUT',
+        body: JSON.stringify(templateData)
+    });
+},
     
     async deleteTemplate(templateName) {
         return await apiCall(`/email/templates/${templateName}`, {
