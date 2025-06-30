@@ -205,51 +205,59 @@ window.Email = {
         this.updateEmailPreview();
     },
     
-    async sendEmail() {
-        const recipient = document.getElementById('emailRecipient')?.value;
-        const cc = document.getElementById('emailCC')?.value;
-        const bcc = document.getElementById('emailBCC')?.value;
-        const subject = document.getElementById('emailSubject')?.value;
-        const body = document.getElementById('emailBody')?.value;
+async sendEmail() {
+    const recipient = document.getElementById('emailRecipient')?.value;
+    const cc = document.getElementById('emailCC')?.value;
+    const bcc = document.getElementById('emailBCC')?.value;
+    const subject = document.getElementById('emailSubject')?.value;
+    const body = document.getElementById('emailBody')?.value;
+    
+    if (!recipient || !subject || !body) {
+        Utils.showNotification('Please fill in recipient, subject, and body', 'error');
+        return;
+    }
+    
+    // FIXED: Use the correct validation function
+    if (!Utils.isValidEmail(recipient)) {
+        Utils.showNotification('Please enter a valid recipient email', 'error');
+        return;
+    }
+    
+    try {
+        Utils.showLoading('Sending email...');
         
-        if (!recipient || !subject || !body) {
-            Utils.showNotification('Please fill in recipient, subject, and body', 'error');
-            return;
-        }
+        const emailData = {
+            to: recipient,
+            subject,
+            body,
+            userId: this.recipientUserId,
+            templateName: this.currentTemplate,
+            cc: cc ? cc.split(',').map(email => email.trim()).filter(email => email) : [],
+            bcc: bcc ? bcc.split(',').map(email => email.trim()).filter(email => email) : []
+        };
         
-        if (!Utils.ValidationUtils?.validateEmail(recipient)) {
-            Utils.showNotification('Please enter a valid recipient email', 'error');
-            return;
-        }
+        // FIXED: Use the correct API function
+        const result = await API.Email.send(emailData);
         
-        try {
-            Utils.showLoading('Sending email...');
+        if (result.success) {
+            Utils.showNotification('Email sent successfully!', 'success');
             
-            const emailData = {
-                to: recipient,
-                subject,
-                body,
-                userId: this.recipientUserId,
-                templateName: this.currentTemplate,
-                cc: cc ? cc.split(',').map(email => email.trim()).filter(email => email) : [],
-                bcc: bcc ? bcc.split(',').map(email => email.trim()).filter(email => email) : []
-            };
+            // Clear form
+			this.clearForm();
             
-            const result = await API.Email.sendEmail(emailData);
-            
-            if (result.success) {
-                Utils.showNotification('Email sent successfully!', 'success');
-                this.clearForm();
-            } else {
-                throw new Error(result.error || 'Failed to send email');
+            // Reload logs if container exists
+            if (document.getElementById('emailLogsContainer')) {
+                await this.loadEmailLogs();
             }
-            
-        } catch (error) {
-            Utils.handleError(error, 'Sending email');
-        } finally {
-            Utils.hideLoading();
+        } else {
+            Utils.showNotification(`Failed to send email: ${result.error}`, 'error');
         }
-    },
+    } catch (error) {
+        Utils.handleError(error, 'Sending email');
+    } finally {
+        Utils.hideLoading();
+    }
+},
     
     async sendBulkEmail() {
         const selectedTags = [];

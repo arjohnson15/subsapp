@@ -19,8 +19,9 @@ router.post('/send', [
     const { to, cc, bcc, subject, body, userId, templateName } = req.body;
 
     const result = await emailService.sendEmail(to, subject, body, {
-      cc: cc ? cc.split(',').map(email => email.trim()) : [],
-      bcc: bcc ? bcc.split(',').map(email => email.trim()) : [],
+      // FIXED: Handle cc and bcc as arrays (already processed by frontend)
+      cc: Array.isArray(cc) ? cc : (cc ? cc.split(',').map(email => email.trim()) : []),
+      bcc: Array.isArray(bcc) ? bcc : (bcc ? bcc.split(',').map(email => email.trim()) : []),
       userId,
       templateName
     });

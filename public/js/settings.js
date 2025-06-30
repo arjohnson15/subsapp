@@ -474,32 +474,41 @@ const Settings = {
         }
     },
     
-    // Test email connection  
-    async testEmailConnection() {
-        try {
-            const button = event.target;
-            const originalText = button.textContent;
-            button.textContent = 'Testing...';
-            button.disabled = true;
-            
-            const result = await API.Email.testConnection();
-            
-            button.textContent = originalText;
-            button.disabled = false;
-            
-            if (result.success) {
-                Utils.showNotification('Test email sent successfully!', 'success');
-            } else {
-                Utils.showNotification(`Email test failed: ${result.error}`, 'error');
-            }
-        } catch (error) {
-            console.error('Error testing email:', error);
-            const button = event.target;
-            button.textContent = 'Send Test Email';
-            button.disabled = false;
-            Utils.showNotification('Error testing email: ' + error.message, 'error');
+// Test email connection  
+async testEmailConnection() {
+    try {
+        // Get the SMTP user email to send test to
+        const smtpUser = document.getElementById('smtpUser')?.value;
+        
+        if (!smtpUser) {
+            Utils.showNotification('Please enter your email address in the SMTP configuration first', 'error');
+            return;
         }
-    },
+        
+        const button = event.target;
+        const originalText = button.textContent;
+        button.textContent = 'Sending Test...';
+        button.disabled = true;
+        
+        // FIXED: Use the correct API function
+        const result = await API.Email.sendTestEmail(smtpUser);
+        
+        button.textContent = originalText;
+        button.disabled = false;
+        
+        if (result.success) {
+            Utils.showNotification(`Test email sent successfully to ${smtpUser}!`, 'success');
+        } else {
+            Utils.showNotification(`Email test failed: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error testing email:', error);
+        const button = event.target;
+        button.textContent = 'Send Test Email';
+        button.disabled = false;
+        Utils.showNotification('Error testing email: ' + error.message, 'error');
+    }
+},
 
     // Test Plex Connection
     async testPlexConnection(serverGroup) {
