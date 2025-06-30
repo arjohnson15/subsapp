@@ -587,17 +587,37 @@ displayEnhancedLibraryAccess(user) {
         }
     },
     
-    emailUser(userName, userEmail) {
-        // FIXED: Use window.showPage
-        window.showPage('email');
-        setTimeout(() => {
-            const recipientField = document.getElementById('emailRecipient');
-            const subjectField = document.getElementById('emailSubject');
-            
-            if (recipientField) recipientField.value = userEmail;
-            if (subjectField) subjectField.value = `Message for ${userName}`;
-        }, 100);
-    },
+emailUser(userName, userEmail) {
+    // Store the user info for the email page
+    window.AppState = window.AppState || {};
+    window.AppState.emailRecipient = {
+        name: userName,
+        email: userEmail
+    };
+    
+    // Navigate to email page
+    window.showPage('email');
+    
+    // Prepopulate fields after page loads
+    setTimeout(() => {
+        const recipientField = document.getElementById('emailRecipient');
+        const subjectField = document.getElementById('emailSubject');
+        
+        if (recipientField) {
+            recipientField.value = userEmail;
+            console.log('📧 Prepopulated recipient:', userEmail);
+        }
+        if (subjectField) {
+            subjectField.value = `Message for ${userName}`;
+            console.log('📧 Prepopulated subject for:', userName);
+        }
+        
+        // Update email preview if Email module is loaded
+        if (window.Email && window.Email.updateEmailPreview) {
+            window.Email.updateEmailPreview();
+        }
+    }, 200);
+},
     
     async deleteUser(userId) {
         if (!confirm('Are you sure you want to delete this user?')) return;
