@@ -157,7 +157,7 @@ const EmailAPI = {
         });
     },
 	
-	async sendBulk(bulkEmailData) {
+async sendBulkEmail(bulkEmailData) {
     return await apiCall('/email/send-bulk', {
         method: 'POST',
         body: JSON.stringify(bulkEmailData)

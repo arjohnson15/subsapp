@@ -4,13 +4,17 @@ window.Email = {
     currentTemplate: null,
     recipientUserId: null,
 
-    async init() {
-        this.setupEventListeners();
-        await this.loadTemplates();
-        
-        // Check for pre-populated recipient from multiple sources
-        await this.checkForPrePopulatedRecipient();
-    },
+async init() {
+    this.setupEventListeners();
+    await this.loadTemplates();
+    
+    // Only check for pre-populated recipient if coming from another page with specific data
+    // Don't auto-load any template content
+    await this.checkForPrePopulatedRecipient();
+    
+    // Ensure form starts completely blank
+    this.clearForm();
+},
     
     async checkForPrePopulatedRecipient() {
         // First check URL parameters
@@ -278,7 +282,7 @@ async sendEmail() {
             return;
         }
         
-        const confirmed = confirm(`Send bulk email to all users with tags: ${selectedTags.join(', ')}?\n\nThis will send individual emails to each user.`);
+        const confirmed = confirm(`Send bulk email to all users with tags: ${selectedTags.join(', ')}?\n\nThis will send a bulk email and bcc user.`);
         if (!confirmed) return;
         
         try {
