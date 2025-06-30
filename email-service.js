@@ -104,7 +104,7 @@ class EmailService {
     }
   }
 
-  async processTemplate(templateBody, userData) {
+async processTemplate(templateBody, userData) {
     try {
       const settings = await this.getEmailSettings();
       
@@ -121,19 +121,20 @@ class EmailService {
         .replace(/\{\{owner_email\}\}/g, userData.owner_email || '')
         .replace(/\{\{plex_expiration\}\}/g, userData.plex_expiration || '')
         .replace(/\{\{iptv_expiration\}\}/g, userData.iptv_expiration || '')
+        .replace(/\{\{expiration_date\}\}/g, userData.expiration_date || userData.plex_expiration || userData.iptv_expiration || '')
         .replace(/\{\{subscription_type\}\}/g, userData.subscription_type || '')
         .replace(/\{\{days_until_expiration\}\}/g, userData.days_until_expiration || '')
         .replace(/\{\{renewal_price\}\}/g, userData.renewal_price || '')
         .replace(/\{\{paypal_link\}\}/g, settings.paypal_link || '')
         .replace(/\{\{venmo_link\}\}/g, settings.venmo_link || '')
         .replace(/\{\{cashapp_link\}\}/g, settings.cashapp_link || '');
-
+      
       return processedBody;
     } catch (error) {
       console.error('Error processing template:', error);
       return templateBody;
     }
-  }
+}
 
   async sendTemplateEmail(userId, templateName, userData, options = {}) {
     try {

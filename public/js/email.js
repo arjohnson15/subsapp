@@ -8,12 +8,13 @@ async init() {
     this.setupEventListeners();
     await this.loadTemplates();
     
-    // Only check for pre-populated recipient if coming from another page with specific data
-    // Don't auto-load any template content
+    // Check for pre-populated recipient FIRST
     await this.checkForPrePopulatedRecipient();
     
-    // Ensure form starts completely blank
-    this.clearForm();
+    // Only clear form if nothing was pre-populated
+    if (!document.getElementById('emailRecipient')?.value) {
+        this.clearForm();
+    }
 },
     
     async checkForPrePopulatedRecipient() {
@@ -54,21 +55,28 @@ async init() {
         }
     },
     
-    setupEventListeners() {
-        const emailBody = document.getElementById('emailBody');
-        if (emailBody) {
-            emailBody.addEventListener('input', this.updateEmailPreview.bind(this));
-        }
-        
-        const emailTemplate = document.getElementById('emailTemplate');
-        if (emailTemplate) {
-            emailTemplate.addEventListener('change', this.onTemplateChange.bind(this));
-        }
-        
-        // Initialize preview and button state
-        this.updateEmailPreview();
-        this.updateTemplateButtons();
-    },
+setupEventListeners() {
+    const emailBody = document.getElementById('emailBody');
+    if (emailBody) {
+        emailBody.addEventListener('input', this.updateEmailPreview.bind(this));
+    }
+    
+    // NEW: Listen for recipient email changes to lookup user data
+    const emailRecipient = document.getElementById('emailRecipient');
+    if (emailRecipient) {
+        emailRecipient.addEventListener('input', this.lookupUserByEmail.bind(this));
+        emailRecipient.addEventListener('blur', this.lookupUserByEmail.bind(this));
+    }
+    
+    const emailTemplate = document.getElementById('emailTemplate');
+    if (emailTemplate) {
+        emailTemplate.addEventListener('change', this.onTemplateChange.bind(this));
+    }
+    
+    // Initialize preview and button state
+    this.updateEmailPreview();
+    this.updateTemplateButtons();
+},
     
     async loadTemplates() {
         try {
@@ -193,6 +201,33 @@ async init() {
             preview.innerHTML = '<p style="color: #666; text-align: center; padding: 40px;">Start typing in the email body below to see the preview...</p>';
         }
     },
+	
+	async lookupUserByEmail() {
+    const recipientEmail = document.getElementById('emailRecipient')?.value;
+    
+    if (!recipientEmail || !Utils.isValidEmail(recipientEmail)) {
+        // No valid email, use sample data
+        this.updateEmailPreview();
+        return;
+    }
+    
+    try {
+        // Look up user by email
+        const users = await API.User.getAll();
+        const user = users.find(u => u.email.toLowerCase() === recipientEmail.toLowerCase());
+        
+        if (user) {
+            console.log('📧 Found user data for email preview:', user.name);
+            this.updateEmailPreview(user);
+        } else {
+            console.log('📧 No user found for email, using sample data');
+            this.updateEmailPreview();
+        }
+    } catch (error) {
+        console.error('Error looking up user by email:', error);
+        this.updateEmailPreview();
+    }
+},
     
     insertField(field) {
         const emailBody = document.getElementById('emailBody');

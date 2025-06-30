@@ -36,6 +36,8 @@ CREATE TABLE users (
   implayer_code VARCHAR(255),
   device_count INT DEFAULT 1 COMMENT 'iMPlayer device count limit',
   bcc_owner_renewal BOOLEAN DEFAULT FALSE,
+  exclude_bulk_emails BOOLEAN DEFAULT FALSE COMMENT 'If true, user will be excluded from bulk emails',
+  exclude_automated_emails BOOLEAN DEFAULT FALSE COMMENT 'If true, user will be excluded from automated renewal reminders',
   tags JSON,
   plex_libraries JSON,
   pending_plex_invites JSON DEFAULT NULL COMMENT 'Tracks pending Plex server invitations for this user',
@@ -173,8 +175,8 @@ INSERT INTO settings (setting_key, setting_value, setting_type) VALUES
 
 -- Insert sample users (updated field names and realistic data)
 INSERT INTO users (name, email, owner_id, plex_email, iptv_username, iptv_password, implayer_code, device_count, bcc_owner_renewal, tags) VALUES
-('Andrew', 'arjohnson15@gmail.com', 1, 'arjohnson15@gmail.com', 'andrew_iptv', 'iptv456', 'ABC123', 2, true, '["Plex 1", "Plex 2", "IPTV"]'),
-('Aaron Fleuren', 'afleuren@yahoo.com', 1, 'afleuren@yahoo.com', '', '', '', 1, false, '["Plex 1"]');
+('test 1', 'andrew+plextest3@cloudjohnson.com', 1, 'andrew+plextest3@cloudjohnson.com', 'andrew_iptv', 'iptv456', 'ABC123', 2, true, '["Plex 1", "Plex 2", "IPTV"]'),
+('test 2', 'andrew+plextest4@cloudjohnson.com', 1, 'andrew+plextest4@cloudjohnson.com', '', '', '', 1, false, '["Plex 1"]');
 
 -- Insert sample subscriptions
 INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status) VALUES
