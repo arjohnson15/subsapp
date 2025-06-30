@@ -8,11 +8,45 @@ window.Email = {
         this.setupEventListeners();
         await this.loadTemplates();
         
-        // Check if we have a recipient pre-populated from URL parameters
+        // Check for pre-populated recipient from multiple sources
+        await this.checkForPrePopulatedRecipient();
+    },
+    
+    async checkForPrePopulatedRecipient() {
+        // First check URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const userId = urlParams.get('userId');
+        
         if (userId) {
+            console.log('📧 Found userId in URL params:', userId);
             await this.prepopulateRecipient(userId);
+            return;
+        }
+        
+        // Then check AppState for data from email button
+        if (window.AppState && window.AppState.emailRecipient) {
+            console.log('📧 Found recipient in AppState:', window.AppState.emailRecipient);
+            const { name, email } = window.AppState.emailRecipient;
+            
+            // Populate the fields
+            const recipientField = document.getElementById('emailRecipient');
+            const subjectField = document.getElementById('emailSubject');
+            
+            if (recipientField && email) {
+                recipientField.value = email;
+                console.log('📧 Populated recipient field:', email);
+            }
+            
+            if (subjectField && name) {
+                subjectField.value = `Message for ${name}`;
+                console.log('📧 Populated subject field for:', name);
+            }
+            
+            // Update preview
+            this.updateEmailPreview();
+            
+            // Clear the AppState data after using it
+            delete window.AppState.emailRecipient;
         }
     },
     
@@ -121,40 +155,28 @@ window.Email = {
         if (userData) {
             // Use real user data for preview
             previewContent = previewContent
-                .replace(/\{\{name\}\}/g, userData.name || '')
-                .replace(/\{\{email\}\}/g, userData.email || '')
-                .replace(/\{\{username\}\}/g, userData.username || userData.name || '')
-                .replace(/\{\{plex_expiration\}\}/g, userData.plex_expiration || '')
-                .replace(/\{\{iptv_expiration\}\}/g, userData.iptv_expiration || '')
-                .replace(/\{\{subscription_type\}\}/g, userData.subscription_type || '')
-                .replace(/\{\{renewal_price\}\}/g, userData.renewal_price || '')
-                .replace(/\{\{owner_name\}\}/g, userData.owner_name || '')
-                .replace(/\{\{owner_email\}\}/g, userData.owner_email || '')
-                .replace(/\{\{plex_email\}\}/g, userData.plex_email || '')
-                .replace(/\{\{iptv_username\}\}/g, userData.iptv_username || '')
-                .replace(/\{\{iptv_password\}\}/g, userData.iptv_password || '')
-                .replace(/\{\{implayer_code\}\}/g, userData.implayer_code || '')
-                .replace(/\{\{device_count\}\}/g, userData.device_count || '1');
+                .replace(/\{\{name\}\}/g, userData.name || 'User Name')
+                .replace(/\{\{email\}\}/g, userData.email || 'user@example.com')
+                .replace(/\{\{username\}\}/g, userData.username || userData.name || 'Username')
+                .replace(/\{\{plex_email\}\}/g, userData.plex_email || userData.email || 'plex@example.com')
+                .replace(/\{\{iptv_username\}\}/g, userData.iptv_username || 'IPTV_Username')
+                .replace(/\{\{subscription_type\}\}/g, userData.subscription_type || 'Your Subscription')
+                .replace(/\{\{expiration_date\}\}/g, userData.expiration_date || 'Expiration Date')
+                .replace(/\{\{renewal_amount\}\}/g, userData.renewal_amount || '$0.00');
         } else {
             // Use sample data for preview
             previewContent = previewContent
                 .replace(/\{\{name\}\}/g, 'John Doe')
-                .replace(/\{\{email\}\}/g, 'john.doe@example.com')
+                .replace(/\{\{email\}\}/g, 'john@example.com')
                 .replace(/\{\{username\}\}/g, 'johndoe')
-                .replace(/\{\{plex_expiration\}\}/g, 'Jun 28, 2025')
-                .replace(/\{\{iptv_expiration\}\}/g, 'Jul 15, 2025')
-                .replace(/\{\{subscription_type\}\}/g, 'Plex')
-                .replace(/\{\{renewal_price\}\}/g, '$120.00')
-                .replace(/\{\{owner_name\}\}/g, 'Andrew')
-                .replace(/\{\{owner_email\}\}/g, 'arjohnson15@gmail.com')
-                .replace(/\{\{plex_email\}\}/g, 'johndoe@example.com')
-                .replace(/\{\{iptv_username\}\}/g, 'johndoe_iptv')
-                .replace(/\{\{iptv_password\}\}/g, 'iptv456')
-                .replace(/\{\{implayer_code\}\}/g, 'ABC123DEF')
-                .replace(/\{\{device_count\}\}/g, '2');
+                .replace(/\{\{plex_email\}\}/g, 'john@plex.com')
+                .replace(/\{\{iptv_username\}\}/g, 'john_iptv')
+                .replace(/\{\{subscription_type\}\}/g, 'Premium Subscription')
+                .replace(/\{\{expiration_date\}\}/g, '2024-12-31')
+                .replace(/\{\{renewal_amount\}\}/g, '$120.00');
         }
         
-        // Replace payment links with sample data or actual settings
+        // Replace payment links with actual settings
         previewContent = previewContent
             .replace(/\{\{paypal_link\}\}/g, 'https://paypal.me/johnsonflix')
             .replace(/\{\{venmo_link\}\}/g, 'https://venmo.com/johnsonflix')
@@ -213,11 +235,14 @@ window.Email = {
                 bcc: bcc ? bcc.split(',').map(email => email.trim()).filter(email => email) : []
             };
             
-            await API.Email.send(emailData);
-            Utils.showNotification('Email sent successfully', 'success');
+            const result = await API.Email.sendEmail(emailData);
             
-            // Clear form
-            this.clearForm();
+            if (result.success) {
+                Utils.showNotification('Email sent successfully!', 'success');
+                this.clearForm();
+            } else {
+                throw new Error(result.error || 'Failed to send email');
+            }
             
         } catch (error) {
             Utils.handleError(error, 'Sending email');
@@ -227,42 +252,41 @@ window.Email = {
     },
     
     async sendBulkEmail() {
-        const selectedTags = Array.from(document.querySelectorAll('input[name="bulkEmailTags"]:checked'))
-            .map(cb => cb.value);
+        const selectedTags = [];
+        document.querySelectorAll('input[name="bulkEmailTags"]:checked').forEach(checkbox => {
+            selectedTags.push(checkbox.value);
+        });
+        
+        if (selectedTags.length === 0) {
+            Utils.showNotification('Please select at least one tag group for bulk email', 'error');
+            return;
+        }
         
         const subject = document.getElementById('emailSubject')?.value;
         const body = document.getElementById('emailBody')?.value;
-        const bcc = document.getElementById('emailBCC')?.value;
-        
-        if (selectedTags.length === 0) {
-            Utils.showNotification('Please select at least one tag for bulk email', 'error');
-            return;
-        }
         
         if (!subject || !body) {
             Utils.showNotification('Please fill in subject and body', 'error');
             return;
         }
         
-        if (!confirm(`Send email to all users with tags: ${selectedTags.join(', ')}?\n\nUsers marked "exclude from bulk emails" will be skipped.`)) {
-            return;
-        }
+        const confirmed = confirm(`Send bulk email to all users with tags: ${selectedTags.join(', ')}?\n\nThis will send individual emails to each user.`);
+        if (!confirmed) return;
         
         try {
             Utils.showLoading('Sending bulk emails...');
             
-            const bulkEmailData = {
+            const bulkData = {
                 tags: selectedTags,
                 subject,
                 body,
-                templateName: this.currentTemplate,
-                bcc
+                templateName: this.currentTemplate
             };
             
-            const result = await API.Email.sendBulk(bulkEmailData);
+            const result = await API.Email.sendBulkEmail(bulkData);
             
             if (result.success) {
-                let message = `Bulk email sent to ${result.sent || 0} users`;
+                let message = `Bulk email sent to ${result.sent || 0} recipients`;
                 if (result.errors && result.errors.length > 0) {
                     message += `, with ${result.errors.length} errors`;
                 }
@@ -316,24 +340,21 @@ window.Email = {
             };
             
             await API.Email.saveTemplate(templateData);
-            Utils.showNotification('Template saved successfully', 'success');
-            
-            // Reload templates and select the new one
+            Utils.showNotification('Template saved successfully!', 'success');
             await this.loadTemplates();
+            
+            // Select the newly saved template
             document.getElementById('emailTemplate').value = templateName;
-            this.currentTemplate = templateName;
             this.updateTemplateButtons();
             
         } catch (error) {
-            Utils.handleError(error, 'Saving template');
+            Utils.handleError(error, 'Saving email template');
         }
     },
     
     async updateTemplate() {
-        if (!this.currentTemplate) {
-            Utils.showNotification('No template selected', 'error');
-            return;
-        }
+        const templateName = document.getElementById('emailTemplate')?.value;
+        if (!templateName) return;
         
         const subject = document.getElementById('emailSubject')?.value;
         const body = document.getElementById('emailBody')?.value;
@@ -345,39 +366,39 @@ window.Email = {
         
         try {
             const templateData = {
+                name: templateName,
                 subject,
                 body,
                 template_type: 'custom'
             };
             
-            await API.Email.updateTemplate(this.currentTemplate, templateData);
-            Utils.showNotification('Template updated successfully', 'success');
+            await API.Email.updateTemplate(templateName, templateData);
+            Utils.showNotification('Template updated successfully!', 'success');
             
         } catch (error) {
-            Utils.handleError(error, 'Updating template');
+            Utils.handleError(error, 'Updating email template');
         }
     },
     
     async deleteTemplate() {
-        if (!this.currentTemplate) {
-            Utils.showNotification('No template selected', 'error');
-            return;
-        }
+        const templateName = document.getElementById('emailTemplate')?.value;
+        if (!templateName) return;
         
-        if (!confirm(`Are you sure you want to delete the template "${this.currentTemplate}"?`)) {
+        if (!confirm(`Are you sure you want to delete the template "${templateName}"?`)) {
             return;
         }
         
         try {
-            await API.Email.deleteTemplate(this.currentTemplate);
-            Utils.showNotification('Template deleted successfully', 'success');
-            
-            // Reload templates and clear form
+            await API.Email.deleteTemplate(templateName);
+            Utils.showNotification('Template deleted successfully!', 'success');
             await this.loadTemplates();
-            this.clearForm();
+            
+            // Clear template selection
+            document.getElementById('emailTemplate').value = '';
+            this.updateTemplateButtons();
             
         } catch (error) {
-            Utils.handleError(error, 'Deleting template');
+            Utils.handleError(error, 'Deleting email template');
         }
     },
     
@@ -388,11 +409,10 @@ window.Email = {
             const result = await API.Email.testConnection();
             
             if (result.success) {
-                Utils.showNotification('Email connection test successful', 'success');
+                Utils.showNotification('Email connection test successful!', 'success');
             } else {
-                Utils.showNotification(`Email test failed: ${result.error}`, 'error');
+                Utils.showNotification(`Email connection test failed: ${result.error}`, 'error');
             }
-            
         } catch (error) {
             Utils.handleError(error, 'Testing email connection');
         } finally {
@@ -410,16 +430,12 @@ window.Email = {
     },
     
     renderEmailLogs(logs) {
-        const logContainer = document.getElementById('emailLogsContainer');
-        if (!logContainer) return;
+        const container = document.getElementById('emailLogsContainer');
+        if (!container) return;
         
-        if (logs.length === 0) {
-            logContainer.innerHTML = '<p>No email logs found</p>';
-            return;
-        }
-        
-        logContainer.innerHTML = `
-            <table class="table">
+        container.innerHTML = `
+            <h4 style="color: #4fc3f7; margin-bottom: 20px;">Recent Email Activity</h4>
+            <table class="data-table">
                 <thead>
                     <tr>
                         <th>Date</th>
