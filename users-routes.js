@@ -323,6 +323,27 @@ router.post('/', [
           console.log('✅ Created paid IPTV subscription for user:', userId, 'type:', iptv_subscription);
         }
       }
+	  
+	        if (plex_email && plex_libraries && Object.keys(plex_libraries).length > 0) {
+        try {
+          console.log(`🔄 Checking pending invites for new user: ${name}`);
+          
+          const pendingInvites = await plexService.checkUserPendingInvites(plex_email);
+          
+          // Update pending invites in database
+          await db.query(`
+            UPDATE users 
+            SET pending_plex_invites = ?, updated_at = NOW()
+            WHERE id = ?
+          `, [pendingInvites ? JSON.stringify(pendingInvites) : null, userId]);
+          
+          console.log(`✅ Updated pending invites for new user ${name}`);
+          
+        } catch (error) {
+          console.error(`⚠️ Could not sync pending invites for new user ${name}:`, error.message);
+          // Don't fail the whole request if pending invite sync fails
+        }
+      }
 
       res.status(201).json({ message: 'User created successfully', id: userId });
 
@@ -334,6 +355,7 @@ router.post('/', [
         warning: 'Subscription creation failed'
       });
     }
+
 
   } catch (error) {
     console.error('Error creating user:', error);

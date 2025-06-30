@@ -96,29 +96,31 @@
         <div class="form-group">
             <label>Plex 1 Status:</label>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <span id="plex1ServerStatus" class="connection-status">Click Test Connection</span>
-                <button type="button" class="btn btn-test" onclick="Settings.testPlexConnection('plex1')">Test Connection</button>
+                <span id="plex1ServerStatus" class="connection-status">Click to test</span>
+                <button class="btn btn-test" onclick="Settings.testPlexConnection('plex1')">Test Connection</button>
             </div>
         </div>
         <div class="form-group">
             <label>Plex 2 Status:</label>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <span id="plex2ServerStatus" class="connection-status">Click Test Connection</span>
-                <button type="button" class="btn btn-test" onclick="Settings.testPlexConnection('plex2')">Test Connection</button>
+                <span id="plex2ServerStatus" class="connection-status">Click to test</span>
+                <button class="btn btn-test" onclick="Settings.testPlexConnection('plex2')">Test Connection</button>
             </div>
         </div>
     </div>
     
     <div style="margin-top: 20px;">
-        <button class="btn btn-sync" onclick="Settings.syncAllPlexLibraries()">Sync All Libraries</button>
-        <small style="color: #4fc3f7; margin-left: 15px;">Update library information from all Plex servers</small>
+        <button class="btn btn-sync" onclick="Settings.syncPlexLibraries()">Sync All Libraries</button>
+        <small style="color: #4fc3f7; margin-left: 15px;">
+            Last sync: <span id="lastSyncTime">Never</span>
+        </small>
     </div>
 </div>
 
 <!-- Payment & Links -->
 <div class="settings-section">
     <h3>Payment & Links</h3>
-    <p style="color: #4fc3f7; margin-bottom: 20px;">Configure payment method links for renewal notifications.</p>
+    <p style="color: #4fc3f7; margin-bottom: 20px;">Configure payment links for renewal emails.</p>
     
     <div class="form-grid">
         <div class="form-group">
@@ -130,9 +132,143 @@
             <input type="url" id="venmoLink" placeholder="https://venmo.com/yourusername">
         </div>
         <div class="form-group">
-            <label for="cashappLink">Cash App Link:</label>
+            <label for="cashappLink">CashApp Link:</label>
             <input type="url" id="cashappLink" placeholder="https://cash.app/$yourusername">
         </div>
+    </div>
+</div>
+
+<!-- Owner Management Section -->
+<div class="settings-section">
+    <h3>Owner Management</h3>
+    <p style="color: #4fc3f7; margin-bottom: 20px;">Manage owners who receive BCC notifications for user renewals and updates.</p>
+    
+    <div style="margin-bottom: 20px;">
+        <button class="btn" onclick="Settings.showOwnerForm()">Add New Owner</button>
+    </div>
+    
+    <!-- Owner Form (hidden by default) -->
+    <div id="ownerFormContainer" style="display: none; margin-bottom: 30px; padding: 20px; background: rgba(79, 195, 247, 0.1); border: 1px solid #4fc3f7; border-radius: 8px;">
+        <h4 id="ownerFormTitle" style="color: #4fc3f7; margin-bottom: 20px;">Add New Owner</h4>
+        <form id="ownerForm" onsubmit="Settings.saveOwner(event)">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="ownerName">Owner Name:</label>
+                    <input type="text" id="ownerName" name="name" required placeholder="e.g., John Johnson">
+                </div>
+                <div class="form-group">
+                    <label for="ownerEmail">Owner Email:</label>
+                    <input type="email" id="ownerEmail" name="email" required placeholder="owner@example.com">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="ownerActive" name="active" checked style="margin-right: 8px;">
+                    Active (receives notifications)
+                </label>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button type="submit" class="btn">Save Owner</button>
+                <button type="button" class="btn btn-secondary" onclick="Settings.hideOwnerForm()">Cancel</button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Owners Table -->
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="ownersTableBody">
+                <tr><td colspan="5" style="text-align: center;">Loading owners...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Subscription Management Section -->
+<div class="settings-section">
+    <h3>Subscription Management</h3>
+    <p style="color: #4fc3f7; margin-bottom: 20px;">Manage subscription types available for users. Create Plex and IPTV subscription plans.</p>
+    
+    <div style="margin-bottom: 20px;">
+        <button class="btn" onclick="Settings.showSubscriptionForm()">Add New Subscription Type</button>
+    </div>
+    
+    <!-- Subscription Form (hidden by default) -->
+    <div id="subscriptionFormContainer" style="display: none; margin-bottom: 30px; padding: 20px; background: rgba(79, 195, 247, 0.1); border: 1px solid #4fc3f7; border-radius: 8px;">
+        <h4 id="subscriptionFormTitle" style="color: #4fc3f7; margin-bottom: 20px;">Create Subscription Type</h4>
+        <form id="subscriptionForm" onsubmit="Settings.saveSubscription(event)">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="subscriptionName">Subscription Name:</label>
+                    <input type="text" id="subscriptionName" name="name" required placeholder="e.g., Plex Premium">
+                </div>
+                <div class="form-group">
+                    <label for="subscriptionType">Type:</label>
+                    <select id="subscriptionType" name="type" required onchange="Settings.handleSubscriptionTypeChange()">
+                        <option value="">Select Type</option>
+                        <option value="plex">Plex</option>
+                        <option value="iptv">IPTV</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="subscriptionDuration">Duration (Months):</label>
+                    <input type="number" id="subscriptionDuration" name="duration_months" required min="1" max="120" placeholder="e.g., 12">
+                </div>
+                <div class="form-group">
+                    <label for="subscriptionPrice">Price ($):</label>
+                    <input type="number" id="subscriptionPrice" name="price" required min="0" step="0.01" placeholder="e.g., 120.00">
+                </div>
+            </div>
+            
+            <div class="form-group" id="streamCountGroup" style="display: none;">
+                <label for="subscriptionStreams">Number of Streams:</label>
+                <input type="number" id="subscriptionStreams" name="streams" min="1" max="10" placeholder="e.g., 2">
+                <small style="color: #4fc3f7;">Leave blank if not applicable</small>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="subscriptionActive" name="active" checked style="margin-right: 8px;">
+                    Active (available for new users)
+                </label>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button type="submit" class="btn">Save Subscription</button>
+                <button type="button" class="btn btn-secondary" onclick="Settings.hideSubscriptionForm()">Cancel</button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Subscriptions Table -->
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="cursor: pointer;" onclick="Settings.sortSubscriptions('name')">Name</th>
+                    <th style="cursor: pointer;" onclick="Settings.sortSubscriptions('type')">Type</th>
+                    <th style="cursor: pointer;" onclick="Settings.sortSubscriptions('duration_months')">Duration</th>
+                    <th>Streams</th>
+                    <th style="cursor: pointer;" onclick="Settings.sortSubscriptions('price')">Price</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="subscriptionsTableBody">
+                <tr><td colspan="7" style="text-align: center;">Loading subscription types...</td></tr>
+            </tbody>
+        </table>
     </div>
 </div>
 
@@ -175,7 +311,7 @@
     margin-bottom: 8px;
 }
 
-.form-group input {
+.form-group input, .form-group select {
     padding: 10px;
     border: 1px solid #4fc3f7;
     border-radius: 4px;
@@ -184,7 +320,7 @@
     font-size: 14px;
 }
 
-.form-group input:focus {
+.form-group input:focus, .form-group select:focus {
     outline: none;
     border-color: #4caf50;
     box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
@@ -220,7 +356,7 @@
     border-radius: 4px;
     font-size: 14px;
     font-weight: 500;
-    min-width: 120px;
+    min-width: 80px;
     text-align: center;
 }
 
@@ -236,80 +372,94 @@
     border: 1px solid #f44336;
 }
 
-.btn {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.3s ease;
-    text-decoration: none;
-    display: inline-block;
-    text-align: center;
-}
-
-.btn-primary {
-    background: linear-gradient(45deg, #8e24aa, #3f51b5);
-    color: white;
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(142, 36, 170, 0.4);
-}
-
-.btn-secondary {
-    background: rgba(79, 195, 247, 0.2);
-    color: #4fc3f7;
-    border: 1px solid #4fc3f7;
-}
-
-.btn-secondary:hover {
-    background: rgba(79, 195, 247, 0.3);
-}
-
-.btn-test {
+.status-testing {
     background: rgba(255, 193, 7, 0.2);
     color: #ffc107;
     border: 1px solid #ffc107;
 }
 
-.btn-test:hover {
-    background: rgba(255, 193, 7, 0.3);
+.table-container {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #4fc3f7;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th {
+    background: rgba(79, 195, 247, 0.2);
+    color: #4fc3f7;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 1px solid #4fc3f7;
+}
+
+.data-table td {
+    padding: 12px;
+    border-bottom: 1px solid rgba(79, 195, 247, 0.1);
+    color: #fff;
+}
+
+.data-table tr:hover {
+    background: rgba(79, 195, 247, 0.05);
+}
+
+.tag {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.tag-plex {
+    background: rgba(229, 160, 13, 0.2);
+    color: #e5a00d;
+}
+
+.tag-iptv {
+    background: rgba(103, 58, 183, 0.2);
+    color: #673ab7;
+}
+
+.tag-plex1 {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+}
+
+.tag-free {
+    background: rgba(158, 158, 158, 0.2);
+    color: #9e9e9e;
+}
+
+.btn-test {
+    background: linear-gradient(135deg, #ffc107, #ff9800);
+    color: #000;
 }
 
 .btn-sync {
-    background: rgba(76, 175, 80, 0.2);
-    color: #4caf50;
-    border: 1px solid #4caf50;
+    background: linear-gradient(135deg, #2196f3, #00bcd4);
+    color: #fff;
 }
 
-.btn-sync:hover {
-    background: rgba(76, 175, 80, 0.3);
+.btn-small {
+    padding: 4px 8px;
+    font-size: 12px;
+    margin: 0 2px;
+}
+
+.btn-edit {
+    background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+    color: #fff;
 }
 
 .btn-delete {
-    background: rgba(244, 67, 54, 0.2);
-    color: #f44336;
-    border: 1px solid #f44336;
-    padding: 5px 10px;
-    font-size: 12px;
-}
-
-.btn-delete:hover {
-    background: rgba(244, 67, 54, 0.3);
-}
-
-@media (max-width: 768px) {
-    .form-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .current-file-display {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
+    background: linear-gradient(135deg, #f44336, #e91e63);
+    color: #fff;
 }
 </style>
