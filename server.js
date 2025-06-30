@@ -29,9 +29,16 @@ app.use(helmet({
 }));
 
 // Rate limiting
+// High rate limit for subscription management app with few hundred users
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 1000, // 1000 requests per minute per IP
+  message: {
+    error: 'Rate limit exceeded - please wait a moment',
+    retryAfter: 60
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use(limiter);
 
