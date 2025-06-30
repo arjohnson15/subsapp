@@ -156,50 +156,68 @@ setupEventListeners() {
         }
     },
     
-    updateEmailPreview(userData = null) {
-        const emailBody = document.getElementById('emailBody')?.value || '';
-        const preview = document.getElementById('emailPreview');
-        
-        if (!preview) return;
-        
-        let previewContent = emailBody;
-        
-        if (userData) {
-            // Use real user data for preview
-            previewContent = previewContent
-                .replace(/\{\{name\}\}/g, userData.name || 'User Name')
-                .replace(/\{\{email\}\}/g, userData.email || 'user@example.com')
-                .replace(/\{\{username\}\}/g, userData.username || userData.name || 'Username')
-                .replace(/\{\{plex_email\}\}/g, userData.plex_email || userData.email || 'plex@example.com')
-                .replace(/\{\{iptv_username\}\}/g, userData.iptv_username || 'IPTV_Username')
-                .replace(/\{\{subscription_type\}\}/g, userData.subscription_type || 'Your Subscription')
-                .replace(/\{\{expiration_date\}\}/g, userData.expiration_date || 'Expiration Date')
-                .replace(/\{\{renewal_amount\}\}/g, userData.renewal_amount || '$0.00');
-        } else {
-            // Use sample data for preview
-            previewContent = previewContent
-                .replace(/\{\{name\}\}/g, 'John Doe')
-                .replace(/\{\{email\}\}/g, 'john@example.com')
-                .replace(/\{\{username\}\}/g, 'johndoe')
-                .replace(/\{\{plex_email\}\}/g, 'john@plex.com')
-                .replace(/\{\{iptv_username\}\}/g, 'john_iptv')
-                .replace(/\{\{subscription_type\}\}/g, 'Premium Subscription')
-                .replace(/\{\{expiration_date\}\}/g, '2024-12-31')
-                .replace(/\{\{renewal_amount\}\}/g, '$120.00');
-        }
-        
-        // Replace payment links with actual settings
+updateEmailPreview(userData = null) {
+    const emailBody = document.getElementById('emailBody')?.value || '';
+    const preview = document.getElementById('emailPreview');
+    
+    if (!preview) return;
+    
+    let previewContent = emailBody;
+    
+    if (userData) {
+        // Use real user data for preview
         previewContent = previewContent
-            .replace(/\{\{paypal_link\}\}/g, 'https://paypal.me/johnsonflix')
-            .replace(/\{\{venmo_link\}\}/g, 'https://venmo.com/johnsonflix')
-            .replace(/\{\{cashapp_link\}\}/g, 'https://cash.app/$johnsonflix')
-            .replace(/\{\{days_until_expiration\}\}/g, '7');
-        
-        if (previewContent.trim()) {
-            preview.innerHTML = previewContent;
-        } else {
-            preview.innerHTML = '<p style="color: #666; text-align: center; padding: 40px;">Start typing in the email body below to see the preview...</p>';
-        }
+            .replace(/\{\{name\}\}/g, userData.name || 'User Name')
+            .replace(/\{\{email\}\}/g, userData.email || 'user@example.com')
+            .replace(/\{\{username\}\}/g, userData.plex_email || userData.iptv_username || userData.name || 'Username')
+            .replace(/\{\{plex_email\}\}/g, userData.plex_email || userData.email || 'plex@example.com')
+            .replace(/\{\{iptv_username\}\}/g, userData.iptv_username || 'IPTV_Username')
+            .replace(/\{\{iptv_password\}\}/g, userData.iptv_password || 'IPTV_Password')
+            .replace(/\{\{implayer_code\}\}/g, userData.implayer_code || 'iMPlayer_Code')
+            .replace(/\{\{device_count\}\}/g, userData.device_count || '1')
+            .replace(/\{\{owner_name\}\}/g, userData.owner_name || 'Owner Name')
+            .replace(/\{\{owner_email\}\}/g, userData.owner_email || 'owner@example.com')
+            .replace(/\{\{plex_expiration\}\}/g, userData.plex_expiration || 'Plex Expiration')
+            .replace(/\{\{iptv_expiration\}\}/g, userData.iptv_expiration || 'IPTV Expiration')
+            .replace(/\{\{expiration_date\}\}/g, userData.expiration_date || userData.plex_expiration || userData.iptv_expiration || 'Expiration Date')
+            .replace(/\{\{subscription_type\}\}/g, userData.subscription_type || 'Your Subscription')
+            .replace(/\{\{days_until_expiration\}\}/g, userData.days_until_expiration || '7')
+            .replace(/\{\{renewal_price\}\}/g, userData.renewal_price || '$0.00')
+            .replace(/\{\{renewal_amount\}\}/g, userData.renewal_price || userData.price || '$0.00');
+    } else {
+        // Use sample data for preview
+        previewContent = previewContent
+            .replace(/\{\{name\}\}/g, 'John Doe')
+            .replace(/\{\{email\}\}/g, 'john@example.com')
+            .replace(/\{\{username\}\}/g, 'johndoe')
+            .replace(/\{\{plex_email\}\}/g, 'john@plex.com')
+            .replace(/\{\{iptv_username\}\}/g, 'john_iptv')
+            .replace(/\{\{iptv_password\}\}/g, 'password123')
+            .replace(/\{\{implayer_code\}\}/g, 'ABC12345')
+            .replace(/\{\{device_count\}\}/g, '2')
+            .replace(/\{\{owner_name\}\}/g, 'Andrew')
+            .replace(/\{\{owner_email\}\}/g, 'arjohnson15@gmail.com')
+            .replace(/\{\{plex_expiration\}\}/g, '2024-12-31')
+            .replace(/\{\{iptv_expiration\}\}/g, '2024-12-31')
+            .replace(/\{\{expiration_date\}\}/g, '2024-12-31')
+            .replace(/\{\{subscription_type\}\}/g, 'Premium Subscription')
+            .replace(/\{\{days_until_expiration\}\}/g, '7')
+            .replace(/\{\{renewal_price\}\}/g, '$120.00')
+            .replace(/\{\{renewal_amount\}\}/g, '$120.00');
+    }
+    
+    // Replace payment links with actual settings
+    previewContent = previewContent
+        .replace(/\{\{paypal_link\}\}/g, 'https://paypal.me/johnsonflix')
+        .replace(/\{\{venmo_link\}\}/g, 'https://venmo.com/johnsonflix')
+        .replace(/\{\{cashapp_link\}\}/g, 'https://cash.app/$johnsonflix');
+    
+    if (previewContent.trim()) {
+        preview.innerHTML = previewContent;
+    } else {
+        preview.innerHTML = '<p style="color: #666; text-align: center; padding: 40px;">Start typing in the email body below to see the preview...</p>';
+    }
+},       }
     },
 	
 	async lookupUserByEmail() {
