@@ -38,87 +38,90 @@
     <div class="dynamic-fields">
         <h4>Dynamic Fields - Click to Insert</h4>
         <div>
-            <span class="field-tag" onclick="insertField('{{name}}')">{{name}}</span>
-            <span class="field-tag" onclick="insertField('{{email}}')">{{email}}</span>
-            <span class="field-tag" onclick="insertField('{{username}}')">{{username}}</span>
-            <span class="field-tag" onclick="insertField('{{plex_expiration}}')">{{plex_expiration}}</span>
-            <span class="field-tag" onclick="insertField('{{iptv_expiration}}')">{{iptv_expiration}}</span>
-            <span class="field-tag" onclick="insertField('{{subscription_type}}')">{{subscription_type}}</span>
-            <span class="field-tag" onclick="insertField('{{days_until_expiration}}')">{{days_until_expiration}}</span>
-            <span class="field-tag" onclick="insertField('{{renewal_price}}')">{{renewal_price}}</span>
-            <span class="field-tag" onclick="insertField('{{owner_name}}')">{{owner_name}}</span>
-            <span class="field-tag" onclick="insertField('{{owner_email}}')">{{owner_email}}</span>
-            <span class="field-tag" onclick="insertField('{{plex_email}}')">{{plex_email}}</span>
-            <span class="field-tag" onclick="insertField('{{iptv_username}}')">{{iptv_username}}</span>
-            <span class="field-tag" onclick="insertField('{{iptv_password}}')">{{iptv_password}}</span>
-            <span class="field-tag" onclick="insertField('{{implayer_code}}')">{{implayer_code}}</span>
-            <span class="field-tag" onclick="insertField('{{device_count}}')">{{device_count}}</span>
-            <span class="field-tag" onclick="insertField('{{paypal_link}}')">{{paypal_link}}</span>
-            <span class="field-tag" onclick="insertField('{{venmo_link}}')">{{venmo_link}}</span>
-            <span class="field-tag" onclick="insertField('{{cashapp_link}}')">{{cashapp_link}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{name}}')">{{name}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{email}}')">{{email}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{username}}')">{{username}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{plex_expiration}}')">{{plex_expiration}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{iptv_expiration}}')">{{iptv_expiration}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{subscription_type}}')">{{subscription_type}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{days_until_expiration}}')">{{days_until_expiration}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{renewal_price}}')">{{renewal_price}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{owner_name}}')">{{owner_name}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{owner_email}}')">{{owner_email}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{plex_email}}')">{{plex_email}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{iptv_username}}')">{{iptv_username}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{iptv_password}}')">{{iptv_password}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{implayer_code}}')">{{implayer_code}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{device_count}}')">{{device_count}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{paypal_link}}')">{{paypal_link}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{venmo_link}}')">{{venmo_link}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{cashapp_link}}')">{{cashapp_link}}</span>
         </div>
     </div>
 
     <!-- Full-Width Preview (moved above email body) -->
     <div style="margin: 30px 0;">
         <h4 style="color: #4fc3f7; margin-bottom: 15px;">Email Preview:</h4>
-        <div class="template-preview-large" id="emailPreview">
-            <h2 style="color: #8e24aa;">Hello John Doe!</h2>
-            <p>This is a reminder that your Plex subscription will expire in 7 days.</p>
-            <p><strong>Expiration Date:</strong> Jun 28, 2025</p>
-            <p>To renew your subscription, please visit our payment portal or contact us directly.</p>
-            <p>Thank you for being a valued customer!</p>
-            <br>
-            <p>Best regards,<br>JohnsonFlix Team</p>
+        <div id="emailPreview" class="template-preview" style="background: white; color: black; padding: 20px; border-radius: 8px; min-height: 300px; border: 1px solid #ddd; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <p style="color: #666; text-align: center; padding: 40px;">Start typing in the email body below to see the preview...</p>
         </div>
     </div>
 
-    <!-- Email Body (moved below preview) -->
+    <!-- Email Body -->
     <div class="form-group">
         <label for="emailBody">Email Body (HTML):</label>
-        <textarea id="emailBody" placeholder="Start typing HTML to see the preview..." style="min-height: 300px; font-family: 'Courier New', monospace; resize: vertical;">
-<h2 style="color: #8e24aa;">Hello {{name}}!</h2>
-<p>This is a reminder that your {{subscription_type}} subscription will expire in {{days_until_expiration}} days.</p>
-<p><strong>Expiration Date:</strong> {{plex_expiration}}</p>
-<p>To renew your subscription, please visit our payment portal or contact us directly.</p>
-<p>Thank you for being a valued customer!</p>
-<br>
-<p>Best regards,<br>JohnsonFlix Team</p>
-        </textarea>
+        <textarea id="emailBody" rows="12" placeholder="Enter your email content here...
+
+You can use dynamic fields like {{name}}, {{email}}, etc. that will be replaced with actual user data."></textarea>
+    </div>
+
+    <!-- Template Management Buttons -->
+    <div style="display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap;">
+        <button class="btn" type="button" onclick="Email.sendEmail()">
+            Send Email
+        </button>
+        <button class="btn btn-secondary" type="button" onclick="Email.clearForm()">
+            Clear Form
+        </button>
+        <button id="saveTemplateBtn" class="btn btn-success" type="button" onclick="Email.saveTemplate()" style="display: inline-block;">
+            Save as Template
+        </button>
+        <button id="updateTemplateBtn" class="btn btn-warning" type="button" onclick="Email.updateTemplate()" style="display: none;">
+            Update Template
+        </button>
+        <button id="deleteTemplateBtn" class="btn btn-danger" type="button" onclick="Email.deleteTemplate()" style="display: none;">
+            Delete Template
+        </button>
     </div>
 
     <!-- Bulk Email Section -->
-    <div class="form-section" style="margin-top: 30px;">
-        <h4 style="color: #4fc3f7; margin-bottom: 15px;">Bulk Email Options</h4>
+    <div style="margin-top: 40px; padding: 20px; background: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+        <h4 style="color: #4fc3f7; margin-bottom: 20px;">Bulk Email (Send to Multiple Users)</h4>
+        
         <div class="form-group">
-            <label>Send to users with tags:</label>
-            <div class="tag-selector">
-                <label class="checkbox-label">
+            <label>Select User Groups:</label>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px;">
+                <label style="display: flex; align-items: center; gap: 5px;">
                     <input type="checkbox" name="bulkEmailTags" value="Plex 1">
-                    <span class="checkmark"></span>
-                    Plex 1 Users
+                    <span>Plex 1 Users</span>
                 </label>
-                <label class="checkbox-label">
+                <label style="display: flex; align-items: center; gap: 5px;">
                     <input type="checkbox" name="bulkEmailTags" value="Plex 2">
-                    <span class="checkmark"></span>
-                    Plex 2 Users
+                    <span>Plex 2 Users</span>
                 </label>
-                <label class="checkbox-label">
+                <label style="display: flex; align-items: center; gap: 5px;">
                     <input type="checkbox" name="bulkEmailTags" value="IPTV">
-                    <span class="checkmark"></span>
-                    IPTV Users
+                    <span>IPTV Users</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" name="bulkEmailTags" value="4K">
+                    <span>4K Users</span>
                 </label>
             </div>
-            <small style="color: #4fc3f7;">Users marked "exclude from bulk emails" will be skipped</small>
         </div>
-    </div>
-
-    <!-- Action Buttons with Smart Template Management -->
-    <div style="text-align: center; margin-top: 40px; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-        <button class="btn" id="saveTemplateBtn" onclick="Email.saveTemplate()" style="display: inline-block;">Save as Template</button>
-        <button class="btn" id="updateTemplateBtn" onclick="Email.updateTemplate()" style="display: none;">Save</button>
-        <button class="btn btn-secondary" id="deleteTemplateBtn" onclick="Email.deleteTemplate()" style="display: none;">Delete Template</button>
-        <button class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a);" onclick="Email.sendEmail()">Send Email</button>
-        <button class="btn" style="background: linear-gradient(45deg, #ff9800, #ff5722);" onclick="Email.sendBulkEmail()">Send Bulk Email</button>
+        
+        <button class="btn btn-info" type="button" onclick="Email.sendBulkEmail()">
+            Send Bulk Email
+        </button>
     </div>
 </div>
