@@ -21,28 +21,30 @@ function formatDate(dateString) {
     }
     
     try {
-        // Fix timezone issues by treating the date as local
         let date;
         if (dateString.includes('T')) {
-            // If it has time, use it as-is
-            date = new Date(dateString);
+            // If it has time, parse it directly but be careful about timezone
+            const dateOnly = dateString.split('T')[0]; // Get just the date part
+            const [year, month, day] = dateOnly.split('-');
+            date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day)); // month is 0-indexed
         } else {
             // If it's just a date (YYYY-MM-DD), treat it as local to avoid timezone shifts
             const [year, month, day] = dateString.split('-');
-            date = new Date(year, month - 1, day); // month is 0-indexed
+            date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day)); // month is 0-indexed
         }
         
         if (isNaN(date.getTime())) {
             return dateString; // Return original if invalid date
         }
         
-        // Format as "MMM DD, YYYY" (e.g., "Jul 01, 2026")
+        // Format as "MMM DD, YYYY" (e.g., "Jul 08, 2025")
         return date.toLocaleDateString('en-US', { 
             year: 'numeric', 
             month: 'short', 
             day: 'numeric' 
         });
     } catch (error) {
+        console.error('Date formatting error:', error, 'for date:', dateString);
         return dateString; // Return original if formatting fails
     }
 }

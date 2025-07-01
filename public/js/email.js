@@ -209,9 +209,23 @@ updateEmailPreview(userData = null) {
         console.log('📧 Using real user data for preview:', userDataToUse.name);
         console.log('📧 User subscriptions:', userDataToUse.subscriptions);
         
+        // Helper function to format dates (remove time)
+        const formatDate = (dateString) => {
+            if (!dateString || dateString === 'FREE' || dateString === 'N/A') {
+                return dateString;
+            }
+            try {
+                // Remove time portion if present
+                return dateString.split('T')[0];
+            } catch (error) {
+                return dateString;
+            }
+        };
+        
         // Helper function to calculate days until expiration
-        const calculateDaysUntilExpiration = (expirationDate) => {
-            if (!expirationDate || expirationDate === 'FREE' || expirationDate === 'N/A') {
+        const calculateDaysUntilExpiration = (expirationDate, isFree = false) => {
+            // If it's a free subscription, return ∞
+            if (isFree || !expirationDate || expirationDate === 'FREE' || expirationDate === 'N/A') {
                 return '∞';
             }
             try {
@@ -239,6 +253,8 @@ updateEmailPreview(userData = null) {
         let iptvPrice = '0.00';
         let plexDays = '0';
         let iptvDays = '0';
+        let plexIsFree = false;
+        let iptvIsFree = false;
         
         if (userDataToUse.subscriptions && Array.isArray(userDataToUse.subscriptions)) {
             plexSubscription = userDataToUse.subscriptions.find(sub => sub.type === 'plex' && sub.status === 'active');
@@ -247,14 +263,28 @@ updateEmailPreview(userData = null) {
             if (plexSubscription) {
                 plexSubscriptionName = plexSubscription.subscription_name || 'Plex Subscription';
                 plexPrice = plexSubscription.price || '0.00';
-                plexDays = calculateDaysUntilExpiration(plexSubscription.expiration_date);
+                plexIsFree = plexSubscription.is_free || false;
+                plexDays = calculateDaysUntilExpiration(plexSubscription.expiration_date, plexIsFree);
             }
             
             if (iptvSubscription) {
                 iptvSubscriptionName = iptvSubscription.subscription_name || 'IPTV Subscription';
                 iptvPrice = iptvSubscription.price || '0.00';
-                iptvDays = calculateDaysUntilExpiration(iptvSubscription.expiration_date);
+                iptvIsFree = iptvSubscription.is_free || false;
+                iptvDays = calculateDaysUntilExpiration(iptvSubscription.expiration_date, iptvIsFree);
             }
+        }
+        
+        // Check if Plex is FREE from the user expiration field
+        if (userDataToUse.plex_expiration === 'FREE') {
+            plexIsFree = true;
+            plexDays = '∞';
+        }
+        
+        // Check if IPTV is FREE from the user expiration field  
+        if (userDataToUse.iptv_expiration === 'FREE') {
+            iptvIsFree = true;
+            iptvDays = '∞';
         }
         
         // Use real user data for preview - FIX: Use actual expiration dates from user object
@@ -270,21 +300,25 @@ updateEmailPreview(userData = null) {
             .replace(/\{\{owner_name\}\}/g, userDataToUse.owner_name || 'Owner Name')
             .replace(/\{\{owner_email\}\}/g, userDataToUse.owner_email || 'owner@example.com')
             
-            // FIX: Use actual expiration dates from user object (already formatted by API)
-            .replace(/\{\{plex_expiration\}\}/g, userDataToUse.plex_expiration || 'N/A')
-            .replace(/\{\{iptv_expiration\}\}/g, userDataToUse.iptv_expiration || 'N/A')
+            // FIX: Use actual expiration dates from user object and format them properly
+            .replace(/\{\{plex_expiration\}\}/g, 
+                userDataToUse.plex_expiration === 'FREE' ? 'FREE' : 
+                formatDate(userDataToUse.plex_expiration) || 'N/A')
+            .replace(/\{\{iptv_expiration\}\}/g, 
+                userDataToUse.iptv_expiration === 'FREE' ? 'FREE' : 
+                formatDate(userDataToUse.iptv_expiration) || 'N/A')
             
             // Specific subscription types only
             .replace(/\{\{plex_subscription_type\}\}/g, plexSubscriptionName)
             .replace(/\{\{iptv_subscription_type\}\}/g, iptvSubscriptionName)
             
-            // Specific days until expiration only
+            // Specific days until expiration only (with FREE check)
             .replace(/\{\{plex_days_until_expiration\}\}/g, plexDays)
             .replace(/\{\{iptv_days_until_expiration\}\}/g, iptvDays)
             
             // Specific renewal prices only
             .replace(/\{\{plex_renewal_price\}\}/g, `$${plexPrice}`)
-			.replace(/\{\{iptv_renewal_price\}\}/g, `$${iptvPrice}`);
+            .replace(/\{\{iptv_renewal_price\}\}/g, `$${iptvPrice}`);
                 
     } else {
         console.log('📧 Using sample data for preview');
