@@ -123,7 +123,8 @@ INSERT INTO subscription_types (name, type, duration_months, streams, price) VAL
 ('IPTV 3 Month - 1 Stream', 'iptv', 3, 1, 25.00),
 ('IPTV 3 Month - 2 Streams', 'iptv', 3, 2, 40.00),
 ('IPTV 6 Month - 1 Stream', 'iptv', 6, 1, 45.00),
-('IPTV 3 Month - 5 Streams', 'iptv', 3, 5, 75.00);
+('IPTV 3 Month - 5 Streams', 'iptv', 3, 5, 75.00),
+('Free Plex Access', 'plex', 0, NULL, 0.00); 
 
 -- Insert default email templates (updated field names)
 INSERT INTO email_templates (name, subject, body, template_type) VALUES
