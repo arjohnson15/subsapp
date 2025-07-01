@@ -161,8 +161,9 @@ async prepopulateRecipient(userId) {
     try {
         this.recipientUserId = userId;
         
-        // Get complete user data with subscriptions from the detailed API
-        const userData = await API.User.getById(userId);
+        // Get complete user data from getAll which includes subscriptions
+        const users = await API.User.getAll();
+        const userData = users.find(u => u.id == userId);
         
         if (userData) {
             document.getElementById('emailRecipient').value = userData.email;
@@ -175,15 +176,14 @@ async prepopulateRecipient(userId) {
     } catch (error) {
         console.error('Error prepopulating recipient:', error);
         
-        // Fallback: try to get basic user data from users list
+        // Fallback: try to get user data from getById
         try {
-            const users = await API.User.getAll();
-            const userData = users.find(u => u.id == userId);
+            const userData = await API.User.getById(userId);
             
             if (userData) {
                 document.getElementById('emailRecipient').value = userData.email;
                 this.currentUserData = userData;
-                console.log('📧 Fallback: Using basic user data for dynamic fields:', userData.name);
+                console.log('📧 Fallback: Using getById user data for dynamic fields:', userData.name);
                 this.updateEmailPreview();
             }
         } catch (fallbackError) {
@@ -201,24 +201,13 @@ updateEmailPreview(userData = null) {
     
     let previewContent = emailBody;
     
-    // Use provided userData, stored currentUserData, or sample data
-    const userDataToUse = userData || this.currentUserData;
+    // CRITICAL FIX: Always use stored currentUserData if available, 
+    // regardless of whether userData parameter is passed
+    const userDataToUse = this.currentUserData || userData;
     
     if (userDataToUse) {
         console.log('📧 Using real user data for preview:', userDataToUse.name);
-        
-        // Helper function to format dates (remove time)
-        const formatDate = (dateString) => {
-            if (!dateString || dateString === 'FREE' || dateString === 'N/A') {
-                return dateString;
-            }
-            try {
-                // Remove time portion if present
-                return dateString.split('T')[0];
-            } catch (error) {
-                return dateString;
-            }
-        };
+        console.log('📧 User subscriptions:', userDataToUse.subscriptions);
         
         // Helper function to calculate days until expiration
         const calculateDaysUntilExpiration = (expirationDate) => {
@@ -226,29 +215,49 @@ updateEmailPreview(userData = null) {
                 return '∞';
             }
             try {
-                // Remove time portion and parse date
-                const expDate = new Date(expirationDate.split('T')[0]);
+                // Handle both database format (YYYY-MM-DD) and ISO format
+                const expDateStr = expirationDate.split('T')[0]; // Remove time if present
+                const expDate = new Date(expDateStr + 'T00:00:00'); // Add time to avoid timezone issues
                 const today = new Date();
+                today.setHours(0, 0, 0, 0); // Reset time for accurate comparison
+                
                 const timeDiff = expDate.getTime() - today.getTime();
                 const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-                return daysDiff > 0 ? daysDiff.toString() : '0';
+                return daysDiff >= 0 ? daysDiff.toString() : '0';
             } catch (error) {
+                console.error('Error calculating days:', error);
                 return '0';
             }
         };
         
-        // Get subscription info from user's subscriptions
+        // Get subscription info from user's subscriptions array
         let plexSubscription = null;
         let iptvSubscription = null;
-        let primarySubscription = null;
+        let plexSubscriptionName = 'N/A';
+        let iptvSubscriptionName = 'N/A';
+        let plexPrice = '0.00';
+        let iptvPrice = '0.00';
+        let plexDays = '0';
+        let iptvDays = '0';
         
         if (userDataToUse.subscriptions && Array.isArray(userDataToUse.subscriptions)) {
             plexSubscription = userDataToUse.subscriptions.find(sub => sub.type === 'plex' && sub.status === 'active');
             iptvSubscription = userDataToUse.subscriptions.find(sub => sub.type === 'iptv' && sub.status === 'active');
-            primarySubscription = plexSubscription || iptvSubscription;
+            
+            if (plexSubscription) {
+                plexSubscriptionName = plexSubscription.subscription_name || 'Plex Subscription';
+                plexPrice = plexSubscription.price || '0.00';
+                plexDays = calculateDaysUntilExpiration(plexSubscription.expiration_date);
+            }
+            
+            if (iptvSubscription) {
+                iptvSubscriptionName = iptvSubscription.subscription_name || 'IPTV Subscription';
+                iptvPrice = iptvSubscription.price || '0.00';
+                iptvDays = calculateDaysUntilExpiration(iptvSubscription.expiration_date);
+            }
         }
         
-        // Use real user data for preview
+        // Use real user data for preview - FIX: Use actual expiration dates from user object
         previewContent = previewContent
             .replace(/\{\{name\}\}/g, userDataToUse.name || 'User Name')
             .replace(/\{\{email\}\}/g, userDataToUse.email || 'user@example.com')
@@ -261,35 +270,21 @@ updateEmailPreview(userData = null) {
             .replace(/\{\{owner_name\}\}/g, userDataToUse.owner_name || 'Owner Name')
             .replace(/\{\{owner_email\}\}/g, userDataToUse.owner_email || 'owner@example.com')
             
-            // Format expiration dates (remove time)
-            .replace(/\{\{plex_expiration\}\}/g, formatDate(userDataToUse.plex_expiration) || 'N/A')
-            .replace(/\{\{iptv_expiration\}\}/g, formatDate(userDataToUse.iptv_expiration) || 'N/A')
-            .replace(/\{\{expiration_date\}\}/g, formatDate(userDataToUse.expiration_date || userDataToUse.plex_expiration || userDataToUse.iptv_expiration) || 'N/A')
+            // FIX: Use actual expiration dates from user object (already formatted by API)
+            .replace(/\{\{plex_expiration\}\}/g, userDataToUse.plex_expiration || 'N/A')
+            .replace(/\{\{iptv_expiration\}\}/g, userDataToUse.iptv_expiration || 'N/A')
             
-            // Get subscription type name from subscription data
-            .replace(/\{\{subscription_type\}\}/g, 
-                (plexSubscription ? plexSubscription.subscription_name : 
-                 iptvSubscription ? iptvSubscription.subscription_name : 
-                 primarySubscription ? primarySubscription.subscription_name : 
-                 'Your Subscription'))
+            // Specific subscription types only
+            .replace(/\{\{plex_subscription_type\}\}/g, plexSubscriptionName)
+            .replace(/\{\{iptv_subscription_type\}\}/g, iptvSubscriptionName)
             
-            // Calculate days until expiration for Plex
-            .replace(/\{\{days_until_expiration\}\}/g, 
-                plexSubscription ? calculateDaysUntilExpiration(plexSubscription.expiration_date) :
-                iptvSubscription ? calculateDaysUntilExpiration(iptvSubscription.expiration_date) :
-                calculateDaysUntilExpiration(userDataToUse.expiration_date || userDataToUse.plex_expiration || userDataToUse.iptv_expiration))
+            // Specific days until expiration only
+            .replace(/\{\{plex_days_until_expiration\}\}/g, plexDays)
+            .replace(/\{\{iptv_days_until_expiration\}\}/g, iptvDays)
             
-            // Get renewal price from subscription data
-            .replace(/\{\{renewal_price\}\}/g, 
-                plexSubscription ? `$${plexSubscription.price}` :
-                iptvSubscription ? `$${iptvSubscription.price}` :
-                primarySubscription ? `$${primarySubscription.price}` :
-                '$0.00')
-            .replace(/\{\{renewal_amount\}\}/g, 
-                plexSubscription ? `$${plexSubscription.price}` :
-                iptvSubscription ? `$${iptvSubscription.price}` :
-                primarySubscription ? `$${primarySubscription.price}` :
-                '$0.00');
+            // Specific renewal prices only
+            .replace(/\{\{plex_renewal_price\}\}/g, `$${plexPrice}`)
+			.replace(/\{\{iptv_renewal_price\}\}/g, `$${iptvPrice}`);
                 
     } else {
         console.log('📧 Using sample data for preview');
@@ -307,11 +302,12 @@ updateEmailPreview(userData = null) {
             .replace(/\{\{owner_email\}\}/g, 'arjohnson15@gmail.com')
             .replace(/\{\{plex_expiration\}\}/g, '2024-12-31')
             .replace(/\{\{iptv_expiration\}\}/g, '2024-12-31')
-            .replace(/\{\{expiration_date\}\}/g, '2024-12-31')
-            .replace(/\{\{subscription_type\}\}/g, 'Plex 12 Month')
-            .replace(/\{\{days_until_expiration\}\}/g, '7')
-            .replace(/\{\{renewal_price\}\}/g, '$120.00')
-            .replace(/\{\{renewal_amount\}\}/g, '$120.00');
+            .replace(/\{\{plex_subscription_type\}\}/g, 'Plex 12 Month')
+            .replace(/\{\{iptv_subscription_type\}\}/g, 'IPTV 3 Month - 2 Streams')
+            .replace(/\{\{plex_days_until_expiration\}\}/g, '15')
+            .replace(/\{\{iptv_days_until_expiration\}\}/g, '7')
+            .replace(/\{\{plex_renewal_price\}\}/g, '$120.00')
+            .replace(/\{\{iptv_renewal_price\}\}/g, '$40.00');
     }
     
     // Replace payment links with actual settings
@@ -327,6 +323,7 @@ updateEmailPreview(userData = null) {
     }
 },
 
+
 // Fixed lookupUserByEmail function to get complete user data with subscriptions
 async lookupUserByEmail() {
     const recipientEmail = document.getElementById('emailRecipient')?.value;
@@ -340,27 +337,18 @@ async lookupUserByEmail() {
     }
     
     try {
-        // Look up user by email - get basic user data first
+        // Look up user by email - get complete user data from getAll (which includes subscriptions)
         const users = await API.User.getAll();
         const user = users.find(u => u.email.toLowerCase() === recipientEmail.toLowerCase());
         
         if (user) {
             console.log('📧 Found user for email preview:', user.name);
+            console.log('📧 User data with subscriptions:', user);
             
-            // Get complete user data with subscriptions
-            try {
-                const completeUserData = await API.User.getById(user.id);
-                this.currentUserData = completeUserData; // Store the complete user data
-                this.recipientUserId = user.id; // Store the user ID
-                console.log('📧 Retrieved complete user data with subscriptions:', completeUserData);
-                this.updateEmailPreview(); // This will now use the complete stored user data
-            } catch (error) {
-                console.error('Error getting complete user data, using basic data:', error);
-                // Fallback to basic user data if detailed fetch fails
-                this.currentUserData = user;
-                this.recipientUserId = user.id;
-                this.updateEmailPreview();
-            }
+            // Store the complete user data (getAll already includes subscriptions)
+            this.currentUserData = user;
+            this.recipientUserId = user.id;
+            this.updateEmailPreview(); // This will now use the stored user data
         } else {
             console.log('📧 No user found for email, using sample data');
             this.currentUserData = null;
@@ -497,18 +485,27 @@ insertField(field) {
     },
     
 clearForm() {
-    document.getElementById('emailRecipient').value = '';
+    // Clear all fields except recipient (if it was pre-populated)
     document.getElementById('emailSubject').value = '';
     document.getElementById('emailBody').value = '';
     document.getElementById('emailCC').value = '';
     document.getElementById('emailBCC').value = '';
     document.getElementById('emailTemplate').value = '';
     
+    // Don't clear recipient if it was pre-populated via navigation
+    const urlParams = new URLSearchParams(window.location.search);
+    const userId = urlParams.get('userId');
+    const hasAppStateRecipient = window.AppState && window.AppState.emailRecipient;
+    
+    if (!userId && !hasAppStateRecipient) {
+        document.getElementById('emailRecipient').value = '';
+        this.currentUserData = null; // CLEAR STORED USER DATA
+        this.recipientUserId = null;
+    }
+    
     // Uncheck bulk email tags
     document.querySelectorAll('input[name="bulkEmailTags"]').forEach(cb => cb.checked = false);
     
-    this.recipientUserId = null;
-    this.currentUserData = null; // ADD THIS LINE
     this.currentTemplate = null;
     this.updateEmailPreview();
     this.updateTemplateButtons();

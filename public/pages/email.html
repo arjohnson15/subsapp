@@ -37,22 +37,34 @@
     <!-- Dynamic Fields -->
     <div class="dynamic-fields">
         <h4>Dynamic Fields - Click to Insert</h4>
-        <div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 5px;">
+            <!-- Basic User Info -->
             <span class="field-tag" onclick="Email.insertField('{{name}}')">{{name}}</span>
             <span class="field-tag" onclick="Email.insertField('{{email}}')">{{email}}</span>
             <span class="field-tag" onclick="Email.insertField('{{username}}')">{{username}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{plex_expiration}}')">{{plex_expiration}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{iptv_expiration}}')">{{iptv_expiration}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{subscription_type}}')">{{subscription_type}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{days_until_expiration}}')">{{days_until_expiration}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{renewal_price}}')">{{renewal_price}}</span>
             <span class="field-tag" onclick="Email.insertField('{{owner_name}}')">{{owner_name}}</span>
             <span class="field-tag" onclick="Email.insertField('{{owner_email}}')">{{owner_email}}</span>
+            
+            <!-- Plex Info -->
             <span class="field-tag" onclick="Email.insertField('{{plex_email}}')">{{plex_email}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{plex_expiration}}')">{{plex_expiration}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{plex_subscription_type}}')">{{plex_subscription_type}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{plex_days_until_expiration}}')">{{plex_days_until_expiration}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{plex_renewal_price}}')">{{plex_renewal_price}}</span>
+            
+            <!-- IPTV Info -->
             <span class="field-tag" onclick="Email.insertField('{{iptv_username}}')">{{iptv_username}}</span>
             <span class="field-tag" onclick="Email.insertField('{{iptv_password}}')">{{iptv_password}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{iptv_expiration}}')">{{iptv_expiration}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{iptv_subscription_type}}')">{{iptv_subscription_type}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{iptv_days_until_expiration}}')">{{iptv_days_until_expiration}}</span>
+            <span class="field-tag" onclick="Email.insertField('{{iptv_renewal_price}}')">{{iptv_renewal_price}}</span>
+            
+            <!-- Device Info -->
             <span class="field-tag" onclick="Email.insertField('{{implayer_code}}')">{{implayer_code}}</span>
             <span class="field-tag" onclick="Email.insertField('{{device_count}}')">{{device_count}}</span>
+            
+            <!-- Payment Links -->
             <span class="field-tag" onclick="Email.insertField('{{paypal_link}}')">{{paypal_link}}</span>
             <span class="field-tag" onclick="Email.insertField('{{venmo_link}}')">{{venmo_link}}</span>
             <span class="field-tag" onclick="Email.insertField('{{cashapp_link}}')">{{cashapp_link}}</span>

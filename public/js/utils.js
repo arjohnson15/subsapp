@@ -21,12 +21,22 @@ function formatDate(dateString) {
     }
     
     try {
-        const date = new Date(dateString);
+        // Fix timezone issues by treating the date as local
+        let date;
+        if (dateString.includes('T')) {
+            // If it has time, use it as-is
+            date = new Date(dateString);
+        } else {
+            // If it's just a date (YYYY-MM-DD), treat it as local to avoid timezone shifts
+            const [year, month, day] = dateString.split('-');
+            date = new Date(year, month - 1, day); // month is 0-indexed
+        }
+        
         if (isNaN(date.getTime())) {
             return dateString; // Return original if invalid date
         }
         
-        // Format as "MMM DD, YYYY" (e.g., "Jun 30, 2025")
+        // Format as "MMM DD, YYYY" (e.g., "Jul 01, 2026")
         return date.toLocaleDateString('en-US', { 
             year: 'numeric', 
             month: 'short', 
