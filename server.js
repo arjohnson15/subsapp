@@ -15,6 +15,7 @@ const plexRoutes = require('./routes-plex');
 const settingsRoutes = require('./routes-settings');
 const ownerRoutes = require('./routes-owners');
 const multer = require('multer');
+const plexService = require('./plex-service');
 const emailService = require('./email-service');
 
 const app = express();
@@ -87,6 +88,10 @@ async function initializeApp() {
   try {
     await db.testConnection();
     console.log('Database connected successfully');
+    
+// 🔧 FIX: PlexService instance already created by import
+console.log('🚀 Plex Service imported - hourly sync should start automatically');
+console.log('✅ Plex Service initialized - hourly sync will start automatically');
     
     // Start server
     app.listen(PORT, () => {

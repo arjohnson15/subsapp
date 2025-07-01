@@ -108,6 +108,46 @@ async processTemplate(templateBody, userData) {
     try {
       const settings = await this.getEmailSettings();
       
+      // Calculate plex-specific days until expiration
+      let plexDaysUntilExpiration = '';
+      if (userData.plex_expiration) {
+        if (userData.plex_expiration === 'FREE' || userData.plex_expiration === 'No Subscription') {
+          plexDaysUntilExpiration = 'N/A (Free Access)';
+        } else {
+          try {
+            const expirationDate = new Date(userData.plex_expiration);
+            const today = new Date();
+            const timeDiff = expirationDate.getTime() - today.getTime();
+            const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+            plexDaysUntilExpiration = daysDiff > 0 ? daysDiff.toString() : '0';
+          } catch (error) {
+            plexDaysUntilExpiration = 'Invalid Date';
+          }
+        }
+      } else {
+        plexDaysUntilExpiration = 'No Plex Access';
+      }
+
+      // Calculate iptv-specific days until expiration
+      let iptvDaysUntilExpiration = '';
+      if (userData.iptv_expiration) {
+        if (userData.iptv_expiration === 'FREE' || userData.iptv_expiration === 'No Subscription') {
+          iptvDaysUntilExpiration = 'N/A (Free Access)';
+        } else {
+          try {
+            const expirationDate = new Date(userData.iptv_expiration);
+            const today = new Date();
+            const timeDiff = expirationDate.getTime() - today.getTime();
+            const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+            iptvDaysUntilExpiration = daysDiff > 0 ? daysDiff.toString() : '0';
+          } catch (error) {
+            iptvDaysUntilExpiration = 'Invalid Date';
+          }
+        }
+      } else {
+        iptvDaysUntilExpiration = 'No IPTV Access';
+      }
+      
       let processedBody = templateBody
         .replace(/\{\{name\}\}/g, userData.name || '')
         .replace(/\{\{email\}\}/g, userData.email || '')
@@ -124,6 +164,9 @@ async processTemplate(templateBody, userData) {
         .replace(/\{\{expiration_date\}\}/g, userData.expiration_date || userData.plex_expiration || userData.iptv_expiration || '')
         .replace(/\{\{subscription_type\}\}/g, userData.subscription_type || '')
         .replace(/\{\{days_until_expiration\}\}/g, userData.days_until_expiration || '')
+        // NEW: Add specific Plex and IPTV days until expiration
+        .replace(/\{\{plex_days_until_expiration\}\}/g, plexDaysUntilExpiration)
+        .replace(/\{\{iptv_days_until_expiration\}\}/g, iptvDaysUntilExpiration)
         .replace(/\{\{renewal_price\}\}/g, userData.renewal_price || '')
         .replace(/\{\{paypal_link\}\}/g, settings.paypal_link || '')
         .replace(/\{\{venmo_link\}\}/g, settings.venmo_link || '')

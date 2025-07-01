@@ -129,27 +129,33 @@ router.get('/', async (req, res) => {
       const plexLibraries = safeJsonParse(user.plex_libraries, {});
       const pendingPlexInvites = safeJsonParse(user.pending_plex_invites, null); // ADD THIS LINE
 
-      // Calculate subscription expirations
-      let plexExpiration = null;
-      let iptvExpiration = null;
+// Calculate subscription expirations
+let plexExpiration = null;
+let iptvExpiration = null;
 
-      for (const sub of subscriptions) {
-        if (sub.type === 'plex') {
-          if (sub.is_free) {
-            plexExpiration = 'FREE';
-            break;
-          } else if (!plexExpiration || new Date(sub.expiration_date) > new Date(plexExpiration)) {
-            plexExpiration = sub.expiration_date;
-          }
-        } else if (sub.type === 'iptv') {
-          if (sub.is_free) {
-            iptvExpiration = 'FREE';
-            break;
-          } else if (!iptvExpiration || new Date(sub.expiration_date) > new Date(iptvExpiration)) {
-            iptvExpiration = sub.expiration_date;
-          }
-        }
-      }
+for (const sub of subscriptions) {
+  if (sub.type === 'plex') {
+    if (sub.is_free) {
+      plexExpiration = 'FREE';
+      break;
+    } else if (!plexExpiration || new Date(sub.expiration_date) > new Date(plexExpiration)) {
+      // Format date to YYYY-MM-DD only (remove time) - SAME AS getById
+      plexExpiration = sub.expiration_date ? 
+        new Date(sub.expiration_date).toISOString().split('T')[0] : 
+        null;
+    }
+  } else if (sub.type === 'iptv') {
+    if (sub.is_free) {
+      iptvExpiration = 'FREE';
+      break;
+    } else if (!iptvExpiration || new Date(sub.expiration_date) > new Date(iptvExpiration)) {
+      // Format date to YYYY-MM-DD only (remove time) - SAME AS getById
+      iptvExpiration = sub.expiration_date ? 
+        new Date(sub.expiration_date).toISOString().split('T')[0] : 
+        null;
+    }
+  }
+}
 
       return {
         ...user,
