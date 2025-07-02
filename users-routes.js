@@ -458,93 +458,128 @@ router.put('/:id', [
 
     console.log('✅ Updated user basic info for ID:', req.params.id);
 
-    // Handle subscription updates if provided
-    try {
-      const userId = req.params.id;
+// BULLETPROOF SUBSCRIPTION HANDLING - REPLACE ENTIRE SECTION
 
-// Helper function to cancel all subscriptions of a specific type
-async function cancelAllSubscriptionsOfType(userId, subscriptionType) {
-  const result = await db.query(`
-    UPDATE subscriptions s
-    JOIN subscription_types st ON s.subscription_type_id = st.id
-    SET s.status = 'cancelled', s.updated_at = NOW()
-    WHERE s.user_id = ? 
-      AND st.type = ?
-      AND s.status = 'active'
-  `, [userId, subscriptionType]);
-  
-  console.log(`✅ Cancelled ${result.affectedRows} existing ${subscriptionType} subscriptions for user ${userId}`);
-  return result.affectedRows;
-}
+// Handle subscription updates if provided
+try {
+  const userId = req.params.id;
 
-// Handle Plex subscription updates - BULLETPROOF VERSION
-if (plex_subscription !== undefined) {
-  console.log('🔄 Processing Plex subscription update:', plex_subscription);
-  
-  if (plex_subscription === 'remove') {
-    await cancelAllSubscriptionsOfType(userId, 'plex');
-    console.log(`✅ Removed Plex subscription(s) for user: ${userId}`);
-
-  } else if (plex_subscription === 'free') {
-    // Cancel existing plex subscriptions first
-    await cancelAllSubscriptionsOfType(userId, 'plex');
+  // BULLETPROOF Helper function to cancel all subscriptions of a specific type
+  async function cancelAllSubscriptionsOfType(userId, subscriptionType) {
+    console.log(`🗑️ Cancelling all ${subscriptionType} subscriptions for user ${userId}`);
     
-// Create FREE Plex subscription with NULL subscription_type_id
-await db.query(`
-  INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
-  VALUES (?, NULL, CURDATE(), NULL, 'active')
-`, [userId]);
-    console.log('✅ Updated to FREE Plex subscription for user:', userId);
-
-  } else if (plex_subscription && plex_subscription !== '' && plex_expiration) {
-    // Cancel existing plex subscriptions first
-    await cancelAllSubscriptionsOfType(userId, 'plex');
+    const result = await db.query(`
+      UPDATE subscriptions s
+      JOIN subscription_types st ON s.subscription_type_id = st.id
+      SET s.status = 'cancelled', s.updated_at = NOW()
+      WHERE s.user_id = ? 
+        AND st.type = ?
+        AND s.status = 'active'
+    `, [userId, subscriptionType]);
     
-    // Create new paid subscription
-    await db.query(`
-      INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
-      VALUES (?, ?, CURDATE(), ?, 'active')
-    `, [userId, parseInt(plex_subscription), plex_expiration]);
-    console.log('✅ Updated to paid Plex subscription for user:', userId, 'type:', plex_subscription);
+    console.log(`✅ Cancelled ${result.affectedRows} existing ${subscriptionType} subscriptions`);
+    return result.affectedRows;
   }
-}
 
-// Handle IPTV subscription updates - NO FREE OPTION
-if (iptv_subscription !== undefined) {
-  console.log('🔄 Processing IPTV subscription update:', iptv_subscription);
-  
-  if (iptv_subscription === 'remove') {
-    await cancelAllSubscriptionsOfType(userId, 'iptv');
-    console.log(`✅ Removed IPTV subscription(s) for user: ${userId}`);
-
-  } else if (iptv_subscription && iptv_subscription !== '' && iptv_expiration) {
-    // Cancel existing iptv subscriptions first
-    await cancelAllSubscriptionsOfType(userId, 'iptv');
+  // Handle Plex subscription updates - BULLETPROOF SIMPLE VERSION
+  if (plex_subscription !== undefined && plex_subscription !== null) {
+    console.log(`🔄 Processing Plex subscription update: "${plex_subscription}"`);
     
-    // Create new IPTV subscription
-    await db.query(`
-      INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
-      VALUES (?, ?, CURDATE(), ?, 'active')
-    `, [userId, parseInt(iptv_subscription), iptv_expiration]);
-    console.log('✅ Updated IPTV subscription for user:', userId, 'type:', iptv_subscription);
-  }
-}
+    if (plex_subscription === 'remove') {
+      // REMOVE: Cancel all Plex subscriptions
+      await cancelAllSubscriptionsOfType(userId, 'plex');
+      console.log(`✅ REMOVED all Plex subscriptions for user ${userId}`);
 
-      res.json({ message: 'User updated successfully' });
+    } else if (plex_subscription === 'free') {
+      // FREE: Cancel existing + Create FREE subscription
+      console.log(`🆓 Setting user ${userId} to FREE Plex...`);
+      
+      // Step 1: Cancel existing subscriptions
+      await cancelAllSubscriptionsOfType(userId, 'plex');
+      
+      // Step 2: Wait a moment for database consistency
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Step 3: Create FREE Plex subscription (ID 1, price 0, no expiration)
+      try {
+        await db.query(`
+          INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
+          VALUES (?, 1, CURDATE(), NULL, 'active')
+        `, [userId]);
+        console.log(`✅ CREATED FREE Plex subscription for user ${userId}`);
+      } catch (insertError) {
+        console.error(`❌ Error creating FREE subscription:`, insertError);
+        throw new Error(`Failed to create FREE subscription: ${insertError.message}`);
+      }
 
-    } catch (subscriptionError) {
-      console.error('Error updating subscriptions:', subscriptionError);
-      res.json({ 
-        message: 'User updated successfully, but there was an issue with subscription updates. Please check subscription settings.',
-        warning: 'Subscription update failed'
-      });
+    } else if (plex_subscription && plex_subscription !== '' && plex_expiration) {
+      // PAID: Cancel existing + Create paid subscription
+      console.log(`💰 Setting user ${userId} to PAID Plex subscription ${plex_subscription}...`);
+      
+      // Step 1: Cancel existing subscriptions
+      await cancelAllSubscriptionsOfType(userId, 'plex');
+      
+      // Step 2: Wait a moment for database consistency
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Step 3: Create new paid subscription
+      try {
+        await db.query(`
+          INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
+          VALUES (?, ?, CURDATE(), ?, 'active')
+        `, [userId, parseInt(plex_subscription), plex_expiration]);
+        console.log(`✅ CREATED paid Plex subscription for user ${userId}, type: ${plex_subscription}`);
+      } catch (insertError) {
+        console.error(`❌ Error creating paid subscription:`, insertError);
+        throw new Error(`Failed to create paid subscription: ${insertError.message}`);
+      }
+    } else {
+      console.log(`ℹ️ Keeping current Plex subscription for user ${userId} (no change)`);
     }
-
-  } catch (error) {
-    console.error('Error updating user:', error);
-    res.status(500).json({ error: 'Failed to update user' });
   }
-});
+
+  // Handle IPTV subscription updates - BULLETPROOF SIMPLE VERSION
+  if (iptv_subscription !== undefined && iptv_subscription !== null) {
+    console.log(`🔄 Processing IPTV subscription update: "${iptv_subscription}"`);
+    
+    if (iptv_subscription === 'remove') {
+      // REMOVE: Cancel all IPTV subscriptions
+      await cancelAllSubscriptionsOfType(userId, 'iptv');
+      console.log(`✅ REMOVED all IPTV subscriptions for user ${userId}`);
+
+    } else if (iptv_subscription && iptv_subscription !== '' && iptv_expiration) {
+      // PAID: Cancel existing + Create paid IPTV subscription (no free IPTV)
+      console.log(`💰 Setting user ${userId} to PAID IPTV subscription ${iptv_subscription}...`);
+      
+      // Step 1: Cancel existing subscriptions
+      await cancelAllSubscriptionsOfType(userId, 'iptv');
+      
+      // Step 2: Wait a moment for database consistency
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Step 3: Create new IPTV subscription
+      try {
+        await db.query(`
+          INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
+          VALUES (?, ?, CURDATE(), ?, 'active')
+        `, [userId, parseInt(iptv_subscription), iptv_expiration]);
+        console.log(`✅ CREATED IPTV subscription for user ${userId}, type: ${iptv_subscription}`);
+      } catch (insertError) {
+        console.error(`❌ Error creating IPTV subscription:`, insertError);
+        throw new Error(`Failed to create IPTV subscription: ${insertError.message}`);
+      }
+    } else {
+      console.log(`ℹ️ Keeping current IPTV subscription for user ${userId} (no change)`);
+    }
+  }
+
+  console.log(`✅ Subscription processing completed for user ${userId}`);
+
+} catch (subscriptionError) {
+  console.error('❌ SUBSCRIPTION ERROR:', subscriptionError);
+  // Don't fail the entire request, but log the error
+  console.error('Subscription update failed, but user info was saved successfully');
+}
 
 // Enhanced user update that also syncs pending invites (ADDITION)
 router.put('/:id/enhanced', async (req, res) => {
