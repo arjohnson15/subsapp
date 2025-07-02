@@ -326,51 +326,51 @@ function updateOwnerDropdown(owners) {
 }
 
 function updateSubscriptionDropdowns(subscriptions) {
-    console.log('?? Updating subscription dropdowns with:', subscriptions);
+    console.log('🔧 Updating subscription dropdowns with:', subscriptions);
     
     // Update Plex subscription dropdown
     const plexSelect = document.getElementById('plexSubscription');
     if (plexSelect) {
-        console.log('?? Found Plex subscription dropdown');
+        console.log('🔧 Found Plex subscription dropdown');
         
+        // FIXED: Filter out the FREE Plex Access database entry to avoid duplicates
         const plexOptions = subscriptions
-            .filter(sub => sub.type === 'plex' && sub.active)
-            .map(sub => `<option value="${sub.id}">${sub.name} - $${sub.price}</option>`)
+    .filter(sub => sub.type === 'plex' && sub.active && sub.price > 0)  // ✅ Only paid plex (price > 0)
+    .map(sub => `<option value="${sub.id}">${sub.name} - $${sub.price}</option>`)
             .join('');
         
-        // UPDATED: Add preserve, free, remove, and paid options
+        // Only include hardcoded FREE option and paid options (no database FREE)
         plexSelect.innerHTML = `
             <option value="">-- Keep Current Plex Subscription --</option>
             <option value="free">FREE Plex Access</option>
-            <option value="remove">??? Remove Plex Subscription</option>
+            <option value="remove">🗑️ Remove Plex Subscription</option>
             ${plexOptions}
         `;
         
-        console.log('? Plex dropdown updated with preserve, FREE, remove, and', plexOptions.length, 'paid options');
+        console.log('✅ Plex dropdown updated with hardcoded FREE and', plexOptions.split('</option>').length - 1, 'paid options');
     } else {
-        console.warn('?? Plex subscription dropdown not found');
+        console.warn('⚠️ Plex subscription dropdown not found');
     }
     
-    // Update IPTV subscription dropdown
+    // Update IPTV subscription dropdown (no changes needed)
     const iptvSelect = document.getElementById('iptvSubscription');
     if (iptvSelect) {
-        console.log('?? Found IPTV subscription dropdown');
+        console.log('🔧 Found IPTV subscription dropdown');
         
         const iptvOptions = subscriptions
             .filter(sub => sub.type === 'iptv' && sub.active)
             .map(sub => `<option value="${sub.id}">${sub.name} - $${sub.price}</option>`)
             .join('');
         
-        // UPDATED: Add preserve and remove options
         iptvSelect.innerHTML = `
             <option value="">-- Keep Current IPTV Subscription --</option>
-            <option value="remove">??? Remove IPTV Subscription</option>
+            <option value="remove">🗑️ Remove IPTV Subscription</option>
             ${iptvOptions}
         `;
         
-        console.log('? IPTV dropdown updated with preserve, remove, and', iptvOptions.length, 'paid options');
+        console.log('✅ IPTV dropdown updated with', iptvOptions.split('</option>').length - 1, 'paid options');
     } else {
-        console.warn('?? IPTV subscription dropdown not found');
+        console.warn('⚠️ IPTV subscription dropdown not found');
     }
 }
 

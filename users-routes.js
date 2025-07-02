@@ -117,9 +117,21 @@ router.get('/', async (req, res) => {
     const processedUsers = await Promise.all(users.map(async (user) => {
 // Get user's subscriptions (updated for new schema)
 const subscriptions = await db.query(`
-  SELECT s.*, st.name as subscription_name, st.type, st.price
+  SELECT s.*, 
+         CASE 
+           WHEN s.subscription_type_id IS NULL THEN 'FREE Plex Access'
+           ELSE st.name 
+         END as subscription_name,
+         CASE 
+           WHEN s.subscription_type_id IS NULL THEN 'plex'
+           ELSE st.type 
+         END as type,
+         CASE 
+           WHEN s.subscription_type_id IS NULL THEN 0.00
+           ELSE st.price 
+         END as price
   FROM subscriptions s
-  JOIN subscription_types st ON s.subscription_type_id = st.id
+  LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
   WHERE s.user_id = ? AND s.status = 'active'
   ORDER BY s.expiration_date DESC
 `, [user.id]);
@@ -477,11 +489,11 @@ if (plex_subscription !== undefined) {
     // Cancel existing plex subscriptions first
     await cancelAllSubscriptionsOfType(userId, 'plex');
     
-    // Create FREE Plex subscription using hardcoded subscription type (ID 1)
-    await db.query(`
-      INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
-      VALUES (?, 1, CURDATE(), NULL, 'active')
-    `, [userId]);
+// Create FREE Plex subscription with NULL subscription_type_id
+await db.query(`
+  INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
+  VALUES (?, NULL, CURDATE(), NULL, 'active')
+`, [userId]);
     console.log('✅ Updated to FREE Plex subscription for user:', userId);
 
   } else if (plex_subscription && plex_subscription !== '' && plex_expiration) {

@@ -511,81 +511,49 @@ displayEnhancedLibraryAccess(user) {
 },
     
     
-    // UPDATED: Use new baseline reloader for editing - FIXED function references
-// UPDATED: Use new baseline reloader for editing - FIXED function references
-    async editUser(userId) {
-        try {
-            console.log(`📝 Starting edit for user ID: ${userId}`);
-            
-            // Set editing state
-            window.AppState.editingUserId = userId;
-            
-            // Get initial user data
-            const user = await API.User.getById(userId);
-            if (!user) {
-                throw new Error('User not found');
-            }
-            
-            console.log(`👤 Loaded user: ${user.name} (${user.email})`);
-            
-            // Store initial user data
-            window.AppState.currentUserData = user;
-            
-            // Set initial baselines for change detection
-            this.originalLibraryBaseline = this.deepClone(user.plex_libraries || {});
-            this.originalTagsBaseline = [...(user.tags || [])];
-            
-            // Navigate to user form first
-            await window.showPage('user-form');
-            
-            // If user has Plex access, refresh their current status in background
-            if (user.plex_email) {
-                console.log(`🔄 Refreshing Plex status for ${user.plex_email}...`);
-                
-                try {
-                    const refreshResult = await API.Plex.refreshUserData(user.plex_email);
-                    
-                    if (refreshResult.success) {
-                        console.log(`✅ User data refreshed successfully`);
-                        
-                        // Update with fresh data if changes were detected
-                        if (refreshResult.updateResult.updated) {
-                            console.log(`📊 User data was updated:`, refreshResult.updateResult.changes);
-                            window.AppState.currentUserData = refreshResult.user;
-                            
-                            // Update baselines with fresh data
-                            this.originalLibraryBaseline = this.deepClone(refreshResult.user.plex_libraries || {});
-                            this.originalTagsBaseline = [...(refreshResult.user.tags || [])];
-                            
-                            // Show notification about changes
-                            const changes = [];
-                            if (refreshResult.updateResult.changes.libraries) changes.push('library access');
-                            if (refreshResult.updateResult.changes.pendingInvites) changes.push('pending invites');
-                            
-                            Utils.showNotification(
-                                `User data refreshed - ${changes.join(' and ')} updated`,
-                                'info'
-                            );
-                        } else {
-                            console.log(`✅ User data is up to date`);
-                        }
-                    }
-                } catch (refreshError) {
-                    console.warn(`⚠️ Could not refresh user data:`, refreshError);
-                    Utils.showNotification('Could not refresh latest Plex status', 'warning');
-                }
-            }
-            
-            // Populate form with current user data (refreshed if applicable)
-            setTimeout(() => {
-                console.log(`🔧 Populating form for editing user: ${window.AppState.currentUserData.name}`);
-                window.populateFormForEditing(window.AppState.currentUserData);
-            }, 1200);
-            
-        } catch (error) {
-            Utils.handleError(error, 'Loading user for editing');
+async editUser(userId) {
+    try {
+        console.log(`📝 Starting edit for user ID: ${userId}`);
+        
+        // Set editing state
+        window.AppState.editingUserId = userId;
+        
+        // Get initial user data
+        const user = await API.User.getById(userId);
+        if (!user) {
+            throw new Error('User not found');
         }
-    },
+        
+        console.log(`👤 Loaded user: ${user.name} (${user.email})`);
+        
+        // Store initial user data
+        window.AppState.currentUserData = user;
+        
+        // Set initial baselines for change detection (from database state only)
+        this.originalLibraryBaseline = this.deepClone(user.plex_libraries || {});
+        this.originalTagsBaseline = [...(user.tags || [])];
+        
+        console.log('✅ Set baselines from database:', {
+            libraries: this.originalLibraryBaseline,
+            tags: this.originalTagsBaseline
+        });
+        
+        // Navigate to user form first
+        await window.showPage('user-form');
+        
+        // REMOVED: Background refresh - all data should come from database
+        // No more automatic API calls that interfere with editing
+        
+        // Populate form with database data only
+        setTimeout(() => {
+            console.log(`🔧 Populating form for editing user: ${user.name}`);
+            window.populateFormForEditing(user);
+        }, 1200);
+        
+    } catch (error) {
+        Utils.handleError(error, 'Loading user for editing');
+    }
+},
     
 emailUser(userName, userEmail) {
     // Store the user info for the email page

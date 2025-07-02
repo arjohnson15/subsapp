@@ -1,5 +1,6 @@
--- JohnsonFlix Database Schema - CORRECTED VERSION
+-- JohnsonFlix Database Schema - FINAL CORRECTED VERSION
 -- Fresh database setup with proper single subscription constraints
+-- FREE subscriptions use NULL subscription_type_id (no FREE subscription types in database)
 CREATE DATABASE IF NOT EXISTS subsapp_db;
 USE subsapp_db;
 
@@ -47,13 +48,12 @@ CREATE TABLE users (
   FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE SET NULL
 );
 
--- Subscriptions table - CORRECTED VERSION
--- Every subscription must have a subscription_type_id (including FREE Plex)
--- No is_free column needed - FREE is determined by price = 0
+-- Subscriptions table - FINAL CORRECTED VERSION
+-- subscription_type_id can be NULL for FREE subscriptions
 CREATE TABLE subscriptions (
   id INT PRIMARY KEY AUTO_INCREMENT,
   user_id INT NOT NULL,
-  subscription_type_id INT NOT NULL,
+  subscription_type_id INT NULL COMMENT 'NULL for FREE subscriptions',
   start_date DATE NOT NULL,
   expiration_date DATE NULL COMMENT 'NULL for FREE subscriptions (never expire)',
   status ENUM('active', 'expired', 'cancelled') DEFAULT 'active',
@@ -116,14 +116,13 @@ INSERT INTO owners (name, email) VALUES
 ('Andrew', 'arjohnson15@gmail.com'),
 ('System Admin', 'admin@johnsonflix.com');
 
--- Insert subscription types - INCLUDING the hardcoded FREE Plex Access
+-- Insert subscription types - ONLY PAID SUBSCRIPTIONS (no FREE types)
 INSERT INTO subscription_types (name, type, duration_months, streams, price, active) VALUES
-('FREE Plex Access', 'plex', 0, NULL, 0.00, TRUE),                    -- ID 1: FREE Plex (hardcoded)
-('Plex 12 Month', 'plex', 12, NULL, 120.00, TRUE),                    -- ID 2: Paid Plex
-('IPTV 3 Month - 1 Stream', 'iptv', 3, 1, 25.00, TRUE),             -- ID 3: IPTV options
-('IPTV 3 Month - 2 Streams', 'iptv', 3, 2, 40.00, TRUE),
-('IPTV 6 Month - 1 Stream', 'iptv', 6, 1, 45.00, TRUE),
-('IPTV 3 Month - 5 Streams', 'iptv', 3, 5, 75.00, TRUE);
+('Plex 12 Month', 'plex', 12, NULL, 120.00, TRUE),                    -- ID 1: Paid Plex
+('IPTV 3 Month - 1 Stream', 'iptv', 3, 1, 25.00, TRUE),             -- ID 2: IPTV options
+('IPTV 3 Month - 2 Streams', 'iptv', 3, 2, 40.00, TRUE),            -- ID 3
+('IPTV 6 Month - 1 Stream', 'iptv', 6, 1, 45.00, TRUE),             -- ID 4
+('IPTV 3 Month - 5 Streams', 'iptv', 3, 5, 75.00, TRUE);            -- ID 5
 
 -- Insert default email templates
 INSERT INTO email_templates (name, subject, body, template_type) VALUES
@@ -178,14 +177,14 @@ INSERT INTO users (name, email, owner_id, plex_email, iptv_username, iptv_passwo
 ('test 1', 'andrew+plextest3@cloudjohnson.com', 1, 'andrew+plextest3@cloudjohnson.com', 'andrew_iptv', 'iptv456', 'ABC123', 2, true, '["Plex 1", "Plex 2", "IPTV"]'),
 ('test 2', 'andrew+plextest4@cloudjohnson.com', 1, 'andrew+plextest4@cloudjohnson.com', '', '', '', 1, false, '["Plex 1"]');
 
--- Insert sample subscriptions using the new system
+-- Insert sample subscriptions - FREE subscriptions use NULL subscription_type_id
 INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status) VALUES
-(1, 1, CURDATE(), NULL, 'active'),                                     -- test 1: FREE Plex Access
-(1, 3, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY), 'active'),     -- test 1: IPTV expiring soon
-(2, 2, '2024-04-15', '2025-04-15', 'active');                         -- test 2: Paid Plex
+(1, NULL, CURDATE(), NULL, 'active'),                                  -- test 1: FREE Plex Access (NULL subscription_type_id)
+(1, 2, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY), 'active'),     -- test 1: IPTV expiring soon
+(2, 1, '2024-04-15', '2025-04-15', 'active');                         -- test 2: Paid Plex
 
 -- =============================================
--- BULLETPROOF SINGLE SUBSCRIPTION CONSTRAINTS
+-- UPDATED TRIGGERS FOR NULL subscription_type_id
 -- =============================================
 
 -- Create bulletproof triggers to prevent duplicate active subscriptions
@@ -200,23 +199,45 @@ BEGIN
   
   -- Only enforce for active subscriptions
   IF NEW.status = 'active' THEN
-    -- Get the type of the subscription being inserted
-    SELECT type INTO subscription_type_name 
-    FROM subscription_types 
-    WHERE id = NEW.subscription_type_id;
-    
-    -- Count any existing active subscriptions of the same type
-    SELECT COUNT(*) INTO existing_count
-    FROM subscriptions s
-    JOIN subscription_types st ON s.subscription_type_id = st.id
-    WHERE s.user_id = NEW.user_id 
-      AND st.type = subscription_type_name
-      AND s.status = 'active';
+    -- Handle FREE subscriptions (NULL subscription_type_id)
+    IF NEW.subscription_type_id IS NULL THEN
+      -- For FREE subscriptions, assume they are plex type
+      SET subscription_type_name = 'plex';
+      
+      -- Count existing FREE plex subscriptions
+      SELECT COUNT(*) INTO existing_count
+      FROM subscriptions s
+      WHERE s.user_id = NEW.user_id 
+        AND s.subscription_type_id IS NULL
+        AND s.status = 'active';
+        
+    ELSE
+      -- Get the type of the paid subscription being inserted
+      SELECT type INTO subscription_type_name 
+      FROM subscription_types 
+      WHERE id = NEW.subscription_type_id;
+      
+      -- Count any existing active subscriptions of the same type (including FREE for plex)
+      SELECT COUNT(*) INTO existing_count
+      FROM subscriptions s
+      LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
+      WHERE s.user_id = NEW.user_id 
+        AND s.status = 'active'
+        AND (
+          (s.subscription_type_id IS NULL AND subscription_type_name = 'plex') OR
+          (st.type = subscription_type_name)
+        );
+    END IF;
     
     -- Prevent duplicate active subscriptions of the same type
     IF existing_count > 0 THEN
-      SIGNAL SQLSTATE '45000' 
-      SET MESSAGE_TEXT = CONCAT('User already has an active ', subscription_type_name, ' subscription. Only one active subscription per type is allowed.');
+      IF subscription_type_name = 'plex' THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'User already has an active plex subscription. Only one active subscription per type is allowed.';
+      ELSE
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'User already has an active iptv subscription. Only one active subscription per type is allowed.';
+      END IF;
     END IF;
   END IF;
 END//
@@ -234,24 +255,45 @@ BEGIN
     OLD.subscription_type_id != NEW.subscription_type_id OR 
     OLD.user_id != NEW.user_id
   ) THEN
-    -- Get the type of the subscription being updated
-    SELECT type INTO subscription_type_name 
-    FROM subscription_types 
-    WHERE id = NEW.subscription_type_id;
-    
-    -- Count any other active subscriptions of the same type
-    SELECT COUNT(*) INTO existing_count
-    FROM subscriptions s
-    JOIN subscription_types st ON s.subscription_type_id = st.id
-    WHERE s.user_id = NEW.user_id 
-      AND st.type = subscription_type_name
-      AND s.status = 'active'
-      AND s.id != NEW.id;
+    -- Handle FREE subscriptions (NULL subscription_type_id)
+    IF NEW.subscription_type_id IS NULL THEN
+      SET subscription_type_name = 'plex';
+      
+      SELECT COUNT(*) INTO existing_count
+      FROM subscriptions s
+      WHERE s.user_id = NEW.user_id 
+        AND s.subscription_type_id IS NULL
+        AND s.status = 'active'
+        AND s.id != NEW.id;
+        
+    ELSE
+      -- Get the type of the paid subscription being updated
+      SELECT type INTO subscription_type_name 
+      FROM subscription_types 
+      WHERE id = NEW.subscription_type_id;
+      
+      -- Count any other active subscriptions of the same type
+      SELECT COUNT(*) INTO existing_count
+      FROM subscriptions s
+      LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
+      WHERE s.user_id = NEW.user_id 
+        AND s.status = 'active'
+        AND s.id != NEW.id
+        AND (
+          (s.subscription_type_id IS NULL AND subscription_type_name = 'plex') OR
+          (st.type = subscription_type_name)
+        );
+    END IF;
     
     -- Prevent duplicate active subscriptions of the same type
     IF existing_count > 0 THEN
-      SIGNAL SQLSTATE '45000' 
-      SET MESSAGE_TEXT = CONCAT('User already has an active ', subscription_type_name, ' subscription. Only one active subscription per type is allowed.');
+      IF subscription_type_name = 'plex' THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'User already has an active plex subscription. Only one active subscription per type is allowed.';
+      ELSE
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'User already has an active iptv subscription. Only one active subscription per type is allowed.';
+      END IF;
     END IF;
   END IF;
 END//
