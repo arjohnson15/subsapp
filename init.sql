@@ -1,4 +1,5 @@
--- JohnsonFlix Database Schema with Unique Subscription Constraints
+-- JohnsonFlix Database Schema - CORRECTED VERSION
+-- Fresh database setup with proper single subscription constraints
 CREATE DATABASE IF NOT EXISTS subsapp_db;
 USE subsapp_db;
 
@@ -24,7 +25,7 @@ CREATE TABLE subscription_types (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Users table (updated field names)
+-- Users table
 CREATE TABLE users (
   id INT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(255) NOT NULL,
@@ -46,14 +47,15 @@ CREATE TABLE users (
   FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE SET NULL
 );
 
--- Subscriptions table with simpler unique constraint approach
+-- Subscriptions table - CORRECTED VERSION
+-- Every subscription must have a subscription_type_id (including FREE Plex)
+-- No is_free column needed - FREE is determined by price = 0
 CREATE TABLE subscriptions (
   id INT PRIMARY KEY AUTO_INCREMENT,
   user_id INT NOT NULL,
   subscription_type_id INT NOT NULL,
   start_date DATE NOT NULL,
-  expiration_date DATE,
-  is_free BOOLEAN DEFAULT FALSE,
+  expiration_date DATE NULL COMMENT 'NULL for FREE subscriptions (never expire)',
   status ENUM('active', 'expired', 'cancelled') DEFAULT 'active',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -61,9 +63,6 @@ CREATE TABLE subscriptions (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (subscription_type_id) REFERENCES subscription_types(id)
 );
-
--- Create a view to help enforce uniqueness and add triggers
--- We'll use a different approach since generated columns with subqueries aren't allowed
 
 -- Email templates table
 CREATE TABLE email_templates (
@@ -117,16 +116,16 @@ INSERT INTO owners (name, email) VALUES
 ('Andrew', 'arjohnson15@gmail.com'),
 ('System Admin', 'admin@johnsonflix.com');
 
--- Insert default subscription types
-INSERT INTO subscription_types (name, type, duration_months, streams, price) VALUES
-('Plex 12 Month', 'plex', 12, NULL, 120.00),
-('IPTV 3 Month - 1 Stream', 'iptv', 3, 1, 25.00),
-('IPTV 3 Month - 2 Streams', 'iptv', 3, 2, 40.00),
-('IPTV 6 Month - 1 Stream', 'iptv', 6, 1, 45.00),
-('IPTV 3 Month - 5 Streams', 'iptv', 3, 5, 75.00),
-('Free Plex Access', 'plex', 0, NULL, 0.00); 
+-- Insert subscription types - INCLUDING the hardcoded FREE Plex Access
+INSERT INTO subscription_types (name, type, duration_months, streams, price, active) VALUES
+('FREE Plex Access', 'plex', 0, NULL, 0.00, TRUE),                    -- ID 1: FREE Plex (hardcoded)
+('Plex 12 Month', 'plex', 12, NULL, 120.00, TRUE),                    -- ID 2: Paid Plex
+('IPTV 3 Month - 1 Stream', 'iptv', 3, 1, 25.00, TRUE),             -- ID 3: IPTV options
+('IPTV 3 Month - 2 Streams', 'iptv', 3, 2, 40.00, TRUE),
+('IPTV 6 Month - 1 Stream', 'iptv', 6, 1, 45.00, TRUE),
+('IPTV 3 Month - 5 Streams', 'iptv', 3, 5, 75.00, TRUE);
 
--- Insert default email templates (updated field names)
+-- Insert default email templates
 INSERT INTO email_templates (name, subject, body, template_type) VALUES
 ('Welcome Email', 'Welcome to {{subscription_type}}!', 
 '<h2 style="color: #8e24aa;">Welcome {{name}}!</h2>
@@ -174,63 +173,92 @@ INSERT INTO settings (setting_key, setting_value, setting_type) VALUES
 ('secondary_color', '#3f51b5', 'string'),
 ('accent_color', '#4fc3f7', 'string');
 
--- Insert sample users (updated field names and realistic data)
+-- Insert sample users
 INSERT INTO users (name, email, owner_id, plex_email, iptv_username, iptv_password, implayer_code, device_count, bcc_owner_renewal, tags) VALUES
 ('test 1', 'andrew+plextest3@cloudjohnson.com', 1, 'andrew+plextest3@cloudjohnson.com', 'andrew_iptv', 'iptv456', 'ABC123', 2, true, '["Plex 1", "Plex 2", "IPTV"]'),
 ('test 2', 'andrew+plextest4@cloudjohnson.com', 1, 'andrew+plextest4@cloudjohnson.com', '', '', '', 1, false, '["Plex 1"]');
 
--- Insert sample subscriptions
-INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, is_free, status) VALUES
-(1, 1, CURDATE(), NULL, true, 'active'), -- Andrew - Free Plex
-(1, 2, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY), false, 'active'), -- Andrew - IPTV expiring soon
-(2, 1, '2024-04-15', '2025-04-15', false, 'active'); -- Aaron - Paid Plex
+-- Insert sample subscriptions using the new system
+INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status) VALUES
+(1, 1, CURDATE(), NULL, 'active'),                                     -- test 1: FREE Plex Access
+(1, 3, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY), 'active'),     -- test 1: IPTV expiring soon
+(2, 2, '2024-04-15', '2025-04-15', 'active');                         -- test 2: Paid Plex
 
--- Create triggers to enforce unique constraint manually since generated columns with subqueries don't work
+-- =============================================
+-- BULLETPROOF SINGLE SUBSCRIPTION CONSTRAINTS
+-- =============================================
+
+-- Create bulletproof triggers to prevent duplicate active subscriptions
 DELIMITER //
 
-CREATE TRIGGER prevent_duplicate_active_subscriptions_insert
+CREATE TRIGGER enforce_single_subscription_per_type_insert
 BEFORE INSERT ON subscriptions
 FOR EACH ROW
 BEGIN
   DECLARE existing_count INT DEFAULT 0;
+  DECLARE subscription_type_name VARCHAR(10);
   
+  -- Only enforce for active subscriptions
   IF NEW.status = 'active' THEN
+    -- Get the type of the subscription being inserted
+    SELECT type INTO subscription_type_name 
+    FROM subscription_types 
+    WHERE id = NEW.subscription_type_id;
+    
+    -- Count any existing active subscriptions of the same type
     SELECT COUNT(*) INTO existing_count
     FROM subscriptions s
     JOIN subscription_types st ON s.subscription_type_id = st.id
-    JOIN subscription_types new_st ON NEW.subscription_type_id = new_st.id
     WHERE s.user_id = NEW.user_id 
-      AND s.status = 'active'
-      AND st.type = new_st.type;
+      AND st.type = subscription_type_name
+      AND s.status = 'active';
     
+    -- Prevent duplicate active subscriptions of the same type
     IF existing_count > 0 THEN
       SIGNAL SQLSTATE '45000' 
-      SET MESSAGE_TEXT = 'User already has an active subscription of this type';
+      SET MESSAGE_TEXT = CONCAT('User already has an active ', subscription_type_name, ' subscription. Only one active subscription per type is allowed.');
     END IF;
   END IF;
 END//
 
-CREATE TRIGGER prevent_duplicate_active_subscriptions_update
+CREATE TRIGGER enforce_single_subscription_per_type_update
 BEFORE UPDATE ON subscriptions
 FOR EACH ROW
 BEGIN
   DECLARE existing_count INT DEFAULT 0;
+  DECLARE subscription_type_name VARCHAR(10);
   
-  IF NEW.status = 'active' AND (OLD.status != 'active' OR OLD.subscription_type_id != NEW.subscription_type_id OR OLD.user_id != NEW.user_id) THEN
+  -- Only check if we're activating a subscription or changing key fields
+  IF NEW.status = 'active' AND (
+    OLD.status != 'active' OR 
+    OLD.subscription_type_id != NEW.subscription_type_id OR 
+    OLD.user_id != NEW.user_id
+  ) THEN
+    -- Get the type of the subscription being updated
+    SELECT type INTO subscription_type_name 
+    FROM subscription_types 
+    WHERE id = NEW.subscription_type_id;
+    
+    -- Count any other active subscriptions of the same type
     SELECT COUNT(*) INTO existing_count
     FROM subscriptions s
     JOIN subscription_types st ON s.subscription_type_id = st.id
-    JOIN subscription_types new_st ON NEW.subscription_type_id = new_st.id
     WHERE s.user_id = NEW.user_id 
+      AND st.type = subscription_type_name
       AND s.status = 'active'
-      AND st.type = new_st.type
       AND s.id != NEW.id;
     
+    -- Prevent duplicate active subscriptions of the same type
     IF existing_count > 0 THEN
       SIGNAL SQLSTATE '45000' 
-      SET MESSAGE_TEXT = 'User already has an active subscription of this type';
+      SET MESSAGE_TEXT = CONCAT('User already has an active ', subscription_type_name, ' subscription. Only one active subscription per type is allowed.');
     END IF;
   END IF;
 END//
 
 DELIMITER ;
+
+-- Add indexes for better performance
+CREATE INDEX idx_subscriptions_user_status ON subscriptions(user_id, status);
+CREATE INDEX idx_subscriptions_type_status ON subscription_types(type, active);
+CREATE INDEX idx_subscriptions_expiration ON subscriptions(expiration_date, status);
