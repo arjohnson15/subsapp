@@ -581,6 +581,14 @@ try {
   console.error('Subscription update failed, but user info was saved successfully');
 }
 
+    res.json({ message: 'User updated successfully' });
+
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
 // Enhanced user update that also syncs pending invites (ADDITION)
 router.put('/:id/enhanced', async (req, res) => {
   try {
