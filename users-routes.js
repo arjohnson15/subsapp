@@ -147,7 +147,7 @@ let iptvExpiration = null;
 
 for (const sub of subscriptions) {
   if (sub.type === 'plex') {
-    if (sub.price === 0) {  // FREE Plex determined by price = 0
+    if (sub.subscription_type_id === null) {  // FREE Plex determined by NULL subscription_type_id
       plexExpiration = 'FREE';
       break;
     } else if (!plexExpiration || new Date(sub.expiration_date) > new Date(plexExpiration)) {
@@ -315,10 +315,10 @@ router.post('/', [
 // Handle Plex subscription (updated for new schema)
 if (plex_subscription && plex_subscription !== 'remove') {
 if (plex_subscription === 'free') {
-  // Use NULL subscription_type_id for FREE Plex Access
+  // Use subscription type ID 1 for FREE Plex Access (from init.sql)
   await db.query(`
     INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
-    VALUES (?, NULL, CURDATE(), NULL, 'active')
+    VALUES (?, 1, CURDATE(), NULL, 'active')
   `, [userId]);
     console.log('✅ Created FREE Plex subscription for user:', userId);
   } else if (plex_expiration) {
@@ -531,7 +531,7 @@ async function cancelAllSubscriptionsOfType(userId, subscriptionType) {
 try {
   await db.query(`
     INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
-    VALUES (?, NULL, CURDATE(), NULL, 'active')
+    VALUES (?, 1, CURDATE(), NULL, 'active')
   `, [userId]);
         console.log(`✅ CREATED FREE Plex subscription for user ${userId}`);
       } catch (insertError) {
