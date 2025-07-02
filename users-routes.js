@@ -199,13 +199,25 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Get user's subscriptions
-    const subscriptions = await db.query(`
-      SELECT s.*, st.name as subscription_name, st.type, st.price
-      FROM subscriptions s
-      JOIN subscription_types st ON s.subscription_type_id = st.id
-      WHERE s.user_id = ? AND s.status = 'active'
-    `, [req.params.id]);
+// Get user's subscriptions - FIXED to include FREE subscriptions
+const subscriptions = await db.query(`
+  SELECT s.*, 
+         CASE 
+           WHEN s.subscription_type_id IS NULL THEN 'FREE Plex Access'
+           ELSE st.name 
+         END as subscription_name,
+         CASE 
+           WHEN s.subscription_type_id IS NULL THEN 'plex'
+           ELSE st.type 
+         END as type,
+         CASE 
+           WHEN s.subscription_type_id IS NULL THEN 0.00
+           ELSE st.price 
+         END as price
+  FROM subscriptions s
+  LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
+  WHERE s.user_id = ? AND s.status = 'active'
+`, [req.params.id]);
 
     // Safe JSON parsing
     user.tags = safeJsonParse(user.tags, []);
@@ -302,12 +314,12 @@ router.post('/', [
     try {
 // Handle Plex subscription (updated for new schema)
 if (plex_subscription && plex_subscription !== 'remove') {
-  if (plex_subscription === 'free') {
-    // Use the hardcoded FREE Plex Access subscription type (ID 1)
-    await db.query(`
-      INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
-      VALUES (?, 1, CURDATE(), NULL, 'active')
-    `, [userId]);
+if (plex_subscription === 'free') {
+  // Use NULL subscription_type_id for FREE Plex Access
+  await db.query(`
+    INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
+    VALUES (?, NULL, CURDATE(), NULL, 'active')
+  `, [userId]);
     console.log('✅ Created FREE Plex subscription for user:', userId);
   } else if (plex_expiration) {
     await db.query(`
@@ -465,21 +477,36 @@ try {
   const userId = req.params.id;
 
   // BULLETPROOF Helper function to cancel all subscriptions of a specific type
-  async function cancelAllSubscriptionsOfType(userId, subscriptionType) {
+async function cancelAllSubscriptionsOfType(userId, subscriptionType) {
     console.log(`🗑️ Cancelling all ${subscriptionType} subscriptions for user ${userId}`);
     
-    const result = await db.query(`
-      UPDATE subscriptions s
-      JOIN subscription_types st ON s.subscription_type_id = st.id
-      SET s.status = 'cancelled', s.updated_at = NOW()
-      WHERE s.user_id = ? 
-        AND st.type = ?
-        AND s.status = 'active'
-    `, [userId, subscriptionType]);
+    let result;
+    
+    if (subscriptionType === 'plex') {
+        // For Plex, cancel both paid subscriptions AND FREE (NULL) subscriptions
+        result = await db.query(`
+          UPDATE subscriptions s
+          LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
+          SET s.status = 'cancelled', s.updated_at = NOW()
+          WHERE s.user_id = ?
+            AND s.status = 'active'
+            AND (s.subscription_type_id IS NULL OR st.type = 'plex')
+        `, [userId]);
+    } else {
+        // For IPTV, only cancel paid subscriptions (no FREE IPTV)
+        result = await db.query(`
+          UPDATE subscriptions s
+          JOIN subscription_types st ON s.subscription_type_id = st.id
+          SET s.status = 'cancelled', s.updated_at = NOW()
+          WHERE s.user_id = ?
+            AND st.type = ?
+            AND s.status = 'active'
+        `, [userId, subscriptionType]);
+    }
     
     console.log(`✅ Cancelled ${result.affectedRows} existing ${subscriptionType} subscriptions`);
     return result.affectedRows;
-  }
+}
 
   // Handle Plex subscription updates - BULLETPROOF SIMPLE VERSION
   if (plex_subscription !== undefined && plex_subscription !== null) {
@@ -500,12 +527,12 @@ try {
       // Step 2: Wait a moment for database consistency
       await new Promise(resolve => setTimeout(resolve, 200));
       
-      // Step 3: Create FREE Plex subscription (ID 1, price 0, no expiration)
-      try {
-        await db.query(`
-          INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
-          VALUES (?, 1, CURDATE(), NULL, 'active')
-        `, [userId]);
+// Step 3: Create FREE Plex subscription (NULL subscription_type_id, no expiration)
+try {
+  await db.query(`
+    INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
+    VALUES (?, NULL, CURDATE(), NULL, 'active')
+  `, [userId]);
         console.log(`✅ CREATED FREE Plex subscription for user ${userId}`);
       } catch (insertError) {
         console.error(`❌ Error creating FREE subscription:`, insertError);
