@@ -215,20 +215,56 @@ function showNotification(message, type = 'info') {
     }, 5000);
 }
 
-// Modal functions
 function closeModal(modalId) {
+    console.log('🔒 Closing modal:', modalId);
+    
     const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.remove('active');
+    if (!modal) {
+        console.warn('Modal not found:', modalId);
+        return;
     }
+    
+    // Remove the active class and hide the modal
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+    
+    // Restore body scrolling
+    document.body.style.overflow = '';
+    
+    // Remove any modal backdrop if it exists
+    const backdrop = document.querySelector('.modal-backdrop');
+    if (backdrop) {
+        backdrop.remove();
+    }
+    
+    console.log('✅ Modal closed successfully');
 }
 
-// Close modal when clicking outside
-window.onclick = function(event) {
+// Make sure it's globally available
+window.closeModal = closeModal;
+
+// Also add click-outside-to-close functionality
+document.addEventListener('click', function(event) {
+    // Check if click is on a modal background (not the content)
     if (event.target.classList.contains('modal')) {
-        event.target.classList.remove('active');
+        // Find the modal ID and close it
+        const modalId = event.target.id;
+        if (modalId) {
+            closeModal(modalId);
+        }
     }
-}
+});
+
+// Add ESC key to close modal
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        // Find any active modal and close it
+        const activeModal = document.querySelector('.modal.active');
+        if (activeModal) {
+            closeModal(activeModal.id);
+        }
+    }
+});
 
 // Page loading utility
 async function loadPageContent(pageName) {

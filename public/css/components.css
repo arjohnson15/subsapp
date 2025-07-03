@@ -537,12 +537,14 @@ th.sortable .sort-arrow {
     border-radius: 16px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     border: 1px solid rgba(79, 195, 247, 0.2);
-    max-width: 800px; /* Increased from 600px */
+    max-width: 900px; /* Increased to accommodate longer text */
     width: 90vw;
     max-height: 85vh;
     overflow-y: auto;
+    position: relative; /* Ensure proper positioning */
 }
 
+/* Enhanced modal header */
 .modal-header {
     background: linear-gradient(45deg, #4fc3f7, #29b6f6);
     color: white;
@@ -555,8 +557,9 @@ th.sortable .sort-arrow {
 }
 
 .modal-header h3 {
-    color: #4fc3f7;
     margin: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
 }
 
 .close-btn {

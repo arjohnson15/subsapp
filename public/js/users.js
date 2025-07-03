@@ -523,7 +523,7 @@ showUserModal(user) {
         modal.classList.add('active');
         modal.style.display = 'flex';
     }
-}
+},
 
 // Enhanced library access display function - Add to users.js
 loadUserLibraryAccess(user) {
@@ -579,7 +579,7 @@ loadUserLibraryAccess(user) {
     } else {
         libraryDiv.innerHTML = libraryHtml;
     }
-}
+},
 
 // NEW: Enhanced library access display that shows both stored access AND pending status
 displayEnhancedLibraryAccess(user) {
@@ -1236,74 +1236,6 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
 },
 
 
-// FIXED: Display invite status indicator - PENDING INVITES ALWAYS WIN
-displayInviteStatusForServer(serverGroup, inviteResponse, userEmail) {
-    const serverData = inviteResponse.servers?.[serverGroup];
-    if (!serverData) return;
-    
-    const statusContainer = document.getElementById(`${serverGroup}Status`);
-    if (!statusContainer) return;
-    
-    let hasPendingInvites = false;
-    let hasAccess = false;
-    const pendingServers = [];
-    const accessServers = [];
-    
-    // Check both regular and 4K servers
-    for (const [serverType, serverInfo] of Object.entries(serverData)) {
-        if (serverInfo.status === 'pending') {
-            hasPendingInvites = true;
-            pendingServers.push(serverType);
-        } else if (serverInfo.status === 'accepted') {
-            hasAccess = true;
-            accessServers.push(serverType);
-        }
-    }
-    
-    let statusHtml = '';
-    
-    // PRIORITY 1: ALWAYS show pending invites first - this is what you care about!
-    if (hasPendingInvites) {
-        statusHtml = `
-            <div style="color: #ff9800; display: flex; flex-direction: column; gap: 4px;">
-                <div style="display: flex; align-items: center; gap: 8px; font-weight: bold;">
-                    <i class="fas fa-clock" style="color: #ff9800;"></i>
-                    <span>PENDING INVITES</span>
-                </div>
-                <div style="font-size: 0.9em; color: #ffb74d;">
-                    User must accept: ${pendingServers.join(', ')}
-                </div>
-                ${hasAccess ? `<div style="font-size: 0.8em; color: #81c784;">✓ Has access: ${accessServers.join(', ')}</div>` : ''}
-            </div>
-        `;
-        
-        // Add warning to library sections
-        this.addInviteWarningToLibraries(serverGroup, pendingServers);
-        
-    } else if (hasAccess) {
-        // PRIORITY 2: Only show access if NO pending invites
-        statusHtml = `
-            <div style="color: #4caf50; display: flex; align-items: center; gap: 8px;">
-                <i class="fas fa-check-circle" style="color: #4caf50;"></i>
-                <span>Access Granted</span>
-                <small style="color: #81c784;">(${accessServers.join(', ')})</small>
-            </div>
-        `;
-    } else {
-        // PRIORITY 3: No access at all
-        statusHtml = `
-            <div style="color: #9e9e9e; display: flex; align-items: center; gap: 8px;">
-                <i class="fas fa-user-slash" style="color: #9e9e9e;"></i>
-                <span>No Access</span>
-            </div>
-        `;
-    }
-    
-    statusContainer.innerHTML = statusHtml;
-    
-    console.log(`📊 ${serverGroup} status: pending=${hasPendingInvites}, access=${hasAccess}`);
-},
-
     // Add warning message to library sections when user has pending invites
     addInviteWarningToLibraries(serverGroup, pendingServers) {
         const libraryGroup = document.getElementById(`${serverGroup}LibraryGroup`);
@@ -1699,7 +1631,7 @@ displayInviteStatusForServer(serverGroup, inviteResponse, userEmail) {
             
             if (Array.isArray(obj1[key]) && Array.isArray(obj2[key])) {
                 // Compare arrays
-                if (obj1[key].length !== obj2.length) return false;
+                if (obj1[key].length !== obj2[key].length) return false;
                 const sorted1 = [...obj1[key]].sort();
                 const sorted2 = [...obj2[key]].sort();
                 for (let i = 0; i < sorted1.length; i++) {
@@ -2203,63 +2135,8 @@ function retryPreSelection(serverGroup, userLibraries, extractLibraryId, findChe
             fourk: userLibraries.fourk?.map(lib => extractLibraryId(lib))
         });
     }
-}
+};
 
-// Helper function for retry logic
-function retryPreSelection(serverGroup, userLibraries, extractLibraryId, findCheckbox) {
-    console.log(`🔄 RETRY: Attempting pre-selection again for ${serverGroup}...`);
-    let retrySelected = 0;
-    
-    // Retry regular libraries
-    if (userLibraries.regular && Array.isArray(userLibraries.regular)) {
-        userLibraries.regular.forEach(lib => {
-            const libId = extractLibraryId(lib);
-            if (!libId) return;
-            
-            const checkbox = findCheckbox(serverGroup, 'regular', libId);
-            if (checkbox && !checkbox.checked) {
-                checkbox.checked = true;
-                retrySelected++;
-                console.log(`🔄 RETRY SUCCESS: Pre-selected regular library: ${libId}`);
-            }
-        });
-    }
-    
-    // Retry 4K libraries
-    if (userLibraries.fourk && Array.isArray(userLibraries.fourk)) {
-        userLibraries.fourk.forEach(lib => {
-            const libId = extractLibraryId(lib);
-            if (!libId) return;
-            
-            const checkbox = findCheckbox(serverGroup, 'fourk', libId);
-            if (checkbox && !checkbox.checked) {
-                checkbox.checked = true;
-                retrySelected++;
-                console.log(`🔄 RETRY SUCCESS: Pre-selected 4K library: ${libId}`);
-            }
-        });
-    }
-    
-    console.log(`🔄 Retry completed for ${serverGroup}: ${retrySelected} additional libraries selected`);
-    
-    // Final debug if still having issues
-    if (retrySelected === 0) {
-        console.log(`⚠️ RETRY FAILED: Still unable to select libraries for ${serverGroup}`);
-        console.log(`🔍 Final debug - checking DOM state...`);
-        
-        // Show current state of DOM
-        const regularBoxes = document.querySelectorAll(`input[name="${serverGroup}_regular"]`);
-        const fourkBoxes = document.querySelectorAll(`input[name="${serverGroup}_fourk"]`);
-        
-        console.log(`📋 Current DOM state for ${serverGroup}:`);
-        console.log(`   Regular checkboxes (${regularBoxes.length}):`, Array.from(regularBoxes).map(cb => cb.value));
-        console.log(`   4K checkboxes (${fourkBoxes.length}):`, Array.from(fourkBoxes).map(cb => cb.value));
-        console.log(`   User library IDs:`, {
-            regular: userLibraries.regular?.map(lib => extractLibraryId(lib)),
-            fourk: userLibraries.fourk?.map(lib => extractLibraryId(lib))
-        });
-    }
-}
 
 // Export for global access
 window.Users.loadUsers = window.Users.loadUsers.bind(window.Users);
