@@ -108,19 +108,37 @@ async processTemplate(templateBody, userData) {
     try {
       const settings = await this.getEmailSettings();
       
-      // Calculate plex-specific days until expiration
+      // Calculate plex-specific days until expiration - FIXED
       let plexDaysUntilExpiration = '';
       if (userData.plex_expiration) {
-        if (userData.plex_expiration === 'FREE' || userData.plex_expiration === 'No Subscription') {
+        // FIXED: Check for FREE more broadly and add debug logging
+        console.log('🔍 Processing Plex expiration:', userData.plex_expiration, typeof userData.plex_expiration);
+        
+        if (userData.plex_expiration === 'FREE' || 
+            userData.plex_expiration === 'No Subscription' ||
+            userData.plex_expiration === null ||
+            userData.plex_expiration === 'free') {
           plexDaysUntilExpiration = 'N/A (Free Access)';
         } else {
           try {
             const expirationDate = new Date(userData.plex_expiration);
-            const today = new Date();
-            const timeDiff = expirationDate.getTime() - today.getTime();
-            const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-            plexDaysUntilExpiration = daysDiff > 0 ? daysDiff.toString() : '0';
+            // Check if it's a valid date
+            if (isNaN(expirationDate.getTime())) {
+              console.log('⚠️ Invalid Plex expiration date:', userData.plex_expiration);
+              plexDaysUntilExpiration = 'Invalid Date';
+            } else {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0); // Reset time to start of day
+              expirationDate.setHours(0, 0, 0, 0); // Reset time to start of day
+              
+              const timeDiff = expirationDate.getTime() - today.getTime();
+              const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+              plexDaysUntilExpiration = daysDiff > 0 ? daysDiff.toString() : '0';
+              
+              console.log('📅 Calculated Plex days:', daysDiff, 'for expiration:', userData.plex_expiration);
+            }
           } catch (error) {
+            console.error('❌ Error calculating Plex days:', error);
             plexDaysUntilExpiration = 'Invalid Date';
           }
         }
@@ -147,6 +165,13 @@ async processTemplate(templateBody, userData) {
       } else {
         iptvDaysUntilExpiration = 'No IPTV Access';
       }
+      
+      console.log('📧 Final template values:', {
+        plexExpiration: userData.plex_expiration,
+        plexDays: plexDaysUntilExpiration,
+        iptvExpiration: userData.iptv_expiration, 
+        iptvDays: iptvDaysUntilExpiration
+      });
       
       let processedBody = templateBody
         .replace(/\{\{name\}\}/g, userData.name || '')
