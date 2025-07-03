@@ -222,27 +222,29 @@ updateEmailPreview(userData = null) {
             }
         };
         
-        // Helper function to calculate days until expiration
-        const calculateDaysUntilExpiration = (expirationDate, isFree = false) => {
-            // If it's a free subscription, return ∞
-            if (isFree || !expirationDate || expirationDate === 'FREE' || expirationDate === 'N/A') {
-                return '∞';
-            }
-            try {
-                // Handle both database format (YYYY-MM-DD) and ISO format
-                const expDateStr = expirationDate.split('T')[0]; // Remove time if present
-                const expDate = new Date(expDateStr + 'T00:00:00'); // Add time to avoid timezone issues
-                const today = new Date();
-                today.setHours(0, 0, 0, 0); // Reset time for accurate comparison
-                
-                const timeDiff = expDate.getTime() - today.getTime();
-                const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-                return daysDiff >= 0 ? daysDiff.toString() : '0';
-            } catch (error) {
-                console.error('Error calculating days:', error);
-                return '0';
-            }
-        };
+// Helper function to calculate days until expiration
+const calculateDaysUntilExpiration = (expirationDate, isFree = false) => {
+    // FIXED: Better FREE detection
+    if (isFree || !expirationDate || expirationDate === 'FREE' || expirationDate === 'N/A' || expirationDate === null) {
+        console.log('📅 FREE subscription detected, returning ∞');
+        return '∞';
+    }
+    try {
+        // Handle both database format (YYYY-MM-DD) and ISO format
+        const expDateStr = expirationDate.split('T')[0]; // Remove time if present
+        const expDate = new Date(expDateStr + 'T00:00:00'); // Add time to avoid timezone issues
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Reset time for accurate comparison
+        
+        const timeDiff = expDate.getTime() - today.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        console.log('📅 Calculated days:', daysDiff, 'for expiration:', expirationDate);
+        return daysDiff >= 0 ? daysDiff.toString() : '0';
+    } catch (error) {
+        console.error('Error calculating days:', error);
+        return '0';
+    }
+};
         
         // Get subscription info from user's subscriptions array
         let plexSubscription = null;
@@ -260,12 +262,20 @@ updateEmailPreview(userData = null) {
             plexSubscription = userDataToUse.subscriptions.find(sub => sub.type === 'plex' && sub.status === 'active');
             iptvSubscription = userDataToUse.subscriptions.find(sub => sub.type === 'iptv' && sub.status === 'active');
             
-            if (plexSubscription) {
-                plexSubscriptionName = plexSubscription.subscription_name || 'Plex Subscription';
-                plexPrice = plexSubscription.price || '0.00';
-                plexIsFree = plexSubscription.is_free || false;
-                plexDays = calculateDaysUntilExpiration(plexSubscription.expiration_date, plexIsFree);
-            }
+if (plexSubscription) {
+    plexSubscriptionName = plexSubscription.subscription_name || 'Plex Subscription';
+    plexPrice = plexSubscription.price || '0.00';
+    // FIXED: Better FREE detection for Plex
+    plexIsFree = (plexSubscription.subscription_type_id === null || plexSubscription.price === 0 || plexSubscription.subscription_name === 'FREE Plex Access');
+    console.log('📧 Plex subscription details:', {
+        name: plexSubscriptionName,
+        price: plexPrice,
+        isFree: plexIsFree,
+        subscription_type_id: plexSubscription.subscription_type_id,
+        expiration_date: plexSubscription.expiration_date
+    });
+    plexDays = calculateDaysUntilExpiration(plexSubscription.expiration_date, plexIsFree);
+}
             
             if (iptvSubscription) {
                 iptvSubscriptionName = iptvSubscription.subscription_name || 'IPTV Subscription';
@@ -275,8 +285,9 @@ updateEmailPreview(userData = null) {
             }
         }
         
-        // Check if Plex is FREE from the user expiration field
+// FIXED: Check if Plex is FREE from the user expiration field as fallback
         if (userDataToUse.plex_expiration === 'FREE') {
+            console.log('📧 User plex_expiration is FREE, overriding days calculation');
             plexIsFree = true;
             plexDays = '∞';
         }
@@ -286,6 +297,15 @@ updateEmailPreview(userData = null) {
             iptvIsFree = true;
             iptvDays = '∞';
         }
+
+        console.log('📧 Final calculated values:', {
+            plexExpiration: userDataToUse.plex_expiration,
+            plexIsFree: plexIsFree,
+            plexDays: plexDays,
+            iptvExpiration: userDataToUse.iptv_expiration,
+            iptvIsFree: iptvIsFree,
+            iptvDays: iptvDays
+        });
         
         // Use real user data for preview - FIX: Use actual expiration dates from user object
         previewContent = previewContent

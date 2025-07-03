@@ -231,7 +231,7 @@ const subscriptions = await db.query(`
 
 subscriptions.forEach(sub => {
   if (sub.type === 'plex') {
-    if (sub.price === 0) {  // ✅ FREE Plex determined by price = 0
+    if (sub.subscription_type_id === null) {  // ✅ FREE Plex determined by NULL subscription_type_id (CONSISTENT)
       user.plex_expiration = 'FREE';
     } else {
       // Format date to YYYY-MM-DD only (remove time)
@@ -315,10 +315,10 @@ router.post('/', [
 // Handle Plex subscription (updated for new schema)
 if (plex_subscription && plex_subscription !== 'remove') {
 if (plex_subscription === 'free') {
-  // Use subscription type ID 1 for FREE Plex Access (from init.sql)
+  // Use NULL subscription_type_id for FREE Plex Access (as per schema)
   await db.query(`
     INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
-    VALUES (?, 1, CURDATE(), NULL, 'active')
+    VALUES (?, NULL, CURDATE(), NULL, 'active')
   `, [userId]);
     console.log('✅ Created FREE Plex subscription for user:', userId);
   } else if (plex_expiration) {
@@ -529,9 +529,9 @@ async function cancelAllSubscriptionsOfType(userId, subscriptionType) {
       
 // Step 3: Create FREE Plex subscription (NULL subscription_type_id, no expiration)
 try {
-  await db.query(`
+await db.query(`
     INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
-    VALUES (?, 1, CURDATE(), NULL, 'active')
+    VALUES (?, NULL, CURDATE(), NULL, 'active')
   `, [userId]);
         console.log(`✅ CREATED FREE Plex subscription for user ${userId}`);
       } catch (insertError) {
