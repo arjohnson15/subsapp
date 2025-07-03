@@ -354,39 +354,232 @@ renderUsersTableBasic() {
         }
     },
     
-// Enhanced user modal with better invite status and library access display
 showUserModal(user) {
     const userDetailsDiv = document.getElementById('userDetails');
     if (!userDetailsDiv) return;
     
-    // Check if user has pending invites
-    const hasPendingInvites = this.userHasPendingInvites(user);
-    const inviteStatusHtml = this.showDetailedInviteStatus(user);
+    // Format expiration dates for display
+    const formatDate = (dateStr) => {
+        if (!dateStr) return 'N/A';
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+        });
+    };
+    
+    // Check email preferences
+    const bulkEmailStatus = user.exclude_bulk_emails ? 'Excluded' : 'Included';
+    const automatedEmailStatus = user.exclude_automated_emails ? 'Excluded' : 'Included';
+    const bccOwnerStatus = user.bcc_owner_renewal ? 'Enabled' : 'Disabled';
+    
+    // Format tags for display
+    const tagsHtml = user.tags && user.tags.length > 0 
+        ? user.tags.map(tag => `<span class="tag tag-${tag.toLowerCase().replace(/\s+/g, '')}">${tag}</span>`).join('')
+        : '<span class="status-indicator status-disabled">No tags assigned</span>';
     
     userDetailsDiv.innerHTML = `
-        <div class="info-item"><div class="info-label">Name</div><div class="info-value">${user.name}</div></div>
-        <div class="info-item"><div class="info-label">Email</div><div class="info-value">${user.email}</div></div>
-        <div class="info-item"><div class="info-label">Owner</div><div class="info-value">${user.owner_name || 'N/A'}</div></div>
-        <div class="info-item"><div class="info-label">Tags</div><div class="info-value">${user.tags ? user.tags.join(', ') : 'None'}</div></div>
-        <div class="info-item"><div class="info-label">Plex Email</div><div class="info-value">${user.plex_email || 'N/A'}</div></div>
-        
-        ${hasPendingInvites ? `
-        <div class="info-item invite-status-warning">
-            <div class="info-label"><i class="fas fa-exclamation-triangle"></i> Invite Status</div>
-            <div class="info-value">${inviteStatusHtml}</div>
+        <div class="user-details-container">
+            <div class="user-info-grid">
+                <!-- Basic Information -->
+                <div class="user-info-section">
+                    <div class="section-title">
+                        <i class="fas fa-user"></i>
+                        Basic Information
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-id-card"></i>
+                            Name
+                        </div>
+                        <div class="info-value">${user.name}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-envelope"></i>
+                            Email
+                        </div>
+                        <div class="info-value email">${user.email}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-user-tie"></i>
+                            Owner
+                        </div>
+                        <div class="info-value">${user.owner_name || 'N/A'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-tags"></i>
+                            Tags
+                        </div>
+                        <div class="info-value tag-list">${tagsHtml}</div>
+                    </div>
+                </div>
+
+                <!-- Service Credentials -->
+                <div class="user-info-section">
+                    <div class="section-title">
+                        <i class="fas fa-key"></i>
+                        Service Credentials
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-tv"></i>
+                            IPTV Username
+                        </div>
+                        <div class="info-value">${user.iptv_username || 'N/A'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-mobile-alt"></i>
+                            iMPlayer Code
+                        </div>
+                        <div class="info-value">${user.implayer_code || 'N/A'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-devices"></i>
+                            Device Count
+                        </div>
+                        <div class="info-value">${user.device_count || 1}</div>
+                    </div>
+                </div>
+
+                <!-- Email Preferences -->
+                <div class="user-info-section email-preferences">
+                    <div class="section-title">
+                        <i class="fas fa-mail-bulk"></i>
+                        Email Preferences
+                    </div>
+                    <div class="preference-grid">
+                        <div class="preference-item">
+                            <div class="preference-icon">
+                                <i class="fas fa-${user.exclude_bulk_emails ? 'ban' : 'check'}" 
+                                   style="color: ${user.exclude_bulk_emails ? '#ff9800' : '#4caf50'}"></i>
+                            </div>
+                            <div class="preference-info">
+                                <div class="preference-title">Bulk Emails</div>
+                                <div class="preference-description">${bulkEmailStatus} from group emails</div>
+                            </div>
+                            <div class="status-indicator ${user.exclude_bulk_emails ? 'status-warning' : 'status-enabled'}">
+                                ${bulkEmailStatus}
+                            </div>
+                        </div>
+                        
+                        <div class="preference-item">
+                            <div class="preference-icon">
+                                <i class="fas fa-${user.exclude_automated_emails ? 'ban' : 'check'}" 
+                                   style="color: ${user.exclude_automated_emails ? '#ff9800' : '#4caf50'}"></i>
+                            </div>
+                            <div class="preference-info">
+                                <div class="preference-title">Automated Emails</div>
+                                <div class="preference-description">${automatedEmailStatus} from renewal reminders</div>
+                            </div>
+                            <div class="status-indicator ${user.exclude_automated_emails ? 'status-warning' : 'status-enabled'}">
+                                ${automatedEmailStatus}
+                            </div>
+                        </div>
+                        
+                        <div class="preference-item">
+                            <div class="preference-icon">
+                                <i class="fas fa-${user.bcc_owner_renewal ? 'user-check' : 'user-times'}" 
+                                   style="color: ${user.bcc_owner_renewal ? '#4caf50' : '#9e9e9e'}"></i>
+                            </div>
+                            <div class="preference-info">
+                                <div class="preference-title">Owner BCC</div>
+                                <div class="preference-description">Owner ${bccOwnerStatus.toLowerCase()} on renewals</div>
+                            </div>
+                            <div class="status-indicator ${user.bcc_owner_renewal ? 'status-enabled' : 'status-disabled'}">
+                                ${bccOwnerStatus}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Library Access Section -->
+            <div class="library-access-section">
+                <div class="section-title">
+                    <i class="fas fa-server"></i>
+                    Current Library Access
+                </div>
+                <div id="userLibraryAccess" class="library-status">
+                    <div style="text-align: center; color: #4fc3f7;">
+                        <i class="fas fa-spinner fa-spin"></i> Loading library access...
+                    </div>
+                </div>
+            </div>
         </div>
-        ` : ''}
-        
-        <div class="info-item"><div class="info-label">IPTV Username</div><div class="info-value">${user.iptv_username || 'N/A'}</div></div>
-        <div class="info-item"><div class="info-label">iMPlayer Code</div><div class="info-value">${user.implayer_code || 'N/A'}</div></div>
-        <div class="info-item"><div class="info-label">Device Count</div><div class="info-value">${user.device_count || 'N/A'}</div></div>
     `;
     
-    // Show enhanced library access display
-    this.displayEnhancedLibraryAccess(user);
+    // Load library access
+    this.loadUserLibraryAccess(user);
     
-    document.getElementById('viewUserModal').classList.add('active');
-},
+    // Show modal
+    const modal = document.getElementById('viewUserModal');
+    if (modal) {
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+    }
+}
+
+// Enhanced library access display function - Add to users.js
+loadUserLibraryAccess(user) {
+    const libraryDiv = document.getElementById('userLibraryAccess');
+    if (!libraryDiv) return;
+    
+    // Check if user has Plex libraries configured
+    if (!user.plex_libraries || Object.keys(user.plex_libraries).length === 0) {
+        libraryDiv.innerHTML = `
+            <div class="no-access-message">
+                <i class="fas fa-ban" style="font-size: 2rem; margin-bottom: 10px; opacity: 0.5;"></i>
+                <div>No Plex access configured</div>
+            </div>
+        `;
+        return;
+    }
+    
+    let libraryHtml = '';
+    
+    // Process each server group
+    Object.keys(user.plex_libraries).forEach(serverGroup => {
+        const libraries = user.plex_libraries[serverGroup];
+        if (!libraries || libraries.length === 0) return;
+        
+        libraryHtml += `
+            <div class="server-group">
+                <div class="server-title">
+                    <i class="fas fa-server"></i>
+                    ${serverGroup}
+                </div>
+                <div class="library-list">
+        `;
+        
+        libraries.forEach(library => {
+            const isK4 = library.toLowerCase().includes('4k');
+            const badgeClass = isK4 ? 'k4' : 'regular';
+            libraryHtml += `<span class="library-badge ${badgeClass}">${library}</span>`;
+        });
+        
+        libraryHtml += `
+                </div>
+            </div>
+        `;
+    });
+    
+    if (libraryHtml === '') {
+        libraryDiv.innerHTML = `
+            <div class="no-access-message">
+                <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 10px; opacity: 0.5;"></i>
+                <div>Plex access configured but no libraries assigned</div>
+            </div>
+        `;
+    } else {
+        libraryDiv.innerHTML = libraryHtml;
+    }
+}
 
 // NEW: Enhanced library access display that shows both stored access AND pending status
 displayEnhancedLibraryAccess(user) {
