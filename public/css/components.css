@@ -1247,3 +1247,256 @@ th.sortable .sort-arrow {
         grid-template-columns: 1fr;
     }
 }
+
+/* Add this CSS to your existing components.css file */
+
+/* Check for Plex Access Section Styling */
+#plexAccessCheckSection {
+    margin: 20px 0;
+}
+
+.plex-access-check-container {
+    background: rgba(76, 195, 247, 0.1);
+    border: 1px solid rgba(76, 195, 247, 0.3);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+.plex-access-check-container:hover {
+    background: rgba(76, 195, 247, 0.15);
+    border-color: rgba(76, 195, 247, 0.4);
+}
+
+.plex-access-check-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.plex-access-check-header h4 {
+    color: #4fc3f7;
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.check-access-btn {
+    background: linear-gradient(45deg, #4fc3f7, #8e24aa);
+    border: none;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: none;
+}
+
+.check-access-btn:hover {
+    background: linear-gradient(45deg, #29b6f6, #7b1fa2);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(76, 195, 247, 0.3);
+}
+
+.check-access-btn:active {
+    transform: translateY(0);
+}
+
+.check-access-description {
+    color: #4fc3f7;
+    font-size: 0.9rem;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Results section styling */
+#plexAccessResults {
+    margin-top: 15px;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Success result styling */
+.plex-access-success {
+    background: rgba(76, 175, 79, 0.1);
+    border: 1px solid rgba(76, 175, 79, 0.3);
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.plex-access-success h5 {
+    color: #4caf50;
+    margin: 0 0 10px 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.plex-access-success p {
+    color: #4caf50;
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* Server group details styling */
+.server-group-detail {
+    background: rgba(76, 195, 247, 0.05);
+    border: 1px solid rgba(76, 195, 247, 0.2);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+    transition: all 0.2s ease;
+}
+
+.server-group-detail:hover {
+    background: rgba(76, 195, 247, 0.1);
+    border-color: rgba(76, 195, 247, 0.3);
+}
+
+.server-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.server-group-header h6 {
+    color: #4fc3f7;
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.server-group-count {
+    color: #4fc3f7;
+    font-size: 0.8rem;
+    background: rgba(76, 195, 247, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.server-group-stats {
+    font-size: 0.8rem;
+    color: #4fc3f7;
+    margin-bottom: 5px;
+}
+
+.server-group-libraries {
+    font-size: 0.75rem;
+    color: rgba(76, 195, 247, 0.8);
+    line-height: 1.3;
+    font-style: italic;
+}
+
+/* Warning/No access styling */
+.plex-access-warning {
+    background: rgba(255, 152, 0, 0.1);
+    border: 1px solid rgba(255, 152, 0, 0.3);
+    border-radius: 6px;
+    padding: 15px;
+}
+
+.plex-access-warning h5 {
+    color: #ff9800;
+    margin: 0 0 10px 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.plex-access-warning p {
+    color: #ff9800;
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* Info/Auto-selection notice styling */
+.plex-access-info {
+    background: rgba(156, 39, 176, 0.1);
+    border: 1px solid rgba(156, 39, 176, 0.3);
+    border-radius: 6px;
+    padding: 12px;
+    margin-top: 15px;
+}
+
+.plex-access-info p {
+    color: #9c27b0;
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* Error styling */
+.plex-access-error {
+    background: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    border-radius: 6px;
+    padding: 15px;
+}
+
+.plex-access-error p {
+    color: #f44336;
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* Loading state for button */
+.check-access-btn .loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.check-access-btn .loading::before {
+    content: "";
+    width: 12px;
+    height: 12px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .plex-access-check-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .check-access-btn {
+        align-self: stretch;
+        text-align: center;
+    }
+    
+    .server-group-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+}
+
+/* Integration with existing form styling */
+.form-group #plexAccessCheckSection {
+    margin-top: 0;
+}
+
+/* Ensure proper spacing with library sections */
+#plexAccessCheckSection + .form-group {
+    margin-top: 25px;
+}

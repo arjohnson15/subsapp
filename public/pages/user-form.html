@@ -31,17 +31,33 @@
             <label>Tags:</label>
             <div class="checkbox-group">
                 <div class="checkbox-item">
-                    <input type="checkbox" id="tag-plex1" name="tags" value="Plex 1">
+                    <input type="checkbox" id="tag-plex1" name="tags" value="Plex 1" onchange="updatePlexAccessCheckVisibility()">
                     <label for="tag-plex1">Plex 1</label>
                 </div>
                 <div class="checkbox-item">
-                    <input type="checkbox" id="tag-plex2" name="tags" value="Plex 2">
+                    <input type="checkbox" id="tag-plex2" name="tags" value="Plex 2" onchange="updatePlexAccessCheckVisibility()">
                     <label for="tag-plex2">Plex 2</label>
                 </div>
                 <div class="checkbox-item">
                     <input type="checkbox" id="tag-iptv" name="tags" value="IPTV">
                     <label for="tag-iptv">IPTV</label>
                 </div>
+            </div>
+        </div>
+
+        <!-- CHECK FOR PLEX ACCESS SECTION -->
+        <div class="form-group" id="plexAccessCheckSection" style="display: none;">
+            <div class="plex-access-check-container">
+                <div class="plex-access-check-header">
+                    <h4>Check Existing Plex Access</h4>
+                    <button type="button" class="check-access-btn" onclick="checkExistingPlexAccess()">
+                        <span id="checkAccessBtnText">🔍 Check for Plex Access</span>
+                    </button>
+                </div>
+                <p class="check-access-description">
+                    Use this if you've already invited this user to Plex and want to detect their current library access.
+                </p>
+                <div id="plexAccessResults" style="display: none;"></div>
             </div>
         </div>
 

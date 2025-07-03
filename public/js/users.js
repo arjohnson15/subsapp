@@ -1862,8 +1862,199 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
             console.error('❌ Debug failed:', error);
             Utils.handleError(error, 'Debug user access');
         }
+    },
+	
+	// Check for Plex Access Methods - NEW FUNCTIONALITY
+    checkExistingPlexAccess: async function(email) {
+        try {
+            console.log('🔍 Checking existing Plex access for:', email);
+            
+            const response = await API.call(`/plex/user-access/${encodeURIComponent(email)}`);
+            
+            console.log('📊 Received access data:', response);
+            return response;
+            
+        } catch (error) {
+            console.error('❌ Error checking Plex access:', error);
+            throw error;
+        }
+    },
+
+    displayPlexAccessResults: function(accessData, email) {
+        const resultsDiv = document.getElementById('plexAccessResults');
+        
+        if (!resultsDiv) {
+            console.warn('⚠️ Results div not found');
+            return;
+        }
+        
+        // Count total libraries
+        let totalLibraries = 0;
+        let hasAnyAccess = false;
+        let serverGroups = [];
+        
+        for (const [serverGroup, groupData] of Object.entries(accessData)) {
+            const regularCount = groupData.regular ? groupData.regular.length : 0;
+            const fourkCount = groupData.fourk ? groupData.fourk.length : 0;
+            const groupTotal = regularCount + fourkCount;
+            
+            if (groupTotal > 0) {
+                hasAnyAccess = true;
+                serverGroups.push({
+                    name: serverGroup,
+                    regular: regularCount,
+                    fourk: fourkCount,
+                    total: groupTotal,
+                    regularLibs: groupData.regular || [],
+                    fourkLibs: groupData.fourk || []
+                });
+            }
+            
+            totalLibraries += groupTotal;
+        }
+        
+        let html = '';
+        
+        if (hasAnyAccess) {
+            html += `
+                <div class="plex-access-success">
+                    <h5>✅ Found Existing Plex Access!</h5>
+                    <p>User <strong>${email}</strong> has access to <strong>${totalLibraries}</strong> libraries across <strong>${serverGroups.length}</strong> server group(s).</p>
+                </div>
+            `;
+            
+            // Show details for each server group
+            for (const group of serverGroups) {
+                const serverName = group.name === 'plex1' ? 'Plex 1' : 'Plex 2';
+                html += `
+                    <div class="server-group-detail">
+                        <div class="server-group-header">
+                            <h6>${serverName}</h6>
+                            <span class="server-group-count">${group.total} libraries</span>
+                        </div>
+                        <div class="server-group-stats">
+                            ${group.regular > 0 ? `Regular: ${group.regular} libraries` : ''}
+                            ${group.regular > 0 && group.fourk > 0 ? ' • ' : ''}
+                            ${group.fourk > 0 ? `4K: ${group.fourk} libraries` : ''}
+                        </div>
+                        <div class="server-group-libraries">
+                            ${group.regularLibs.map(lib => lib.title || `Library ${lib.id}`).join(', ')}
+                            ${group.regularLibs.length > 0 && group.fourkLibs.length > 0 ? ', ' : ''}
+                            ${group.fourkLibs.map(lib => `${lib.title || `Library ${lib.id}`} (4K)`).join(', ')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += `
+                <div class="plex-access-info">
+                    <p>💡 <strong>Auto-Selection:</strong> The detected libraries have been automatically selected below. You can modify the selection as needed.</p>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="plex-access-warning">
+                    <h5>⚠️ No Plex Access Found</h5>
+                    <p>User <strong>${email}</strong> doesn't appear to have access to any Plex libraries yet. You can manually select libraries below to invite them.</p>
+                </div>
+            `;
+        }
+        
+        resultsDiv.innerHTML = html;
+        resultsDiv.style.display = 'block';
+    },
+
+    autoSelectDetectedLibraries: function(accessData) {
+        console.log('🎯 Auto-selecting detected libraries...');
+        
+        for (const [serverGroup, groupData] of Object.entries(accessData)) {
+            const regularLibs = groupData.regular || [];
+            const fourkLibs = groupData.fourk || [];
+            
+            if (regularLibs.length > 0 || fourkLibs.length > 0) {
+                console.log(`📚 Auto-selecting libraries for ${serverGroup}:`, { regular: regularLibs.length, fourk: fourkLibs.length });
+                
+                // Make sure the library section is visible
+                const libraryGroup = document.getElementById(`${serverGroup}LibraryGroup`);
+                if (libraryGroup && libraryGroup.style.display === 'none') {
+                    libraryGroup.style.display = 'block';
+                }
+                
+                // Load the libraries first, then select after a delay to ensure they're rendered
+                if (window.loadPlexLibrariesForGroup) {
+                    window.loadPlexLibrariesForGroup(serverGroup).then(() => {
+                        // Multiple attempts with increasing delays to ensure checkboxes are rendered
+                        setTimeout(() => this.selectLibrariesById(serverGroup, regularLibs, fourkLibs), 500);
+                        setTimeout(() => this.selectLibrariesById(serverGroup, regularLibs, fourkLibs), 1000);
+                        setTimeout(() => this.selectLibrariesById(serverGroup, regularLibs, fourkLibs), 2000);
+                    });
+                }
+            }
+        }
+    },
+
+    selectLibrariesById: function(serverGroup, regularLibs, fourkLibs) {
+        console.log(`🎯 Selecting libraries for ${serverGroup}:`, { regularLibs, fourkLibs });
+        
+        let selectedCount = 0;
+        
+        // Select regular libraries
+        regularLibs.forEach(lib => {
+            // Try multiple possible checkbox selectors
+            const selectors = [
+                `input[name="${serverGroup}RegularLibraries"][value="${lib.id}"]`,
+                `input[data-library-id="${lib.id}"][data-server-group="${serverGroup}"][data-library-type="regular"]`,
+                `#${serverGroup}RegularLibrariesList input[value="${lib.id}"]`,
+                `input[name="${serverGroup}_regular"][value="${lib.id}"]`
+            ];
+            
+            let checkbox = null;
+            for (const selector of selectors) {
+                checkbox = document.querySelector(selector);
+                if (checkbox) break;
+            }
+            
+            if (checkbox) {
+                checkbox.checked = true;
+                selectedCount++;
+                console.log(`✅ Selected regular library: ${lib.title || lib.id}`);
+            } else {
+                console.log(`⚠️ Regular library checkbox not found for: ${lib.title || lib.id} (ID: ${lib.id})`);
+            }
+        });
+        
+        // Select 4K libraries
+        fourkLibs.forEach(lib => {
+            // Try multiple possible checkbox selectors
+            const selectors = [
+                `input[name="${serverGroup}FourkLibraries"][value="${lib.id}"]`,
+                `input[data-library-id="${lib.id}"][data-server-group="${serverGroup}"][data-library-type="fourk"]`,
+                `#${serverGroup}FourkLibrariesList input[value="${lib.id}"]`,
+                `input[name="${serverGroup}_fourk"][value="${lib.id}"]`
+            ];
+            
+            let checkbox = null;
+            for (const selector of selectors) {
+                checkbox = document.querySelector(selector);
+                if (checkbox) break;
+            }
+            
+            if (checkbox) {
+                checkbox.checked = true;
+                selectedCount++;
+                console.log(`✅ Selected 4K library: ${lib.title || lib.id}`);
+            } else {
+                console.log(`⚠️ 4K library checkbox not found for: ${lib.title || lib.id} (ID: ${lib.id})`);
+            }
+        });
+        
+        console.log(`📊 Auto-selected ${selectedCount} libraries for ${serverGroup}`);
+        
+        return selectedCount;
     }
+	
 };
+
 
 // Override the global showUserForm function to fix new user pre-population
 window.showUserForm = function() {
@@ -2293,3 +2484,79 @@ window.saveUser = function(event) {
 };
 
 console.log('👥 Users module loaded successfully');
+
+// Global function that can be called from the HTML
+window.checkExistingPlexAccess = async function() {
+    const plexEmailField = document.getElementById('plexEmail');
+    const emailField = document.getElementById('userEmail');
+    const btnText = document.getElementById('checkAccessBtnText');
+    const resultsDiv = document.getElementById('plexAccessResults');
+    
+    // Get email to check
+    const emailToCheck = plexEmailField.value.trim() || emailField.value.trim();
+    
+    if (!emailToCheck) {
+        Utils.showNotification('Please enter a Plex email or regular email first', 'error');
+        return;
+    }
+    
+    // Update button state
+    btnText.innerHTML = '🔄 Checking...';
+    
+    try {
+        console.log('🔍 Checking existing Plex access for:', emailToCheck);
+        
+        // Use the Users method
+        const accessData = await window.Users.checkExistingPlexAccess(emailToCheck);
+        
+        console.log('📊 Received access data:', accessData);
+        
+        // Show results
+        window.Users.displayPlexAccessResults(accessData, emailToCheck);
+        
+        // Auto-select detected libraries
+        window.Users.autoSelectDetectedLibraries(accessData);
+        
+        Utils.showNotification('Plex access check completed!', 'success');
+        
+    } catch (error) {
+        console.error('❌ Error checking Plex access:', error);
+        Utils.showNotification('Error checking Plex access: ' + error.message, 'error');
+        
+        // Show error in results
+        if (resultsDiv) {
+            resultsDiv.innerHTML = `
+                <div class="plex-access-error">
+                    <p>❌ Error: ${error.message}</p>
+                </div>
+            `;
+            resultsDiv.style.display = 'block';
+        }
+    } finally {
+        // Reset button
+        btnText.innerHTML = '🔍 Check for Plex Access';
+    }
+};
+
+// Function to show/hide the check access section when Plex tags are selected
+window.updatePlexAccessCheckVisibility = function() {
+    const plex1Checkbox = document.getElementById('tag-plex1');
+    const plex2Checkbox = document.getElementById('tag-plex2');
+    const checkSection = document.getElementById('plexAccessCheckSection');
+    
+    if (!checkSection) return;
+    
+    const hasPlexTags = (plex1Checkbox && plex1Checkbox.checked) || (plex2Checkbox && plex2Checkbox.checked);
+    
+    if (hasPlexTags) {
+        checkSection.style.display = 'block';
+    } else {
+        checkSection.style.display = 'none';
+        // Clear any previous results
+        const resultsDiv = document.getElementById('plexAccessResults');
+        if (resultsDiv) {
+            resultsDiv.style.display = 'none';
+            resultsDiv.innerHTML = '';
+        }
+    }
+};
