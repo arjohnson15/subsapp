@@ -273,12 +273,13 @@ router.post('/', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { 
-      name, email, owner_id, plex_email, iptv_username, iptv_password, 
-      implayer_code, device_count, bcc_owner_renewal, tags, plex_libraries,
-      plex_subscription, plex_expiration, plex_is_free,
-      iptv_subscription, iptv_expiration, iptv_is_free
-    } = req.body;
+const { 
+  name, email, owner_id, plex_email, iptv_username, iptv_password, 
+  implayer_code, device_count, bcc_owner_renewal, exclude_bulk_emails, exclude_automated_emails,
+  tags, plex_libraries,
+  plex_subscription, plex_expiration, plex_is_free,
+  iptv_subscription, iptv_expiration, iptv_is_free
+} = req.body;
 
     console.log('🔄 Creating user with subscription data:', {
       name, email, plex_subscription, plex_expiration, plex_is_free,
@@ -289,20 +290,21 @@ router.post('/', [
     const transactionQueries = [];
 
     // Insert user query
-    transactionQueries.push({
-      sql: `
-        INSERT INTO users (
-          name, email, owner_id, plex_email, iptv_username, iptv_password, 
-          implayer_code, device_count, bcc_owner_renewal, tags, plex_libraries
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      params: [
-        name, email, owner_id || null, plex_email || null,
-        iptv_username || null, iptv_password || null, implayer_code || null,
-        device_count || 1, bcc_owner_renewal || false,
-        JSON.stringify(tags || []), JSON.stringify(plex_libraries || {})
-      ]
-    });
+transactionQueries.push({
+  sql: `
+    INSERT INTO users (
+      name, email, owner_id, plex_email, iptv_username, iptv_password, 
+      implayer_code, device_count, bcc_owner_renewal, exclude_bulk_emails, exclude_automated_emails,
+      tags, plex_libraries
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `,
+  params: [
+    name, email, owner_id || null, plex_email || null,
+    iptv_username || null, iptv_password || null, implayer_code || null,
+    device_count || 1, bcc_owner_renewal || false, exclude_bulk_emails || false, exclude_automated_emails || false,
+    JSON.stringify(tags || []), JSON.stringify(plex_libraries || {})
+  ]
+});
 
     // Execute user creation first to get ID
     const result = await db.transaction(transactionQueries);
@@ -382,9 +384,6 @@ if (iptv_subscription && iptv_subscription !== 'remove' && iptv_expiration) {
   }
 });
 
-// Update user - FIXED subscription validation and transaction handling
-// This is the section you need to replace in your users-routes.js file
-// Replace the PUT route (router.put('/:id', ...) section that handles subscription updates
 
 // Update user - FIXED subscription validation and transaction handling
 router.put('/:id', [
@@ -422,13 +421,14 @@ router.put('/:id', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const {
-      name, email, owner_id, plex_email,
-      iptv_username, iptv_password, implayer_code, device_count,
-      bcc_owner_renewal, tags, plex_libraries, _skipTagProcessing,
-      plex_subscription, plex_expiration, plex_is_free,
-      iptv_subscription, iptv_expiration, iptv_is_free
-    } = req.body;
+const {
+  name, email, owner_id, plex_email,
+  iptv_username, iptv_password, implayer_code, device_count,
+  bcc_owner_renewal, exclude_bulk_emails, exclude_automated_emails,
+  tags, plex_libraries, _skipTagProcessing,
+  plex_subscription, plex_expiration, plex_is_free,
+  iptv_subscription, iptv_expiration, iptv_is_free
+} = req.body;
 
     console.log('🔄 Updating user with subscription data:', {
       userId: req.params.id, plex_subscription, plex_expiration, plex_is_free,
@@ -455,18 +455,20 @@ router.put('/:id', [
     }
 
     // Update user information
-    await db.query(`
-      UPDATE users SET 
-        name = ?, email = ?, owner_id = ?, plex_email = ?, 
-        iptv_username = ?, iptv_password = ?, implayer_code = ?, device_count = ?,
-        bcc_owner_renewal = ?, tags = ?, plex_libraries = ?
-      WHERE id = ?
-    `, [
-      name, email, owner_id || null, plex_email || null,
-      iptv_username || null, iptv_password || null, implayer_code || null, device_count || 1,
-      bcc_owner_renewal || false, JSON.stringify(finalTags), JSON.stringify(plex_libraries || {}),
-      req.params.id
-    ]);
+await db.query(`
+  UPDATE users SET 
+    name = ?, email = ?, owner_id = ?, plex_email = ?, 
+    iptv_username = ?, iptv_password = ?, implayer_code = ?, device_count = ?,
+    bcc_owner_renewal = ?, exclude_bulk_emails = ?, exclude_automated_emails = ?,
+    tags = ?, plex_libraries = ?
+  WHERE id = ?
+`, [
+  name, email, owner_id || null, plex_email || null,
+  iptv_username || null, iptv_password || null, implayer_code || null, device_count || 1,
+  bcc_owner_renewal || false, exclude_bulk_emails || false, exclude_automated_emails || false,
+  JSON.stringify(finalTags), JSON.stringify(plex_libraries || {}),
+  req.params.id
+]);
 
     console.log('✅ Updated user basic info for ID:', req.params.id);
 
@@ -620,10 +622,11 @@ await db.query(`
 router.put('/:id/enhanced', async (req, res) => {
   try {
     const userId = req.params.id;
-    const {
-      name, email, owner_id, plex_email, iptv_username, iptv_password, 
-      implayer_code, device_count, bcc_owner_renewal, plex_libraries
-    } = req.body;
+const {
+  name, email, owner_id, plex_email, iptv_username, iptv_password, 
+  implayer_code, device_count, bcc_owner_renewal, exclude_bulk_emails, exclude_automated_emails,
+  plex_libraries
+} = req.body;
 
     // Validate required fields
     if (!name || !email) {
@@ -644,18 +647,19 @@ router.put('/:id/enhanced', async (req, res) => {
     const libraryData = plex_libraries ? JSON.stringify(plex_libraries) : null;
 
     // Update user
-    await db.query(`
-      UPDATE users SET
-        name = ?, email = ?, owner_id = ?, plex_email = ?, 
-        iptv_username = ?, iptv_password = ?, implayer_code = ?, 
-        device_count = ?, bcc_owner_renewal = ?, plex_libraries = ?, 
-        updated_at = NOW()
-      WHERE id = ?
-    `, [
-      name, email, owner_id || null, plex_email || null,
-      iptv_username || null, iptv_password || null, implayer_code || null,
-      device_count || 1, bcc_owner_renewal || false, libraryData, userId
-    ]);
+await db.query(`
+  UPDATE users SET
+    name = ?, email = ?, owner_id = ?, plex_email = ?, 
+    iptv_username = ?, iptv_password = ?, implayer_code = ?, 
+    device_count = ?, bcc_owner_renewal = ?, exclude_bulk_emails = ?, exclude_automated_emails = ?,
+    plex_libraries = ?, updated_at = NOW()
+  WHERE id = ?
+`, [
+  name, email, owner_id || null, plex_email || null,
+  iptv_username || null, iptv_password || null, implayer_code || null,
+  device_count || 1, bcc_owner_renewal || false, exclude_bulk_emails || false, exclude_automated_emails || false,
+  libraryData, userId
+]);
 
     // If user has Plex access, sync their pending invites immediately
     if (plex_email && plex_libraries && Object.keys(plex_libraries).length > 0) {

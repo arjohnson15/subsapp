@@ -345,29 +345,71 @@ renderUsersTableBasic() {
         });
     },
     
-    async viewUser(userId) {
-        try {
-            const user = await API.User.getById(userId);
-            this.showUserModal(user);
-        } catch (error) {
-            Utils.handleError(error, 'Loading user details');
-        }
-    },
+
+async viewUser(userId) {
+    try {
+        // Ensure subscription types are loaded first
+        await this.ensureSubscriptionTypesLoaded();
+        
+        // Then get the user data
+        const user = await API.User.getById(userId);
+        this.showUserModal(user);
+    } catch (error) {
+        Utils.handleError(error, 'Loading user details');
+    }
+},
     
+// Enhanced user modal with proper subscription type name resolution
 showUserModal(user) {
     const userDetailsDiv = document.getElementById('userDetails');
     if (!userDetailsDiv) return;
     
-    // Format expiration dates for display
+    // Helper functions
     const formatDate = (dateStr) => {
-        if (!dateStr) return 'N/A';
-        const date = new Date(dateStr);
-        return date.toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric' 
-        });
+        if (!dateStr || dateStr === 'FREE') return 'N/A';
+        try {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+            });
+        } catch (error) {
+            return dateStr;
+        }
     };
+    
+    const isDateExpired = (dateString) => {
+        if (!dateString || dateString === 'FREE') return false;
+        const expirationDate = new Date(dateString);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return expirationDate < today;
+    };
+    
+    // Function to get subscription type name by ID
+    const getSubscriptionTypeName = (subscriptionTypeId) => {
+        if (!subscriptionTypeId) return 'N/A';
+        
+        // Handle special cases
+        if (subscriptionTypeId === 'free' || subscriptionTypeId === 'FREE') return 'FREE';
+        if (subscriptionTypeId === 'remove') return 'Removed';
+        
+        // Try to find the subscription type in our global state
+        const subscriptionTypes = window.AppState?.subscriptionTypes || [];
+        const subscriptionType = subscriptionTypes.find(sub => sub.id == subscriptionTypeId);
+        
+        if (subscriptionType) {
+            return subscriptionType.name;
+        }
+        
+        // If not found in cache, return the ID with a note
+        return `Subscription #${subscriptionTypeId}`;
+    };
+    
+    // Get subscription type names
+    const plexSubscriptionName = getSubscriptionTypeName(user.plex_subscription);
+    const iptvSubscriptionName = getSubscriptionTypeName(user.iptv_subscription);
     
     // Check email preferences
     const bulkEmailStatus = user.exclude_bulk_emails ? 'Excluded' : 'Included';
@@ -378,6 +420,10 @@ showUserModal(user) {
     const tagsHtml = user.tags && user.tags.length > 0 
         ? user.tags.map(tag => `<span class="tag tag-${tag.toLowerCase().replace(/\s+/g, '')}">${tag}</span>`).join('')
         : '<span class="status-indicator status-disabled">No tags assigned</span>';
+    
+    // Check for pending invites
+    const hasPendingInvites = this.userHasPendingInvites(user);
+    const inviteStatusHtml = this.showDetailedInviteStatus(user);
     
     userDetailsDiv.innerHTML = `
         <div class="user-details-container">
@@ -426,6 +472,13 @@ showUserModal(user) {
                     </div>
                     <div class="info-item">
                         <div class="info-label">
+                            <i class="fas fa-play"></i>
+                            Plex Email
+                        </div>
+                        <div class="info-value email">${user.plex_email || 'N/A'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">
                             <i class="fas fa-tv"></i>
                             IPTV Username
                         </div>
@@ -447,7 +500,68 @@ showUserModal(user) {
                     </div>
                 </div>
 
-                <!-- Email Preferences -->
+                <!-- Subscription Information -->
+                <div class="user-info-section">
+                    <div class="section-title">
+                        <i class="fas fa-calendar"></i>
+                        Plex Subscription
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-bookmark"></i>
+                            Type
+                        </div>
+                        <div class="info-value">${plexSubscriptionName}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-calendar-alt"></i>
+                            Expiration
+                        </div>
+                        <div class="info-value">
+                            ${user.plex_expiration === 'FREE' ? 
+                                '<span class="status-indicator status-enabled">FREE</span>' :
+                                user.plex_expiration ? 
+                                    (isDateExpired(user.plex_expiration) ? 
+                                        `<span class="status-indicator status-warning">${formatDate(user.plex_expiration)} (Expired)</span>` :
+                                        `<span class="status-indicator status-enabled">${formatDate(user.plex_expiration)}</span>`
+                                    ) : 'N/A'
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="user-info-section">
+                    <div class="section-title">
+                        <i class="fas fa-tv"></i>
+                        IPTV Subscription
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-bookmark"></i>
+                            Type
+                        </div>
+                        <div class="info-value">${iptvSubscriptionName}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-calendar-alt"></i>
+                            Expiration
+                        </div>
+                        <div class="info-value">
+                            ${user.iptv_expiration === 'FREE' ? 
+                                '<span class="status-indicator status-enabled">FREE</span>' :
+                                user.iptv_expiration ? 
+                                    (isDateExpired(user.iptv_expiration) ? 
+                                        `<span class="status-indicator status-warning">${formatDate(user.iptv_expiration)} (Expired)</span>` :
+                                        `<span class="status-indicator status-enabled">${formatDate(user.iptv_expiration)}</span>`
+                                    ) : 'N/A'
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Email Preferences Section -->
                 <div class="user-info-section email-preferences">
                     <div class="section-title">
                         <i class="fas fa-mail-bulk"></i>
@@ -511,6 +625,17 @@ showUserModal(user) {
                     </div>
                 </div>
             </div>
+
+            ${hasPendingInvites ? `
+                <div class="invite-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <div>
+                        <strong>Pending Plex Invitations Detected</strong>
+                        <small>This user has pending library invitations that need to be accepted.</small>
+                        ${inviteStatusHtml}
+                    </div>
+                </div>
+            ` : ''}
         </div>
     `;
     
@@ -522,6 +647,21 @@ showUserModal(user) {
     if (modal) {
         modal.classList.add('active');
         modal.style.display = 'flex';
+    }
+},
+
+// Add this helper function to ensure subscription types are loaded
+async ensureSubscriptionTypesLoaded() {
+    if (!window.AppState?.subscriptionTypes || window.AppState.subscriptionTypes.length === 0) {
+        try {
+            console.log('📊 Loading subscription types for modal...');
+            const subscriptionTypes = await API.call('/subscriptions');
+            window.AppState.subscriptionTypes = subscriptionTypes;
+            console.log('✅ Subscription types loaded:', subscriptionTypes.length);
+        } catch (error) {
+            console.error('❌ Error loading subscription types:', error);
+            window.AppState.subscriptionTypes = [];
+        }
     }
 },
 
