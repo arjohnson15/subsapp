@@ -1500,3 +1500,75 @@ th.sortable .sort-arrow {
 #plexAccessCheckSection + .form-group {
     margin-top: 25px;
 }
+
+/* Library section stacking and spacing */
+.library-section {
+    margin-bottom: 15px;
+}
+
+.library-section h6 {
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    color: #4fc3f7;
+}
+
+.library-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.library-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.library-badge.regular {
+    background-color: #4caf50;
+    color: white;
+}
+
+.library-badge.k4 {
+    background-color: #ff9800;
+    color: white;
+}
+
+/* Server group vertical stacking */
+.server-group {
+    margin-bottom: 20px;
+}
+
+.server-title {
+    margin-bottom: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #4fc3f7;
+}
+
+.library-list {
+    padding-left: 0;
+}
+
+/* Add padding to info values for better text spacing */
+.info-value {
+    padding-right: 15px;
+    word-break: break-word;
+}
+
+.info-value.email {
+    padding-right: 15px;
+}
+
+/* Ensure proper spacing in all text fields */
+.user-info-section .info-item {
+    margin-bottom: 12px;
+}
+
+.user-info-section .info-item:last-child {
+    margin-bottom: 0;
+}

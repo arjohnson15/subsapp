@@ -484,20 +484,13 @@ showUserModal(user) {
                         </div>
                         <div class="info-value">${user.iptv_username || 'N/A'}</div>
                     </div>
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-mobile-alt"></i>
-                            iMPlayer Code
-                        </div>
-                        <div class="info-value">${user.implayer_code || 'N/A'}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-devices"></i>
-                            Device Count
-                        </div>
-                        <div class="info-value">${user.device_count || 1}</div>
-                    </div>
+<div class="info-item">
+    <div class="info-label">
+        <i class="fas fa-lock"></i>
+        IPTV Password
+    </div>
+    <div class="info-value">${user.iptv_password || 'N/A'}</div>
+</div>
                 </div>
 
                 <!-- Subscription Information -->
@@ -683,31 +676,112 @@ loadUserLibraryAccess(user) {
     
     let libraryHtml = '';
     
-    // Process each server group
-    Object.keys(user.plex_libraries).forEach(serverGroup => {
-        const libraries = user.plex_libraries[serverGroup];
-        if (!libraries || libraries.length === 0) return;
-        
-        libraryHtml += `
-            <div class="server-group">
-                <div class="server-title">
-                    <i class="fas fa-server"></i>
-                    ${serverGroup}
-                </div>
-                <div class="library-list">
-        `;
-        
-        libraries.forEach(library => {
-            const isK4 = library.toLowerCase().includes('4k');
-            const badgeClass = isK4 ? 'k4' : 'regular';
-            libraryHtml += `<span class="library-badge ${badgeClass}">${library}</span>`;
-        });
-        
-        libraryHtml += `
-                </div>
+// Process each server group
+Object.keys(user.plex_libraries).forEach(serverGroup => {
+    const serverAccess = user.plex_libraries[serverGroup];
+    
+    // Check if this server group has any libraries
+    const hasRegularLibs = serverAccess.regular && Array.isArray(serverAccess.regular) && serverAccess.regular.length > 0;
+    const hasFourkLibs = serverAccess.fourk && Array.isArray(serverAccess.fourk) && serverAccess.fourk.length > 0;
+    
+    if (!hasRegularLibs && !hasFourkLibs) return;
+    
+    libraryHtml += `
+        <div class="server-group">
+            <div class="server-title">
+                <i class="fas fa-server"></i>
+                ${serverGroup.toUpperCase()}
             </div>
-        `;
-    });
+            <div class="library-list">
+    `;
+    
+    // Process regular libraries
+    if (hasRegularLibs) {
+        libraryHtml += `<div class="library-section">
+            <h6>Regular Libraries (${serverAccess.regular.length})</h6>
+            <div class="library-items">`;
+        
+serverAccess.regular.forEach(library => {
+    // Handle both object and string formats
+    let libraryName;
+    let libraryId;
+    
+    if (typeof library === 'object' && library !== null) {
+        // Library is stored as an object
+        libraryName = library.title || library.name || `Library ${library.id}`;
+        libraryId = library.id;
+    } else {
+        // Library is stored as just an ID string
+        libraryId = library;
+        
+        // Try to get library name from available libraries
+        const availableLibraries = window.AppState?.plexLibraries || {};
+        const serverLibs = availableLibraries[serverGroup];
+        
+        if (serverLibs) {
+            const regularLib = serverLibs.regular?.find(lib => lib.id === libraryId || lib.id === String(libraryId));
+            if (regularLib) {
+                libraryName = regularLib.title || regularLib.name || `Library ${libraryId}`;
+            } else {
+                libraryName = `Library ${libraryId}`;
+            }
+        } else {
+            libraryName = `Library ${libraryId}`;
+        }
+    }
+    
+    libraryHtml += `<span class="library-badge regular">${libraryName}</span>`;
+});
+
+        libraryHtml += `</div></div>`;
+    }
+    
+    // Process 4K libraries
+    if (hasFourkLibs) {
+        libraryHtml += `<div class="library-section">
+            <h6>4K Libraries (${serverAccess.fourk.length})</h6>
+            <div class="library-items">`;
+        
+serverAccess.fourk.forEach(library => {
+    // Handle both object and string formats
+    let libraryName;
+    let libraryId;
+    
+    if (typeof library === 'object' && library !== null) {
+        // Library is stored as an object
+        libraryName = library.title || library.name || `Library ${library.id}`;
+        libraryId = library.id;
+    } else {
+        // Library is stored as just an ID string
+        libraryId = library;
+        
+        // Try to get library name from available libraries
+        const availableLibraries = window.AppState?.plexLibraries || {};
+        const serverLibs = availableLibraries[serverGroup];
+        
+        if (serverLibs) {
+            const fourkLib = serverLibs.fourk?.find(lib => lib.id === libraryId || lib.id === String(libraryId));
+            if (fourkLib) {
+                libraryName = fourkLib.title || fourkLib.name || `Library ${libraryId}`;
+            } else {
+                libraryName = `Library ${libraryId}`;
+            }
+        } else {
+            libraryName = `Library ${libraryId}`;
+        }
+    }
+    
+    libraryHtml += `<span class="library-badge k4">${libraryName}</span>`;
+});
+        
+        libraryHtml += `</div></div>`;
+    }
+    
+    libraryHtml += `
+            </div>
+        </div>
+    `;
+});
     
     if (libraryHtml === '') {
         libraryDiv.innerHTML = `
