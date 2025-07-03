@@ -142,12 +142,16 @@ const subscriptions = await db.query(`
       const pendingPlexInvites = safeJsonParse(user.pending_plex_invites, null); // ADD THIS LINE
 
 // Calculate subscription expirations
+// Calculate subscription expirations and names
 let plexExpiration = null;
 let iptvExpiration = null;
+let plexSubscription = null;
+let iptvSubscription = null;
 
 for (const sub of subscriptions) {
   if (sub.type === 'plex') {
-    if (sub.subscription_type_id === null) {  // FREE Plex determined by NULL subscription_type_id
+    plexSubscription = sub.subscription_name; // Add subscription name
+    if (sub.subscription_type_id === null) {
       plexExpiration = 'FREE';
       break;
     } else if (!plexExpiration || new Date(sub.expiration_date) > new Date(plexExpiration)) {
@@ -156,7 +160,7 @@ for (const sub of subscriptions) {
         null;
     }
   } else if (sub.type === 'iptv') {
-    // IPTV is never free, so always show expiration date
+    iptvSubscription = sub.subscription_name; // Add subscription name
     if (!iptvExpiration || new Date(sub.expiration_date) > new Date(iptvExpiration)) {
       iptvExpiration = sub.expiration_date ? 
         new Date(sub.expiration_date).toISOString().split('T')[0] : 
@@ -165,15 +169,17 @@ for (const sub of subscriptions) {
   }
 }
 
-      return {
-        ...user,
-        tags,
-        plex_libraries: plexLibraries,
-        pending_plex_invites: pendingPlexInvites, // ADD THIS LINE
-        subscriptions,
-        plex_expiration: plexExpiration,
-        iptv_expiration: iptvExpiration
-      };
+return {
+  ...user,
+  tags,
+  plex_libraries: plexLibraries,
+  pending_plex_invites: pendingPlexInvites,
+  subscriptions,
+  plex_subscription: plexSubscription,  // ADD THIS
+  iptv_subscription: iptvSubscription,  // ADD THIS
+  plex_expiration: plexExpiration,
+  iptv_expiration: iptvExpiration
+};
     }));
 
     res.json(processedUsers);
@@ -200,6 +206,7 @@ router.get('/:id', async (req, res) => {
     }
 
 // Get user's subscriptions - FIXED to include FREE subscriptions
+// Get user's subscriptions - ENHANCED to include subscription type names
 const subscriptions = await db.query(`
   SELECT s.*, 
          CASE 
@@ -229,23 +236,35 @@ const subscriptions = await db.query(`
     user.plex_expiration = null;
     user.iptv_expiration = null;
 
+// Add subscription type names and expiration dates
+user.plex_subscription = null;
+user.iptv_subscription = null;
+
 subscriptions.forEach(sub => {
   if (sub.type === 'plex') {
-    if (sub.subscription_type_id === null) {  // ✅ FREE Plex determined by NULL subscription_type_id (CONSISTENT)
+    user.plex_subscription = sub.subscription_name; // Add subscription name
+    if (sub.subscription_type_id === null) {
       user.plex_expiration = 'FREE';
     } else {
-      // Format date to YYYY-MM-DD only (remove time)
       user.plex_expiration = sub.expiration_date ? 
         new Date(sub.expiration_date).toISOString().split('T')[0] : 
         null;
     }
   } else if (sub.type === 'iptv') {
-    // IPTV is never free, so always show expiration date
+    user.iptv_subscription = sub.subscription_name; // Add subscription name
     user.iptv_expiration = sub.expiration_date ? 
       new Date(sub.expiration_date).toISOString().split('T')[0] : 
       null;
   }
 });
+
+// Set default values if no subscriptions found
+if (user.plex_subscription === null) {
+  user.plex_subscription = null;
+}
+if (user.iptv_subscription === null) {
+  user.iptv_subscription = null;
+}
 
     // If no subscriptions found, leave as null (will display as empty in frontend)
     if (user.plex_expiration === null) {
