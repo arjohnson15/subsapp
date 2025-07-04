@@ -9,13 +9,62 @@ const Settings = {
     availableTemplates: [],              
     availableTags: [], 
     
-    async init() {
+async init() {
+    try {
+        console.log('⚙️ Initializing Settings page...');
+        
+        // Load essential data first (these should always work)
         await this.loadSettings();
         await this.loadOwners();
         await this.loadSubscriptions();
         this.loadPlexStatus();
         this.setupSubscriptionEventListeners();
-    },
+        
+        // Only try to load email schedules if the table exists on the page
+        if (document.getElementById('schedulesTableBody')) {
+            try {
+                console.log('📧 Loading email schedules...');
+                await this.loadEmailSchedules();
+            } catch (error) {
+                console.warn('Email schedules not available:', error);
+                // Show message in table instead of failing silently
+                const tbody = document.getElementById('schedulesTableBody');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Email scheduling not available</td></tr>';
+                }
+            }
+        }
+        
+        // Only try to load email templates if needed
+        if (document.getElementById('emailTemplate')) {
+            try {
+                console.log('📧 Loading email templates...');
+                await this.loadEmailTemplates();
+            } catch (error) {
+                console.warn('Email templates not available:', error);
+            }
+        }
+        
+        // Only try to load tags if the container exists
+        if (document.getElementById('targetTagsContainer')) {
+            try {
+                console.log('🏷️ Loading available tags...');
+                await this.loadAvailableTags();
+            } catch (error) {
+                console.warn('Could not load available tags:', error);
+                // Set fallback tags
+                this.availableTags = ['Plex 1', 'Plex 2', 'IPTV'];
+                this.populateTagsContainer();
+            }
+        }
+        
+        console.log('✅ Settings initialization complete');
+        
+    } catch (error) {
+        console.error('❌ Settings initialization failed:', error);
+        Utils.handleError(error, 'Initializing settings');
+    }
+},
     
     setupSubscriptionEventListeners() {
         // Type change listener to show/hide streams field
@@ -522,18 +571,6 @@ populateTagsContainer() {
     });
 },
 
-// ADD to the init() method:
-// Change your existing init() method to include:
-async init() {
-    await this.loadSettings();
-    await this.loadOwners();
-    await this.loadSubscriptions();
-    await this.loadEmailSchedules();  
-    await this.loadEmailTemplates();
-	await this.loadAvailableTags();	
-    this.loadPlexStatus();
-    this.setupSubscriptionEventListeners();
-},
     
     renderSubscriptionsTable() {
         const tbody = document.getElementById('subscriptionsTableBody');
