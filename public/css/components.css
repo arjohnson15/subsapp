@@ -1782,3 +1782,93 @@ th.sortable .sort-arrow {
         transform: translateY(0); 
     }
 }
+
+/* TARGET TAGS STYLING - Add this to components.css */
+.tags-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    margin-top: 8px;
+}
+
+.tag-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    min-height: 44px;
+}
+
+.tag-checkbox-item:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(76, 195, 247, 0.5);
+    transform: translateY(-1px);
+}
+
+.tag-checkbox-item input[type="checkbox"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+    accent-color: #4fc3f7;
+    cursor: pointer;
+}
+
+.tag-checkbox-item label {
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.95rem;
+    margin: 0;
+    flex: 1;
+}
+
+/* Tag-specific colors */
+.tag-checkbox-item.tag-iptv {
+    border-color: rgba(76, 175, 80, 0.3);
+}
+
+.tag-checkbox-item.tag-iptv:hover {
+    border-color: rgba(76, 175, 80, 0.6);
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.tag-checkbox-item.tag-plex1 {
+    border-color: rgba(255, 152, 0, 0.3);
+}
+
+.tag-checkbox-item.tag-plex1:hover {
+    border-color: rgba(255, 152, 0, 0.6);
+    background: rgba(255, 152, 0, 0.1);
+}
+
+.tag-checkbox-item.tag-plex2 {
+    border-color: rgba(33, 150, 243, 0.3);
+}
+
+.tag-checkbox-item.tag-plex2:hover {
+    border-color: rgba(33, 150, 243, 0.6);
+    background: rgba(33, 150, 243, 0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .tags-container {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 12px;
+    }
+    
+    .tag-checkbox-item {
+        padding: 8px 10px;
+        min-height: 40px;
+    }
+}

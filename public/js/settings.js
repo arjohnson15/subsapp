@@ -45,18 +45,19 @@ const Settings = {
                 }
             }
             
-            // Only try to load tags if the container exists
-            if (document.getElementById('targetTagsContainer')) {
-                try {
-                    console.log('🏷️ Loading available tags...');
-                    await this.loadAvailableTags();
-                } catch (error) {
-                    console.warn('Could not load available tags:', error);
-                    // Set fallback tags
-                    this.availableTags = ['Plex 1', 'Plex 2', 'IPTV'];
-                    this.populateTagsContainer();
-                }
-            }
+// Only try to load tags if the container exists
+if (document.getElementById('targetTagsContainer')) {
+    try {
+        console.log('🏷️ Loading available tags...');
+        await this.loadAvailableTags();
+        this.populateTagsContainer(); // ADD THIS LINE
+    } catch (error) {
+        console.warn('Could not load available tags:', error);
+        // Set fallback tags
+        this.availableTags = ['Plex 1', 'Plex 2', 'IPTV'];
+        this.populateTagsContainer(); // This line stays
+    }
+}
             
             console.log('✅ Settings initialization complete');
             
@@ -578,34 +579,29 @@ async saveSchedule(event) {
         }
     },
 
+// REPLACE this entire function
 populateTagsContainer() {
     const container = document.getElementById('targetTagsContainer');
     if (!container) return;
 
-    container.innerHTML = '';
-    
-    if (this.availableTags.length === 0) {
-        container.innerHTML = '<p style="color: #666; font-style: italic; margin: 0; padding: 10px; text-align: center;">No tags available</p>';
-        return;
-    }
-    
-    this.availableTags.forEach(tag => {
-        const label = document.createElement('label');
-        
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.value = tag;
-        
-        const span = document.createElement('span');
-        span.textContent = tag;
-        span.style.fontSize = '14px';
-        span.style.color = '#ffffff';
-        span.style.fontWeight = '500';
-        
-        label.appendChild(checkbox);
-        label.appendChild(span);
-        container.appendChild(label);
-    });
+    // Define available tags with nice display names
+    const availableTags = [
+        { value: 'IPTV', label: 'IPTV', class: 'tag-iptv' },
+        { value: 'Plex 1', label: 'Plex 1', class: 'tag-plex1' },
+        { value: 'Plex 2', label: 'Plex 2', class: 'tag-plex2' }
+    ];
+
+    container.innerHTML = availableTags.map(tag => {
+        return `
+            <div class="tag-checkbox-item ${tag.class}">
+                <input type="checkbox" 
+                       id="targetTag_${tag.value.replace(/\s+/g, '')}" 
+                       name="target_tags" 
+                       value="${tag.value}">
+                <label for="targetTag_${tag.value.replace(/\s+/g, '')}">${tag.label}</label>
+            </div>
+        `;
+    }).join('');
 },
     
     renderSubscriptionsTable() {
