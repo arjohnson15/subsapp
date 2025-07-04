@@ -249,8 +249,8 @@ const SettingsAPI = {
     }
 };
 
-// ADD this to your existing API object in api.js
-EmailSchedules: {
+// ADD this BEFORE the window.API export
+const EmailSchedulesAPI = {
     async getAll() {
         return await apiCall('/email-schedules');
     },
@@ -280,9 +280,9 @@ EmailSchedules: {
             method: 'POST'
         });
     }
-}
+};
 
-// Export API modules
+// Then MODIFY your existing window.API export:
 window.API = {
     call: apiCall,
     User: UserAPI,
@@ -290,5 +290,6 @@ window.API = {
     Subscription: SubscriptionAPI,
     Email: EmailAPI,
     Plex: PlexAPI,
-    Settings: SettingsAPI
+    Settings: SettingsAPI,
+    EmailSchedules: EmailSchedulesAPI  // ADD THIS LINE
 };

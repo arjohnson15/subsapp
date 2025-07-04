@@ -5,6 +5,9 @@ const Settings = {
     editingSubscriptionId: null,
     currentSortField: 'name',
     currentSortDirection: 'asc',
+	currentEditingSchedule: null,        
+    availableTemplates: [],              
+    availableTags: [], 
     
     async init() {
         await this.loadSettings();
@@ -248,9 +251,8 @@ const Settings = {
             Utils.handleError(error, 'Loading subscriptions');
         }
     },
-
-
-// Email Schedule Management
+	
+	// Email Schedule Management
 async loadEmailSchedules() {
     try {
         const schedules = await API.EmailSchedules.getAll();
@@ -268,6 +270,7 @@ async loadEmailTemplates() {
         Utils.handleError(error, 'Loading email templates');
     }
 },
+
 
 populateTemplateSelect() {
     const select = document.getElementById('emailTemplate');
@@ -353,14 +356,181 @@ async saveSchedule(event) {
     }
 }
 
+// ADD these methods inside your Settings object, after your existing scheduler methods
+
+renderSchedulesTable(schedules) {
+    const tbody = document.getElementById('schedulesTableBody');
+    if (!tbody) return;
+
+    if (schedules.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No email schedules found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = schedules.map(schedule => {
+        let details = '';
+        if (schedule.schedule_type === 'expiration_reminder') {
+            details = `${schedule.days_before_expiration} days before ${schedule.subscription_type} expiration`;
+        } else {
+            details = `${schedule.scheduled_date} at ${schedule.scheduled_time}`;
+        }
+
+        let targetInfo = '';
+        if (schedule.target_tags && schedule.target_tags.length > 0) {
+            targetInfo = ` (Tags: ${schedule.target_tags.join(', ')})`;
+        }
+
+        return `
+            <tr>
+                <td>${schedule.name}</td>
+                <td><span class="status-badge ${schedule.schedule_type === 'expiration_reminder' ? 'status-info' : 'status-warning'}">${schedule.schedule_type.replace('_', ' ').toUpperCase()}</span></td>
+                <td>${details}${targetInfo}</td>
+                <td>${schedule.template_name || 'Unknown'}</td>
+                <td>
+                    <span class="status-badge ${schedule.active ? 'status-active' : 'status-inactive'}">
+                        ${schedule.active ? 'Active' : 'Inactive'}
+                    </span>
+                </td>
+                <td>${schedule.last_run ? new Date(schedule.last_run).toLocaleDateString() : 'Never'}</td>
+                <td class="actions">
+                    <button onclick="Settings.editSchedule(${schedule.id})" class="btn-icon" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="Settings.toggleSchedule(${schedule.id})" class="btn-icon" title="Toggle Status">
+                        <i class="fas fa-power-off"></i>
+                    </button>
+                    <button onclick="Settings.testSchedule(${schedule.id})" class="btn-icon" title="Test Run">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button onclick="Settings.deleteSchedule(${schedule.id})" class="btn-icon" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+},
+
+async editSchedule(id) {
+    try {
+        const schedules = await API.EmailSchedules.getAll();
+        const schedule = schedules.find(s => s.id === id);
+        if (schedule) {
+            this.showScheduleForm(schedule);
+        }
+    } catch (error) {
+        Utils.handleError(error, 'Loading schedule for editing');
+    }
+},
+
+async toggleSchedule(id) {
+    try {
+        await API.EmailSchedules.test(id); // Using test endpoint for toggle
+        Utils.showNotification('Schedule status toggled successfully!', 'success');
+        await this.loadEmailSchedules();
+    } catch (error) {
+        Utils.handleError(error, 'Toggling schedule status');
+    }
+},
+
+async testSchedule(id) {
+    try {
+        const result = await API.EmailSchedules.test(id);
+        Utils.showNotification(`Test run completed! Found ${result.target_users_count || 0} target users`, 'success');
+    } catch (error) {
+        Utils.handleError(error, 'Testing schedule');
+    }
+},
+
+async deleteSchedule(id) {
+    if (!confirm('Are you sure you want to delete this email schedule? This cannot be undone.')) {
+        return;
+    }
+
+    try {
+        await API.EmailSchedules.delete(id);
+        Utils.showNotification('Email schedule deleted successfully!', 'success');
+        await this.loadEmailSchedules();
+    } catch (error) {
+        Utils.handleError(error, 'Deleting email schedule');
+    }
+},
+
+populateScheduleForm(schedule) {
+    document.getElementById('scheduleId').value = schedule.id;
+    document.getElementById('scheduleName').value = schedule.name;
+    document.getElementById('scheduleType').value = schedule.schedule_type;
+    document.getElementById('emailTemplate').value = schedule.email_template_id;
+    document.getElementById('excludeAutomated').checked = schedule.exclude_users_with_setting;
+    document.getElementById('scheduleActive').checked = schedule.active;
+
+    if (schedule.schedule_type === 'expiration_reminder') {
+        document.getElementById('daysBefore').value = schedule.days_before_expiration;
+        document.getElementById('subscriptionTypeFilter').value = schedule.subscription_type;
+    } else {
+        document.getElementById('scheduledDate').value = schedule.scheduled_date;
+        document.getElementById('scheduledTime').value = schedule.scheduled_time;
+    }
+
+    // Set target tags if they exist
+    if (schedule.target_tags && schedule.target_tags.length > 0) {
+        const checkboxes = document.querySelectorAll('#targetTagsContainer input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = schedule.target_tags.includes(checkbox.value);
+        });
+    }
+},
+
+async loadAvailableTags() {
+    try {
+        const users = await API.User.getAll();
+        const allTags = new Set();
+        
+        users.forEach(user => {
+            if (user.tags && Array.isArray(user.tags)) {
+                user.tags.forEach(tag => allTags.add(tag));
+            }
+        });
+        
+        this.availableTags = Array.from(allTags).sort();
+        this.populateTagsContainer();
+    } catch (error) {
+        console.warn('Could not load available tags:', error);
+        this.availableTags = ['Plex 1', 'Plex 2', 'IPTV']; // Fallback
+        this.populateTagsContainer();
+    }
+},
+
+populateTagsContainer() {
+    const container = document.getElementById('targetTagsContainer');
+    if (!container) return;
+
+    container.innerHTML = '';
+    this.availableTags.forEach(tag => {
+        const label = document.createElement('label');
+        label.style.display = 'block';
+        label.style.marginBottom = '5px';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = tag;
+        checkbox.style.marginRight = '8px';
+        
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(tag));
+        container.appendChild(label);
+    });
+},
+
 // ADD to the init() method:
 // Change your existing init() method to include:
 async init() {
     await this.loadSettings();
     await this.loadOwners();
     await this.loadSubscriptions();
-    await this.loadEmailSchedules();  // ADD THIS LINE
-    await this.loadEmailTemplates();  // ADD THIS LINE
+    await this.loadEmailSchedules();  
+    await this.loadEmailTemplates();
+	await this.loadAvailableTags();	
     this.loadPlexStatus();
     this.setupSubscriptionEventListeners();
 },
