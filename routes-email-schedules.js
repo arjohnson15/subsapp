@@ -1,12 +1,13 @@
 // routes-email-schedules.js
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const db = require('./database-config');
+const db = require('./database-config'); // Fixed: Use same path as other routes
 const router = express.Router();
 
 // Get all email schedules
 router.get('/', async (req, res) => {
   try {
+    // Check if email_schedules table exists, if not return empty array
     const schedules = await db.query(`
       SELECT es.*, et.name as template_name, et.subject as template_subject
       FROM email_schedules es
@@ -28,7 +29,14 @@ router.get('/', async (req, res) => {
     res.json(schedules);
   } catch (error) {
     console.error('Error fetching email schedules:', error);
-    res.status(500).json({ error: 'Failed to fetch email schedules' });
+    
+    // If table doesn't exist, return empty array instead of error
+    if (error.code === 'ER_NO_SUCH_TABLE') {
+      console.warn('email_schedules table does not exist - returning empty array');
+      res.json([]);
+    } else {
+      res.status(500).json({ error: 'Failed to fetch email schedules' });
+    }
   }
 });
 

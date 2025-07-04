@@ -1572,3 +1572,213 @@ th.sortable .sort-arrow {
 .user-info-section .info-item:last-child {
     margin-bottom: 0;
 }
+
+/* Clean Date and Time Input Styling */
+.clean-date-input, .clean-time-input {
+    width: 100% !important;
+    padding: 12px 15px !important;
+    font-size: 14px !important;
+    border: 2px solid rgba(79, 195, 247, 0.3) !important;
+    border-radius: 6px !important;
+    background: rgba(0, 0, 0, 0.7) !important;
+    color: #ffffff !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+}
+
+.clean-date-input:hover, .clean-time-input:hover {
+    border-color: #4fc3f7 !important;
+    box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.1) !important;
+}
+
+.clean-date-input:focus, .clean-time-input:focus {
+    border-color: #4fc3f7 !important;
+    box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.2) !important;
+    outline: none !important;
+}
+
+/* Enhanced calendar picker styling */
+.clean-date-input::-webkit-calendar-picker-indicator,
+.clean-time-input::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    background: rgba(79, 195, 247, 0.8);
+    border-radius: 3px;
+    padding: 4px;
+    margin-left: 8px;
+}
+
+/* Improved Tags Container */
+.tags-container-improved {
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.tags-container-improved label {
+    display: flex !important;
+    align-items: center !important;
+    margin-bottom: 8px !important;
+    padding: 8px 12px !important;
+    border-radius: 4px !important;
+    transition: background-color 0.2s ease !important;
+    cursor: pointer !important;
+    border: 1px solid transparent !important;
+}
+
+.tags-container-improved label:hover {
+    background-color: rgba(79, 195, 247, 0.15) !important;
+    border-color: rgba(79, 195, 247, 0.3) !important;
+}
+
+.tags-container-improved input[type="checkbox"] {
+    margin-right: 10px !important;
+    margin-left: 0 !important;
+    transform: scale(1.2) !important;
+    accent-color: #4fc3f7 !important;
+    flex-shrink: 0 !important;
+}
+
+/* Enhanced Checkbox Styling */
+.checkbox-group {
+    margin-bottom: 15px;
+}
+
+.checkbox-label {
+    display: flex !important;
+    align-items: center !important;
+    cursor: pointer !important;
+    padding: 8px 12px !important;
+    border-radius: 6px !important;
+    transition: all 0.2s ease !important;
+    border: 1px solid transparent !important;
+}
+
+.checkbox-label:hover {
+    background-color: rgba(79, 195, 247, 0.1) !important;
+    border-color: rgba(79, 195, 247, 0.3) !important;
+}
+
+.checkbox-label input[type="checkbox"] {
+    margin-right: 12px !important;
+    margin-left: 0 !important;
+    transform: scale(1.3) !important;
+    accent-color: #4fc3f7 !important;
+    flex-shrink: 0 !important;
+}
+
+.checkbox-text {
+    color: #4fc3f7 !important;
+    font-weight: 500 !important;
+    font-size: 14px !important;
+}
+
+/* Animation for smooth transitions */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.checkbox-group, .tags-container-improved label {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Better focus states */
+.checkbox-label input[type="checkbox"]:focus {
+    outline: 2px solid #4fc3f7;
+    outline-offset: 2px;
+}
+
+.tags-container-improved input[type="checkbox"]:focus {
+    outline: 2px solid #4fc3f7;
+    outline-offset: 2px;
+}
+
+/* Clean Tags Container */
+.clean-tags-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+    padding: 15px;
+    background: rgba(79, 195, 247, 0.05);
+    border: 1px solid rgba(79, 195, 247, 0.2);
+    border-radius: 6px;
+    max-height: none; /* Remove scrolling */
+}
+
+.clean-tags-container label {
+    display: flex !important;
+    align-items: center !important;
+    padding: 8px 12px !important;
+    border-radius: 4px !important;
+    transition: background-color 0.2s ease !important;
+    cursor: pointer !important;
+    border: 1px solid transparent !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    font-size: 14px !important;
+    color: #ffffff !important;
+    font-weight: 500 !important;
+}
+
+.clean-tags-container label:hover {
+    background-color: rgba(79, 195, 247, 0.15) !important;
+    border-color: rgba(79, 195, 247, 0.3) !important;
+}
+
+.clean-tags-container input[type="checkbox"] {
+    margin-right: 8px !important;
+    margin-left: 0 !important;
+    transform: scale(1.1) !important;
+    accent-color: #4fc3f7 !important;
+    flex-shrink: 0 !important;
+}
+
+/* Clean Checkbox Styling */
+.clean-checkbox-group {
+    margin-bottom: 15px;
+}
+
+.clean-checkbox-label {
+    display: flex !important;
+    align-items: center !important;
+    cursor: pointer !important;
+    padding: 10px 15px !important;
+    border-radius: 6px !important;
+    transition: all 0.2s ease !important;
+    border: 1px solid transparent !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.clean-checkbox-label:hover {
+    background-color: rgba(79, 195, 247, 0.1) !important;
+    border-color: rgba(79, 195, 247, 0.3) !important;
+}
+
+.clean-checkbox-label input[type="checkbox"] {
+    margin-right: 12px !important;
+    margin-left: 0 !important;
+    transform: scale(1.2) !important;
+    accent-color: #4fc3f7 !important;
+    flex-shrink: 0 !important;
+}
+
+.clean-checkbox-text {
+    color: #4fc3f7 !important;
+    font-weight: 500 !important;
+    font-size: 14px !important;
+}
+
+/* Smooth animations */
+.clean-checkbox-group, .clean-tags-container label {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes fadeInUp {
+    from { 
+        opacity: 0; 
+        transform: translateY(10px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}

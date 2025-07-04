@@ -5,66 +5,66 @@ const Settings = {
     editingSubscriptionId: null,
     currentSortField: 'name',
     currentSortDirection: 'asc',
-	currentEditingSchedule: null,        
+    currentEditingSchedule: null,        
     availableTemplates: [],              
     availableTags: [], 
     
-async init() {
-    try {
-        console.log('⚙️ Initializing Settings page...');
-        
-        // Load essential data first (these should always work)
-        await this.loadSettings();
-        await this.loadOwners();
-        await this.loadSubscriptions();
-        this.loadPlexStatus();
-        this.setupSubscriptionEventListeners();
-        
-        // Only try to load email schedules if the table exists on the page
-        if (document.getElementById('schedulesTableBody')) {
-            try {
-                console.log('📧 Loading email schedules...');
-                await this.loadEmailSchedules();
-            } catch (error) {
-                console.warn('Email schedules not available:', error);
-                // Show message in table instead of failing silently
-                const tbody = document.getElementById('schedulesTableBody');
-                if (tbody) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Email scheduling not available</td></tr>';
+    async init() {
+        try {
+            console.log('⚙️ Initializing Settings page...');
+            
+            // Load essential data first (these should always work)
+            await this.loadSettings();
+            await this.loadOwners();
+            await this.loadSubscriptions();
+            this.loadPlexStatus();
+            this.setupSubscriptionEventListeners();
+            
+            // Only try to load email schedules if the table exists on the page
+            if (document.getElementById('schedulesTableBody')) {
+                try {
+                    console.log('📧 Loading email schedules...');
+                    await this.loadEmailSchedules();
+                } catch (error) {
+                    console.warn('Email schedules not available:', error);
+                    // Show message in table instead of failing silently
+                    const tbody = document.getElementById('schedulesTableBody');
+                    if (tbody) {
+                        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Email scheduling not available</td></tr>';
+                    }
                 }
             }
-        }
-        
-        // Only try to load email templates if needed
-        if (document.getElementById('emailTemplate')) {
-            try {
-                console.log('📧 Loading email templates...');
-                await this.loadEmailTemplates();
-            } catch (error) {
-                console.warn('Email templates not available:', error);
+            
+            // Only try to load email templates if needed
+            if (document.getElementById('emailTemplate')) {
+                try {
+                    console.log('📧 Loading email templates...');
+                    await this.loadEmailTemplates();
+                } catch (error) {
+                    console.warn('Email templates not available:', error);
+                }
             }
-        }
-        
-        // Only try to load tags if the container exists
-        if (document.getElementById('targetTagsContainer')) {
-            try {
-                console.log('🏷️ Loading available tags...');
-                await this.loadAvailableTags();
-            } catch (error) {
-                console.warn('Could not load available tags:', error);
-                // Set fallback tags
-                this.availableTags = ['Plex 1', 'Plex 2', 'IPTV'];
-                this.populateTagsContainer();
+            
+            // Only try to load tags if the container exists
+            if (document.getElementById('targetTagsContainer')) {
+                try {
+                    console.log('🏷️ Loading available tags...');
+                    await this.loadAvailableTags();
+                } catch (error) {
+                    console.warn('Could not load available tags:', error);
+                    // Set fallback tags
+                    this.availableTags = ['Plex 1', 'Plex 2', 'IPTV'];
+                    this.populateTagsContainer();
+                }
             }
+            
+            console.log('✅ Settings initialization complete');
+            
+        } catch (error) {
+            console.error('❌ Settings initialization failed:', error);
+            Utils.handleError(error, 'Initializing settings');
         }
-        
-        console.log('✅ Settings initialization complete');
-        
-    } catch (error) {
-        console.error('❌ Settings initialization failed:', error);
-        Utils.handleError(error, 'Initializing settings');
-    }
-},
+    },
     
     setupSubscriptionEventListeners() {
         // Type change listener to show/hide streams field
@@ -301,276 +301,312 @@ async init() {
         }
     },
 	
-	// Email Schedule Management
-async loadEmailSchedules() {
-    try {
-        const schedules = await API.EmailSchedules.getAll();
-        this.renderSchedulesTable(schedules);
-    } catch (error) {
-        Utils.handleError(error, 'Loading email schedules');
-    }
-},
+    // Email Schedule Management
+    async loadEmailSchedules() {
+        try {
+            const schedules = await API.EmailSchedules.getAll();
+            this.renderSchedulesTable(schedules);
+        } catch (error) {
+            Utils.handleError(error, 'Loading email schedules');
+        }
+    },
 
-async loadEmailTemplates() {
-    try {
-        this.availableTemplates = await API.Email.getTemplates();
-        this.populateTemplateSelect();
-    } catch (error) {
-        Utils.handleError(error, 'Loading email templates');
-    }
-},
+    async loadEmailTemplates() {
+        try {
+            this.availableTemplates = await API.Email.getTemplates();
+            this.populateTemplateSelect();
+        } catch (error) {
+            Utils.handleError(error, 'Loading email templates');
+        }
+    },
 
+    populateTemplateSelect() {
+        const select = document.getElementById('emailTemplate');
+        if (!select) return;
 
-populateTemplateSelect() {
-    const select = document.getElementById('emailTemplate');
-    if (!select) return;
+        select.innerHTML = '<option value="">Select Template</option>';
+        this.availableTemplates.forEach(template => {
+            const option = document.createElement('option');
+            option.value = template.id;
+            option.textContent = template.name;
+            select.appendChild(option);
+        });
+    },
 
-    select.innerHTML = '<option value="">Select Template</option>';
-    this.availableTemplates.forEach(template => {
-        const option = document.createElement('option');
-        option.value = template.id;
-        option.textContent = template.name;
-        select.appendChild(option);
-    });
-},
+    showScheduleForm(schedule = null) {
+        // Schedule form management logic
+        const container = document.getElementById('scheduleFormContainer');
+        const title = document.getElementById('scheduleFormTitle');
+        const form = document.getElementById('scheduleForm');
 
-showScheduleForm(schedule = null) {
-    // Schedule form management logic
-    const container = document.getElementById('scheduleFormContainer');
-    const title = document.getElementById('scheduleFormTitle');
-    const form = document.getElementById('scheduleForm');
+        if (schedule) {
+            title.textContent = 'Edit Email Schedule';
+            this.populateScheduleForm(schedule);
+        } else {
+            title.textContent = 'Add New Email Schedule';
+            form.reset();
+            document.getElementById('scheduleId').value = '';
+        }
 
-    if (schedule) {
-        title.textContent = 'Edit Email Schedule';
-        this.populateScheduleForm(schedule);
-    } else {
-        title.textContent = 'Add New Email Schedule';
-        form.reset();
-        document.getElementById('scheduleId').value = '';
-    }
+        container.style.display = 'block';
+        container.scrollIntoView({ behavior: 'smooth' });
+        this.toggleScheduleFields();
+    },
 
-    container.style.display = 'block';
-    container.scrollIntoView({ behavior: 'smooth' });
-    this.toggleScheduleFields();
-},
+    hideScheduleForm() {
+        document.getElementById('scheduleFormContainer').style.display = 'none';
+    },
 
-hideScheduleForm() {
-    document.getElementById('scheduleFormContainer').style.display = 'none';
-},
+    toggleScheduleFields() {
+        const scheduleType = document.getElementById('scheduleType').value;
+        const expirationFields = document.getElementById('expirationFields');
+        const specificDateFields = document.getElementById('specificDateFields');
 
-toggleScheduleFields() {
-    const scheduleType = document.getElementById('scheduleType').value;
-    const expirationFields = document.getElementById('expirationFields');
-    const specificDateFields = document.getElementById('specificDateFields');
-
-    if (scheduleType === 'expiration_reminder') {
-        expirationFields.style.display = 'block';
-        specificDateFields.style.display = 'none';
-    } else if (scheduleType === 'specific_date') {
-        expirationFields.style.display = 'none';
-        specificDateFields.style.display = 'block';
-    } else {
-        expirationFields.style.display = 'none';
-        specificDateFields.style.display = 'none';
-    }
-},
+        if (scheduleType === 'expiration_reminder') {
+            expirationFields.style.display = 'block';
+            specificDateFields.style.display = 'none';
+        } else if (scheduleType === 'specific_date') {
+            expirationFields.style.display = 'none';
+            specificDateFields.style.display = 'block';
+        } else {
+            expirationFields.style.display = 'none';
+            specificDateFields.style.display = 'none';
+        }
+    },
 
 async saveSchedule(event) {
     event.preventDefault();
     
     try {
-        const formData = new FormData(event.target);
-        const scheduleData = Object.fromEntries(formData.entries());
+        Utils.showLoading();
         
-        const isEditing = scheduleData.id && scheduleData.id !== '';
-        const url = isEditing ? `/email-schedules/${scheduleData.id}` : '/email-schedules';
-        const method = isEditing ? 'PUT' : 'POST';
-
-        const response = await fetch(`/api${url}`, {
-            method: method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(scheduleData)
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to save schedule');
+        // Collect form data manually to handle complex fields
+        const form = event.target;
+        const formData = new FormData(form);
+        
+        // Get basic form data
+        const scheduleData = {
+            name: formData.get('name'),
+            schedule_type: formData.get('schedule_type'),
+            email_template_id: parseInt(formData.get('email_template_id')),
+            exclude_users_with_setting: formData.get('exclude_users_with_setting') === 'on',
+            active: formData.get('active') === 'on'
+        };
+        
+        // Handle conditional fields
+        if (scheduleData.schedule_type === 'expiration_reminder') {
+            scheduleData.days_before_expiration = parseInt(formData.get('days_before_expiration'));
+            scheduleData.subscription_type = formData.get('subscription_type');
+        } else if (scheduleData.schedule_type === 'specific_date') {
+            scheduleData.scheduled_date = formData.get('scheduled_date');
+            scheduleData.scheduled_time = formData.get('scheduled_time');
         }
-
+        
+        // Collect selected target tags
+        const targetTags = [];
+        const tagCheckboxes = document.querySelectorAll('#targetTagsContainer input[type="checkbox"]:checked');
+        tagCheckboxes.forEach(checkbox => {
+            targetTags.push(checkbox.value);
+        });
+        scheduleData.target_tags = targetTags;
+        
+        console.log('📅 Saving schedule data:', scheduleData);
+        
+        // Determine if editing
+        const scheduleId = formData.get('id');
+        const isEditing = scheduleId && scheduleId !== '';
+        
+        let result;
+        if (isEditing) {
+            result = await API.EmailSchedules.update(scheduleId, scheduleData);
+        } else {
+            result = await API.EmailSchedules.create(scheduleData);
+        }
+        
         Utils.showNotification(`Email schedule ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
         this.hideScheduleForm();
         await this.loadEmailSchedules();
+        
     } catch (error) {
+        console.error('❌ Error saving schedule:', error);
         Utils.handleError(error, 'Saving email schedule');
+    } finally {
+        Utils.hideLoading();
     }
-}
+},
 
-// ADD these methods inside your Settings object, after your existing scheduler methods
+    renderSchedulesTable(schedules) {
+        const tbody = document.getElementById('schedulesTableBody');
+        if (!tbody) return;
 
-renderSchedulesTable(schedules) {
-    const tbody = document.getElementById('schedulesTableBody');
-    if (!tbody) return;
-
-    if (schedules.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No email schedules found</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = schedules.map(schedule => {
-        let details = '';
-        if (schedule.schedule_type === 'expiration_reminder') {
-            details = `${schedule.days_before_expiration} days before ${schedule.subscription_type} expiration`;
-        } else {
-            details = `${schedule.scheduled_date} at ${schedule.scheduled_time}`;
+        if (schedules.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No email schedules found</td></tr>';
+            return;
         }
 
-        let targetInfo = '';
-        if (schedule.target_tags && schedule.target_tags.length > 0) {
-            targetInfo = ` (Tags: ${schedule.target_tags.join(', ')})`;
-        }
-
-        return `
-            <tr>
-                <td>${schedule.name}</td>
-                <td><span class="status-badge ${schedule.schedule_type === 'expiration_reminder' ? 'status-info' : 'status-warning'}">${schedule.schedule_type.replace('_', ' ').toUpperCase()}</span></td>
-                <td>${details}${targetInfo}</td>
-                <td>${schedule.template_name || 'Unknown'}</td>
-                <td>
-                    <span class="status-badge ${schedule.active ? 'status-active' : 'status-inactive'}">
-                        ${schedule.active ? 'Active' : 'Inactive'}
-                    </span>
-                </td>
-                <td>${schedule.last_run ? new Date(schedule.last_run).toLocaleDateString() : 'Never'}</td>
-                <td class="actions">
-                    <button onclick="Settings.editSchedule(${schedule.id})" class="btn-icon" title="Edit">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button onclick="Settings.toggleSchedule(${schedule.id})" class="btn-icon" title="Toggle Status">
-                        <i class="fas fa-power-off"></i>
-                    </button>
-                    <button onclick="Settings.testSchedule(${schedule.id})" class="btn-icon" title="Test Run">
-                        <i class="fas fa-play"></i>
-                    </button>
-                    <button onclick="Settings.deleteSchedule(${schedule.id})" class="btn-icon" title="Delete">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
-    }).join('');
-},
-
-async editSchedule(id) {
-    try {
-        const schedules = await API.EmailSchedules.getAll();
-        const schedule = schedules.find(s => s.id === id);
-        if (schedule) {
-            this.showScheduleForm(schedule);
-        }
-    } catch (error) {
-        Utils.handleError(error, 'Loading schedule for editing');
-    }
-},
-
-async toggleSchedule(id) {
-    try {
-        await API.EmailSchedules.test(id); // Using test endpoint for toggle
-        Utils.showNotification('Schedule status toggled successfully!', 'success');
-        await this.loadEmailSchedules();
-    } catch (error) {
-        Utils.handleError(error, 'Toggling schedule status');
-    }
-},
-
-async testSchedule(id) {
-    try {
-        const result = await API.EmailSchedules.test(id);
-        Utils.showNotification(`Test run completed! Found ${result.target_users_count || 0} target users`, 'success');
-    } catch (error) {
-        Utils.handleError(error, 'Testing schedule');
-    }
-},
-
-async deleteSchedule(id) {
-    if (!confirm('Are you sure you want to delete this email schedule? This cannot be undone.')) {
-        return;
-    }
-
-    try {
-        await API.EmailSchedules.delete(id);
-        Utils.showNotification('Email schedule deleted successfully!', 'success');
-        await this.loadEmailSchedules();
-    } catch (error) {
-        Utils.handleError(error, 'Deleting email schedule');
-    }
-},
-
-populateScheduleForm(schedule) {
-    document.getElementById('scheduleId').value = schedule.id;
-    document.getElementById('scheduleName').value = schedule.name;
-    document.getElementById('scheduleType').value = schedule.schedule_type;
-    document.getElementById('emailTemplate').value = schedule.email_template_id;
-    document.getElementById('excludeAutomated').checked = schedule.exclude_users_with_setting;
-    document.getElementById('scheduleActive').checked = schedule.active;
-
-    if (schedule.schedule_type === 'expiration_reminder') {
-        document.getElementById('daysBefore').value = schedule.days_before_expiration;
-        document.getElementById('subscriptionTypeFilter').value = schedule.subscription_type;
-    } else {
-        document.getElementById('scheduledDate').value = schedule.scheduled_date;
-        document.getElementById('scheduledTime').value = schedule.scheduled_time;
-    }
-
-    // Set target tags if they exist
-    if (schedule.target_tags && schedule.target_tags.length > 0) {
-        const checkboxes = document.querySelectorAll('#targetTagsContainer input[type="checkbox"]');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = schedule.target_tags.includes(checkbox.value);
-        });
-    }
-},
-
-async loadAvailableTags() {
-    try {
-        const users = await API.User.getAll();
-        const allTags = new Set();
-        
-        users.forEach(user => {
-            if (user.tags && Array.isArray(user.tags)) {
-                user.tags.forEach(tag => allTags.add(tag));
+        tbody.innerHTML = schedules.map(schedule => {
+            let details = '';
+            if (schedule.schedule_type === 'expiration_reminder') {
+                details = `${schedule.days_before_expiration} days before ${schedule.subscription_type} expiration`;
+            } else {
+                details = `${schedule.scheduled_date} at ${schedule.scheduled_time}`;
             }
-        });
-        
-        this.availableTags = Array.from(allTags).sort();
-        this.populateTagsContainer();
-    } catch (error) {
-        console.warn('Could not load available tags:', error);
-        this.availableTags = ['Plex 1', 'Plex 2', 'IPTV']; // Fallback
-        this.populateTagsContainer();
-    }
-},
+
+            let targetInfo = '';
+            if (schedule.target_tags && schedule.target_tags.length > 0) {
+                targetInfo = ` (Tags: ${schedule.target_tags.join(', ')})`;
+            }
+
+            return `
+                <tr>
+                    <td>${schedule.name}</td>
+                    <td><span class="status-badge ${schedule.schedule_type === 'expiration_reminder' ? 'status-info' : 'status-warning'}">${schedule.schedule_type.replace('_', ' ').toUpperCase()}</span></td>
+                    <td>${details}${targetInfo}</td>
+                    <td>${schedule.template_name || 'Unknown'}</td>
+                    <td>
+                        <span class="status-badge ${schedule.active ? 'status-active' : 'status-inactive'}">
+                            ${schedule.active ? 'Active' : 'Inactive'}
+                        </span>
+                    </td>
+                    <td>${schedule.last_run ? new Date(schedule.last_run).toLocaleDateString() : 'Never'}</td>
+                    <td class="actions">
+                        <button onclick="Settings.editSchedule(${schedule.id})" class="btn-icon" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="Settings.toggleSchedule(${schedule.id})" class="btn-icon" title="Toggle Status">
+                            <i class="fas fa-power-off"></i>
+                        </button>
+                        <button onclick="Settings.testSchedule(${schedule.id})" class="btn-icon" title="Test Run">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <button onclick="Settings.deleteSchedule(${schedule.id})" class="btn-icon" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    async editSchedule(id) {
+        try {
+            const schedules = await API.EmailSchedules.getAll();
+            const schedule = schedules.find(s => s.id === id);
+            if (schedule) {
+                this.showScheduleForm(schedule);
+            }
+        } catch (error) {
+            Utils.handleError(error, 'Loading schedule for editing');
+        }
+    },
+
+    async toggleSchedule(id) {
+        try {
+            await API.EmailSchedules.test(id); // Using test endpoint for toggle
+            Utils.showNotification('Schedule status toggled successfully!', 'success');
+            await this.loadEmailSchedules();
+        } catch (error) {
+            Utils.handleError(error, 'Toggling schedule status');
+        }
+    },
+
+    async testSchedule(id) {
+        try {
+            const result = await API.EmailSchedules.test(id);
+            Utils.showNotification(`Test run completed! Found ${result.target_users_count || 0} target users`, 'success');
+        } catch (error) {
+            Utils.handleError(error, 'Testing schedule');
+        }
+    },
+
+    async deleteSchedule(id) {
+        if (!confirm('Are you sure you want to delete this email schedule? This cannot be undone.')) {
+            return;
+        }
+
+        try {
+            await API.EmailSchedules.delete(id);
+            Utils.showNotification('Email schedule deleted successfully!', 'success');
+            await this.loadEmailSchedules();
+        } catch (error) {
+            Utils.handleError(error, 'Deleting email schedule');
+        }
+    },
+
+    populateScheduleForm(schedule) {
+        document.getElementById('scheduleId').value = schedule.id;
+        document.getElementById('scheduleName').value = schedule.name;
+        document.getElementById('scheduleType').value = schedule.schedule_type;
+        document.getElementById('emailTemplate').value = schedule.email_template_id;
+        document.getElementById('excludeAutomated').checked = schedule.exclude_users_with_setting;
+        document.getElementById('scheduleActive').checked = schedule.active;
+
+        if (schedule.schedule_type === 'expiration_reminder') {
+            document.getElementById('daysBefore').value = schedule.days_before_expiration;
+            document.getElementById('subscriptionTypeFilter').value = schedule.subscription_type;
+        } else {
+            document.getElementById('scheduledDate').value = schedule.scheduled_date;
+            document.getElementById('scheduledTime').value = schedule.scheduled_time;
+        }
+
+        // Set target tags if they exist
+        if (schedule.target_tags && schedule.target_tags.length > 0) {
+            const checkboxes = document.querySelectorAll('#targetTagsContainer input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = schedule.target_tags.includes(checkbox.value);
+            });
+        }
+    },
+
+    async loadAvailableTags() {
+        try {
+            const users = await API.User.getAll();
+            const allTags = new Set();
+            
+            users.forEach(user => {
+                if (user.tags && Array.isArray(user.tags)) {
+                    user.tags.forEach(tag => allTags.add(tag));
+                }
+            });
+            
+            this.availableTags = Array.from(allTags).sort();
+            this.populateTagsContainer();
+        } catch (error) {
+            console.warn('Could not load available tags:', error);
+            this.availableTags = ['Plex 1', 'Plex 2', 'IPTV']; // Fallback
+            this.populateTagsContainer();
+        }
+    },
 
 populateTagsContainer() {
     const container = document.getElementById('targetTagsContainer');
     if (!container) return;
 
     container.innerHTML = '';
+    
+    if (this.availableTags.length === 0) {
+        container.innerHTML = '<p style="color: #666; font-style: italic; margin: 0; padding: 10px; text-align: center;">No tags available</p>';
+        return;
+    }
+    
     this.availableTags.forEach(tag => {
         const label = document.createElement('label');
-        label.style.display = 'block';
-        label.style.marginBottom = '5px';
         
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.value = tag;
-        checkbox.style.marginRight = '8px';
+        
+        const span = document.createElement('span');
+        span.textContent = tag;
+        span.style.fontSize = '14px';
+        span.style.color = '#ffffff';
+        span.style.fontWeight = '500';
         
         label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(tag));
+        label.appendChild(span);
         container.appendChild(label);
     });
 },
-
     
     renderSubscriptionsTable() {
         const tbody = document.getElementById('subscriptionsTableBody');
@@ -797,41 +833,41 @@ populateTagsContainer() {
         }
     },
     
-// Test email connection  
-async testEmailConnection() {
-    try {
-        // Get the SMTP user email to send test to
-        const smtpUser = document.getElementById('smtpUser')?.value;
-        
-        if (!smtpUser) {
-            Utils.showNotification('Please enter your email address in the SMTP configuration first', 'error');
-            return;
+    // Test email connection  
+    async testEmailConnection() {
+        try {
+            // Get the SMTP user email to send test to
+            const smtpUser = document.getElementById('smtpUser')?.value;
+            
+            if (!smtpUser) {
+                Utils.showNotification('Please enter your email address in the SMTP configuration first', 'error');
+                return;
+            }
+            
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = 'Sending Test...';
+            button.disabled = true;
+            
+            // FIXED: Use the correct API function
+            const result = await API.Email.sendTestEmail(smtpUser);
+            
+            button.textContent = originalText;
+            button.disabled = false;
+            
+            if (result.success) {
+                Utils.showNotification(`Test email sent successfully to ${smtpUser}!`, 'success');
+            } else {
+                Utils.showNotification(`Email test failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error testing email:', error);
+            const button = event.target;
+            button.textContent = 'Send Test Email';
+            button.disabled = false;
+            Utils.showNotification('Error testing email: ' + error.message, 'error');
         }
-        
-        const button = event.target;
-        const originalText = button.textContent;
-        button.textContent = 'Sending Test...';
-        button.disabled = true;
-        
-        // FIXED: Use the correct API function
-        const result = await API.Email.sendTestEmail(smtpUser);
-        
-        button.textContent = originalText;
-        button.disabled = false;
-        
-        if (result.success) {
-            Utils.showNotification(`Test email sent successfully to ${smtpUser}!`, 'success');
-        } else {
-            Utils.showNotification(`Email test failed: ${result.error}`, 'error');
-        }
-    } catch (error) {
-        console.error('Error testing email:', error);
-        const button = event.target;
-        button.textContent = 'Send Test Email';
-        button.disabled = false;
-        Utils.showNotification('Error testing email: ' + error.message, 'error');
-    }
-},
+    },
 
     // Test Plex Connection
     async testPlexConnection(serverGroup) {
@@ -1133,7 +1169,7 @@ async testEmailConnection() {
         }
     },
 	
-	// Add this function after syncAllPlexLibraries
+    // Add this function after syncAllPlexLibraries
     async syncPlexLibraries() {
         // This is an alias for syncAllPlexLibraries to match the HTML onclick
         return await this.syncAllPlexLibraries();
