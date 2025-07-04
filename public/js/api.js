@@ -249,6 +249,39 @@ const SettingsAPI = {
     }
 };
 
+// ADD this to your existing API object in api.js
+EmailSchedules: {
+    async getAll() {
+        return await apiCall('/email-schedules');
+    },
+
+    async create(scheduleData) {
+        return await apiCall('/email-schedules', {
+            method: 'POST',
+            body: JSON.stringify(scheduleData)
+        });
+    },
+
+    async update(id, scheduleData) {
+        return await apiCall(`/email-schedules/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(scheduleData)
+        });
+    },
+
+    async delete(id) {
+        return await apiCall(`/email-schedules/${id}`, {
+            method: 'DELETE'
+        });
+    },
+
+    async test(id) {
+        return await apiCall(`/email-schedules/${id}/test`, {
+            method: 'POST'
+        });
+    }
+}
+
 // Export API modules
 window.API = {
     call: apiCall,

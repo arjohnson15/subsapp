@@ -248,6 +248,122 @@ const Settings = {
             Utils.handleError(error, 'Loading subscriptions');
         }
     },
+
+
+// Email Schedule Management
+async loadEmailSchedules() {
+    try {
+        const schedules = await API.EmailSchedules.getAll();
+        this.renderSchedulesTable(schedules);
+    } catch (error) {
+        Utils.handleError(error, 'Loading email schedules');
+    }
+},
+
+async loadEmailTemplates() {
+    try {
+        this.availableTemplates = await API.Email.getTemplates();
+        this.populateTemplateSelect();
+    } catch (error) {
+        Utils.handleError(error, 'Loading email templates');
+    }
+},
+
+populateTemplateSelect() {
+    const select = document.getElementById('emailTemplate');
+    if (!select) return;
+
+    select.innerHTML = '<option value="">Select Template</option>';
+    this.availableTemplates.forEach(template => {
+        const option = document.createElement('option');
+        option.value = template.id;
+        option.textContent = template.name;
+        select.appendChild(option);
+    });
+},
+
+showScheduleForm(schedule = null) {
+    // Schedule form management logic
+    const container = document.getElementById('scheduleFormContainer');
+    const title = document.getElementById('scheduleFormTitle');
+    const form = document.getElementById('scheduleForm');
+
+    if (schedule) {
+        title.textContent = 'Edit Email Schedule';
+        this.populateScheduleForm(schedule);
+    } else {
+        title.textContent = 'Add New Email Schedule';
+        form.reset();
+        document.getElementById('scheduleId').value = '';
+    }
+
+    container.style.display = 'block';
+    container.scrollIntoView({ behavior: 'smooth' });
+    this.toggleScheduleFields();
+},
+
+hideScheduleForm() {
+    document.getElementById('scheduleFormContainer').style.display = 'none';
+},
+
+toggleScheduleFields() {
+    const scheduleType = document.getElementById('scheduleType').value;
+    const expirationFields = document.getElementById('expirationFields');
+    const specificDateFields = document.getElementById('specificDateFields');
+
+    if (scheduleType === 'expiration_reminder') {
+        expirationFields.style.display = 'block';
+        specificDateFields.style.display = 'none';
+    } else if (scheduleType === 'specific_date') {
+        expirationFields.style.display = 'none';
+        specificDateFields.style.display = 'block';
+    } else {
+        expirationFields.style.display = 'none';
+        specificDateFields.style.display = 'none';
+    }
+},
+
+async saveSchedule(event) {
+    event.preventDefault();
+    
+    try {
+        const formData = new FormData(event.target);
+        const scheduleData = Object.fromEntries(formData.entries());
+        
+        const isEditing = scheduleData.id && scheduleData.id !== '';
+        const url = isEditing ? `/email-schedules/${scheduleData.id}` : '/email-schedules';
+        const method = isEditing ? 'PUT' : 'POST';
+
+        const response = await fetch(`/api${url}`, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(scheduleData)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to save schedule');
+        }
+
+        Utils.showNotification(`Email schedule ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
+        this.hideScheduleForm();
+        await this.loadEmailSchedules();
+    } catch (error) {
+        Utils.handleError(error, 'Saving email schedule');
+    }
+}
+
+// ADD to the init() method:
+// Change your existing init() method to include:
+async init() {
+    await this.loadSettings();
+    await this.loadOwners();
+    await this.loadSubscriptions();
+    await this.loadEmailSchedules();  // ADD THIS LINE
+    await this.loadEmailTemplates();  // ADD THIS LINE
+    this.loadPlexStatus();
+    this.setupSubscriptionEventListeners();
+},
     
     renderSubscriptionsTable() {
         const tbody = document.getElementById('subscriptionsTableBody');

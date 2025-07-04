@@ -272,6 +272,124 @@
     </div>
 </div>
 
+<!-- Email Automation Scheduler Section -->
+<div class="settings-section">
+    <h3>Email Automation Scheduler</h3>
+    <p style="color: #4fc3f7; margin-bottom: 20px;">Configure automated email schedules for renewals and custom mailings.</p>
+    
+    <div style="margin-bottom: 20px;">
+        <button class="btn" onclick="Settings.showScheduleForm()">Add New Schedule</button>
+    </div>
+
+    <!-- Schedule Form (hidden by default) -->
+    <div id="scheduleFormContainer" style="display: none; margin-bottom: 30px; padding: 20px; background: rgba(79, 195, 247, 0.1); border: 1px solid #4fc3f7; border-radius: 8px;">
+        <h4 id="scheduleFormTitle" style="color: #4fc3f7; margin-bottom: 20px;">Add New Email Schedule</h4>
+        <form id="scheduleForm" onsubmit="Settings.saveSchedule(event)">
+            <input type="hidden" id="scheduleId" name="id">
+            
+            <div class="form-group">
+                <label for="scheduleName">Schedule Name:</label>
+                <input type="text" id="scheduleName" name="name" required placeholder="e.g., 7-Day Renewal Reminder">
+            </div>
+
+            <div class="form-group">
+                <label for="scheduleType">Schedule Type:</label>
+                <select id="scheduleType" name="schedule_type" required onchange="Settings.toggleScheduleFields()">
+                    <option value="">Select Type</option>
+                    <option value="expiration_reminder">Expiration Reminder</option>
+                    <option value="specific_date">Specific Date/Time</option>
+                </select>
+            </div>
+
+            <!-- Expiration Reminder Fields -->
+            <div id="expirationFields" style="display: none;">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="daysBefore">Days Before Expiration:</label>
+                        <input type="number" id="daysBefore" name="days_before_expiration" min="1" max="365" placeholder="7">
+                    </div>
+                    <div class="form-group">
+                        <label for="subscriptionTypeFilter">Subscription Type:</label>
+                        <select id="subscriptionTypeFilter" name="subscription_type">
+                            <option value="both">Both Plex & IPTV</option>
+                            <option value="plex">Plex Only</option>
+                            <option value="iptv">IPTV Only</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Specific Date Fields -->
+            <div id="specificDateFields" style="display: none;">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="scheduledDate">Date:</label>
+                        <input type="date" id="scheduledDate" name="scheduled_date">
+                    </div>
+                    <div class="form-group">
+                        <label for="scheduledTime">Time:</label>
+                        <input type="time" id="scheduledTime" name="scheduled_time">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="emailTemplate">Email Template:</label>
+                <select id="emailTemplate" name="email_template_id" required>
+                    <option value="">Select Template</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="targetTags">Target User Tags (Optional):</label>
+                <div id="targetTagsContainer" class="tags-container">
+                    <!-- Dynamic tag checkboxes will be inserted here -->
+                </div>
+                <small>Leave blank to target all users matching other criteria</small>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="excludeAutomated" name="exclude_users_with_setting" checked style="margin-right: 8px;">
+                    Exclude users who opted out of automated emails
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="scheduleActive" name="active" checked style="margin-right: 8px;">
+                    Active (schedule will run automatically)
+                </label>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button type="submit" class="btn">Save Schedule</button>
+                <button type="button" class="btn btn-secondary" onclick="Settings.hideScheduleForm()">Cancel</button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Schedules Table -->
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Details</th>
+                    <th>Template</th>
+                    <th>Status</th>
+                    <th>Last Run</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="schedulesTableBody">
+                <tr><td colspan="7" style="text-align: center;">Loading schedules...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <!-- Save Button -->
 <div style="margin-top: 40px; text-align: center;">
     <button class="btn btn-primary" onclick="Settings.saveAllSettings()" style="padding: 15px 40px; font-size: 16px;">

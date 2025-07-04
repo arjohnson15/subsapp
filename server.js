@@ -14,6 +14,7 @@ const emailRoutes = require('./routes-email');
 const plexRoutes = require('./routes-plex');
 const settingsRoutes = require('./routes-settings');
 const ownerRoutes = require('./routes-owners');
+const emailScheduleRoutes = require('./routes-email-schedules');
 const multer = require('multer');
 const plexService = require('./plex-service');
 const emailService = require('./email-service');
@@ -63,6 +64,7 @@ app.use('/api/email', emailRoutes);
 app.use('/api/plex', plexRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/owners', ownerRoutes);
+app.use('/api/email-schedules', emailScheduleRoutes);
 
 // Serve main application
 app.get('/', (req, res) => {
@@ -99,11 +101,27 @@ console.log('✅ Plex Service initialized - hourly sync will start automatically
       console.log(`Access the application at http://localhost:${PORT}`);
     });
 
-    // Schedule renewal reminders to run daily at 9 AM
-    cron.schedule('0 9 * * *', () => {
-      console.log('Running scheduled renewal reminders...');
-      emailService.sendRenewalReminders();
-    });
+// REPLACE this existing code:
+cron.schedule('0 9 * * *', () => {
+    console.log('Running scheduled renewal reminders...');
+    emailService.sendRenewalReminders();
+});
+
+// WITH THIS:
+cron.schedule('0 * * * *', async () => {
+    console.log('🕐 Hourly automated email check started at', new Date().toLocaleString());
+    try {
+        await emailService.processScheduledEmails();
+    } catch (error) {
+        console.error('❌ Error in hourly email automation:', error);
+    }
+});
+
+// Keep your existing daily reminder as backup:
+cron.schedule('0 9 * * *', () => {
+    console.log('Running scheduled renewal reminders...');
+    emailService.sendRenewalReminders();
+});
 
   } catch (error) {
     console.error('Failed to start application:', error);

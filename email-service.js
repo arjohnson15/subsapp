@@ -306,6 +306,90 @@ async processTemplate(templateBody, userData) {
     }
   }
   
+  // ADD this method to your existing EmailService class
+async processScheduledEmails() {
+    try {
+        console.log('🔄 Processing scheduled emails...');
+        
+        const schedules = await db.query(`
+            SELECT es.*, et.subject, et.body, et.name as template_name
+            FROM email_schedules es
+            LEFT JOIN email_templates et ON es.email_template_id = et.id
+            WHERE es.active = TRUE
+            ORDER BY es.id
+        `);
+
+        console.log(`📧 Found ${schedules.length} active email schedules`);
+
+        for (const schedule of schedules) {
+            await this.processIndividualSchedule(schedule);
+        }
+
+        console.log('✅ Finished processing scheduled emails');
+    } catch (error) {
+        console.error('❌ Error processing scheduled emails:', error);
+    }
+}
+
+async processIndividualSchedule(schedule) {
+    // Process each schedule based on its type
+    const now = new Date();
+    let shouldRun = false;
+    let targetUsers = [];
+
+    if (schedule.schedule_type === 'expiration_reminder') {
+        // Check daily for expiration reminders
+        targetUsers = await this.getExpiringUsers(
+            schedule.days_before_expiration,
+            schedule.subscription_type,
+            schedule.target_tags ? JSON.parse(schedule.target_tags) : null,
+            schedule.exclude_users_with_setting
+        );
+        
+        shouldRun = targetUsers.length > 0;
+        
+    } else if (schedule.schedule_type === 'specific_date') {
+        if (schedule.next_run) {
+            const nextRun = new Date(schedule.next_run);
+            shouldRun = now >= nextRun;
+            
+            if (shouldRun) {
+                targetUsers = await this.getAllTargetUsers(
+                    schedule.target_tags ? JSON.parse(schedule.target_tags) : null,
+                    schedule.exclude_users_with_setting
+                );
+            }
+        }
+    }
+
+    if (shouldRun && targetUsers.length > 0) {
+        console.log(`📤 Running schedule: ${schedule.name} for ${targetUsers.length} users`);
+        
+        // Send emails to all target users
+        for (const user of targetUsers) {
+            try {
+                const personalizedBody = await this.replacePlaceholders(schedule.body, user);
+                const personalizedSubject = await this.replacePlaceholders(schedule.subject, user);
+                
+                await this.sendEmail(user.email, personalizedSubject, personalizedBody, {
+                    userId: user.id,
+                    templateName: schedule.template_name
+                });
+            } catch (error) {
+                console.error(`Error sending to ${user.name}:`, error);
+            }
+        }
+
+        // Update schedule statistics
+        await db.query(`
+            UPDATE email_schedules 
+            SET last_run = ?, run_count = run_count + 1,
+                active = ${schedule.schedule_type === 'specific_date' ? 'FALSE' : 'TRUE'}
+            WHERE id = ?
+        `, [now, schedule.id]);
+    }
+}
+  
 async sendBulkEmail(tags, subject, htmlBody, options = {}) {
   try {
     const whereClause = tags.map(() => 'JSON_CONTAINS(tags, ?)').join(' OR ');
