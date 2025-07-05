@@ -128,23 +128,25 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label for="plexSubscription">Plex Subscription:</label>
-                    <select id="plexSubscription" name="plex_subscription">
+                    <select id="plexSubscription" name="plex_subscription" onchange="calculateNewPlexExpiration()">
                         <option value="">No Plex Subscription</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="plexExpiration">Plex Expiration:</label>
-                    <input type="date" id="plexExpiration">
+                    <input type="date" id="plexExpiration" name="plex_expiration">
+                    <small style="color: #4fc3f7;">Manual override - leave blank for auto-calculation</small>
                 </div>
                 <div class="form-group">
                     <label for="iptvSubscription">IPTV Subscription:</label>
-                    <select id="iptvSubscription" name="iptv_subscription">
+                    <select id="iptvSubscription" name="iptv_subscription" onchange="calculateNewIptvExpiration()">
                         <option value="">No IPTV Subscription</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="iptvExpiration">IPTV Expiration:</label>
-                    <input type="date" id="iptvExpiration">
+                    <input type="date" id="iptvExpiration" name="iptv_expiration">
+                    <small style="color: #4fc3f7;">Manual override - leave blank for auto-calculation</small>
                 </div>
             </div>
         </div>

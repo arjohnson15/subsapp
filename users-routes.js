@@ -529,62 +529,149 @@ async function cancelAllSubscriptionsOfType(userId, subscriptionType) {
     return result.affectedRows;
 }
 
-  // Handle Plex subscription updates - BULLETPROOF SIMPLE VERSION
-  if (plex_subscription !== undefined && plex_subscription !== null) {
-    console.log(`🔄 Processing Plex subscription update: "${plex_subscription}"`);
+// Replace the subscription handling section in the PUT '/:id' route in users-routes.js
+// This goes in the section after "Handle subscription updates - BULLETPROOF SIMPLE VERSION"
+
+// Handle Plex subscription updates - WITH MANUAL EXPIRATION OVERRIDE SUPPORT
+if (plex_subscription !== undefined && plex_subscription !== null) {
+  console.log(`🔄 Processing Plex subscription update: "${plex_subscription}"`);
+  console.log(`🗓️ Manual Plex expiration override: "${plex_expiration}"`);
+  
+  if (plex_subscription === 'remove') {
+    // REMOVE: Cancel all Plex subscriptions
+    await cancelAllSubscriptionsOfType(userId, 'plex');
+    console.log(`✅ REMOVED all Plex subscriptions for user ${userId}`);
+
+  } else if (plex_subscription === 'free') {
+    // FREE: Cancel existing + Create FREE subscription
+    console.log(`🆓 Setting user ${userId} to FREE Plex access...`);
     
-    if (plex_subscription === 'remove') {
-      // REMOVE: Cancel all Plex subscriptions
-      await cancelAllSubscriptionsOfType(userId, 'plex');
-      console.log(`✅ REMOVED all Plex subscriptions for user ${userId}`);
-
-    } else if (plex_subscription === 'free') {
-      // FREE: Cancel existing + Create FREE subscription
-      console.log(`🆓 Setting user ${userId} to FREE Plex...`);
-      
-      // Step 1: Cancel existing subscriptions
-      await cancelAllSubscriptionsOfType(userId, 'plex');
-      
-      // Step 2: Wait a moment for database consistency
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-// Step 3: Create FREE Plex subscription (NULL subscription_type_id, no expiration)
-try {
-await db.query(`
-    INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
-    VALUES (?, NULL, CURDATE(), NULL, 'active')
-  `, [userId]);
-        console.log(`✅ CREATED FREE Plex subscription for user ${userId}`);
-      } catch (insertError) {
-        console.error(`❌ Error creating FREE subscription:`, insertError);
-        throw new Error(`Failed to create FREE subscription: ${insertError.message}`);
-      }
-
-    } else if (plex_subscription && plex_subscription !== '' && plex_expiration) {
-      // PAID: Cancel existing + Create paid subscription
-      console.log(`💰 Setting user ${userId} to PAID Plex subscription ${plex_subscription}...`);
-      
-      // Step 1: Cancel existing subscriptions
-      await cancelAllSubscriptionsOfType(userId, 'plex');
-      
-      // Step 2: Wait a moment for database consistency
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      // Step 3: Create new paid subscription
-      try {
-        await db.query(`
-          INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
-          VALUES (?, ?, CURDATE(), ?, 'active')
-        `, [userId, parseInt(plex_subscription), plex_expiration]);
-        console.log(`✅ CREATED paid Plex subscription for user ${userId}, type: ${plex_subscription}`);
-      } catch (insertError) {
-        console.error(`❌ Error creating paid subscription:`, insertError);
-        throw new Error(`Failed to create paid subscription: ${insertError.message}`);
-      }
-    } else {
-      console.log(`ℹ️ Keeping current Plex subscription for user ${userId} (no change)`);
+    // Cancel existing subscriptions
+    await cancelAllSubscriptionsOfType(userId, 'plex');
+    
+    // Create FREE subscription (NULL subscription_type_id, NULL expiration_date)
+    try {
+      await db.query(`
+        INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
+        VALUES (?, NULL, CURDATE(), NULL, 'active')
+      `, [userId]);
+      console.log(`✅ CREATED FREE Plex subscription for user ${userId}`);
+    } catch (insertError) {
+      console.error(`❌ Error creating FREE Plex subscription:`, insertError);
+      throw new Error(`Failed to create FREE subscription: ${insertError.message}`);
     }
+
+  } else if (plex_subscription && plex_subscription !== '') {
+    // PAID: Cancel existing + Create paid subscription
+    console.log(`💰 Setting user ${userId} to PAID Plex subscription ${plex_subscription}...`);
+    
+    // Step 1: Cancel existing subscriptions
+    await cancelAllSubscriptionsOfType(userId, 'plex');
+    
+    // Step 2: Wait a moment for database consistency
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // Step 3: Determine expiration date - MANUAL OVERRIDE SUPPORT
+    let finalExpirationDate;
+    
+    if (plex_expiration && plex_expiration.trim() !== '') {
+      // Use manually provided expiration date
+      finalExpirationDate = plex_expiration;
+      console.log(`🎯 Using MANUAL Plex expiration: ${finalExpirationDate}`);
+    } else {
+      // Auto-calculate expiration date from subscription type
+      const [subscriptionType] = await db.query(
+        'SELECT duration_months FROM subscription_types WHERE id = ?', 
+        [parseInt(plex_subscription)]
+      );
+      
+      if (subscriptionType && subscriptionType.duration_months) {
+        const today = new Date();
+        const expiration = new Date();
+        expiration.setMonth(today.getMonth() + subscriptionType.duration_months);
+        finalExpirationDate = expiration.toISOString().split('T')[0];
+        console.log(`🤖 Auto-calculated Plex expiration: ${finalExpirationDate} (${subscriptionType.duration_months} months)`);
+      } else {
+        throw new Error(`Subscription type ${plex_subscription} not found or has no duration`);
+      }
+    }
+    
+    // Step 4: Create new paid subscription with final expiration date
+    try {
+      await db.query(`
+        INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
+        VALUES (?, ?, CURDATE(), ?, 'active')
+      `, [userId, parseInt(plex_subscription), finalExpirationDate]);
+      console.log(`✅ CREATED paid Plex subscription for user ${userId}, expires: ${finalExpirationDate}`);
+    } catch (insertError) {
+      console.error(`❌ Error creating paid Plex subscription:`, insertError);
+      throw new Error(`Failed to create paid subscription: ${insertError.message}`);
+    }
+  } else {
+    console.log(`ℹ️ Keeping current Plex subscription for user ${userId} (no change)`);
   }
+}
+
+// Handle IPTV subscription updates - WITH MANUAL EXPIRATION OVERRIDE SUPPORT
+if (iptv_subscription !== undefined && iptv_subscription !== null) {
+  console.log(`🔄 Processing IPTV subscription update: "${iptv_subscription}"`);
+  console.log(`🗓️ Manual IPTV expiration override: "${iptv_expiration}"`);
+  
+  if (iptv_subscription === 'remove') {
+    // REMOVE: Cancel all IPTV subscriptions
+    await cancelAllSubscriptionsOfType(userId, 'iptv');
+    console.log(`✅ REMOVED all IPTV subscriptions for user ${userId}`);
+
+  } else if (iptv_subscription && iptv_subscription !== '') {
+    // PAID: Cancel existing + Create paid IPTV subscription (no free IPTV)
+    console.log(`💰 Setting user ${userId} to PAID IPTV subscription ${iptv_subscription}...`);
+    
+    // Step 1: Cancel existing subscriptions
+    await cancelAllSubscriptionsOfType(userId, 'iptv');
+    
+    // Step 2: Wait a moment for database consistency
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // Step 3: Determine expiration date - MANUAL OVERRIDE SUPPORT
+    let finalExpirationDate;
+    
+    if (iptv_expiration && iptv_expiration.trim() !== '') {
+      // Use manually provided expiration date
+      finalExpirationDate = iptv_expiration;
+      console.log(`🎯 Using MANUAL IPTV expiration: ${finalExpirationDate}`);
+    } else {
+      // Auto-calculate expiration date from subscription type
+      const [subscriptionType] = await db.query(
+        'SELECT duration_months FROM subscription_types WHERE id = ?', 
+        [parseInt(iptv_subscription)]
+      );
+      
+      if (subscriptionType && subscriptionType.duration_months) {
+        const today = new Date();
+        const expiration = new Date();
+        expiration.setMonth(today.getMonth() + subscriptionType.duration_months);
+        finalExpirationDate = expiration.toISOString().split('T')[0];
+        console.log(`🤖 Auto-calculated IPTV expiration: ${finalExpirationDate} (${subscriptionType.duration_months} months)`);
+      } else {
+        throw new Error(`Subscription type ${iptv_subscription} not found or has no duration`);
+      }
+    }
+    
+    // Step 4: Create new IPTV subscription with final expiration date
+    try {
+      await db.query(`
+        INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
+        VALUES (?, ?, CURDATE(), ?, 'active')
+      `, [userId, parseInt(iptv_subscription), finalExpirationDate]);
+      console.log(`✅ CREATED IPTV subscription for user ${userId}, expires: ${finalExpirationDate}`);
+    } catch (insertError) {
+      console.error(`❌ Error creating IPTV subscription:`, insertError);
+      throw new Error(`Failed to create IPTV subscription: ${insertError.message}`);
+    }
+  } else {
+    console.log(`ℹ️ Keeping current IPTV subscription for user ${userId} (no change)`);
+  }
+}
 
   // Handle IPTV subscription updates - BULLETPROOF SIMPLE VERSION
   if (iptv_subscription !== undefined && iptv_subscription !== null) {
