@@ -417,13 +417,28 @@ async saveSchedule(event) {
         const scheduleId = formData.get('id');
         const isEditing = scheduleId && scheduleId !== '';
         
-        let result;
-        if (isEditing) {
-            result = await API.EmailSchedules.update(scheduleId, scheduleData);
-        } else {
-            result = await API.EmailSchedules.create(scheduleData);
+        const url = isEditing ? `/email-schedules/${scheduleId}` : '/email-schedules';
+        const method = isEditing ? 'PUT' : 'POST';
+
+        const response = await fetch(`/api${url}`, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(scheduleData)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('❌ Server validation errors:', errorData);
+            
+            // Show specific validation errors if available
+            if (errorData.errors && Array.isArray(errorData.errors)) {
+                const errorMessages = errorData.errors.map(err => err.msg || err.message).join('\n');
+                throw new Error(`Validation errors:\n${errorMessages}`);
+            } else {
+                throw new Error(errorData.error || 'Failed to save schedule');
+            }
         }
-        
+
         Utils.showNotification(`Email schedule ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
         this.hideScheduleForm();
         await this.loadEmailSchedules();
