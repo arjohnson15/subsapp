@@ -111,6 +111,26 @@ CREATE TABLE email_logs (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- Email schedules table
+CREATE TABLE email_schedules (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  schedule_type ENUM('expiration_reminder', 'specific_date') NOT NULL,
+  days_before_expiration INT NULL,
+  subscription_type ENUM('plex', 'iptv', 'both') NULL,
+  scheduled_date DATE NULL,
+  scheduled_time TIME NULL,
+  email_template_id INT NOT NULL,
+  target_tags JSON NULL,
+  exclude_users_with_setting BOOLEAN DEFAULT TRUE,
+  active BOOLEAN DEFAULT TRUE,
+  next_run DATETIME NULL,
+  last_run DATETIME NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (email_template_id) REFERENCES email_templates(id) ON DELETE CASCADE
+);
+
 -- Insert default owners
 INSERT INTO owners (name, email) VALUES 
 ('Andrew', 'arjohnson15@gmail.com'),
