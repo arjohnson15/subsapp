@@ -1,4 +1,4 @@
-// server.js - REPLACEMENT FILE
+// server.js - COMPLETE REPLACEMENT FILE
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -101,28 +101,111 @@ async function initializeApp() {
       console.log(`Access the application at http://localhost:${PORT}`);
     });
 
+    // Test email service immediately on startup
+    console.log('🧪 Testing email service on startup...');
+    setTimeout(async () => {
+      try {
+        if (emailService.transporter) {
+          console.log('✅ Email service is ready');
+        } else {
+          console.log('❌ Email service failed to initialize - check SMTP settings');
+        }
+      } catch (error) {
+        console.error('❌ Email service test error:', error);
+      }
+    }, 3000);
+
     // ===== AUTOMATED EMAIL SCHEDULING =====
+    
     // Hourly check for scheduled emails (runs every hour at minute 0)
     cron.schedule('0 * * * *', async () => {
-      console.log('🕐 Hourly automated email check started at', new Date().toLocaleString());
+      const timestamp = new Date().toLocaleString();
+      console.log('');
+      console.log('🕐='.repeat(50));
+      console.log(`🕐 HOURLY EMAIL AUTOMATION STARTED: ${timestamp}`);
+      console.log('🕐='.repeat(50));
+      
       try {
+        // Check email service status
+        if (!emailService.transporter) {
+          console.log('❌ Email service not initialized - attempting to reinitialize...');
+          await emailService.initializeTransporter();
+        }
+
+        // Process scheduled emails
         await emailService.processScheduledEmails();
+        
+        console.log('🕐='.repeat(50));
+        console.log(`🕐 HOURLY EMAIL AUTOMATION COMPLETED: ${new Date().toLocaleString()}`);
+        console.log('🕐='.repeat(50));
+        console.log('');
       } catch (error) {
-        console.error('❌ Error in hourly email automation:', error);
+        console.error('❌ ERROR IN HOURLY EMAIL AUTOMATION:', error);
+        console.log('🕐='.repeat(50));
+        console.log('');
       }
     });
     console.log('✅ Hourly email scheduler activated');
 
-    // Daily renewal reminders (runs at 9 AM every day as backup)
+    // Daily renewal reminders (runs at 9 AM every day)
     cron.schedule('0 9 * * *', async () => {
-      console.log('📧 Running daily renewal reminders at', new Date().toLocaleString());
+      const timestamp = new Date().toLocaleString();
+      console.log('');
+      console.log('📧='.repeat(50));
+      console.log(`📧 DAILY RENEWAL REMINDERS STARTED: ${timestamp}`);
+      console.log('📧='.repeat(50));
+      
       try {
-        await emailService.sendRenewalReminders();
+        // Check email service status
+        if (!emailService.transporter) {
+          console.log('❌ Email service not initialized - attempting to reinitialize...');
+          await emailService.initializeTransporter();
+        }
+
+        const result = await emailService.sendRenewalReminders();
+        
+        if (result.success) {
+          console.log(`✅ Renewal reminders completed: ${result.sent} emails sent`);
+        } else {
+          console.log(`❌ Renewal reminders failed: ${result.error}`);
+        }
+        
+        console.log('📧='.repeat(50));
+        console.log(`📧 DAILY RENEWAL REMINDERS COMPLETED: ${new Date().toLocaleString()}`);
+        console.log('📧='.repeat(50));
+        console.log('');
       } catch (error) {
-        console.error('❌ Error in daily renewal reminders:', error);
+        console.error('❌ ERROR IN DAILY RENEWAL REMINDERS:', error);
+        console.log('📧='.repeat(50));
+        console.log('');
       }
     });
     console.log('✅ Daily renewal reminder scheduler activated');
+
+    // Every 5 minutes check for immediate scheduled emails (for testing and urgent emails)
+    cron.schedule('*/5 * * * *', async () => {
+      try {
+        // Quick check for any emails that should run NOW (within last 5 minutes)
+        const now = new Date();
+        const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+        
+        const urgentSchedules = await db.query(`
+          SELECT COUNT(*) as count FROM email_schedules 
+          WHERE active = TRUE 
+            AND schedule_type = 'specific_date' 
+            AND next_run IS NOT NULL
+            AND next_run BETWEEN ? AND ?
+        `, [fiveMinutesAgo, now]);
+
+        if (urgentSchedules[0].count > 0) {
+          console.log(`⚡ Found ${urgentSchedules[0].count} urgent scheduled emails - processing...`);
+          await emailService.processScheduledEmails();
+        }
+      } catch (error) {
+        // Silent catch - don't spam logs for this frequent check
+      }
+    });
+    console.log('✅ 5-minute urgent email checker activated');
 
   } catch (error) {
     console.error('Failed to start application:', error);

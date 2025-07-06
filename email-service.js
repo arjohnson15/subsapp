@@ -10,79 +10,58 @@ class EmailService {
 
   async initializeTransporter() {
     try {
-      // Get SMTP settings from database
-      const smtpSettings = await this.getSMTPSettings();
+      const settings = await this.getEmailSettings();
       
-      if (smtpSettings.smtp_host && smtpSettings.smtp_user && smtpSettings.smtp_pass) {
-        this.transporter = nodemailer.createTransporter({
-          host: smtpSettings.smtp_host,
-          port: parseInt(smtpSettings.smtp_port) || 587,
-          secure: parseInt(smtpSettings.smtp_port) === 465,
-          auth: {
-            user: smtpSettings.smtp_user,
-            pass: smtpSettings.smtp_pass
-          }
-        });
-        console.log('✅ Email service initialized with database settings');
-      } else {
-        console.log('⚠️ Email service not configured - missing SMTP settings');
+      if (!settings.smtp_host || !settings.smtp_user || !settings.smtp_pass) {
+        console.warn('Email settings not configured - email functionality will be disabled');
+        return;
       }
-    } catch (error) {
-      console.error('❌ Error initializing email service:', error);
-    }
-  }
 
-  async getSMTPSettings() {
-    try {
-      const settings = await db.query(`
-        SELECT setting_key, setting_value 
-        FROM settings 
-        WHERE setting_key IN ('smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'from_email', 'from_name')
-      `);
-      
-      const smtpConfig = {};
-      settings.forEach(setting => {
-        smtpConfig[setting.setting_key] = setting.setting_value;
+      this.transporter = nodemailer.createTransporter({
+        host: settings.smtp_host,
+        port: parseInt(settings.smtp_port) || 587,
+        secure: false,
+        auth: {
+          user: settings.smtp_user,
+          pass: settings.smtp_pass,
+        },
+        tls: {
+          rejectUnauthorized: false,
+        },
       });
-      
-      return smtpConfig;
+
+      // Test connection
+      await this.transporter.verify();
+      console.log('✅ Email service initialized successfully');
     } catch (error) {
-      console.error('Error fetching SMTP settings:', error);
-      return {};
+      console.error('❌ Email service initialization failed:', error.message);
+      this.transporter = null;
     }
   }
 
-  async testConnection() {
+  async getEmailSettings() {
     try {
-      if (!this.transporter) {
-        await this.initializeTransporter();
-      }
-      
-      if (!this.transporter) {
-        return { success: false, error: 'SMTP not configured' };
-      }
-      
-      await this.transporter.verify();
-      return { success: true, message: 'SMTP connection successful' };
+      const settings = await db.query('SELECT setting_key, setting_value FROM settings WHERE setting_key LIKE "smtp_%"');
+      const settingsMap = {};
+      settings.forEach(setting => {
+        settingsMap[setting.setting_key] = setting.setting_value;
+      });
+      return settingsMap;
     } catch (error) {
-      return { success: false, error: error.message };
+      console.error('Error fetching email settings:', error);
+      return {};
     }
   }
 
   async sendEmail(to, subject, htmlBody, options = {}) {
     try {
       if (!this.transporter) {
-        await this.initializeTransporter();
-      }
-      
-      if (!this.transporter) {
-        throw new Error('Email service not configured');
+        console.error('❌ Email transporter not initialized');
+        return { success: false, error: 'Email service not configured' };
       }
 
-      const smtpSettings = await this.getSMTPSettings();
-      
       const mailOptions = {
-        from: `${smtpSettings.from_name || 'JohnsonFlix'} <${smtpSettings.from_email || smtpSettings.smtp_user}>`,
+        from: options.from || process.env.SMTP_USER,
         to: to,
         subject: subject,
         html: htmlBody,
@@ -91,25 +70,31 @@ class EmailService {
 
       const result = await this.transporter.sendMail(mailOptions);
       
-      // Log the email
-      await this.logEmail(options.userId, to, subject, options.templateName, 'sent');
-      
+      // Log email to database
+      if (options.userId) {
+        await this.logEmail(options.userId, to, subject, options.templateName || 'Manual', 'sent');
+      }
+
+      console.log(`✅ Email sent to ${to}: ${subject}`);
       return { success: true, messageId: result.messageId };
     } catch (error) {
-      // Log the error
-      await this.logEmail(options.userId, to, subject, options.templateName, 'failed', error.message);
+      console.error(`❌ Failed to send email to ${to}:`, error.message);
       
-      console.error('Error sending email:', error);
+      // Log failed email
+      if (options.userId) {
+        await this.logEmail(options.userId, to, subject, options.templateName || 'Manual', 'failed', error.message);
+      }
+      
       return { success: false, error: error.message };
     }
   }
 
-  async logEmail(userId, recipientEmail, subject, templateUsed, status, errorMessage = null) {
+  async logEmail(userId, email, subject, templateName, status, errorMessage = null) {
     try {
       await db.query(`
-        INSERT INTO email_logs (user_id, recipient_email, subject, template_used, status, error_message)
+        INSERT INTO email_logs (user_id, email, subject, template_used, status, error_message)
         VALUES (?, ?, ?, ?, ?, ?)
-      `, [userId || null, recipientEmail, subject, templateUsed || null, status, errorMessage]);
+      `, [userId, email, subject, templateName, status, errorMessage]);
     } catch (error) {
       console.error('Error logging email:', error);
     }
@@ -129,24 +114,21 @@ class EmailService {
     try {
       let processedBody = templateBody;
       
-      // Get all settings for dynamic replacement
+      // Get settings for payment links
       const settings = await db.query('SELECT setting_key, setting_value FROM settings');
       const settingsMap = {};
       settings.forEach(setting => {
         settingsMap[setting.setting_key] = setting.setting_value;
       });
-
-      // Replace user-specific placeholders
+      
+      // Define all possible placeholders
       const placeholders = {
         name: userData.name || '',
         email: userData.email || '',
-        plex_email: userData.plex_email || '',
+        plex_email: userData.plex_email || userData.email || '',
         iptv_username: userData.iptv_username || '',
         iptv_password: userData.iptv_password || '',
         implayer_code: userData.implayer_code || '',
-        device_count: userData.device_count || '',
-        owner_name: userData.owner_name || '',
-        owner_email: userData.owner_email || '',
         subscription_name: userData.subscription_name || '',
         subscription_type: userData.subscription_type || '',
         expiration_date: userData.expiration_date || '',
@@ -201,7 +183,7 @@ class EmailService {
 
   async sendRenewalReminders() {
     try {
-      console.log('Starting renewal reminder process...');
+      console.log('🔄 Starting renewal reminder process...');
 
       // Get users expiring in 7 days
       const sevenDayUsers = await db.query(`
@@ -245,6 +227,8 @@ class EmailService {
           AND u.exclude_automated_emails = FALSE
       `);
 
+      console.log(`📧 Found ${sevenDayUsers.length} users expiring in 7 days, ${twoDayUsers.length} users expiring in 2 days`);
+
       // Send 7-day reminders
       for (const user of sevenDayUsers) {
         const userData = {
@@ -273,10 +257,10 @@ class EmailService {
         });
       }
 
-      console.log(`Sent ${sevenDayUsers.length} 7-day reminders and ${twoDayUsers.length} 2-day reminders`);
+      console.log(`✅ Sent ${sevenDayUsers.length} 7-day reminders and ${twoDayUsers.length} 2-day reminders`);
       return { success: true, sent: sevenDayUsers.length + twoDayUsers.length };
     } catch (error) {
-      console.error('Error sending renewal reminders:', error);
+      console.error('❌ Error sending renewal reminders:', error);
       return { success: false, error: error.message };
     }
   }
@@ -309,12 +293,15 @@ class EmailService {
 
   async processIndividualSchedule(schedule) {
     try {
+      console.log(`🔍 Processing schedule: ${schedule.name} (ID: ${schedule.id})`);
+      
       const now = new Date();
       let shouldRun = false;
       let targetUsers = [];
 
       if (schedule.schedule_type === 'expiration_reminder') {
-        // Check daily for expiration reminders
+        console.log(`   → Expiration reminder: ${schedule.days_before_expiration} days before, type: ${schedule.subscription_type}`);
+        
         targetUsers = await this.getExpiringUsers(
           schedule.days_before_expiration,
           schedule.subscription_type,
@@ -323,18 +310,25 @@ class EmailService {
         );
         
         shouldRun = targetUsers.length > 0;
+        console.log(`   → Found ${targetUsers.length} expiring users`);
         
       } else if (schedule.schedule_type === 'specific_date') {
+        console.log(`   → Specific date schedule: ${schedule.next_run}`);
+        
         if (schedule.next_run) {
           const nextRun = new Date(schedule.next_run);
           shouldRun = now >= nextRun;
+          console.log(`   → Should run? ${shouldRun} (now: ${now.toISOString()}, scheduled: ${nextRun.toISOString()})`);
           
           if (shouldRun) {
             targetUsers = await this.getAllTargetUsers(
               schedule.target_tags ? JSON.parse(schedule.target_tags) : null,
               schedule.exclude_users_with_setting
             );
+            console.log(`   → Found ${targetUsers.length} target users`);
           }
+        } else {
+          console.log(`   → No next_run date set, skipping`);
         }
       }
 
@@ -357,7 +351,7 @@ class EmailService {
               sentCount++;
             }
           } catch (error) {
-            console.error(`Error sending to ${user.name}:`, error);
+            console.error(`   ❌ Error sending to ${user.name}:`, error);
           }
         }
 
@@ -370,6 +364,8 @@ class EmailService {
         `, [now, schedule.id]);
 
         console.log(`✅ Schedule "${schedule.name}" completed: ${sentCount}/${targetUsers.length} emails sent`);
+      } else {
+        console.log(`   → Skipping schedule (shouldRun: ${shouldRun}, targetUsers: ${targetUsers.length})`);
       }
     } catch (error) {
       console.error(`❌ Error processing schedule ${schedule.name}:`, error);
@@ -378,6 +374,8 @@ class EmailService {
 
   async getExpiringUsers(daysBefore, subscriptionType, targetTags, excludeAutomated) {
     try {
+      console.log(`   🔍 Getting expiring users: ${daysBefore} days, type: ${subscriptionType}, excludeAutomated: ${excludeAutomated}`);
+      
       let query = `
         SELECT 
           u.*, 
@@ -411,29 +409,38 @@ class EmailService {
       }
 
       const users = await db.query(query, params);
+      console.log(`   📊 Database returned ${users.length} users before tag filtering`);
 
       // Filter by tags if specified
       if (targetTags && targetTags.length > 0) {
-        return users.filter(user => {
+        const filteredUsers = users.filter(user => {
           if (!user.tags) return false;
-          const userTags = JSON.parse(user.tags);
-          return targetTags.some(tag => userTags.includes(tag));
+          try {
+            const userTags = JSON.parse(user.tags);
+            return targetTags.some(tag => userTags.includes(tag));
+          } catch (e) {
+            return false;
+          }
         });
+        console.log(`   🏷️ After tag filtering: ${filteredUsers.length} users`);
+        return filteredUsers;
       }
 
       return users;
     } catch (error) {
-      console.error('Error getting expiring users:', error);
+      console.error('❌ Error getting expiring users:', error);
       return [];
     }
   }
 
   async getAllTargetUsers(targetTags, excludeAutomated) {
     try {
+      console.log(`   🔍 Getting all target users, excludeAutomated: ${excludeAutomated}`);
+      
       let query = `
         SELECT 
           u.*, 
-          o.name as owner_name,
+          o.name as owner_name, 
           o.email as owner_email
         FROM users u
         LEFT JOIN owners o ON u.owner_id = o.id
@@ -448,65 +455,183 @@ class EmailService {
       }
 
       const users = await db.query(query, params);
+      console.log(`   📊 Database returned ${users.length} users before tag filtering`);
 
       // Filter by tags if specified
       if (targetTags && targetTags.length > 0) {
-        return users.filter(user => {
+        const filteredUsers = users.filter(user => {
           if (!user.tags) return false;
-          const userTags = JSON.parse(user.tags);
-          return targetTags.some(tag => userTags.includes(tag));
+          try {
+            const userTags = JSON.parse(user.tags);
+            return targetTags.some(tag => userTags.includes(tag));
+          } catch (e) {
+            return false;
+          }
         });
+        console.log(`   🏷️ After tag filtering: ${filteredUsers.length} users`);
+        return filteredUsers;
       }
 
       return users;
     } catch (error) {
-      console.error('Error getting target users:', error);
+      console.error('❌ Error getting all target users:', error);
       return [];
     }
   }
-
-  async sendBulkEmail(tags, subject, htmlBody, options = {}) {
+  
+  async testConnection() {
     try {
-      const whereClause = tags.map(() => 'JSON_CONTAINS(tags, ?)').join(' OR ');
-      const tagParams = tags.map(tag => JSON.stringify(tag));
+      if (!this.transporter) {
+        await this.initializeTransporter();
+      }
       
-      const users = await db.query(`
-        SELECT u.*, o.email as owner_email 
-        FROM users u 
-        LEFT JOIN owners o ON u.owner_id = o.id
-        WHERE u.exclude_bulk_emails = FALSE AND (${whereClause})
-      `, tagParams);
+      if (!this.transporter) {
+        return { success: false, error: 'SMTP not configured' };
+      }
+      
+      await this.transporter.verify();
+      return { success: true, message: 'SMTP connection successful' };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
 
+  async testEmailConnection() {
+    try {
+      console.log('🧪 Testing email connection...');
+      
+      // Get SMTP settings from database
+      const smtpSettings = await this.getEmailSettings();
+      console.log('📧 SMTP Settings:', { 
+        host: smtpSettings.smtp_host, 
+        port: smtpSettings.smtp_port, 
+        user: smtpSettings.smtp_user,
+        pass: smtpSettings.smtp_pass ? '[CONFIGURED]' : '[NOT SET]'
+      });
+      
+      if (!smtpSettings.smtp_host || !smtpSettings.smtp_user || !smtpSettings.smtp_pass) {
+        return { 
+          success: false, 
+          error: 'Email service not configured - missing SMTP settings' 
+        };
+      }
+
+      // Test connection
+      const connectionTest = await this.testConnection();
+      if (!connectionTest.success) {
+        return { 
+          success: false, 
+          error: `SMTP connection failed: ${connectionTest.error}` 
+        };
+      }
+
+      // Send test email to the configured email address
+      const testEmail = smtpSettings.smtp_user;
+      const testSubject = 'JohnsonFlix Email Test';
+      const testBody = `
+        <h2 style="color: #8e24aa;">Email Test Successful!</h2>
+        <p>This is a test email from your JohnsonFlix subscription manager.</p>
+        <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+        <p><strong>SMTP Host:</strong> ${smtpSettings.smtp_host}</p>
+        <p><strong>SMTP Port:</strong> ${smtpSettings.smtp_port}</p>
+        <p>If you received this email, your email configuration is working correctly!</p>
+      `;
+
+      const result = await this.sendEmail(testEmail, testSubject, testBody, {
+        templateName: 'Email Test'
+      });
+
+      if (result.success) {
+        return { 
+          success: true, 
+          message: `Test email sent successfully to ${testEmail}` 
+        };
+      } else {
+        return { 
+          success: false, 
+          error: `Failed to send test email: ${result.error}` 
+        };
+      }
+
+    } catch (error) {
+      console.error('❌ Email test error:', error);
+      return { 
+        success: false, 
+        error: `Email test failed: ${error.message}` 
+      };
+    }
+  }
+
+  async getSMTPSettings() {
+    return await this.getEmailSettings();
+  }
+
+  async sendBulkEmail(tags, subject, body, options = {}) {
+    try {
+      console.log(`📧 Starting bulk email to tags: ${tags.join(', ')}`);
+      
+      // Get target users
+      let query = 'SELECT * FROM users WHERE 1=1';
+      const params = [];
+
+      if (options.excludeBulkOptOut !== false) {
+        query += ' AND exclude_bulk_emails = FALSE';
+      }
+
+      const allUsers = await db.query(query, params);
+
+      // Filter by tags if specified
+      let targetUsers = allUsers;
+      if (tags && tags.length > 0) {
+        targetUsers = allUsers.filter(user => {
+          if (!user.tags) return false;
+          try {
+            const userTags = JSON.parse(user.tags);
+            return tags.some(tag => userTags.includes(tag));
+          } catch (e) {
+            return false;
+          }
+        });
+      }
+
+      console.log(`📧 Found ${targetUsers.length} target users for bulk email`);
+
+      // Send emails to all target users
       let sentCount = 0;
-      let errors = [];
+      let failedCount = 0;
 
-      for (const user of users) {
+      for (const user of targetUsers) {
         try {
-          const personalizedBody = await this.processTemplate(htmlBody, user);
-          const personalizedSubject = await this.processTemplate(subject, user);
+          const personalizedBody = await this.replacePlaceholders(body, user);
+          const personalizedSubject = await this.replacePlaceholders(subject, user);
           
           const result = await this.sendEmail(user.email, personalizedSubject, personalizedBody, {
             userId: user.id,
-            templateName: options.templateName,
-            bcc: options.bcc
+            templateName: options.templateName || 'Bulk Email',
+            bcc: options.bcc || []
           });
 
           if (result.success) {
             sentCount++;
           } else {
-            errors.push(`${user.name}: ${result.error}`);
+            failedCount++;
           }
         } catch (error) {
-          errors.push(`${user.name}: ${error.message}`);
+          console.error(`Error sending bulk email to ${user.name}:`, error);
+          failedCount++;
         }
       }
 
+      console.log(`✅ Bulk email completed: ${sentCount} sent, ${failedCount} failed`);
+
       return {
         success: true,
+        message: `Bulk email completed: ${sentCount} sent, ${failedCount} failed`,
         sent: sentCount,
-        total: users.length,
-        errors: errors
+        failed: failedCount,
+        total: targetUsers.length
       };
+
     } catch (error) {
       console.error('Error sending bulk email:', error);
       return { success: false, error: error.message };
@@ -514,6 +639,4 @@ class EmailService {
   }
 }
 
-// Create and export singleton instance
-const emailService = new EmailService();
-module.exports = emailService;
+module.exports = new EmailService();
