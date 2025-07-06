@@ -18,7 +18,68 @@ router.post('/send', [
 
     const { to, cc, bcc, subject, body, userId, templateName } = req.body;
 
-    const result = await emailService.sendEmail(to, subject, body, {
+    // FIXED: Get complete user data for dynamic field replacement
+    let userData = null;
+    if (userId) {
+      try {
+        const users = await db.query(`
+          SELECT u.*, o.name as owner_name, o.email as owner_email,
+                 GROUP_CONCAT(CONCAT(st.name, ':', s.expiration_date) SEPARATOR '|') as subscriptions
+          FROM users u
+          LEFT JOIN owners o ON u.owner_id = o.id
+          LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
+          LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
+          WHERE u.id = ?
+          GROUP BY u.id
+        `, [userId]);
+
+        if (users.length > 0) {
+          userData = users[0];
+          
+          // Parse subscription data for dynamic fields
+          if (userData.subscriptions) {
+            const subscriptionPairs = userData.subscriptions.split('|');
+            subscriptionPairs.forEach(pair => {
+              const [type, expiration] = pair.split(':');
+              if (type && expiration) {
+                userData.subscription_name = type;
+                userData.subscription_type = type;
+                userData.expiration_date = expiration;
+                
+                if (type.toLowerCase().includes('plex')) {
+                  userData.plex_expiration = expiration;
+                } else if (type.toLowerCase().includes('iptv')) {
+                  userData.iptv_expiration = expiration;
+                }
+                
+                // Calculate days until expiration
+                const expirationDate = new Date(expiration);
+                const today = new Date();
+                const timeDiff = expirationDate.getTime() - today.getTime();
+                const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+                userData.days_until_expiration = daysDiff;
+              }
+            });
+          }
+          
+          console.log('📧 Retrieved user data for email:', userData.name, 'ID:', userData.id);
+        }
+      } catch (error) {
+        console.error('Error fetching user data for email:', error);
+      }
+    }
+
+    // FIXED: Process the email body and subject with user data for dynamic fields
+    let processedSubject = subject;
+    let processedBody = body;
+    
+    if (userData) {
+      processedSubject = await emailService.replacePlaceholders(subject, userData);
+      processedBody = await emailService.replacePlaceholders(body, userData);
+      console.log('📧 Processed email with dynamic fields for user:', userData.name);
+    }
+
+    const result = await emailService.sendEmail(to, processedSubject, processedBody, {
       // FIXED: Handle cc and bcc as arrays (already processed by frontend)
       cc: Array.isArray(cc) ? cc : (cc ? cc.split(',').map(email => email.trim()) : []),
       bcc: Array.isArray(bcc) ? bcc : (bcc ? bcc.split(',').map(email => email.trim()) : []),

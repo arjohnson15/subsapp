@@ -92,7 +92,7 @@ class EmailService {
   async logEmail(userId, email, subject, templateName, status, errorMessage = null) {
     try {
       await db.query(`
-        INSERT INTO email_logs (user_id, email, subject, template_used, status, error_message)
+        INSERT INTO email_logs (user_id, recipient_email, subject, template_used, status, error_message)
         VALUES (?, ?, ?, ?, ?, ?)
       `, [userId, email, subject, templateName, status, errorMessage]);
     } catch (error) {
@@ -121,26 +121,49 @@ class EmailService {
         settingsMap[setting.setting_key] = setting.setting_value;
       });
       
-      // Define all possible placeholders
-      const placeholders = {
-        name: userData.name || '',
-        email: userData.email || '',
-        plex_email: userData.plex_email || userData.email || '',
-        iptv_username: userData.iptv_username || '',
-        iptv_password: userData.iptv_password || '',
-        implayer_code: userData.implayer_code || '',
-        subscription_name: userData.subscription_name || '',
-        subscription_type: userData.subscription_type || '',
-        expiration_date: userData.expiration_date || '',
-        plex_expiration: userData.plex_expiration || userData.expiration_date || '',
-        iptv_expiration: userData.iptv_expiration || userData.expiration_date || '',
-        days_until_expiration: userData.days_until_expiration || '',
-        renewal_price: userData.renewal_price || '',
-        // Add settings-based placeholders
-        paypal_link: settingsMap.paypal_link || '#',
-        venmo_link: settingsMap.venmo_link || '#',
-        cashapp_link: settingsMap.cashapp_link || '#'
-      };
+
+// Define all possible placeholders
+const placeholders = {
+  // Basic user info
+  name: userData.name || '',
+  email: userData.email || '',
+  username: userData.username || userData.name || '',
+  
+  // Owner info
+  owner_name: userData.owner_name || '',
+  owner_email: userData.owner_email || '',
+  
+  // Plex info
+  plex_email: userData.plex_email || userData.email || '',
+  plex_expiration: userData.plex_expiration || userData.expiration_date || '',
+  plex_subscription_type: userData.plex_subscription_type || userData.subscription_type || '',
+  plex_days_until_expiration: userData.plex_days_until_expiration || userData.days_until_expiration || '',
+  plex_renewal_price: userData.plex_renewal_price || userData.renewal_price || '',
+  
+  // IPTV info
+  iptv_username: userData.iptv_username || '',
+  iptv_password: userData.iptv_password || '',
+  iptv_expiration: userData.iptv_expiration || userData.expiration_date || '',
+  iptv_subscription_type: userData.iptv_subscription_type || userData.subscription_type || '',
+  iptv_days_until_expiration: userData.iptv_days_until_expiration || userData.days_until_expiration || '',
+  iptv_renewal_price: userData.iptv_renewal_price || userData.renewal_price || '',
+  
+  // Device info
+  implayer_code: userData.implayer_code || '',
+  device_count: userData.device_count || '',
+  
+  // General subscription info (legacy fields for backward compatibility)
+  subscription_name: userData.subscription_name || '',
+  subscription_type: userData.subscription_type || '',
+  expiration_date: userData.expiration_date || '',
+  days_until_expiration: userData.days_until_expiration || '',
+  renewal_price: userData.renewal_price || '',
+  
+  // Payment links from settings
+  paypal_link: settingsMap.paypal_link || '#',
+  venmo_link: settingsMap.venmo_link || '#',
+  cashapp_link: settingsMap.cashapp_link || '#'
+};
 
       // Replace all placeholders
       for (const [key, value] of Object.entries(placeholders)) {
@@ -291,86 +314,97 @@ class EmailService {
     }
   }
 
-  async processIndividualSchedule(schedule) {
-    try {
-      console.log(`🔍 Processing schedule: ${schedule.name} (ID: ${schedule.id})`);
+async processIndividualSchedule(schedule) {
+  try {
+    console.log(`🔍 Processing schedule: ${schedule.name} (ID: ${schedule.id})`);
+    
+    const now = new Date();
+    let shouldRun = false;
+    let targetUsers = [];
+
+    // Helper function to safely parse target_tags
+    const parseTargetTags = (targetTags) => {
+      if (!targetTags) return null;
+      try {
+        return JSON.parse(targetTags);
+      } catch (e) {
+        console.log(`⚠️ Invalid target_tags JSON for schedule ${schedule.id}:`, targetTags);
+        return null;
+      }
+    };
+
+    if (schedule.schedule_type === 'expiration_reminder') {
+      console.log(`   → Expiration reminder: ${schedule.days_before_expiration} days before, type: ${schedule.subscription_type}`);
       
-      const now = new Date();
-      let shouldRun = false;
-      let targetUsers = [];
-
-      if (schedule.schedule_type === 'expiration_reminder') {
-        console.log(`   → Expiration reminder: ${schedule.days_before_expiration} days before, type: ${schedule.subscription_type}`);
+      targetUsers = await this.getExpiringUsers(
+        schedule.days_before_expiration,
+        schedule.subscription_type,
+        parseTargetTags(schedule.target_tags),
+        schedule.exclude_users_with_setting
+      );
+      
+      shouldRun = targetUsers.length > 0;
+      console.log(`   → Found ${targetUsers.length} expiring users`);
+      
+    } else if (schedule.schedule_type === 'specific_date') {
+      console.log(`   → Specific date schedule: ${schedule.next_run}`);
+      
+      if (schedule.next_run) {
+        const nextRun = new Date(schedule.next_run);
+        shouldRun = now >= nextRun;
+        console.log(`   → Should run? ${shouldRun} (now: ${now.toISOString()}, scheduled: ${nextRun.toISOString()})`);
         
-        targetUsers = await this.getExpiringUsers(
-          schedule.days_before_expiration,
-          schedule.subscription_type,
-          schedule.target_tags ? JSON.parse(schedule.target_tags) : null,
-          schedule.exclude_users_with_setting
-        );
-        
-        shouldRun = targetUsers.length > 0;
-        console.log(`   → Found ${targetUsers.length} expiring users`);
-        
-      } else if (schedule.schedule_type === 'specific_date') {
-        console.log(`   → Specific date schedule: ${schedule.next_run}`);
-        
-        if (schedule.next_run) {
-          const nextRun = new Date(schedule.next_run);
-          shouldRun = now >= nextRun;
-          console.log(`   → Should run? ${shouldRun} (now: ${now.toISOString()}, scheduled: ${nextRun.toISOString()})`);
-          
-          if (shouldRun) {
-            targetUsers = await this.getAllTargetUsers(
-              schedule.target_tags ? JSON.parse(schedule.target_tags) : null,
-              schedule.exclude_users_with_setting
-            );
-            console.log(`   → Found ${targetUsers.length} target users`);
-          }
-        } else {
-          console.log(`   → No next_run date set, skipping`);
+        if (shouldRun) {
+          targetUsers = await this.getAllTargetUsers(
+            parseTargetTags(schedule.target_tags),
+            schedule.exclude_users_with_setting
+          );
+          console.log(`   → Found ${targetUsers.length} target users`);
         }
-      }
-
-      if (shouldRun && targetUsers.length > 0) {
-        console.log(`📤 Running schedule: ${schedule.name} for ${targetUsers.length} users`);
-        
-        // Send emails to all target users
-        let sentCount = 0;
-        for (const user of targetUsers) {
-          try {
-            const personalizedBody = await this.replacePlaceholders(schedule.body, user);
-            const personalizedSubject = await this.replacePlaceholders(schedule.subject, user);
-            
-            const result = await this.sendEmail(user.email, personalizedSubject, personalizedBody, {
-              userId: user.id,
-              templateName: schedule.template_name
-            });
-
-            if (result.success) {
-              sentCount++;
-            }
-          } catch (error) {
-            console.error(`   ❌ Error sending to ${user.name}:`, error);
-          }
-        }
-
-        // Update schedule statistics
-        await db.query(`
-          UPDATE email_schedules 
-          SET last_run = ?, run_count = COALESCE(run_count, 0) + 1,
-              active = ${schedule.schedule_type === 'specific_date' ? 'FALSE' : 'TRUE'}
-          WHERE id = ?
-        `, [now, schedule.id]);
-
-        console.log(`✅ Schedule "${schedule.name}" completed: ${sentCount}/${targetUsers.length} emails sent`);
       } else {
-        console.log(`   → Skipping schedule (shouldRun: ${shouldRun}, targetUsers: ${targetUsers.length})`);
+        console.log(`   → No next_run date set, skipping`);
       }
-    } catch (error) {
-      console.error(`❌ Error processing schedule ${schedule.name}:`, error);
     }
+
+    if (shouldRun && targetUsers.length > 0) {
+      console.log(`📤 Running schedule: ${schedule.name} for ${targetUsers.length} users`);
+      
+      // Send emails to all target users
+      let sentCount = 0;
+      for (const user of targetUsers) {
+        try {
+          const personalizedBody = await this.replacePlaceholders(schedule.body, user);
+          const personalizedSubject = await this.replacePlaceholders(schedule.subject, user);
+          
+          const result = await this.sendEmail(user.email, personalizedSubject, personalizedBody, {
+            userId: user.id,
+            templateName: schedule.template_name
+          });
+
+          if (result.success) {
+            sentCount++;
+          }
+        } catch (error) {
+          console.error(`   ❌ Error sending to ${user.name}:`, error);
+        }
+      }
+
+      // Update schedule statistics
+      await db.query(`
+        UPDATE email_schedules 
+        SET last_run = ?, run_count = COALESCE(run_count, 0) + 1,
+            active = ${schedule.schedule_type === 'specific_date' ? 'FALSE' : 'TRUE'}
+        WHERE id = ?
+      `, [now, schedule.id]);
+
+      console.log(`✅ Schedule "${schedule.name}" completed: ${sentCount}/${targetUsers.length} emails sent`);
+    } else {
+      console.log(`   → Skipping schedule (shouldRun: ${shouldRun}, targetUsers: ${targetUsers.length})`);
+    }
+  } catch (error) {
+    console.error(`❌ Error processing schedule ${schedule.name}:`, error);
   }
+}
 
   async getExpiringUsers(daysBefore, subscriptionType, targetTags, excludeAutomated) {
     try {
