@@ -147,8 +147,8 @@ async function initializeApp() {
     });
     console.log('✅ Hourly specific date email scheduler activated');
 
-    // Daily renewal reminders AND expiration reminder schedules (runs at 6 PM UTC every day for testing)
-    cron.schedule('0 23 * * *', async () => {
+    // Daily renewal reminders AND expiration reminder schedules (runs at 1 pm UTC 8am Central every day)
+    cron.schedule('0 13 * * *', async () => {
       const timestamp = new Date().toLocaleString();
       console.log('');
       console.log('📧='.repeat(50));
