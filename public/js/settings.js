@@ -172,35 +172,37 @@ if (document.getElementById('targetTagsContainer')) {
         }
     },
     
-    renderOwnersTable(owners) {
-        const tbody = document.getElementById('ownersTableBody');
-        if (!tbody) {
-            console.log('⚠️ Owners table body not found - probably not on management page');
-            return;
-        }
-        
-        if (owners.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No owners found</td></tr>';
-            return;
-        }
-        
-        tbody.innerHTML = owners.map(owner => `
-            <tr>
-                <td>${owner.name}</td>
-                <td>${owner.email}</td>
-                <td>
-                    <span class="status-badge ${owner.active ? 'status-active' : 'status-inactive'}">
-                        ${owner.active ? 'Active' : 'Inactive'}
-                    </span>
-                </td>
-                <td>${new Date(owner.created_at).toLocaleDateString()}</td>
-                <td>
-                    <button class="btn btn-small btn-edit" onclick="Settings.editOwner(${owner.id})">Edit</button>
-                    <button class="btn btn-small btn-delete" onclick="Settings.deleteOwner(${owner.id})">Delete</button>
-                </td>
-            </tr>
-        `).join('');
-    },
+renderOwnersTable(owners) {
+    const tbody = document.getElementById('ownersTableBody');
+    if (!tbody) {
+        console.log('⚠️ Owners table body not found - probably not on management page');
+        return;
+    }
+    
+    if (!owners || owners.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No owners found</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = owners.map(owner => `
+        <tr>
+            <td>${Utils.escapeHtml(owner.name)}</td>
+            <td>${Utils.escapeHtml(owner.email)}</td>
+            <td>
+                <span class="status-badge ${owner.active !== false ? 'status-active' : 'status-inactive'}">
+                    ${owner.active !== false ? 'Active' : 'Inactive'}
+                </span>
+            </td>
+            <td>${Utils.formatDate(owner.created_at)}</td>
+            <td>
+                <button class="btn btn-small" onclick="Settings.editOwner(${owner.id})">Edit</button>
+                <button class="btn btn-small btn-danger" onclick="Settings.deleteOwner(${owner.id})">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+    
+    console.log(`✅ Rendered ${owners.length} owners`);
+},
         
     async addOwner() {
         const name = document.getElementById('ownerName')?.value;
@@ -504,7 +506,7 @@ renderSchedulesTable(schedules) {
             </tr>
         `;
     }).join('');
-}
+},
 
     async editSchedule(id) {
         try {
@@ -621,46 +623,43 @@ populateTagsContainer() {
     }).join('');
 },
     
-    renderSubscriptionsTable() {
-        const tbody = document.getElementById('subscriptionsTableBody');
-        if (!tbody) {
-            console.log('⚠️ Subscriptions table body not found - probably not on management page');
-            return;
-        }
-        
-        const subscriptions = window.AppState.subscriptionTypes || [];
-        console.log('🎨 Rendering', subscriptions.length, 'subscriptions');
-        
-        if (subscriptions.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No subscription types found</td></tr>';
-            return;
-        }
-        
-        tbody.innerHTML = subscriptions.map(sub => `
-            <tr>
-                <td>${sub.name}</td>
-                <td>
-                    <span class="tag tag-${sub.type}">${sub.type.toUpperCase()}</span>
-                </td>
-                <td>${sub.duration_months} month${sub.duration_months > 1 ? 's' : ''}</td>
-                <td>${sub.streams || 'N/A'}</td>
-                <td>$${parseFloat(sub.price).toFixed(2)}</td>
-                <td>
-                    <span class="tag ${sub.active ? 'tag-plex1' : 'tag-free'}">
-                        ${sub.active ? 'Active' : 'Inactive'}
-                    </span>
-                </td>
-                <td>
-                    <button class="btn btn-small btn-edit" onclick="Settings.editSubscription(${sub.id})">Edit</button>
-                    <button class="btn btn-small btn-delete" onclick="Settings.toggleSubscription(${sub.id})">
-                        ${sub.active ? 'Deactivate' : 'Activate'}
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-        
-        console.log('✅ Subscriptions table rendered');
-    },
+renderSubscriptionsTable(subscriptions) {
+    const tbody = document.getElementById('subscriptionsTableBody');
+    if (!tbody) {
+        console.log('⚠️ Subscriptions table body not found - probably not on management page');
+        return;
+    }
+    
+    if (!subscriptions || subscriptions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No subscription types found</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = subscriptions.map(sub => `
+        <tr>
+            <td>${Utils.escapeHtml(sub.name)}</td>
+            <td>
+                <span class="status-badge ${sub.type === 'plex' ? 'status-info' : 'status-warning'}">
+                    ${sub.type.toUpperCase()}
+                </span>
+            </td>
+            <td>${sub.duration_months} month${sub.duration_months > 1 ? 's' : ''}</td>
+            <td>${sub.streams ? `${sub.streams} streams` : 'N/A'}</td>
+            <td>$${parseFloat(sub.price || 0).toFixed(2)}</td>
+            <td>
+                <span class="status-badge ${sub.active ? 'status-active' : 'status-inactive'}">
+                    ${sub.active ? 'Active' : 'Inactive'}
+                </span>
+            </td>
+            <td>
+                <button class="btn btn-small" onclick="Settings.editSubscription(${sub.id})">Edit</button>
+                <button class="btn btn-small btn-danger" onclick="Settings.deleteSubscription(${sub.id})">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+    
+    console.log(`✅ Rendered ${subscriptions.length} subscription types`);
+},
         
     sortSubscriptions(field) {
         if (this.currentSortField === field) {
@@ -841,6 +840,28 @@ populateTagsContainer() {
             
         } catch (error) {
             Utils.handleError(error, 'Updating subscription status');
+        } finally {
+            Utils.hideLoading();
+        }
+    },
+	
+	    async deleteSubscription(subscriptionId) {
+        try {
+            const subscription = window.AppState.subscriptionTypes.find(sub => sub.id === subscriptionId);
+            if (!subscription) return;
+            
+            if (!confirm(`Are you sure you want to delete "${subscription.name}"? This cannot be undone.`)) return;
+            
+            Utils.showLoading();
+            
+            await API.Subscription.delete(subscriptionId);
+            Utils.showNotification('Subscription type deleted successfully', 'success');
+            
+            // Reload data
+            await this.loadSubscriptions();
+            
+        } catch (error) {
+            Utils.handleError(error, 'Deleting subscription type');
         } finally {
             Utils.hideLoading();
         }
