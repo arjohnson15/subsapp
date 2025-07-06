@@ -249,7 +249,6 @@ const SettingsAPI = {
     }
 };
 
-// ADD this BEFORE the window.API export
 const EmailSchedulesAPI = {
     async getAll() {
         return await apiCall('/email-schedules');
@@ -282,7 +281,7 @@ const EmailSchedulesAPI = {
     }
 };
 
-// Then MODIFY your existing window.API export:
+// Then MODIFY your existing window.API export to include EmailSchedules:
 window.API = {
     call: apiCall,
     User: UserAPI,

@@ -451,58 +451,103 @@ async saveSchedule(event) {
     }
 },
 
-    renderSchedulesTable(schedules) {
-        const tbody = document.getElementById('schedulesTableBody');
-        if (!tbody) return;
+// REPLACE the renderSchedulesTable function in your settings.js with this:
 
-        if (schedules.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No email schedules found</td></tr>';
-            return;
+renderSchedulesTable(schedules) {
+    const tbody = document.getElementById('schedulesTableBody');
+    if (!tbody) return;
+
+    if (schedules.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No email schedules found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = schedules.map(schedule => {
+        // Clean up the date/time display - remove seconds and milliseconds
+        let scheduleDetails = '';
+        if (schedule.schedule_type === 'expiration_reminder') {
+            scheduleDetails = `${schedule.days_before_expiration} days before (${schedule.subscription_type || 'all'})`;
+        } else if (schedule.schedule_type === 'specific_date') {
+            if (schedule.next_run) {
+                const nextRun = new Date(schedule.next_run);
+                const dateStr = nextRun.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                });
+                const timeStr = nextRun.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                });
+                scheduleDetails = `${dateStr} at ${timeStr}`;
+            } else if (schedule.scheduled_date && schedule.scheduled_time) {
+                scheduleDetails = `${schedule.scheduled_date} at ${schedule.scheduled_time}`;
+            } else {
+                scheduleDetails = 'Not scheduled';
+            }
         }
 
-        tbody.innerHTML = schedules.map(schedule => {
-            let details = '';
-            if (schedule.schedule_type === 'expiration_reminder') {
-                details = `${schedule.days_before_expiration} days before ${schedule.subscription_type} expiration`;
-            } else {
-                details = `${schedule.scheduled_date} at ${schedule.scheduled_time}`;
-            }
+        const lastRun = schedule.last_run ? 
+            new Date(schedule.last_run).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            }) : 'Never';
 
-            let targetInfo = '';
-            if (schedule.target_tags && schedule.target_tags.length > 0) {
-                targetInfo = ` (Tags: ${schedule.target_tags.join(', ')})`;
-            }
+        const runCount = schedule.run_count || 0;
 
-            return `
-                <tr>
-                    <td>${schedule.name}</td>
-                    <td><span class="status-badge ${schedule.schedule_type === 'expiration_reminder' ? 'status-info' : 'status-warning'}">${schedule.schedule_type.replace('_', ' ').toUpperCase()}</span></td>
-                    <td>${details}${targetInfo}</td>
-                    <td>${schedule.template_name || 'Unknown'}</td>
-                    <td>
-                        <span class="status-badge ${schedule.active ? 'status-active' : 'status-inactive'}">
-                            ${schedule.active ? 'Active' : 'Inactive'}
-                        </span>
-                    </td>
-                    <td>${schedule.last_run ? new Date(schedule.last_run).toLocaleDateString() : 'Never'}</td>
-                    <td class="actions">
-                        <button onclick="Settings.editSchedule(${schedule.id})" class="btn-icon" title="Edit">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button onclick="Settings.toggleSchedule(${schedule.id})" class="btn-icon" title="Toggle Status">
-                            <i class="fas fa-power-off"></i>
-                        </button>
-                        <button onclick="Settings.testSchedule(${schedule.id})" class="btn-icon" title="Test Run">
-                            <i class="fas fa-play"></i>
-                        </button>
-                        <button onclick="Settings.deleteSchedule(${schedule.id})" class="btn-icon" title="Delete">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
-    },
+        return `
+            <tr>
+                <td>
+                    <strong>${Utils.escapeHtml(schedule.name)}</strong>
+                    <br><small style="color: #4fc3f7;">${schedule.template_name || 'No template'}</small>
+                </td>
+                <td>
+                    <span class="schedule-type ${schedule.schedule_type}">${schedule.schedule_type.replace('_', ' ')}</span>
+                </td>
+                <td>
+                    <small>${scheduleDetails}</small>
+                </td>
+                <td>
+                    <span class="status-badge ${schedule.active ? 'active' : 'inactive'}">
+                        ${schedule.active ? 'Active' : 'Inactive'}
+                    </span>
+                </td>
+                <td>
+                    <small>
+                        Last: ${lastRun}<br>
+                        Count: ${runCount}
+                    </small>
+                </td>
+                <td>
+                    ${schedule.target_tags && schedule.target_tags.length > 0 ? 
+                        schedule.target_tags.map(tag => `<span class="tag-chip">${tag}</span>`).join(' ') : 
+                        '<small style="color: #666;">All users</small>'
+                    }
+                </td>
+                <td>
+                    <button class="btn btn-small" onclick="Settings.editSchedule(${schedule.id})" title="Edit">
+                        <i class="icon">✏️</i>
+                    </button>
+                    <button class="btn btn-small" onclick="Settings.testSchedule(${schedule.id})" title="Test Run">
+                        <i class="icon">🧪</i>
+                    </button>
+                    <button class="btn btn-small ${schedule.active ? 'btn-warning' : 'btn-success'}" 
+                            onclick="Settings.toggleSchedule(${schedule.id})" 
+                            title="${schedule.active ? 'Disable' : 'Enable'}">
+                        <i class="icon">${schedule.active ? '⏸️' : '▶️'}</i>
+                    </button>
+                    <button class="btn btn-small btn-danger" onclick="Settings.deleteSchedule(${schedule.id})" title="Delete">
+                        <i class="icon">🗑️</i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
 
     async editSchedule(id) {
         try {

@@ -1,3 +1,4 @@
+// server.js - REPLACEMENT FILE
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -85,15 +86,14 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// Initialize database
+// Initialize database and start scheduled tasks
 async function initializeApp() {
   try {
     await db.testConnection();
     console.log('Database connected successfully');
     
-// 🔧 FIX: PlexService instance already created by import
-console.log('🚀 Plex Service imported - hourly sync should start automatically');
-console.log('✅ Plex Service initialized - hourly sync will start automatically');
+    console.log('🚀 Plex Service imported - hourly sync should start automatically');
+    console.log('✅ Plex Service initialized - hourly sync will start automatically');
     
     // Start server
     app.listen(PORT, () => {
@@ -101,27 +101,28 @@ console.log('✅ Plex Service initialized - hourly sync will start automatically
       console.log(`Access the application at http://localhost:${PORT}`);
     });
 
-// REPLACE this existing code:
-cron.schedule('0 9 * * *', () => {
-    console.log('Running scheduled renewal reminders...');
-    emailService.sendRenewalReminders();
-});
-
-// WITH THIS:
-cron.schedule('0 * * * *', async () => {
-    console.log('🕐 Hourly automated email check started at', new Date().toLocaleString());
-    try {
+    // ===== AUTOMATED EMAIL SCHEDULING =====
+    // Hourly check for scheduled emails (runs every hour at minute 0)
+    cron.schedule('0 * * * *', async () => {
+      console.log('🕐 Hourly automated email check started at', new Date().toLocaleString());
+      try {
         await emailService.processScheduledEmails();
-    } catch (error) {
+      } catch (error) {
         console.error('❌ Error in hourly email automation:', error);
-    }
-});
+      }
+    });
+    console.log('✅ Hourly email scheduler activated');
 
-// Keep your existing daily reminder as backup:
-cron.schedule('0 9 * * *', () => {
-    console.log('Running scheduled renewal reminders...');
-    emailService.sendRenewalReminders();
-});
+    // Daily renewal reminders (runs at 9 AM every day as backup)
+    cron.schedule('0 9 * * *', async () => {
+      console.log('📧 Running daily renewal reminders at', new Date().toLocaleString());
+      try {
+        await emailService.sendRenewalReminders();
+      } catch (error) {
+        console.error('❌ Error in daily renewal reminders:', error);
+      }
+    });
+    console.log('✅ Daily renewal reminder scheduler activated');
 
   } catch (error) {
     console.error('Failed to start application:', error);

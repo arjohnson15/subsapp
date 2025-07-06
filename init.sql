@@ -111,6 +111,7 @@ CREATE TABLE email_logs (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
+
 -- Email schedules table
 CREATE TABLE email_schedules (
   id INT PRIMARY KEY AUTO_INCREMENT,
@@ -126,6 +127,7 @@ CREATE TABLE email_schedules (
   active BOOLEAN DEFAULT TRUE,
   next_run DATETIME NULL,
   last_run DATETIME NULL,
+  run_count INT DEFAULT 0,  -- ADD THIS LINE
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (email_template_id) REFERENCES email_templates(id) ON DELETE CASCADE
