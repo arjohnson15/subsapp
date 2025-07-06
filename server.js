@@ -16,7 +16,6 @@ const plexRoutes = require('./routes-plex');
 const settingsRoutes = require('./routes-settings');
 const ownerRoutes = require('./routes-owners');
 const emailScheduleRoutes = require('./routes-email-schedules');
-const testRoutes = require('./routes-test'); // NEW: Test routes
 const multer = require('multer');
 const plexService = require('./plex-service');
 const emailService = require('./email-service');
@@ -67,7 +66,6 @@ app.use('/api/plex', plexRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/owners', ownerRoutes);
 app.use('/api/email-schedules', emailScheduleRoutes);
-app.use('/api/test', testRoutes); // NEW: Test routes
 
 // Serve main application
 app.get('/', (req, res) => {
@@ -119,12 +117,12 @@ async function initializeApp() {
 
     // ===== AUTOMATED EMAIL SCHEDULING =====
     
-    // Hourly check for scheduled emails (runs every hour at minute 0)
+    // Hourly check for SPECIFIC DATE emails only (NOT expiration reminders)
     cron.schedule('0 * * * *', async () => {
       const timestamp = new Date().toLocaleString();
       console.log('');
       console.log('🕐='.repeat(50));
-      console.log(`🕐 HOURLY EMAIL AUTOMATION STARTED: ${timestamp}`);
+      console.log(`🕐 HOURLY SPECIFIC DATE EMAILS STARTED: ${timestamp}`);
       console.log('🕐='.repeat(50));
       
       try {
@@ -134,23 +132,23 @@ async function initializeApp() {
           await emailService.initializeTransporter();
         }
 
-        // Process scheduled emails
+        // Process ONLY specific date scheduled emails
         await emailService.processScheduledEmails();
         
         console.log('🕐='.repeat(50));
-        console.log(`🕐 HOURLY EMAIL AUTOMATION COMPLETED: ${new Date().toLocaleString()}`);
+        console.log(`🕐 HOURLY SPECIFIC DATE EMAILS COMPLETED: ${new Date().toLocaleString()}`);
         console.log('🕐='.repeat(50));
         console.log('');
       } catch (error) {
-        console.error('❌ ERROR IN HOURLY EMAIL AUTOMATION:', error);
+        console.error('❌ ERROR IN HOURLY EMAIL PROCESSING:', error);
         console.log('🕐='.repeat(50));
         console.log('');
       }
     });
-    console.log('✅ Hourly email scheduler activated');
+    console.log('✅ Hourly specific date email scheduler activated');
 
-    // Daily renewal reminders (runs at 9 AM every day)
-    cron.schedule('0 9 * * *', async () => {
+    // Daily renewal reminders AND expiration reminder schedules (runs at 6 PM UTC every day for testing)
+    cron.schedule('0 23 * * *', async () => {
       const timestamp = new Date().toLocaleString();
       console.log('');
       console.log('📧='.repeat(50));
@@ -164,13 +162,17 @@ async function initializeApp() {
           await emailService.initializeTransporter();
         }
 
-        const result = await emailService.sendRenewalReminders();
+        // Process built-in renewal reminders (7-day and 2-day)
+        const builtInResult = await emailService.sendRenewalReminders();
         
-        if (result.success) {
-          console.log(`✅ Renewal reminders completed: ${result.sent} emails sent`);
+        if (builtInResult.success) {
+          console.log(`✅ Built-in renewal reminders completed: ${builtInResult.sent} emails sent`);
         } else {
-          console.log(`❌ Renewal reminders failed: ${result.error}`);
+          console.log(`❌ Built-in renewal reminders failed: ${builtInResult.error}`);
         }
+
+        // Process custom expiration reminder schedules
+        await emailService.processExpirationReminders();
         
         console.log('📧='.repeat(50));
         console.log(`📧 DAILY RENEWAL REMINDERS COMPLETED: ${new Date().toLocaleString()}`);
@@ -182,7 +184,7 @@ async function initializeApp() {
         console.log('');
       }
     });
-    console.log('✅ Daily renewal reminder scheduler activated');
+    console.log('✅ Daily renewal reminder scheduler activated (4 PM)');
 
     // Every 5 minutes check for immediate scheduled emails (for testing and urgent emails)
     cron.schedule('*/5 * * * *', async () => {

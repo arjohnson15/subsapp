@@ -74,11 +74,13 @@ router.post('/', [
       active
     } = req.body;
 
-    // Calculate next_run based on schedule type
-    let next_run = null;
-    if (schedule_type === 'specific_date' && scheduled_date && scheduled_time) {
-      next_run = `${scheduled_date} ${scheduled_time}:00`;
-    }
+// Calculate next_run based on schedule type  
+let next_run = null;
+if (schedule_type === 'specific_date' && scheduled_date && scheduled_time) {
+  // Extract just the date part (YYYY-MM-DD) from the ISO string
+  const dateOnly = scheduled_date.split('T')[0];
+  next_run = `${dateOnly} ${scheduled_time}:00`;
+}
 
     const result = await db.query(`
       INSERT INTO email_schedules (

@@ -290,29 +290,58 @@ const placeholders = {
   
   // ===== AUTOMATED EMAIL SCHEDULER METHODS =====
   
-  async processScheduledEmails() {
-    try {
-      console.log('🔄 Processing scheduled emails...');
-      
-      const schedules = await db.query(`
-        SELECT es.*, et.subject, et.body, et.name as template_name
-        FROM email_schedules es
-        LEFT JOIN email_templates et ON es.email_template_id = et.id
-        WHERE es.active = TRUE
-        ORDER BY es.id
-      `);
+async processScheduledEmails() {
+  try {
+    console.log('📧 Processing scheduled emails...');
+    
+    // ONLY process specific_date emails in hourly runs
+    // Expiration reminders run separately in the daily job
+    const schedules = await db.query(`
+      SELECT es.*, et.subject, et.body, et.name as template_name
+      FROM email_schedules es
+      LEFT JOIN email_templates et ON es.email_template_id = et.id
+      WHERE es.active = TRUE 
+        AND es.schedule_type = 'specific_date'
+      ORDER BY es.id
+    `);
 
-      console.log(`📧 Found ${schedules.length} active email schedules`);
+    console.log(`📧 Found ${schedules.length} active specific date schedules`);
 
-      for (const schedule of schedules) {
-        await this.processIndividualSchedule(schedule);
-      }
-
-      console.log('✅ Finished processing scheduled emails');
-    } catch (error) {
-      console.error('❌ Error processing scheduled emails:', error);
+    for (const schedule of schedules) {
+      await this.processIndividualSchedule(schedule);
     }
+
+    console.log('✅ Finished processing specific date emails');
+  } catch (error) {
+    console.error('❌ Error processing scheduled emails:', error);
   }
+}
+
+async processExpirationReminders() {
+  try {
+    console.log('📧 Processing expiration reminder schedules...');
+    
+    // ONLY process expiration_reminder emails in daily runs
+    const schedules = await db.query(`
+      SELECT es.*, et.subject, et.body, et.name as template_name
+      FROM email_schedules es
+      LEFT JOIN email_templates et ON es.email_template_id = et.id
+      WHERE es.active = TRUE 
+        AND es.schedule_type = 'expiration_reminder'
+      ORDER BY es.id
+    `);
+
+    console.log(`📧 Found ${schedules.length} active expiration reminder schedules`);
+
+    for (const schedule of schedules) {
+      await this.processIndividualSchedule(schedule);
+    }
+
+    console.log('✅ Finished processing expiration reminder emails');
+  } catch (error) {
+    console.error('❌ Error processing expiration reminder emails:', error);
+  }
+}
 
 async processIndividualSchedule(schedule) {
   try {

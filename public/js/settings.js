@@ -466,11 +466,13 @@ renderSchedulesTable(schedules) {
 
     tbody.innerHTML = schedules.map(schedule => {
         let details = '';
-        if (schedule.schedule_type === 'expiration_reminder') {
-            details = `${schedule.days_before_expiration} days before ${schedule.subscription_type} expiration`;
-        } else {
-            details = `${schedule.scheduled_date} at ${schedule.scheduled_time}`;
-        }
+if (schedule.schedule_type === 'specific_date' && schedule.next_run) {
+    // Use the properly formatted next_run timestamp
+    const runDate = new Date(schedule.next_run);
+    details = runDate.toLocaleString(); // Shows: "7/6/2025, 5:55:00 PM"
+} else if (schedule.schedule_type === 'expiration_reminder') {
+    details = `${schedule.days_before_expiration} days before ${schedule.subscription_type} expiration`;
+}
 
         let targetInfo = '';
         if (schedule.target_tags && schedule.target_tags.length > 0) {
