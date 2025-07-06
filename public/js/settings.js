@@ -296,7 +296,7 @@ renderOwnersTable(owners) {
             // Store in global state
             window.AppState.subscriptionTypes = subscriptions;
             
-            this.renderSubscriptionsTable();
+            this.renderSubscriptionsTable(subscriptions);
             // Note: updateSubscriptionStats() removed since we removed the stats section
         } catch (error) {
             console.error('❌ Error loading subscriptions:', error);
