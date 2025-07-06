@@ -884,7 +884,7 @@ renderSubscriptionsTable(subscriptions) {
             button.disabled = true;
             
             // FIXED: Use the correct API function
-            const result = await API.Email.sendTestEmail(smtpUser);
+            const result = await API.Email.testConnection();
             
             button.textContent = originalText;
             button.disabled = false;
