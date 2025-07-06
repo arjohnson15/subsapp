@@ -1873,7 +1873,7 @@ th.sortable .sort-arrow {
     }
 }
  
-/* Enhanced Responsive Table System */
+/* COMPLETE RESPONSIVE TABLE SYSTEM - PROPER FIX */
 .table-container {
     background: rgba(255, 255, 255, 0.05);
     border-radius: 12px;
@@ -1881,41 +1881,39 @@ th.sortable .sort-arrow {
     overflow-y: visible;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     margin-bottom: 50px;
-    /* ADD THESE PROPERTIES FOR BETTER MOBILE SCROLLING */
     width: 100%;
     max-width: 100%;
-    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-    scrollbar-width: thin; /* Firefox */
-    scrollbar-color: #4fc3f7 rgba(255, 255, 255, 0.1); /* Firefox */
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #4fc3f7 rgba(255, 255, 255, 0.1);
 }
 
-/* Custom Scrollbar for WebKit browsers (Chrome, Safari, Edge) */
+/* Visible, styled scrollbars */
 .table-container::-webkit-scrollbar {
-    height: 8px;
-    width: 8px;
+    height: 12px;
+    width: 12px;
 }
 
 .table-container::-webkit-scrollbar-track {
     background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
+    border-radius: 6px;
 }
 
 .table-container::-webkit-scrollbar-thumb {
     background: linear-gradient(45deg, #4fc3f7, #8e24aa);
-    border-radius: 4px;
+    border-radius: 6px;
 }
 
 .table-container::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(45deg, #29b6f6, #9c27b0);
 }
 
-/* Table Base Styles */
+/* Table base styles */
 table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 1000px; /* Ensures horizontal scroll on smaller screens */
+    min-width: 1200px; /* Force horizontal scroll on smaller screens */
     table-layout: auto;
-    white-space: nowrap;
 }
 
 th, td {
@@ -1924,9 +1922,10 @@ th, td {
     vertical-align: middle;
     font-size: 0.9rem;
     text-align: left;
+    white-space: nowrap;
 }
 
-/* Fixed Header */
+/* Fixed header */
 th {
     background: linear-gradient(45deg, #8e24aa, #3f51b5);
     font-weight: bold;
@@ -1934,7 +1933,6 @@ th {
     position: sticky;
     top: 0;
     z-index: 10;
-    white-space: nowrap;
 }
 
 th:hover {
@@ -1945,138 +1943,75 @@ tbody tr:hover {
     background: rgba(255, 255, 255, 0.05);
 }
 
-/* ENHANCED COLUMN DEFINITIONS WITH RESPONSIVE WIDTHS */
+/* SPECIFIC TABLE COLUMN WIDTHS */
 
-/* Owners Table Columns */
-.owners-table th:nth-child(1), .owners-table td:nth-child(1) { /* Name */
-    width: 150px;
-    min-width: 150px;
-}
+/* Owners Table */
+.owners-table th:nth-child(1), .owners-table td:nth-child(1) { width: 150px; min-width: 150px; }
+.owners-table th:nth-child(2), .owners-table td:nth-child(2) { width: 250px; min-width: 250px; }
+.owners-table th:nth-child(3), .owners-table td:nth-child(3) { width: 100px; min-width: 100px; text-align: center; }
+.owners-table th:nth-child(4), .owners-table td:nth-child(4) { width: 120px; min-width: 120px; text-align: center; }
+.owners-table th:nth-child(5), .owners-table td:nth-child(5) { width: 180px; min-width: 180px; text-align: center; }
 
-.owners-table th:nth-child(2), .owners-table td:nth-child(2) { /* Email */
-    width: 250px;
-    min-width: 250px;
-}
+/* Subscriptions Table */
+.subscriptions-table th:nth-child(1), .subscriptions-table td:nth-child(1) { width: 180px; min-width: 180px; }
+.subscriptions-table th:nth-child(2), .subscriptions-table td:nth-child(2) { width: 100px; min-width: 100px; text-align: center; }
+.subscriptions-table th:nth-child(3), .subscriptions-table td:nth-child(3) { width: 120px; min-width: 120px; text-align: center; }
+.subscriptions-table th:nth-child(4), .subscriptions-table td:nth-child(4) { width: 100px; min-width: 100px; text-align: center; }
+.subscriptions-table th:nth-child(5), .subscriptions-table td:nth-child(5) { width: 100px; min-width: 100px; text-align: center; }
+.subscriptions-table th:nth-child(6), .subscriptions-table td:nth-child(6) { width: 100px; min-width: 100px; text-align: center; }
+.subscriptions-table th:nth-child(7), .subscriptions-table td:nth-child(7) { width: 180px; min-width: 180px; text-align: center; }
 
-.owners-table th:nth-child(3), .owners-table td:nth-child(3) { /* Status */
-    width: 100px;
-    min-width: 100px;
-    text-align: center;
-}
+/* Email Schedules Table */
+.schedules-table th:nth-child(1), .schedules-table td:nth-child(1) { width: 120px; min-width: 120px; }
+.schedules-table th:nth-child(2), .schedules-table td:nth-child(2) { width: 160px; min-width: 160px; text-align: center; }
+.schedules-table th:nth-child(3), .schedules-table td:nth-child(3) { width: 220px; min-width: 220px; }
+.schedules-table th:nth-child(4), .schedules-table td:nth-child(4) { width: 160px; min-width: 160px; }
+.schedules-table th:nth-child(5), .schedules-table td:nth-child(5) { width: 80px; min-width: 80px; text-align: center; }
+.schedules-table th:nth-child(6), .schedules-table td:nth-child(6) { width: 120px; min-width: 120px; text-align: center; }
+.schedules-table th:nth-child(7), .schedules-table td:nth-child(7) { width: 200px; min-width: 200px; text-align: center; }
 
-.owners-table th:nth-child(4), .owners-table td:nth-child(4) { /* Created */
-    width: 120px;
-    min-width: 120px;
-    text-align: center;
-}
-
-.owners-table th:nth-child(5), .owners-table td:nth-child(5) { /* Actions */
-    width: 150px;
-    min-width: 150px;
-    text-align: center;
-}
-
-/* Subscription Types Table Columns */
-.subscriptions-table th:nth-child(1), .subscriptions-table td:nth-child(1) { /* Name */
-    width: 180px;
-    min-width: 180px;
-}
-
-.subscriptions-table th:nth-child(2), .subscriptions-table td:nth-child(2) { /* Type */
-    width: 100px;
-    min-width: 100px;
-    text-align: center;
-}
-
-.subscriptions-table th:nth-child(3), .subscriptions-table td:nth-child(3) { /* Duration */
-    width: 120px;
-    min-width: 120px;
-    text-align: center;
-}
-
-.subscriptions-table th:nth-child(4), .subscriptions-table td:nth-child(4) { /* Streams */
-    width: 100px;
-    min-width: 100px;
-    text-align: center;
-}
-
-.subscriptions-table th:nth-child(5), .subscriptions-table td:nth-child(5) { /* Price */
-    width: 100px;
-    min-width: 100px;
-    text-align: center;
-}
-
-.subscriptions-table th:nth-child(6), .subscriptions-table td:nth-child(6) { /* Status */
-    width: 100px;
-    min-width: 100px;
-    text-align: center;
-}
-
-.subscriptions-table th:nth-child(7), .subscriptions-table td:nth-child(7) { /* Actions */
-    width: 150px;
-    min-width: 150px;
-    text-align: center;
-}
-
-/* Email Schedules Table Columns */
-.schedules-table th:nth-child(1), .schedules-table td:nth-child(1) { /* Name */
-    width: 120px;
-    min-width: 120px;
-}
-
-.schedules-table th:nth-child(2), .schedules-table td:nth-child(2) { /* Type */
-    width: 140px;
-    min-width: 140px;
-    text-align: center;
-}
-
-.schedules-table th:nth-child(3), .schedules-table td:nth-child(3) { /* Details */
-    width: 200px;
-    min-width: 200px;
-}
-
-.schedules-table th:nth-child(4), .schedules-table td:nth-child(4) { /* Template */
-    width: 160px;
-    min-width: 160px;
-}
-
-.schedules-table th:nth-child(5), .schedules-table td:nth-child(5) { /* Status */
-    width: 80px;
-    min-width: 80px;
-    text-align: center;
-}
-
-.schedules-table th:nth-child(6), .schedules-table td:nth-child(6) { /* Last Run */
-    width: 120px;
-    min-width: 120px;
-    text-align: center;
-}
-
-.schedules-table th:nth-child(7), .schedules-table td:nth-child(7) { /* Actions */
-    width: 200px;
-    min-width: 200px;
-    text-align: center;
-}
-
-/* Action Buttons Styling */
-.btn-small {
-    padding: 6px 12px;
-    margin: 2px;
-    font-size: 0.8rem;
-    border-radius: 4px;
+/* BUTTON STYLES - Both btn-small and btn-icon */
+.btn-small, .btn-icon {
     border: none;
     cursor: pointer;
     transition: all 0.2s ease;
     white-space: nowrap;
     display: inline-block;
+    margin: 2px;
+    border-radius: 4px;
 }
 
-.btn-small:hover {
+.btn-small {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    background: linear-gradient(45deg, #4fc3f7, #8e24aa);
+    color: white;
+}
+
+.btn-icon {
+    padding: 8px;
+    font-size: 0.9rem;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(45deg, #4fc3f7, #8e24aa);
+    color: white;
+}
+
+.btn-small:hover, .btn-icon:hover {
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Status Badges */
+/* Action-specific button colors */
+.btn-icon[title*="Edit"] { background: linear-gradient(45deg, #ff9800, #ffc107); }
+.btn-icon[title*="Toggle"] { background: linear-gradient(45deg, #4caf50, #8bc34a); }
+.btn-icon[title*="Test"] { background: linear-gradient(45deg, #2196f3, #03a9f4); }
+.btn-icon[title*="Delete"] { background: linear-gradient(45deg, #f44336, #e91e63); }
+
+/* Status badges */
 .status-badge {
     padding: 4px 8px;
     border-radius: 12px;
@@ -2096,67 +2031,51 @@ tbody tr:hover {
     color: white;
 }
 
-/* Mobile Specific Enhancements */
+.status-info {
+    background: linear-gradient(45deg, #2196f3, #03a9f4);
+    color: white;
+}
+
+.status-warning {
+    background: linear-gradient(45deg, #ff9800, #ffc107);
+    color: white;
+}
+
+/* Mobile responsiveness */
 @media (max-width: 768px) {
     .table-container {
-        margin: 0 -10px 20px -10px; /* Extend to edges on mobile */
+        margin: 0 -10px 20px -10px;
         border-radius: 0;
-        overflow-x: auto;
     }
     
-    /* Increase touch target size on mobile */
-    .btn-small {
-        padding: 8px 14px;
-        margin: 3px;
-        font-size: 0.85rem;
-    }
-    
-    /* Better spacing for mobile */
     th, td {
         padding: 10px 6px;
         font-size: 0.85rem;
     }
     
-    /* Ensure minimum table width for proper scrolling */
+    .btn-icon {
+        width: 36px;
+        height: 36px;
+        margin: 3px;
+    }
+    
     table {
-        min-width: 1100px;
+        min-width: 1300px; /* Wider on mobile to ensure scrolling */
     }
 }
 
 @media (max-width: 480px) {
-    /* Even more condensed on very small screens */
     th, td {
         padding: 8px 4px;
         font-size: 0.8rem;
     }
     
-    .btn-small {
-        padding: 6px 10px;
-        font-size: 0.75rem;
+    .btn-icon {
+        width: 34px;
+        height: 34px;
     }
     
-    /* Ensure table is still scrollable */
     table {
-        min-width: 1000px;
-    }
-}
-
-/* Scroll Indicator for Mobile */
-.table-container::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 20px;
-    height: 100%;
-    background: linear-gradient(to left, rgba(0,0,0,0.3), transparent);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-@media (max-width: 768px) {
-    .table-container::after {
-        opacity: 1;
+        min-width: 1200px;
     }
 }
