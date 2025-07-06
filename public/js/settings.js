@@ -186,8 +186,8 @@ renderOwnersTable(owners) {
     
     tbody.innerHTML = owners.map(owner => `
         <tr>
-            <td>${Utils.escapeHtml(owner.name)}</td>
-            <td>${Utils.escapeHtml(owner.email)}</td>
+            <td>${owner.name}</td>
+            <td>${owner.email}</td>
             <td>
                 <span class="status-badge ${owner.active !== false ? 'status-active' : 'status-inactive'}">
                     ${owner.active !== false ? 'Active' : 'Inactive'}
@@ -637,7 +637,7 @@ renderSubscriptionsTable(subscriptions) {
     
     tbody.innerHTML = subscriptions.map(sub => `
         <tr>
-            <td>${Utils.escapeHtml(sub.name)}</td>
+            <td>${sub.name}</td>
             <td>
                 <span class="status-badge ${sub.type === 'plex' ? 'status-info' : 'status-warning'}">
                     ${sub.type.toUpperCase()}
