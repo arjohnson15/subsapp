@@ -97,6 +97,11 @@ router.put('/', async (req, res) => {
       `, [key, stringValue, type, stringValue, type]);
     }
     
+    // ADD THESE LINES:
+    const emailService = require('./email-service');
+    await emailService.reinitialize();
+    console.log('📧 Email service reinitialized after settings update');
+    
     res.json({ message: 'Settings updated successfully' });
   } catch (error) {
     console.error('Error updating settings:', error);

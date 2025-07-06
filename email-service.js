@@ -561,6 +561,12 @@ class EmailService {
       };
     }
   }
+  
+  async reinitialize() {
+  console.log('🔄 Reinitializing email service with new settings...');
+  this.transporter = null;
+  await this.initializeTransporter();
+}
 
   async getSMTPSettings() {
     return await this.getEmailSettings();
