@@ -1,7 +1,8 @@
 // routes-email-schedules.js
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const db = require('./database-config'); // Fixed: Use same path as other routes
+const db = require('./database-config');
+const emailService = require('./email-service');
 const router = express.Router();
 
 // Get all email schedules
@@ -216,110 +217,175 @@ router.post('/:id/test', async (req, res) => {
     }
 
     const schedule = schedules[0];
-    
-    // Parse target tags
-    let targetTags = null;
-    if (schedule.target_tags) {
-      try {
-        targetTags = JSON.parse(schedule.target_tags);
-      } catch (e) {
-        targetTags = [];
-      }
-    }
+    console.log(`🧪 Testing schedule: ${schedule.name} (ID: ${scheduleId})`);
 
-    // Get users based on schedule criteria
-    let users = [];
-    if (schedule.schedule_type === 'expiration_reminder') {
-      users = await getExpiringUsers(schedule.days_before_expiration, schedule.subscription_type, targetTags, schedule.exclude_users_with_setting);
-    } else {
-      users = await getAllTargetUsers(targetTags, schedule.exclude_users_with_setting);
-    }
+    // Force run this specific schedule
+    await emailService.processIndividualSchedule(schedule);
 
-    res.json({
-      message: 'Test run completed',
-      schedule_name: schedule.name,
-      template_name: schedule.template_name,
-      target_users_count: users.length,
-      target_users: users.map(u => ({ name: u.name, email: u.email }))
+    res.json({ 
+      message: 'Schedule test run completed',
+      schedule: schedule.name,
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error testing email schedule:', error);
-    res.status(500).json({ error: 'Failed to test email schedule' });
+    console.error('Error testing schedule:', error);
+    res.status(500).json({ error: 'Failed to test schedule' });
   }
 });
 
-// Helper function to get expiring users
-async function getExpiringUsers(daysBefore, subscriptionType, targetTags, excludeAutomated) {
-  let subscriptionFilter = '';
-  if (subscriptionType === 'plex') {
-    subscriptionFilter = `AND (s.subscription_type_id IS NULL OR st.type = 'plex')`;
-  } else if (subscriptionType === 'iptv') {
-    subscriptionFilter = `AND st.type = 'iptv'`;
+// MANUAL TRIGGER ENDPOINT - Process all scheduled emails NOW
+router.post('/trigger-all', async (req, res) => {
+  try {
+    console.log('🚀 MANUAL TRIGGER: Processing all scheduled emails...');
+    
+    // Check email service status
+    if (!emailService.transporter) {
+      console.log('❌ Email service not initialized - attempting to reinitialize...');
+      await emailService.initializeTransporter();
+    }
+
+    // Process all scheduled emails
+    await emailService.processScheduledEmails();
+    
+    res.json({ 
+      success: true,
+      message: 'All scheduled emails processed successfully',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Error in manual trigger:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to process scheduled emails',
+      details: error.message
+    });
   }
-  // 'both' means no additional filter
+});
 
-  let tagFilter = '';
-  if (targetTags && targetTags.length > 0) {
-    const tagConditions = targetTags.map(() => 'JSON_CONTAINS(u.tags, ?)').join(' OR ');
-    tagFilter = `AND (${tagConditions})`;
+// DEBUG ENDPOINT - Check email automation status
+router.get('/debug/status', async (req, res) => {
+  try {
+    // Get email service status
+    const emailServiceStatus = {
+      transporterReady: !!emailService.transporter,
+      smtpSettings: await emailService.getSMTPSettings()
+    };
+
+    // Get current time info
+    const now = new Date();
+    const timeInfo = {
+      serverTime: now.toISOString(),
+      localTime: now.toLocaleString(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    };
+
+    // Get schedules that should run soon
+    const upcomingSchedules = await db.query(`
+      SELECT es.*, et.name as template_name, et.subject
+      FROM email_schedules es
+      LEFT JOIN email_templates et ON es.email_template_id = et.id
+      WHERE es.active = TRUE
+        AND es.schedule_type = 'specific_date'
+        AND es.next_run IS NOT NULL
+        AND es.next_run >= ?
+      ORDER BY es.next_run ASC
+      LIMIT 5
+    `, [now]);
+
+    // Get schedules that should have run already but haven't
+    const missedSchedules = await db.query(`
+      SELECT es.*, et.name as template_name, et.subject
+      FROM email_schedules es
+      LEFT JOIN email_templates et ON es.email_template_id = et.id
+      WHERE es.active = TRUE
+        AND es.schedule_type = 'specific_date'
+        AND es.next_run IS NOT NULL
+        AND es.next_run <= ?
+        AND (es.last_run IS NULL OR es.last_run < es.next_run)
+      ORDER BY es.next_run ASC
+    `, [now]);
+
+    res.json({
+      success: true,
+      emailService: emailServiceStatus,
+      timeInfo: timeInfo,
+      upcomingSchedules: upcomingSchedules,
+      missedSchedules: missedSchedules,
+      totalActiveSchedules: await db.query('SELECT COUNT(*) as count FROM email_schedules WHERE active = TRUE'),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error getting debug status:', error);
+    res.status(500).json({ error: 'Failed to get debug status' });
   }
+});
 
-  let excludeFilter = '';
-  if (excludeAutomated) {
-    excludeFilter = 'AND u.exclude_automated_emails = FALSE';
+// DEBUG ENDPOINT - Check what users would receive emails for a schedule
+router.get('/:id/debug/preview', async (req, res) => {
+  try {
+    const scheduleId = req.params.id;
+    
+    // Get the schedule details
+    const schedules = await db.query(`
+      SELECT es.*, et.subject, et.body, et.name as template_name
+      FROM email_schedules es
+      LEFT JOIN email_templates et ON es.email_template_id = et.id
+      WHERE es.id = ?
+    `, [scheduleId]);
+
+    if (schedules.length === 0) {
+      return res.status(404).json({ error: 'Schedule not found' });
+    }
+
+    const schedule = schedules[0];
+    let targetUsers = [];
+
+    // Helper function to safely parse target_tags
+    const parseTargetTags = (targetTags) => {
+      if (!targetTags) return null;
+      try {
+        return JSON.parse(targetTags);
+      } catch (e) {
+        return null;
+      }
+    };
+
+    if (schedule.schedule_type === 'expiration_reminder') {
+      targetUsers = await emailService.getExpiringUsers(
+        schedule.days_before_expiration,
+        schedule.subscription_type,
+        parseTargetTags(schedule.target_tags),
+        schedule.exclude_users_with_setting
+      );
+    } else if (schedule.schedule_type === 'specific_date') {
+      targetUsers = await emailService.getAllTargetUsers(
+        parseTargetTags(schedule.target_tags),
+        schedule.exclude_users_with_setting
+      );
+    }
+
+    res.json({
+      success: true,
+      schedule: {
+        id: schedule.id,
+        name: schedule.name,
+        type: schedule.schedule_type,
+        next_run: schedule.next_run,
+        last_run: schedule.last_run
+      },
+      targetUsers: targetUsers.map(user => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        tags: user.tags
+      })),
+      userCount: targetUsers.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error previewing schedule:', error);
+    res.status(500).json({ error: 'Failed to preview schedule' });
   }
-
-  const query = `
-    SELECT DISTINCT u.*, o.name as owner_name, o.email as owner_email,
-           s.expiration_date, st.name as subscription_name, st.type as subscription_type
-    FROM users u
-    LEFT JOIN owners o ON u.owner_id = o.id
-    LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
-    LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
-    WHERE s.expiration_date = DATE_ADD(CURDATE(), INTERVAL ? DAY)
-    ${subscriptionFilter}
-    ${tagFilter}
-    ${excludeFilter}
-    ORDER BY u.name
-  `;
-
-  const params = [daysBefore];
-  if (targetTags && targetTags.length > 0) {
-    targetTags.forEach(tag => params.push(`"${tag}"`));
-  }
-
-  return await db.query(query, params);
-}
-
-// Helper function to get all target users for specific date emails
-async function getAllTargetUsers(targetTags, excludeAutomated) {
-  let tagFilter = '';
-  if (targetTags && targetTags.length > 0) {
-    const tagConditions = targetTags.map(() => 'JSON_CONTAINS(u.tags, ?)').join(' OR ');
-    tagFilter = `AND (${tagConditions})`;
-  }
-
-  let excludeFilter = '';
-  if (excludeAutomated) {
-    excludeFilter = 'AND u.exclude_automated_emails = FALSE';
-  }
-
-  const query = `
-    SELECT u.*, o.name as owner_name, o.email as owner_email
-    FROM users u
-    LEFT JOIN owners o ON u.owner_id = o.id
-    WHERE 1=1
-    ${tagFilter}
-    ${excludeFilter}
-    ORDER BY u.name
-  `;
-
-  const params = [];
-  if (targetTags && targetTags.length > 0) {
-    targetTags.forEach(tag => params.push(`"${tag}"`));
-  }
-
-  return await db.query(query, params);
-}
+});
 
 module.exports = router;

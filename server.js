@@ -16,6 +16,7 @@ const plexRoutes = require('./routes-plex');
 const settingsRoutes = require('./routes-settings');
 const ownerRoutes = require('./routes-owners');
 const emailScheduleRoutes = require('./routes-email-schedules');
+const testRoutes = require('./routes-test'); // NEW: Test routes
 const multer = require('multer');
 const plexService = require('./plex-service');
 const emailService = require('./email-service');
@@ -66,6 +67,7 @@ app.use('/api/plex', plexRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/owners', ownerRoutes);
 app.use('/api/email-schedules', emailScheduleRoutes);
+app.use('/api/test', testRoutes); // NEW: Test routes
 
 // Serve main application
 app.get('/', (req, res) => {
