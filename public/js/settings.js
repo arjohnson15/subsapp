@@ -1348,8 +1348,6 @@ window.uploadFavicon = (input) => Settings.uploadFile && Settings.uploadFile(inp
 // Email function alias
 window.sendTestEmail = Settings.sendTestEmail.bind(Settings);
 
-// ADD THESE IPTV FUNCTION ALIASES AT THE END:
-
 // IPTV function aliases for settings page
 window.testIPTVConnection = Settings.testIPTVConnection.bind(Settings);
 
