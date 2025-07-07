@@ -786,16 +786,55 @@ $(document).ready(() => {
   }
 });
 
-// Merge the IPTV module functions without overwriting existing ones
+// FIXED: Proper merging that preserves existing functions
 if (!window.IPTV) {
   window.IPTV = {};
 }
 
-// First assign the IPTV object, then merge
-Object.assign(window.IPTV, IPTV);
+// Save any existing functions that might have been created by settings.js
+const existingIptvFunctions = { ...window.IPTV };
 
-// Make sure the global IPTV variable also points to window.IPTV
-window.IPTV = Object.assign(window.IPTV, IPTV);
+// Merge this IPTV object's functions, but don't overwrite existing ones
+Object.keys(IPTV).forEach(key => {
+  if (typeof IPTV[key] === 'function') {
+    // Only add if it doesn't exist or if the existing one is not a function
+    if (!existingIptvFunctions[key] || typeof existingIptvFunctions[key] !== 'function') {
+      window.IPTV[key] = IPTV[key];
+    } else {
+      // Keep the existing function (from settings.js) and add this one with a suffix
+      window.IPTV[key + '_userForm'] = IPTV[key];
+    }
+  } else {
+    // Non-function properties can be overwritten
+    window.IPTV[key] = IPTV[key];
+  }
+});
 
-console.log('📺 IPTV module loaded and merged with existing functions');
-console.log('🔍 Final IPTV object has testPanelConnection:', typeof window.IPTV.testPanelConnection);
+// Restore any existing functions that we want to keep
+Object.keys(existingIptvFunctions).forEach(key => {
+  if (typeof existingIptvFunctions[key] === 'function' && !window.IPTV[key]) {
+    window.IPTV[key] = existingIptvFunctions[key];
+  }
+});
+
+console.log('📺 IPTV module loaded and properly merged with existing functions');
+console.log('🔍 Available IPTV functions:', Object.keys(window.IPTV).filter(k => typeof window.IPTV[k] === 'function'));
+
+// CRITICAL: Make sure the settings page functions are still available
+const requiredSettingsFunctions = [
+  'testPanelConnection',
+  'syncPackagesFromPanel', 
+  'syncBouquetsFromPanel',
+  'syncCreditsBalance'
+];
+
+const missingSettingsFunctions = requiredSettingsFunctions.filter(funcName => {
+  return typeof window.IPTV[funcName] !== 'function';
+});
+
+if (missingSettingsFunctions.length > 0) {
+  console.warn('⚠️ Missing IPTV functions after merge:', missingSettingsFunctions);
+  console.log('📋 Available functions:', Object.keys(window.IPTV).filter(k => typeof window.IPTV[k] === 'function'));
+} else {
+  console.log('✅ All required IPTV functions are available');
+}
