@@ -255,21 +255,23 @@ function setupUserFormEventListeners() {
     console.log('?? Setting up user form event listeners...');
     
     // Tag change listeners
-    const tagCheckboxes = document.querySelectorAll('input[name="tags"]');
-    tagCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', function(e) {
-            const tagValue = e.target.value;
-            const isChecked = e.target.checked;
-            
-            console.log(`??? Tag ${tagValue} changed to ${isChecked}`);
-            
-            if (tagValue === 'Plex 1') {
-                togglePlexLibrariesByTag('plex1', isChecked);
-            } else if (tagValue === 'Plex 2') {
-                togglePlexLibrariesByTag('plex2', isChecked);
-            }
-        });
+const tagCheckboxes = document.querySelectorAll('input[name="tags"]');
+tagCheckboxes.forEach(checkbox => {
+    checkbox.addEventListener('change', function(e) {
+        const tagValue = e.target.value;
+        const isChecked = e.target.checked;
+        
+        console.log(`🏷️ Tag ${tagValue} changed to ${isChecked}`);
+        
+        if (tagValue === 'Plex 1') {
+            togglePlexLibrariesByTag('plex1', isChecked);
+        } else if (tagValue === 'Plex 2') {
+            togglePlexLibrariesByTag('plex2', isChecked);
+        } else if (tagValue === 'IPTV') {
+            toggleIptvManagementByTag(isChecked);
+        }
     });
+});
     
     // Subscription change listeners
     const plexSub = document.getElementById('plexSubscription');
@@ -531,6 +533,39 @@ if (data && (data.regular || data.fourk)) {
     }
 }
 
+// Toggle IPTV management section visibility
+function toggleIptvManagementByTag(isChecked) {
+    console.log(`🔧 Toggling IPTV management: ${isChecked}`);
+    
+    const iptvGroup = document.getElementById('iptvManagementGroup');
+    if (!iptvGroup) {
+        console.error(`❌ IPTV management group not found`);
+        return;
+    }
+    
+    if (isChecked) {
+        iptvGroup.style.display = 'block';
+        
+        // Initialize IPTV functionality when shown
+        if (window.IPTV && typeof window.IPTV.initializeForUser === 'function') {
+            console.log('🚀 Initializing IPTV for user...');
+            window.IPTV.initializeForUser();
+        } else {
+            console.warn('⚠️ IPTV module not available or initializeForUser function missing');
+        }
+    } else {
+        iptvGroup.style.display = 'none';
+        
+        // Clear IPTV data when hidden
+        if (window.IPTV && typeof window.IPTV.clearUserData === 'function') {
+            console.log('🧹 Clearing IPTV user data...');
+            window.IPTV.clearUserData();
+        }
+    }
+    
+    console.log(`✅ IPTV management section ${isChecked ? 'shown' : 'hidden'}`);
+}
+
 // Test Plex connection quietly
 async function testPlexConnectionQuiet(serverGroup) {
     const statusElement = document.getElementById(`${serverGroup}Status`);
@@ -613,23 +648,34 @@ async function loadAndPopulateUser(userId) {
         // Set checkboxes
         document.getElementById('bccOwnerRenewal').checked = user.bcc_owner_renewal === 1;
         
-        // Handle tags and show appropriate library sections
-        if (user.tags && Array.isArray(user.tags)) {
-            user.tags.forEach(tag => {
-                const checkbox = document.querySelector(`input[name="tags"][value="${tag}"]`);
-                if (checkbox) {
-                    checkbox.checked = true;
-                    
-                    // Show library sections for Plex tags and trigger pre-selection
-                    if (tag === 'Plex 1') {
-                        togglePlexLibrariesByTag('plex1', true);
-                    }
-                    if (tag === 'Plex 2') {
-                        togglePlexLibrariesByTag('plex2', true);
-                    }
+// Tags and library sections
+document.querySelectorAll('input[name="tags"]').forEach(cb => cb.checked = false);
+if (user.tags && Array.isArray(user.tags)) {
+    user.tags.forEach(tag => {
+        const checkbox = document.querySelector(`input[name="tags"][value="${tag}"]`);
+        if (checkbox) {
+            checkbox.checked = true;
+            
+            // Show library sections for Plex tags and pre-select libraries
+            if (tag === 'Plex 1') {
+                togglePlexLibrariesByTag('plex1', true);
+            }
+            if (tag === 'Plex 2') {
+                togglePlexLibrariesByTag('plex2', true);
+            }
+            // ADD THIS NEW SECTION:
+            if (tag === 'IPTV') {
+                toggleIptvManagementByTag(true);
+                // Load current IPTV status for this user
+                if (window.IPTV && typeof window.IPTV.loadUserStatus === 'function') {
+                    setTimeout(() => {
+                        window.IPTV.loadUserStatus(user);
+                    }, 500); // Small delay to ensure UI is ready
                 }
-            });
+            }
         }
+    });
+}
         
         console.log(`✅ Form population completed for ${user.name}`);
         

@@ -43,18 +43,31 @@ class IPTVService {
    * Get IPTV settings from database
    */
   async getSettings() {
-    const [rows] = await db.query(`
-      SELECT setting_key, setting_value 
-      FROM settings 
-      WHERE setting_key LIKE 'iptv_%'
-    `);
-    
-    const settings = {};
-    rows.forEach(row => {
-      settings[row.setting_key] = row.setting_value;
-    });
-    
-    return settings;
+    try {
+      const result = await db.query(`
+        SELECT setting_key, setting_value 
+        FROM settings 
+        WHERE setting_key LIKE 'iptv_%'
+      `);
+      
+      // Handle different return formats from mysql2
+      const rows = Array.isArray(result) ? result[0] : result;
+      
+      if (!rows || !Array.isArray(rows)) {
+        console.log('⚠️ No IPTV settings found in database, using defaults');
+        return {};
+      }
+      
+      const settings = {};
+      rows.forEach(row => {
+        settings[row.setting_key] = row.setting_value;
+      });
+      
+      return settings;
+    } catch (error) {
+      console.error('❌ Error getting IPTV settings:', error);
+      return {};
+    }
   }
 
   /**

@@ -87,6 +87,173 @@
     </div>
 </div>
 
+<!-- IPTV Panel Configuration Section -->
+<div class="settings-section">
+    <h3>IPTV Panel Configuration</h3>
+    <p style="color: #4fc3f7; margin-bottom: 20px;">Configure IPTV panel integration for subscription management.</p>
+    
+    <div class="form-grid">
+        <div class="form-group">
+            <label for="iptvPanelBaseUrl">Panel Base URL:</label>
+            <input type="text" id="iptvPanelBaseUrl" name="iptv_panel_base_url" placeholder="https://panel.pinkpony.lol" value="">
+            <small style="color: #4fc3f7;">Base URL for the IPTV panel API (without /login or trailing slash)</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="iptvPanelLoginUrl">Login URL:</label>
+            <input type="text" id="iptvPanelLoginUrl" name="iptv_panel_login_url" placeholder="https://panel.pinkpony.lol/login/rwykjyh" value="">
+            <small style="color: #4fc3f7;">Full login URL including the unique path</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="iptvPanelUsername">Panel Username:</label>
+            <input type="text" id="iptvPanelUsername" name="iptv_panel_username" placeholder="johnsonflix" value="">
+            <small style="color: #4fc3f7;">Your IPTV panel login username</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="iptvPanelPassword">Panel Password:</label>
+            <input type="password" id="iptvPanelPassword" name="iptv_panel_password" placeholder="••••••••" value="">
+            <small style="color: #4fc3f7;">Your IPTV panel login password</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="iptvPackageIdForBouquets">Package ID for Bouquets:</label>
+            <input type="text" id="iptvPackageIdForBouquets" name="iptv_package_id_for_bouquets" placeholder="34" value="">
+            <small style="color: #4fc3f7;">Package ID to use when fetching available bouquets (usually 34)</small>
+        </div>
+    </div>
+    
+    <!-- Connection Test and Status -->
+    <div style="margin-top: 25px;">
+        <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px;">
+            <button type="button" class="btn" onclick="IPTV.testPanelConnection()" style="background: linear-gradient(45deg, #4fc3f7, #29b6f6);">
+                <span id="testConnectionText">Test Connection</span>
+            </button>
+            <button type="button" class="btn" onclick="IPTV.syncPackagesFromPanel()" style="background: linear-gradient(45deg, #ff9800, #ff5722);">
+                Sync Packages
+            </button>
+            <button type="button" class="btn" onclick="IPTV.syncBouquetsFromPanel()" style="background: linear-gradient(45deg, #9c27b0, #e91e63);">
+                Sync Bouquets
+            </button>
+        </div>
+        
+        <div id="iptvConnectionStatus" style="padding: 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.3); border: 1px solid #333; display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span id="connectionStatusText" style="color: #fff;">Ready to test connection...</span>
+                <span id="connectionStatusIcon" style="font-size: 1.2rem;">⚪</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Credit Balance Display -->
+    <div style="margin-top: 25px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(76, 175, 80, 0.1); padding: 15px; border-radius: 8px; border: 1px solid #4caf50;">
+            <div>
+                <span style="color: #4caf50; font-weight: 500; font-size: 1.1rem;">Available Credits: </span>
+                <span id="currentCreditBalance" style="color: #fff; font-size: 1.3rem; font-weight: bold;">Loading...</span>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn" onclick="IPTV.syncCreditsBalance()" style="padding: 8px 16px; font-size: 0.9rem; background: linear-gradient(45deg, #4caf50, #8bc34a);">
+                    Sync Balance
+                </button>
+                <span id="lastCreditSync" style="color: #4fc3f7; font-size: 0.85rem; align-self: center;">Never synced</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- IPTV Channel Groups Management Section -->
+<div class="settings-section">
+    <h3>IPTV Channel Groups</h3>
+    <p style="color: #4fc3f7; margin-bottom: 20px;">Create custom channel groups by combining bouquets for easy user assignment.</p>
+    
+    <!-- Add New Channel Group Form -->
+    <div id="channelGroupForm" style="display: none; background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 8px; border: 1px solid #333; margin-bottom: 20px;">
+        <h4 style="color: #4fc3f7; margin-bottom: 15px;" id="channelGroupFormTitle">Create New Channel Group</h4>
+        <form onsubmit="IPTV.saveChannelGroup(event)">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="channelGroupName">Group Name:</label>
+                    <input type="text" id="channelGroupName" name="name" required placeholder="e.g., Premium Package">
+                </div>
+                <div class="form-group">
+                    <label for="channelGroupDescription">Description:</label>
+                    <input type="text" id="channelGroupDescription" name="description" placeholder="e.g., USA, CAN, UK, LAT, SPORTS, 24/7, VOD, PPV, ADULT">
+                </div>
+            </div>
+            
+            <div class="form-group" style="margin-top: 15px;">
+                <label>Available Bouquets:</label>
+                <div id="bouquetSelectionContainer" style="max-height: 300px; overflow-y: auto; background: rgba(0, 0, 0, 0.2); padding: 15px; border-radius: 8px; border: 1px solid #333; margin-top: 10px;">
+                    <div style="text-align: center; color: #666; padding: 20px;">
+                        Loading bouquets... <br>
+                        <small>Click "Sync Bouquets" above if this doesn't load</small>
+                    </div>
+                </div>
+                <div style="margin-top: 10px; display: flex; gap: 10px;">
+                    <button type="button" class="btn btn-secondary" onclick="IPTV.selectAllBouquets()" style="font-size: 0.85rem; padding: 6px 12px;">Select All</button>
+                    <button type="button" class="btn btn-secondary" onclick="IPTV.clearAllBouquets()" style="font-size: 0.85rem; padding: 6px 12px;">Clear All</button>
+                    <button type="button" class="btn" onclick="IPTV.loadBouquetsForSelection()" style="font-size: 0.85rem; padding: 6px 12px; background: linear-gradient(45deg, #4fc3f7, #29b6f6);">Refresh Bouquets</button>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button type="submit" class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a);">Save Channel Group</button>
+                <button type="button" class="btn btn-secondary" onclick="IPTV.hideChannelGroupForm()">Cancel</button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Channel Groups Table Controls -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <button class="btn" onclick="IPTV.showChannelGroupForm()" style="background: linear-gradient(45deg, #4caf50, #8bc34a);">
+            Create New Channel Group
+        </button>
+        <button type="button" class="btn" onclick="IPTV.loadChannelGroups()" style="padding: 8px 16px; font-size: 0.9rem;">
+            Refresh List
+        </button>
+    </div>
+    
+    <!-- Channel Groups Table -->
+    <div class="table-container">
+        <table class="data-table channel-groups-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Bouquets</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="channelGroupsTableBody">
+                <tr><td colspan="6" style="text-align: center; color: #666;">Loading channel groups...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div style="margin-top: 20px; padding: 15px; background: rgba(255, 193, 7, 0.1); border: 1px solid #ffc107; border-radius: 8px;">
+        <h4 style="color: #ffc107; margin-bottom: 10px;">Quick Actions</h4>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="button" class="btn" onclick="IPTV.createDefaultChannelGroups()" style="background: linear-gradient(45deg, #ff9800, #ff5722); font-size: 0.85rem; padding: 6px 12px;">
+                Create Default Groups
+            </button>
+            <button type="button" class="btn" onclick="IPTV.exportChannelGroups()" style="background: linear-gradient(45deg, #2196f3, #03a9f4); font-size: 0.85rem; padding: 6px 12px;">
+                Export Config
+            </button>
+            <button type="button" class="btn" onclick="IPTV.viewBouquetDetails()" style="background: linear-gradient(45deg, #9c27b0, #e91e63); font-size: 0.85rem; padding: 6px 12px;">
+                View All Bouquets
+            </button>
+        </div>
+        <small style="color: #ffc107; display: block; margin-top: 8px;">
+            💡 Tip: Create channel groups that match your subscription tiers (Basic, Premium, Ultimate) for easier user management.
+        </small>
+    </div>
+</div>
+
 <!-- Plex Configuration -->
 <div class="settings-section">
     <h3>Plex Configuration</h3>
