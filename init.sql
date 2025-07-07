@@ -43,6 +43,14 @@ CREATE TABLE users (
   tags JSON,
   plex_libraries JSON,
   pending_plex_invites JSON DEFAULT NULL COMMENT 'Tracks pending Plex server invitations for this user',
+  iptv_line_id VARCHAR(20) NULL COMMENT 'IPTV panel user ID',
+  iptv_package_id VARCHAR(10) NULL COMMENT 'Current IPTV package ID',
+  iptv_package_name VARCHAR(100) NULL COMMENT 'Current IPTV package name',
+  iptv_expiration DATETIME NULL COMMENT 'IPTV subscription expiration date',
+  iptv_credits_used INT DEFAULT 0 COMMENT 'Total credits spent on this user',
+  iptv_channel_group_id INT NULL COMMENT 'Assigned custom channel group',
+  iptv_connections INT NULL COMMENT 'Max allowed connections for this user',
+  iptv_is_trial BOOLEAN DEFAULT FALSE COMMENT 'Whether current subscription is trial',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE SET NULL
@@ -192,7 +200,18 @@ INSERT INTO settings (setting_key, setting_value, setting_type) VALUES
 ('cashapp_link', '', 'string'),
 ('primary_color', '#8e24aa', 'string'),
 ('secondary_color', '#3f51b5', 'string'),
-('accent_color', '#4fc3f7', 'string');
+('accent_color', '#4fc3f7', 'string'),
+('iptv_panel_base_url', '', 'string'),
+('iptv_panel_login_url', '', 'string'),
+('iptv_panel_username', '', 'string'),
+('iptv_panel_password', '', 'string'),
+('iptv_package_id_for_bouquets', '46', 'string'),
+('iptv_csrf_token', '', 'string'),
+('iptv_csrf_expires', '', 'string'),
+('iptv_credits_balance', '0', 'number'),
+('iptv_last_sync', '', 'string'),
+('iptv_auto_sync_enabled', 'true', 'boolean'),
+('iptv_sync_interval_hours', '1', 'number');
 
 -- Insert sample users
 INSERT INTO users (name, email, owner_id, plex_email, iptv_username, iptv_password, implayer_code, device_count, bcc_owner_renewal, tags) VALUES
@@ -326,3 +345,89 @@ DELIMITER ;
 CREATE INDEX idx_subscriptions_user_status ON subscriptions(user_id, status);
 CREATE INDEX idx_subscriptions_type_status ON subscription_types(type, active);
 CREATE INDEX idx_subscriptions_expiration ON subscriptions(expiration_date, status);
+
+-- NEW IPTV TABLES
+
+-- IPTV Packages (synced from panel)
+CREATE TABLE iptv_packages (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  package_id VARCHAR(10) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  connections INT NOT NULL,
+  duration_months INT NOT NULL,
+  credits INT NOT NULL,
+  package_type ENUM('trial', 'basic', 'full', 'live_tv') NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_package (package_id),
+  INDEX idx_package_type (package_type),
+  INDEX idx_is_active (is_active)
+);
+
+-- Custom Channel Groups (admin-created bouquet combinations)
+CREATE TABLE iptv_channel_groups (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(100) NOT NULL,
+  description TEXT,
+  bouquet_ids JSON NOT NULL COMMENT 'Array of bouquet IDs included in this group',
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_is_active (is_active)
+);
+
+-- Bouquet Master List (synced from panel)
+CREATE TABLE iptv_bouquets (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  bouquet_id VARCHAR(10) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  category VARCHAR(50),
+  is_active BOOLEAN DEFAULT true,
+  synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_bouquet (bouquet_id),
+  INDEX idx_category (category),
+  INDEX idx_is_active (is_active)
+);
+
+-- IPTV User Activity Log (for tracking API calls and credits)
+CREATE TABLE iptv_activity_log (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT,
+  line_id VARCHAR(20),
+  action ENUM('create_trial', 'create_paid', 'extend', 'sync', 'error') NOT NULL,
+  package_id VARCHAR(10),
+  credits_used INT DEFAULT 0,
+  success BOOLEAN DEFAULT TRUE,
+  error_message TEXT,
+  api_response JSON,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_user_id (user_id),
+  INDEX idx_line_id (line_id),
+  INDEX idx_action (action),
+  INDEX idx_created_at (created_at)
+);
+
+-- Add foreign key constraint for iptv_channel_group_id
+ALTER TABLE users ADD CONSTRAINT fk_users_iptv_channel_group 
+  FOREIGN KEY (iptv_channel_group_id) REFERENCES iptv_channel_groups(id) ON DELETE SET NULL;
+
+-- Insert sample IPTV data
+INSERT INTO iptv_packages (package_id, name, connections, duration_months, credits, package_type) VALUES
+('150', '2 Connections - 1 Month', 2, 1, 1, 'full'),
+('151', '4 Connections - 1 Month', 4, 1, 2, 'full'),
+('152', '6 Connections - 1 Month', 6, 1, 3, 'full'),
+('159', '2 Connections - 12 Months', 2, 12, 12, 'full'),
+('160', '4 Connections - 12 Months', 4, 12, 24, 'full'),
+('175', 'Live TV 2 Connections - 1 Month', 2, 1, 1, 'live_tv'),
+('176', 'Live TV 4 Connections - 1 Month', 4, 1, 2, 'live_tv');
+
+INSERT INTO iptv_channel_groups (name, description, bouquet_ids) VALUES
+('Premium Package', 'USA, CAN, UK, LAT, SPORTS, 24/7, VOD, PPV, ADULT', 
+ JSON_ARRAY('130', '134', '137', '144', '145', '146', '147')),
+('Family Friendly', 'USA, CAN, UK, SPORTS, 24/7 (No Adult Content)', 
+ JSON_ARRAY('130', '134', '137', '144', '145', '146'));
