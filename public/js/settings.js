@@ -120,32 +120,58 @@ if (document.getElementById('targetTagsContainer')) {
         }
     },
     
-    populateSettingFields(settings) {
-        const fieldMapping = {
-            'smtpHost': 'smtp_host',
-            'smtpPort': 'smtp_port',
-            'smtpUser': 'smtp_user',
-            'smtpPass': 'smtp_pass',
-            'paypalLink': 'paypal_link',
-            'venmoLink': 'venmo_link',
-            'cashappLink': 'cashapp_link'
-        };
+populateSettingFields(settings) {
+    const fieldMapping = {
+        'smtpHost': 'smtp_host',
+        'smtpPort': 'smtp_port',
+        'smtpUser': 'smtp_user',
+        'smtpPass': 'smtp_pass',
+        'paypalLink': 'paypal_link',
+        'venmoLink': 'venmo_link',
+        'cashappLink': 'cashapp_link'
+    };
+    
+    Object.keys(fieldMapping).forEach(fieldId => {
+        const element = document.getElementById(fieldId);
+        const settingKey = fieldMapping[fieldId];
         
-        Object.keys(fieldMapping).forEach(fieldId => {
-            const element = document.getElementById(fieldId);
-            const settingKey = fieldMapping[fieldId];
-            
-            if (element && settings[settingKey] !== undefined) {
-                if (fieldId === 'smtpHost' && !settings[settingKey]) {
-                    element.value = 'smtp.gmail.com'; // Default
-                } else if (fieldId === 'smtpPort' && !settings[settingKey]) {
-                    element.value = '587'; // Default
-                } else {
-                    element.value = settings[settingKey] || '';
-                }
+        if (element && settings[settingKey] !== undefined) {
+            if (fieldId === 'smtpHost' && !settings[settingKey]) {
+                element.value = 'smtp.gmail.com'; // Default
+            } else if (fieldId === 'smtpPort' && !settings[settingKey]) {
+                element.value = '587'; // Default
+            } else {
+                element.value = settings[settingKey] || '';
             }
-        });
-    },
+        }
+    });
+
+    // IPTV Panel Settings
+    if (settings.iptv_panel_base_url) {
+        const element = document.getElementById('iptvPanelBaseUrl');
+        if (element) element.value = settings.iptv_panel_base_url;
+    }
+    if (settings.iptv_panel_login_url) {
+        const element = document.getElementById('iptvPanelLoginUrl');
+        if (element) element.value = settings.iptv_panel_login_url;
+    }
+    if (settings.iptv_panel_username) {
+        const element = document.getElementById('iptvPanelUsername');
+        if (element) element.value = settings.iptv_panel_username;
+    }
+    if (settings.iptv_panel_password) {
+        const element = document.getElementById('iptvPanelPassword');
+        if (element) element.value = settings.iptv_panel_password;
+    }
+    if (settings.iptv_package_id_for_bouquets) {
+        const element = document.getElementById('iptvPackageIdForBouquets');
+        if (element) element.value = settings.iptv_package_id_for_bouquets;
+    }
+    if (settings.iptv_credits_balance) {
+        const element = document.getElementById('currentCreditBalance');
+        if (element) element.textContent = settings.iptv_credits_balance;
+    }
+},
     
     loadPlexStatus() {
         // Just set initial status text, don't auto-test connections
@@ -956,43 +982,50 @@ renderSubscriptionsTable(subscriptions) {
         }
     },
 
-    async saveAllSettings() {
-        try {
-            // First upload any pending files
-            await this.uploadPendingFiles();
+async saveAllSettings() {
+    try {
+        // First upload any pending files
+        await this.uploadPendingFiles();
+        
+        const settingsData = {
+            // Branding settings (text only - files already uploaded above)
+            app_title: document.getElementById('appTitle')?.value?.trim() || '',
+            app_subtitle: document.getElementById('appSubtitle')?.value?.trim() || '',
             
-            const settingsData = {
-                // Branding settings (text only - files already uploaded above)
-                app_title: document.getElementById('appTitle')?.value?.trim() || '',
-                app_subtitle: document.getElementById('appSubtitle')?.value?.trim() || '',
-                
-                // Email settings
-                smtp_host: document.getElementById('smtpHost')?.value || 'smtp.gmail.com',
-                smtp_port: parseInt(document.getElementById('smtpPort')?.value) || 587,
-                smtp_user: document.getElementById('smtpUser')?.value || '',
-                smtp_pass: document.getElementById('smtpPass')?.value || '',
-                
-                // Payment settings
-                paypal_link: document.getElementById('paypalLink')?.value || '',
-                venmo_link: document.getElementById('venmoLink')?.value || '',
-                cashapp_link: document.getElementById('cashappLink')?.value || ''
-            };
+            // Email settings
+            smtp_host: document.getElementById('smtpHost')?.value || 'smtp.gmail.com',
+            smtp_port: parseInt(document.getElementById('smtpPort')?.value) || 587,
+            smtp_user: document.getElementById('smtpUser')?.value || '',
+            smtp_pass: document.getElementById('smtpPass')?.value || '',
             
-            // Save text settings (only if there are any changes)
-            if (Object.values(settingsData).some(value => value !== '')) {
-                await API.Settings.update(settingsData);
-            }
+            // Payment settings
+            paypal_link: document.getElementById('paypalLink')?.value || '',
+            venmo_link: document.getElementById('venmoLink')?.value || '',
+            cashapp_link: document.getElementById('cashappLink')?.value || '',
             
-            Utils.showNotification('Settings saved successfully!', 'success');
-            
-            // Apply branding immediately
-            const allSettings = await API.Settings.getAll();
-            this.applyBranding(allSettings);
-            
-        } catch (error) {
-            Utils.handleError(error, 'Saving settings');
+            // IPTV Panel Configuration
+            iptv_panel_base_url: document.getElementById('iptvPanelBaseUrl')?.value || '',
+            iptv_panel_login_url: document.getElementById('iptvPanelLoginUrl')?.value || '',
+            iptv_panel_username: document.getElementById('iptvPanelUsername')?.value || '',
+            iptv_panel_password: document.getElementById('iptvPanelPassword')?.value || '',
+            iptv_package_id_for_bouquets: document.getElementById('iptvPackageIdForBouquets')?.value || ''
+        };
+        
+        // Save text settings (only if there are any changes)
+        if (Object.values(settingsData).some(value => value !== '')) {
+            await API.Settings.update(settingsData);
         }
-    },
+        
+        Utils.showNotification('Settings saved successfully!', 'success');
+        
+        // Apply branding immediately
+        const allSettings = await API.Settings.getAll();
+        this.applyBranding(allSettings);
+        
+    } catch (error) {
+        Utils.handleError(error, 'Saving settings');
+    }
+},
 
     // NEW: Upload pending files
     async uploadPendingFiles() {
@@ -1220,9 +1253,69 @@ renderSubscriptionsTable(subscriptions) {
         return await this.syncAllPlexLibraries();
     },
 
-    // Email alias
+// Email alias
     async sendTestEmail() {
         return await this.testEmailConnection();
+    },
+    
+    // IPTV Panel Functions
+    async testIPTVConnection() {
+        try {
+            const button = document.getElementById('testConnectionText');
+            const statusDiv = document.getElementById('iptvConnectionStatus');
+            const statusText = document.getElementById('connectionStatusText');
+            const statusIcon = document.getElementById('connectionStatusIcon');
+
+            if (button) button.textContent = 'Testing...';
+            if (statusDiv) statusDiv.style.display = 'block';
+            if (statusText) statusText.textContent = 'Testing connection...';
+            if (statusIcon) statusIcon.textContent = '🔄';
+
+            // First save current settings to ensure they're available for the test
+            await this.saveCurrentIPTVSettings();
+
+            const response = await fetch('/api/iptv/test-connection', { method: 'POST' });
+            const data = await response.json();
+
+            if (data.success) {
+                if (statusText) statusText.textContent = 'Connection successful!';
+                if (statusIcon) statusIcon.textContent = '✅';
+                Utils.showNotification('IPTV panel connection successful', 'success');
+            } else {
+                if (statusText) statusText.textContent = `Connection failed: ${data.message}`;
+                if (statusIcon) statusIcon.textContent = '❌';
+                Utils.showNotification('IPTV panel connection failed', 'error');
+            }
+        } catch (error) {
+            console.error('❌ Connection test failed:', error);
+            const statusText = document.getElementById('connectionStatusText');
+            const statusIcon = document.getElementById('connectionStatusIcon');
+            if (statusText) statusText.textContent = 'Connection test failed';
+            if (statusIcon) statusIcon.textContent = '❌';
+            Utils.showNotification('Connection test failed', 'error');
+        } finally {
+            const button = document.getElementById('testConnectionText');
+            if (button) button.textContent = 'Test Connection';
+        }
+    },
+
+    async saveCurrentIPTVSettings() {
+        try {
+            const iptvSettings = {
+                iptv_panel_base_url: document.getElementById('iptvPanelBaseUrl')?.value || '',
+                iptv_panel_login_url: document.getElementById('iptvPanelLoginUrl')?.value || '',
+                iptv_panel_username: document.getElementById('iptvPanelUsername')?.value || '',
+                iptv_panel_password: document.getElementById('iptvPanelPassword')?.value || '',
+                iptv_package_id_for_bouquets: document.getElementById('iptvPackageIdForBouquets')?.value || ''
+            };
+
+            // Only save if there are actual values
+            if (Object.values(iptvSettings).some(value => value !== '')) {
+                await API.Settings.update(iptvSettings);
+            }
+        } catch (error) {
+            console.error('Failed to save IPTV settings:', error);
+        }
     }
 };
 
@@ -1254,5 +1347,64 @@ window.uploadFavicon = (input) => Settings.uploadFile && Settings.uploadFile(inp
 
 // Email function alias
 window.sendTestEmail = Settings.sendTestEmail.bind(Settings);
+
+// ADD THESE IPTV FUNCTION ALIASES AT THE END:
+
+// IPTV function aliases for settings page
+window.testIPTVConnection = Settings.testIPTVConnection.bind(Settings);
+
+// Create IPTV object if it doesn't exist and add the functions called by settings.html
+if (!window.IPTV) {
+    window.IPTV = {};
+}
+
+// Map the settings page IPTV functions to the Settings object
+window.IPTV.testPanelConnection = Settings.testIPTVConnection.bind(Settings);
+window.IPTV.syncPackagesFromPanel = async () => {
+    try {
+        Utils.showNotification('Syncing packages from panel...', 'info');
+        const response = await fetch('/api/iptv/sync-packages', { method: 'POST' });
+        const data = await response.json();
+        if (data.success) {
+            Utils.showNotification(`Synced ${data.count || 0} packages`, 'success');
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (error) {
+        Utils.showNotification('Failed to sync packages', 'error');
+    }
+};
+
+window.IPTV.syncBouquetsFromPanel = async () => {
+    try {
+        Utils.showNotification('Syncing bouquets from panel...', 'info');
+        const response = await fetch('/api/iptv/sync-bouquets', { method: 'POST' });
+        const data = await response.json();
+        if (data.success) {
+            Utils.showNotification(`Synced ${data.count || 0} bouquets`, 'success');
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (error) {
+        Utils.showNotification('Failed to sync bouquets', 'error');
+    }
+};
+
+window.IPTV.syncCreditsBalance = async () => {
+    try {
+        Utils.showNotification('Syncing credit balance...', 'info');
+        const response = await fetch('/api/iptv/sync-credits', { method: 'POST' });
+        const data = await response.json();
+        if (data.success) {
+            const element = document.getElementById('currentCreditBalance');
+            if (element) element.textContent = data.balance;
+            Utils.showNotification(`Credit balance: ${data.balance}`, 'success');
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (error) {
+        Utils.showNotification('Failed to sync credits', 'error');
+    }
+};
 
 console.log('✅ Enhanced Settings.js with file upload support loaded successfully');
