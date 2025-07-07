@@ -77,9 +77,21 @@ router.post('/', [
 // Calculate next_run based on schedule type  
 let next_run = null;
 if (schedule_type === 'specific_date' && scheduled_date && scheduled_time) {
-  // Extract just the date part (YYYY-MM-DD) from the ISO string
+  // Convert Central Time input to UTC for storage
   const dateOnly = scheduled_date.split('T')[0];
-  next_run = `${dateOnly} ${scheduled_time}:00`;
+  const centralDateTime = `${dateOnly}T${scheduled_time}:00`;
+  const centralDate = new Date(centralDateTime);
+  
+  // Assume Central Time and convert to UTC
+  // Central Time is UTC-6 (CST) or UTC-5 (CDT)
+  const now = new Date();
+  const isDST = now.getMonth() >= 2 && now.getMonth() <= 10; // Rough DST check
+  const offsetHours = isDST ? 5 : 6; // CDT = UTC-5, CST = UTC-6
+  
+  const utcDate = new Date(centralDate.getTime() + (offsetHours * 60 * 60 * 1000));
+  next_run = utcDate.toISOString().slice(0, 19).replace('T', ' ');
+  
+  console.log(`🕐 Converting Central Time ${dateOnly} ${scheduled_time} to UTC: ${next_run}`);
 }
 
     const result = await db.query(`
@@ -145,10 +157,23 @@ router.put('/:id', [
       active
     } = req.body;
 
-    // Calculate next_run based on schedule type
+// Calculate next_run based on schedule type
     let next_run = null;
     if (schedule_type === 'specific_date' && scheduled_date && scheduled_time) {
-      next_run = `${scheduled_date} ${scheduled_time}:00`;
+      // Convert Central Time input to UTC for storage
+      const dateOnly = scheduled_date.split('T')[0];
+      const centralDateTime = `${dateOnly}T${scheduled_time}:00`;
+      const centralDate = new Date(centralDateTime);
+      
+      // Assume Central Time and convert to UTC
+      const now = new Date();
+      const isDST = now.getMonth() >= 2 && now.getMonth() <= 10; // Rough DST check
+      const offsetHours = isDST ? 5 : 6; // CDT = UTC-5, CST = UTC-6
+      
+      const utcDate = new Date(centralDate.getTime() + (offsetHours * 60 * 60 * 1000));
+      next_run = utcDate.toISOString().slice(0, 19).replace('T', ' ');
+      
+      console.log(`🕐 Updating - Converting Central Time ${dateOnly} ${scheduled_time} to UTC: ${next_run}`);
     }
 
     await db.query(`

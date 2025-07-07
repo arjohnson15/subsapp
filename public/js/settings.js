@@ -466,13 +466,22 @@ renderSchedulesTable(schedules) {
 
     tbody.innerHTML = schedules.map(schedule => {
         let details = '';
-if (schedule.schedule_type === 'specific_date' && schedule.next_run) {
-    // Use the properly formatted next_run timestamp
-    const runDate = new Date(schedule.next_run);
-    details = runDate.toLocaleString(); // Shows: "7/6/2025, 5:55:00 PM"
-} else if (schedule.schedule_type === 'expiration_reminder') {
-    details = `${schedule.days_before_expiration} days before ${schedule.subscription_type} expiration`;
-}
+        if (schedule.schedule_type === 'specific_date' && schedule.next_run) {
+            // Convert UTC time to Central Time for display
+            const utcDate = new Date(schedule.next_run);
+            const centralTime = utcDate.toLocaleString('en-US', {
+                timeZone: 'America/Chicago',
+                year: 'numeric',
+                month: 'numeric',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
+            details = `${centralTime} <span style="color: #888; font-size: 0.9em;">(Central Time)</span>`;
+        } else if (schedule.schedule_type === 'expiration_reminder') {
+            details = `${schedule.days_before_expiration} days before ${schedule.subscription_type} expiration`;
+        }
 
         let targetInfo = '';
         if (schedule.target_tags && schedule.target_tags.length > 0) {
@@ -490,7 +499,7 @@ if (schedule.schedule_type === 'specific_date' && schedule.next_run) {
                         ${schedule.active ? 'Active' : 'Inactive'}
                     </span>
                 </td>
-                <td>${schedule.last_run ? new Date(schedule.last_run).toLocaleDateString() : 'Never'}</td>
+                <td>${schedule.last_run ? new Date(schedule.last_run).toLocaleString('en-US', {timeZone: 'America/Chicago'}) : 'Never'}</td>
                 <td class="actions">
                     <button onclick="Settings.editSchedule(${schedule.id})" class="btn-icon" title="Edit">
                         <i class="fas fa-edit"></i>
