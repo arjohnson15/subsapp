@@ -786,10 +786,10 @@ $(document).ready(() => {
   }
 });
 
-// FIXED: Proper merging that preserves existing functions
-if (!window.IPTV) {
-  window.IPTV = {};
-}
+// Clean export for user management pages - no merging conflicts
+window.IPTVUser = IPTV;
+
+console.log('📺 IPTV user module loaded cleanly');
 
 // Save any existing functions that might have been created by settings.js
 const existingIptvFunctions = { ...window.IPTV };

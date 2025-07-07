@@ -1319,61 +1319,26 @@ async saveAllSettings() {
     }
 };
 
-// CRITICAL FIX: Assign to window AFTER the object is created
+/// Clean export - no merging, no IPTV conflicts
 window.Settings = Settings;
 
-// Make functions globally available for onclick handlers
-window.addOwner = Settings.addOwner.bind(Settings);
-window.saveSettings = Settings.saveAllSettings.bind(Settings);
-window.testEmailConnection = Settings.testEmailConnection.bind(Settings);
+// Create dedicated settings page IPTV functions
+window.SettingsIPTV = {
+    async testPanelConnection() {
+        console.log('🔧 Testing IPTV panel connection...');
+        
+        try {
+            const button = document.getElementById('testConnectionText');
+            const statusDiv = document.getElementById('iptvConnectionStatus');
+            const statusText = document.getElementById('connectionStatusText');
+            const statusIcon = document.getElementById('connectionStatusIcon');
 
-// Owner management functions
-window.showOwnerForm = Settings.showOwnerForm.bind(Settings);
-window.hideOwnerForm = Settings.hideOwnerForm.bind(Settings);
-window.saveOwner = Settings.saveOwner.bind(Settings);
+            if (button) button.textContent = 'Testing...';
+            if (statusDiv) statusDiv.style.display = 'block';
+            if (statusText) statusText.textContent = 'Testing connection...';
+            if (statusIcon) statusIcon.textContent = '🔄';
 
-// Subscription management functions  
-window.sortSubscriptions = Settings.sortSubscriptions.bind(Settings);
-window.showSubscriptionForm = Settings.showSubscriptionForm.bind(Settings);
-window.hideSubscriptionForm = Settings.hideSubscriptionForm.bind(Settings);
-window.saveSubscription = Settings.saveSubscription.bind(Settings);
-
-// Plex functions that don't conflict with plex.js
-window.syncAllPlexLibraries = Settings.syncAllPlexLibraries.bind(Settings);
-
-// File upload functions
-window.uploadLogo = (input) => Settings.uploadFile && Settings.uploadFile(input, 'logo');
-window.uploadFavicon = (input) => Settings.uploadFile && Settings.uploadFile(input, 'favicon');
-
-// Email function alias
-window.sendTestEmail = Settings.sendTestEmail.bind(Settings);
-
-// IPTV function aliases for settings page
-window.testIPTVConnection = Settings.testIPTVConnection?.bind(Settings);
-
-// Create IPTV object if it doesn't exist and add the functions called by settings.html
-if (!window.IPTV) {
-    window.IPTV = {};
-}
-
-// DIRECT IMPLEMENTATION of testPanelConnection to avoid binding issues
-window.IPTV.testPanelConnection = async function() {
-    try {
-        const button = document.getElementById('testConnectionText');
-        const statusDiv = document.getElementById('iptvConnectionStatus');
-        const statusText = document.getElementById('connectionStatusText');
-        const statusIcon = document.getElementById('connectionStatusIcon');
-
-        if (button) button.textContent = 'Testing...';
-        if (statusDiv) statusDiv.style.display = 'block';
-        if (statusText) statusText.textContent = 'Testing connection...';
-        if (statusIcon) statusIcon.textContent = '🔄';
-
-        // First save current settings to ensure they're available for the test
-        if (Settings && Settings.saveCurrentIPTVSettings) {
-            await Settings.saveCurrentIPTVSettings();
-        } else {
-            // Fallback: save settings directly
+            // Save current settings first
             const iptvSettings = {
                 iptv_panel_base_url: document.getElementById('iptvPanelBaseUrl')?.value || '',
                 iptv_panel_login_url: document.getElementById('iptvPanelLoginUrl')?.value || '',
@@ -1385,227 +1350,96 @@ window.IPTV.testPanelConnection = async function() {
             if (Object.values(iptvSettings).some(value => value !== '')) {
                 await API.Settings.update(iptvSettings);
             }
-        }
 
-        const response = await fetch('/api/iptv/test-connection', { method: 'POST' });
-        const data = await response.json();
+            // Test connection
+            const response = await fetch('/api/iptv/test-connection', { method: 'POST' });
+            const data = await response.json();
 
-        if (data.success) {
-            if (statusText) statusText.textContent = 'Connection successful!';
-            if (statusIcon) statusIcon.textContent = '✅';
-            Utils.showNotification('IPTV panel connection successful', 'success');
-        } else {
-            if (statusText) statusText.textContent = `Connection failed: ${data.message}`;
-            if (statusIcon) statusIcon.textContent = '❌';
-            Utils.showNotification('IPTV panel connection failed', 'error');
-        }
-    } catch (error) {
-        console.error('❌ Connection test failed:', error);
-        const statusText = document.getElementById('connectionStatusText');
-        const statusIcon = document.getElementById('connectionStatusIcon');
-        if (statusText) statusText.textContent = 'Connection test failed';
-        if (statusIcon) statusIcon.textContent = '❌';
-        Utils.showNotification('Connection test failed', 'error');
-    } finally {
-        const button = document.getElementById('testConnectionText');
-        if (button) button.textContent = 'Test Connection';
-    }
-};
-
-window.IPTV.syncPackagesFromPanel = async function() {
-    try {
-        Utils.showNotification('Syncing packages from panel...', 'info');
-        const response = await fetch('/api/iptv/sync-packages', { method: 'POST' });
-        const data = await response.json();
-        if (data.success) {
-            Utils.showNotification(`Synced ${data.count || 0} packages`, 'success');
-        } else {
-            throw new Error(data.message);
-        }
-    } catch (error) {
-        console.error('Failed to sync packages:', error);
-        Utils.showNotification('Failed to sync packages', 'error');
-    }
-};
-
-window.IPTV.syncBouquetsFromPanel = async function() {
-    try {
-        Utils.showNotification('Syncing bouquets from panel...', 'info');
-        const response = await fetch('/api/iptv/sync-bouquets', { method: 'POST' });
-        const data = await response.json();
-        if (data.success) {
-            Utils.showNotification(`Synced ${data.count || 0} bouquets`, 'success');
-        } else {
-            throw new Error(data.message);
-        }
-    } catch (error) {
-        console.error('Failed to sync bouquets:', error);
-        Utils.showNotification('Failed to sync bouquets', 'error');
-    }
-};
-
-window.IPTV.syncCreditsBalance = async function() {
-    try {
-        Utils.showNotification('Syncing credit balance...', 'info');
-        const response = await fetch('/api/iptv/sync-credits', { method: 'POST' });
-        const data = await response.json();
-        if (data.success) {
-            const element = document.getElementById('currentCreditBalance');
-            if (element) element.textContent = data.credits;
-            Utils.showNotification(`Credit balance: ${data.credits}`, 'success');
-        } else {
-            throw new Error(data.message);
-        }
-    } catch (error) {
-        console.error('Failed to sync credits:', error);
-        Utils.showNotification('Failed to sync credits', 'error');
-    }
-};
-
-// Add all the channel group management functions that settings.html expects
-window.IPTV.showChannelGroupForm = function() {
-    const form = document.getElementById('channelGroupForm');
-    if (form) form.style.display = 'block';
-};
-
-window.IPTV.hideChannelGroupForm = function() {
-    const form = document.getElementById('channelGroupForm');
-    if (form) form.style.display = 'none';
-};
-
-window.IPTV.loadChannelGroups = async function() {
-    try {
-        Utils.showNotification('Loading channel groups...', 'info');
-        const response = await fetch('/api/iptv/channel-groups');
-        const data = await response.json();
-        console.log('Channel groups loaded:', data);
-        Utils.showNotification(`Loaded ${data.total || 0} channel groups`, 'info');
-    } catch (error) {
-        console.error('Failed to load channel groups:', error);
-        Utils.showNotification('Failed to load channel groups', 'error');
-    }
-};
-
-window.IPTV.saveChannelGroup = function(event) {
-    event.preventDefault();
-    Utils.showNotification('Channel group save functionality to be implemented', 'info');
-};
-
-window.IPTV.selectAllBouquets = function() {
-    const checkboxes = document.querySelectorAll('#bouquetSelectionContainer input[type="checkbox"]');
-    checkboxes.forEach(cb => cb.checked = true);
-};
-
-window.IPTV.clearAllBouquets = function() {
-    const checkboxes = document.querySelectorAll('#bouquetSelectionContainer input[type="checkbox"]');
-    checkboxes.forEach(cb => cb.checked = false);
-};
-
-window.IPTV.loadBouquetsForSelection = async function() {
-    try {
-        Utils.showNotification('Loading bouquets...', 'info');
-        const response = await fetch('/api/iptv/bouquets');
-        const data = await response.json();
-        console.log('Bouquets loaded:', data);
-        Utils.showNotification(`Loaded ${data.total || 0} bouquets`, 'info');
-    } catch (error) {
-        console.error('Failed to load bouquets:', error);
-        Utils.showNotification('Failed to load bouquets', 'error');
-    }
-};
-
-window.IPTV.createDefaultChannelGroups = async function() {
-    Utils.showNotification('Creating default channel groups...', 'info');
-    // Add implementation if needed
-};
-
-window.IPTV.exportChannelGroups = function() {
-    Utils.showNotification('Export functionality to be implemented', 'info');
-};
-
-window.IPTV.viewBouquetDetails = function() {
-    Utils.showNotification('Bouquet details view to be implemented', 'info');
-};
-
-console.log('✅ Enhanced Settings.js with file upload support loaded successfully');
-
-// Debug: Check what's in the IPTV object
-console.log('🔍 Debug: window.IPTV object contents:', Object.keys(window.IPTV));
-console.log('🔍 Debug: testPanelConnection function exists?', typeof window.IPTV?.testPanelConnection);
-console.log('🔍 Debug: Settings.testIPTVConnection exists?', typeof Settings?.testIPTVConnection);
-
-// Verify all required IPTV functions are available
-const requiredFunctions = [
-    'testPanelConnection',
-    'syncPackagesFromPanel', 
-    'syncBouquetsFromPanel',
-    'syncCreditsBalance'
-];
-
-const missingFunctions = requiredFunctions.filter(fn => typeof window.IPTV[fn] !== 'function');
-
-if (missingFunctions.length === 0) {
-    console.log('✅ All IPTV functions successfully assigned');
-} else {
-    console.error('❌ Missing IPTV functions:', missingFunctions);
-    
-    // Force assign any missing critical functions
-    if (!window.IPTV.testPanelConnection) {
-        window.IPTV.testPanelConnection = function() {
-            Utils.showNotification('IPTV test connection not available yet', 'warning');
-        };
-    }
-}
-
-// Final verification
-console.log('🎯 IPTV.testPanelConnection ready:', typeof window.IPTV.testPanelConnection === 'function');
-
-// NUCLEAR OPTION - Force override after everything loads
-console.log('🚀 NUCLEAR OPTION: Setting up IPTV function override...');
-
-// Wait for page to fully load, then override
-window.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        console.log('🚀 NUCLEAR: Executing function override...');
-        
-        // Completely nuke and recreate the IPTV object
-        window.IPTV = window.IPTV || {};
-        
-        // Force override the function
-        window.IPTV.testPanelConnection = async function() {
-            console.log('🚀 NUCLEAR testPanelConnection executing...');
-            try {
-                const response = await fetch('/api/iptv/test-connection', { method: 'POST' });
-                const data = await response.json();
-                console.log('Response:', data);
-                
-                if (data.success) {
-                    alert('✅ SUCCESS: ' + data.message);
-                } else {
-                    alert('❌ FAILED: ' + data.message);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('💥 ERROR: ' + error.message);
-            }
-        };
-        
-        console.log('✅ NUCLEAR override complete - function type:', typeof window.IPTV.testPanelConnection);
-        
-        // Also verify it can be called
-        console.log('🧪 Testing function call capability...');
-        try {
-            // Don't actually call it, just verify it exists
-            if (typeof window.IPTV.testPanelConnection === 'function') {
-                console.log('✅ Function is callable');
+            if (data.success) {
+                if (statusText) statusText.textContent = 'Connection successful!';
+                if (statusIcon) statusIcon.textContent = '✅';
+                Utils.showNotification('IPTV panel connection successful', 'success');
             } else {
-                console.error('❌ Function still not callable');
+                if (statusText) statusText.textContent = `Connection failed: ${data.message}`;
+                if (statusIcon) statusIcon.textContent = '❌';
+                Utils.showNotification('IPTV panel connection failed', 'error');
             }
-        } catch (e) {
-            console.error('❌ Function test failed:', e);
+        } catch (error) {
+            console.error('❌ Connection test failed:', error);
+            const statusText = document.getElementById('connectionStatusText');
+            const statusIcon = document.getElementById('connectionStatusIcon');
+            if (statusText) statusText.textContent = 'Connection test failed';
+            if (statusIcon) statusIcon.textContent = '❌';
+            Utils.showNotification('Connection test failed', 'error');
+        } finally {
+            const button = document.getElementById('testConnectionText');
+            if (button) button.textContent = 'Test Connection';
         }
-        
-    }, 2000); // Wait 2 seconds for everything to load
-});
+    },
 
-console.log('🚀 NUCLEAR OPTION setup complete');
+    async syncPackagesFromPanel() {
+        try {
+            Utils.showNotification('Syncing packages from panel...', 'info');
+            const response = await fetch('/api/iptv/sync-packages', { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+                Utils.showNotification(`Synced ${data.count || 0} packages`, 'success');
+            } else {
+                throw new Error(data.message);
+            }
+        } catch (error) {
+            console.error('Failed to sync packages:', error);
+            Utils.showNotification('Failed to sync packages', 'error');
+        }
+    },
+
+    async syncBouquetsFromPanel() {
+        try {
+            Utils.showNotification('Syncing bouquets from panel...', 'info');
+            const response = await fetch('/api/iptv/sync-bouquets', { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+                Utils.showNotification(`Synced ${data.count || 0} bouquets`, 'success');
+            } else {
+                throw new Error(data.message);
+            }
+        } catch (error) {
+            console.error('Failed to sync bouquets:', error);
+            Utils.showNotification('Failed to sync bouquets', 'error');
+        }
+    },
+
+    async syncCreditsBalance() {
+        try {
+            Utils.showNotification('Syncing credit balance...', 'info');
+            const response = await fetch('/api/iptv/sync-credits', { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+                const element = document.getElementById('currentCreditBalance');
+                if (element) element.textContent = data.credits;
+                Utils.showNotification(`Credit balance: ${data.credits}`, 'success');
+            } else {
+                throw new Error(data.message);
+            }
+        } catch (error) {
+            console.error('Failed to sync credits:', error);
+            Utils.showNotification('Failed to sync credits', 'error');
+        }
+    }
+};
+
+// Export settings functions for onclick handlers
+window.addOwner = Settings.addOwner.bind(Settings);
+window.saveSettings = Settings.saveAllSettings.bind(Settings);
+window.testEmailConnection = Settings.testEmailConnection.bind(Settings);
+window.showOwnerForm = Settings.showOwnerForm.bind(Settings);
+window.hideOwnerForm = Settings.hideOwnerForm.bind(Settings);
+window.saveOwner = Settings.saveOwner.bind(Settings);
+window.sortSubscriptions = Settings.sortSubscriptions.bind(Settings);
+window.showSubscriptionForm = Settings.showSubscriptionForm.bind(Settings);
+window.hideSubscriptionForm = Settings.hideSubscriptionForm.bind(Settings);
+window.saveSubscription = Settings.saveSubscription.bind(Settings);
+window.syncAllPlexLibraries = Settings.syncAllPlexLibraries.bind(Settings);
+window.sendTestEmail = Settings.sendTestEmail.bind(Settings);
+
+console.log('✅ Settings.js loaded cleanly with dedicated SettingsIPTV functions');
