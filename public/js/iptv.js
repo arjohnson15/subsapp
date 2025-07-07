@@ -786,5 +786,15 @@ $(document).ready(() => {
   }
 });
 
-// Export for use in other modules
-window.IPTV = IPTV;
+// At the very end of iptv.js, REPLACE this line:
+// window.IPTV = IPTV;
+
+// WITH this code that preserves existing IPTV functions:
+if (!window.IPTV) {
+  window.IPTV = {};
+}
+
+// Merge the IPTV module functions without overwriting existing ones
+Object.assign(window.IPTV, IPTV);
+
+console.log('📺 IPTV module loaded and merged with existing functions');
