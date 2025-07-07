@@ -1,4 +1,4 @@
-// iptv-service.js - IPTV Panel API Integration Service
+// iptv-service.js - IPTV Panel API Integration Service - FIXED VERSION
 const axios = require('axios');
 const db = require('./database-config');
 
@@ -601,12 +601,14 @@ class IPTVService {
    */
   async getPackageInfo(packageId) {
     try {
-      const [rows] = await db.query(
+      const result = await db.query(
         'SELECT * FROM iptv_packages WHERE package_id = ? AND is_active = true',
         [packageId]
       );
       
-      return rows[0] || null;
+      // Handle different return formats from mysql2
+      const rows = Array.isArray(result) ? result[0] : result;
+      return (Array.isArray(rows) && rows.length > 0) ? rows[0] : null;
     } catch (error) {
       console.error(`❌ Failed to get package info for ${packageId}:`, error);
       return null;
@@ -650,54 +652,74 @@ class IPTVService {
     }
   }
 
-/**
- * Get available packages from database
- */
-async getAvailablePackages() {
-  try {
-    const [rows] = await db.query(`
-      SELECT * FROM iptv_packages 
-      WHERE is_active = true 
-      ORDER BY package_type, duration_months, connections
-    `);
-    
-    return Array.isArray(rows) ? rows : [];
-  } catch (error) {
-    console.error('❌ Failed to get available packages:', error);
-    return []; // Always return empty array on error
+  /**
+   * Get available packages from database - FIXED VERSION
+   */
+  async getAvailablePackages() {
+    try {
+      const result = await db.query(`
+        SELECT * FROM iptv_packages 
+        WHERE is_active = true 
+        ORDER BY package_type, duration_months, connections
+      `);
+      
+      // Handle different return formats from mysql2
+      const rows = Array.isArray(result) ? result[0] : result;
+      
+      if (!rows || !Array.isArray(rows)) {
+        console.log('⚠️ No packages found in database');
+        return [];
+      }
+      
+      return rows;
+    } catch (error) {
+      console.error('❌ Failed to get available packages:', error);
+      return []; // Always return empty array on error
+    }
   }
-}
 
-/**
- * Get channel groups from database
- */
-async getChannelGroups() {
-  try {
-    const [rows] = await db.query(`
-      SELECT * FROM iptv_channel_groups 
-      WHERE is_active = true 
-      ORDER BY name
-    `);
-    
-    return Array.isArray(rows) ? rows : [];
-  } catch (error) {
-    console.error('❌ Failed to get channel groups:', error);
-    return []; // Always return empty array on error
+  /**
+   * Get channel groups from database - FIXED VERSION
+   */
+  async getChannelGroups() {
+    try {
+      const result = await db.query(`
+        SELECT * FROM iptv_channel_groups 
+        WHERE is_active = true 
+        ORDER BY name
+      `);
+      
+      // Handle different return formats from mysql2
+      const rows = Array.isArray(result) ? result[0] : result;
+      
+      if (!rows || !Array.isArray(rows)) {
+        console.log('⚠️ No channel groups found in database');
+        return [];
+      }
+      
+      return rows;
+    } catch (error) {
+      console.error('❌ Failed to get channel groups:', error);
+      return []; // Always return empty array on error
+    }
   }
-}
 
   /**
    * Create new channel group
    */
   async createChannelGroup(name, description, bouquetIds) {
     try {
-      const [result] = await db.query(`
+      const result = await db.query(`
         INSERT INTO iptv_channel_groups (name, description, bouquet_ids)
         VALUES (?, ?, ?)
       `, [name, description, JSON.stringify(bouquetIds)]);
       
+      // Handle different return formats from mysql2
+      const insertResult = Array.isArray(result) ? result[0] : result;
+      const insertId = insertResult.insertId;
+      
       console.log(`✅ Created channel group: ${name}`);
-      return result.insertId;
+      return insertId;
     } catch (error) {
       console.error(`❌ Failed to create channel group ${name}:`, error);
       throw error;

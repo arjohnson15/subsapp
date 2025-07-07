@@ -1,4 +1,4 @@
-// routes-iptv.js - IPTV API Routes - CORRECTED VERSION
+// routes-iptv.js - IPTV API Routes - FIXED VERSION
 const express = require('express');
 const router = express.Router();
 const { body, param, validationResult } = require('express-validator');
@@ -27,6 +27,21 @@ iptvService.initialize().catch(console.error);
 router.get('/packages', async (req, res) => {
   try {
     const packages = await iptvService.getAvailablePackages();
+    
+    // Ensure packages is an array before filtering
+    if (!Array.isArray(packages)) {
+      console.error('❌ Packages is not an array:', typeof packages);
+      return res.json({
+        success: true,
+        packages: {
+          trial: [],
+          full: [],
+          live_tv: [],
+          basic: []
+        },
+        total: 0
+      });
+    }
     
     // Group packages by type for easier frontend handling
     const groupedPackages = {
@@ -79,11 +94,22 @@ router.post('/sync-packages', async (req, res) => {
  */
 router.get('/bouquets', async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    const result = await db.query(`
       SELECT * FROM iptv_bouquets 
       WHERE is_active = true 
       ORDER BY category, name
     `);
+    
+    // Handle different return formats from mysql2
+    const rows = Array.isArray(result) ? result[0] : result;
+    
+    if (!rows || !Array.isArray(rows)) {
+      return res.json({
+        success: true,
+        bouquets: {},
+        total: 0
+      });
+    }
     
     // Group by category
     const groupedBouquets = {};
@@ -139,6 +165,16 @@ router.post('/sync-bouquets', async (req, res) => {
 router.get('/channel-groups', async (req, res) => {
   try {
     const groups = await iptvService.getChannelGroups();
+    
+    // Ensure groups is an array before mapping
+    if (!Array.isArray(groups)) {
+      console.error('❌ Channel groups is not an array:', typeof groups);
+      return res.json({
+        success: true,
+        channelGroups: [],
+        total: 0
+      });
+    }
     
     // Parse bouquet_ids JSON for each group
     const parsedGroups = groups.map(group => ({
@@ -257,7 +293,7 @@ router.get('/user/:id', [
     const { id } = req.params;
     
     // Get user's IPTV data from database
-    const [rows] = await db.query(`
+    const result = await db.query(`
       SELECT 
         u.id, u.name, u.email, u.iptv_username, u.iptv_line_id,
         u.iptv_package_id, u.iptv_package_name, u.iptv_expiration,
@@ -270,7 +306,10 @@ router.get('/user/:id', [
       WHERE u.id = ?
     `, [id]);
     
-    if (rows.length === 0) {
+    // Handle different return formats from mysql2
+    const rows = Array.isArray(result) ? result[0] : result;
+    
+    if (!rows || !Array.isArray(rows) || rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
@@ -323,8 +362,10 @@ router.post('/subscription', [
     await iptvService.initialize();
     
     // Get user data
-    const [userRows] = await db.query('SELECT * FROM users WHERE id = ?', [user_id]);
-    if (userRows.length === 0) {
+    const userResult = await db.query('SELECT * FROM users WHERE id = ?', [user_id]);
+    const userRows = Array.isArray(userResult) ? userResult[0] : userResult;
+    
+    if (!userRows || !Array.isArray(userRows) || userRows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
@@ -343,12 +384,14 @@ router.post('/subscription', [
     }
     
     // Get channel group bouquets
-    const [channelGroupRows] = await db.query(
+    const channelGroupResult = await db.query(
       'SELECT bouquet_ids FROM iptv_channel_groups WHERE id = ? AND is_active = true',
       [channel_group_id]
     );
     
-    if (channelGroupRows.length === 0) {
+    const channelGroupRows = Array.isArray(channelGroupResult) ? channelGroupResult[0] : channelGroupResult;
+    
+    if (!channelGroupRows || !Array.isArray(channelGroupRows) || channelGroupRows.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Invalid channel group selected'
@@ -520,12 +563,14 @@ router.get('/sync-user/:id', [
     const { id } = req.params;
     
     // Get user's line_id from database
-    const [userRows] = await db.query(
+    const userResult = await db.query(
       'SELECT iptv_line_id, iptv_username FROM users WHERE id = ?',
       [id]
     );
     
-    if (userRows.length === 0) {
+    const userRows = Array.isArray(userResult) ? userResult[0] : userResult;
+    
+    if (!userRows || !Array.isArray(userRows) || userRows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
@@ -676,7 +721,7 @@ router.get('/activity/:userId', [
     const limit = parseInt(req.query.limit) || 50;
     const offset = parseInt(req.query.offset) || 0;
     
-    const [rows] = await db.query(`
+    const result = await db.query(`
       SELECT 
         action, package_id, credits_used, success, error_message, created_at,
         line_id
@@ -686,10 +731,13 @@ router.get('/activity/:userId', [
       LIMIT ? OFFSET ?
     `, [userId, limit, offset]);
     
+    // Handle different return formats from mysql2
+    const rows = Array.isArray(result) ? result[0] : result;
+    
     res.json({
       success: true,
-      activities: rows,
-      total: rows.length
+      activities: Array.isArray(rows) ? rows : [],
+      total: Array.isArray(rows) ? rows.length : 0
     });
   } catch (error) {
     console.error('❌ Error getting IPTV activity:', error);
