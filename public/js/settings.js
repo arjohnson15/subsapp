@@ -1358,6 +1358,7 @@ if (!window.IPTV) {
 
 // Map the settings page IPTV functions to the Settings object
 window.IPTV.testPanelConnection = Settings.testIPTVConnection.bind(Settings);
+
 window.IPTV.syncPackagesFromPanel = async () => {
     try {
         Utils.showNotification('Syncing packages from panel...', 'info');
