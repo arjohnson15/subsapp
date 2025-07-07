@@ -1559,3 +1559,53 @@ if (missingFunctions.length === 0) {
 
 // Final verification
 console.log('🎯 IPTV.testPanelConnection ready:', typeof window.IPTV.testPanelConnection === 'function');
+
+// NUCLEAR OPTION - Force override after everything loads
+console.log('🚀 NUCLEAR OPTION: Setting up IPTV function override...');
+
+// Wait for page to fully load, then override
+window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        console.log('🚀 NUCLEAR: Executing function override...');
+        
+        // Completely nuke and recreate the IPTV object
+        window.IPTV = window.IPTV || {};
+        
+        // Force override the function
+        window.IPTV.testPanelConnection = async function() {
+            console.log('🚀 NUCLEAR testPanelConnection executing...');
+            try {
+                const response = await fetch('/api/iptv/test-connection', { method: 'POST' });
+                const data = await response.json();
+                console.log('Response:', data);
+                
+                if (data.success) {
+                    alert('✅ SUCCESS: ' + data.message);
+                } else {
+                    alert('❌ FAILED: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('💥 ERROR: ' + error.message);
+            }
+        };
+        
+        console.log('✅ NUCLEAR override complete - function type:', typeof window.IPTV.testPanelConnection);
+        
+        // Also verify it can be called
+        console.log('🧪 Testing function call capability...');
+        try {
+            // Don't actually call it, just verify it exists
+            if (typeof window.IPTV.testPanelConnection === 'function') {
+                console.log('✅ Function is callable');
+            } else {
+                console.error('❌ Function still not callable');
+            }
+        } catch (e) {
+            console.error('❌ Function test failed:', e);
+        }
+        
+    }, 2000); // Wait 2 seconds for everything to load
+});
+
+console.log('🚀 NUCLEAR OPTION setup complete');

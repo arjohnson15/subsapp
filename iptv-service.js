@@ -99,6 +99,8 @@ class IPTVService {
   async getCSRFToken() {
     try {
       console.log('🔑 Getting CSRF token from:', this.loginURL);
+	  console.log('🔍 DEBUG: loginURL type:', typeof this.loginURL);
+	  console.log('🔍 DEBUG: loginURL value:', JSON.stringify(this.loginURL));
       
       const response = await axios.get(this.loginURL, {
         timeout: 10000,
