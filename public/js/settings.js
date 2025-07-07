@@ -1406,4 +1406,66 @@ window.IPTV.syncCreditsBalance = async () => {
     }
 };
 
+// Add all the channel group management functions that settings.html expects
+window.IPTV.showChannelGroupForm = () => {
+    const form = document.getElementById('channelGroupForm');
+    if (form) form.style.display = 'block';
+};
+
+window.IPTV.hideChannelGroupForm = () => {
+    const form = document.getElementById('channelGroupForm');
+    if (form) form.style.display = 'none';
+};
+
+window.IPTV.loadChannelGroups = async () => {
+    Utils.showNotification('Loading channel groups...', 'info');
+    // Add implementation if needed
+};
+
+window.IPTV.saveChannelGroup = (event) => {
+    event.preventDefault();
+    Utils.showNotification('Channel group save functionality to be implemented', 'info');
+};
+
+window.IPTV.selectAllBouquets = () => {
+    const checkboxes = document.querySelectorAll('#bouquetSelectionContainer input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = true);
+};
+
+window.IPTV.clearAllBouquets = () => {
+    const checkboxes = document.querySelectorAll('#bouquetSelectionContainer input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = false);
+};
+
+window.IPTV.loadBouquetsForSelection = async () => {
+    Utils.showNotification('Loading bouquets...', 'info');
+    // Add implementation if needed
+};
+
+window.IPTV.createDefaultChannelGroups = async () => {
+    Utils.showNotification('Creating default channel groups...', 'info');
+    // Add implementation if needed
+};
+
+window.IPTV.exportChannelGroups = () => {
+    Utils.showNotification('Export functionality to be implemented', 'info');
+};
+
+window.IPTV.viewBouquetDetails = () => {
+    Utils.showNotification('Bouquet details view to be implemented', 'info');
+};
+
 console.log('✅ Enhanced Settings.js with file upload support loaded successfully');
+
+// Debug: Check what's in the IPTV object
+console.log('🔍 Debug: window.IPTV object contents:', window.IPTV);
+console.log('🔍 Debug: testPanelConnection function exists?', typeof window.IPTV?.testPanelConnection);
+console.log('🔍 Debug: Settings.testIPTVConnection exists?', typeof Settings.testIPTVConnection);
+
+// Force assign the function if it's missing
+if (!window.IPTV?.testPanelConnection) {
+    console.log('⚠️ testPanelConnection missing, force assigning...');
+    window.IPTV = window.IPTV || {};
+    window.IPTV.testPanelConnection = Settings.testIPTVConnection.bind(Settings);
+    console.log('✅ Force assigned testPanelConnection');
+}

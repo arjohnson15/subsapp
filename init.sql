@@ -347,7 +347,6 @@ CREATE INDEX idx_subscriptions_type_status ON subscription_types(type, active);
 CREATE INDEX idx_subscriptions_expiration ON subscriptions(expiration_date, status);
 
 -- NEW IPTV TABLES
-
 -- IPTV Packages (synced from panel)
 CREATE TABLE iptv_packages (
   id INT PRIMARY KEY AUTO_INCREMENT,
@@ -366,19 +365,19 @@ CREATE TABLE iptv_packages (
   INDEX idx_is_active (is_active)
 );
 
--- Custom Channel Groups (admin-created bouquet combinations)
+-- Custom Channel Groups
 CREATE TABLE iptv_channel_groups (
   id INT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(100) NOT NULL,
   description TEXT,
-  bouquet_ids JSON NOT NULL COMMENT 'Array of bouquet IDs included in this group',
+  bouquet_ids JSON NOT NULL,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_is_active (is_active)
 );
 
--- Bouquet Master List (synced from panel)
+-- Bouquet Master List
 CREATE TABLE iptv_bouquets (
   id INT PRIMARY KEY AUTO_INCREMENT,
   bouquet_id VARCHAR(10) NOT NULL,
@@ -393,7 +392,7 @@ CREATE TABLE iptv_bouquets (
   INDEX idx_is_active (is_active)
 );
 
--- IPTV User Activity Log (for tracking API calls and credits)
+-- IPTV User Activity Log
 CREATE TABLE iptv_activity_log (
   id INT PRIMARY KEY AUTO_INCREMENT,
   user_id INT,
@@ -411,10 +410,6 @@ CREATE TABLE iptv_activity_log (
   INDEX idx_action (action),
   INDEX idx_created_at (created_at)
 );
-
--- Add foreign key constraint for iptv_channel_group_id
-ALTER TABLE users ADD CONSTRAINT fk_users_iptv_channel_group 
-  FOREIGN KEY (iptv_channel_group_id) REFERENCES iptv_channel_groups(id) ON DELETE SET NULL;
 
 -- Insert sample IPTV data
 INSERT INTO iptv_packages (package_id, name, connections, duration_months, credits, package_type) VALUES

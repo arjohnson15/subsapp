@@ -786,15 +786,16 @@ $(document).ready(() => {
   }
 });
 
-// At the very end of iptv.js, REPLACE this line:
-// window.IPTV = IPTV;
-
-// WITH this code that preserves existing IPTV functions:
+// Merge the IPTV module functions without overwriting existing ones
 if (!window.IPTV) {
   window.IPTV = {};
 }
 
-// Merge the IPTV module functions without overwriting existing ones
+// First assign the IPTV object, then merge
 Object.assign(window.IPTV, IPTV);
 
+// Make sure the global IPTV variable also points to window.IPTV
+window.IPTV = Object.assign(window.IPTV, IPTV);
+
 console.log('📺 IPTV module loaded and merged with existing functions');
+console.log('🔍 Final IPTV object has testPanelConnection:', typeof window.IPTV.testPanelConnection);

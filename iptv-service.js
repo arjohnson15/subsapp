@@ -650,41 +650,41 @@ class IPTVService {
     }
   }
 
-  /**
-   * Get available packages from database
-   */
-  async getAvailablePackages() {
-    try {
-      const [rows] = await db.query(`
-        SELECT * FROM iptv_packages 
-        WHERE is_active = true 
-        ORDER BY package_type, duration_months, connections
-      `);
-      
-      return rows;
-    } catch (error) {
-      console.error('❌ Failed to get available packages:', error);
-      return [];
-    }
+/**
+ * Get available packages from database
+ */
+async getAvailablePackages() {
+  try {
+    const [rows] = await db.query(`
+      SELECT * FROM iptv_packages 
+      WHERE is_active = true 
+      ORDER BY package_type, duration_months, connections
+    `);
+    
+    return Array.isArray(rows) ? rows : [];
+  } catch (error) {
+    console.error('❌ Failed to get available packages:', error);
+    return []; // Always return empty array on error
   }
+}
 
-  /**
-   * Get channel groups from database
-   */
-  async getChannelGroups() {
-    try {
-      const [rows] = await db.query(`
-        SELECT * FROM iptv_channel_groups 
-        WHERE is_active = true 
-        ORDER BY name
-      `);
-      
-      return rows;
-    } catch (error) {
-      console.error('❌ Failed to get channel groups:', error);
-      return [];
-    }
+/**
+ * Get channel groups from database
+ */
+async getChannelGroups() {
+  try {
+    const [rows] = await db.query(`
+      SELECT * FROM iptv_channel_groups 
+      WHERE is_active = true 
+      ORDER BY name
+    `);
+    
+    return Array.isArray(rows) ? rows : [];
+  } catch (error) {
+    console.error('❌ Failed to get channel groups:', error);
+    return []; // Always return empty array on error
   }
+}
 
   /**
    * Create new channel group
