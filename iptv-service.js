@@ -44,33 +44,32 @@ class IPTVService {
   /**
    * Get IPTV settings from database
    */
-  async getSettings() {
-    try {
-      const result = await db.query(`
-        SELECT setting_key, setting_value 
-        FROM settings 
-        WHERE setting_key LIKE 'iptv_%'
-      `);
-      
-      // Handle different return formats from mysql2
-      const rows = Array.isArray(result) ? result[0] : result;
-      
-      if (!rows || !Array.isArray(rows)) {
-        console.log('⚠️ No IPTV settings found in database, using defaults');
-        return {};
-      }
-      
-      const settings = {};
-      rows.forEach(row => {
-        settings[row.setting_key] = row.setting_value;
-      });
-      
-      return settings;
-    } catch (error) {
-      console.error('❌ Error getting IPTV settings:', error);
+async getSettings() {
+  try {
+    const result = await db.query('SELECT * FROM settings');
+    
+    // Handle different return formats from mysql2
+    const rows = Array.isArray(result) ? result[0] : result;
+    
+    if (!rows || !Array.isArray(rows)) {
+      console.log('⚠️ No settings found in database');
       return {};
     }
+    
+    const settings = {};
+    rows.forEach(row => {
+      if (row.setting_key && row.setting_key.startsWith('iptv_')) {
+        settings[row.setting_key] = row.setting_value;
+      }
+    });
+    
+    console.log('🔍 DEBUG: Loaded IPTV settings:', settings);
+    return settings;
+  } catch (error) {
+    console.error('❌ Error getting IPTV settings:', error);
+    return {};
   }
+}
 
   /**
    * Update setting in database
