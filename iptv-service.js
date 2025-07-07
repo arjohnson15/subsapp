@@ -48,8 +48,13 @@ async getSettings() {
   try {
     const result = await db.query('SELECT * FROM settings');
     
+    // ADD THIS DEBUG LINE:
+    console.log('🔍 DEBUG: Raw database result:', result);
+    
     // Handle different return formats from mysql2
     const rows = Array.isArray(result) ? result[0] : result;
+    
+    console.log('🔍 DEBUG: Processed rows:', rows);
     
     if (!rows || !Array.isArray(rows)) {
       console.log('⚠️ No settings found in database');
