@@ -211,6 +211,7 @@ INSERT INTO settings (setting_key, setting_value, setting_type) VALUES
 ('iptv_credits_balance', '0', 'number'),
 ('iptv_last_sync', '', 'string'),
 ('iptv_auto_sync_enabled', 'true', 'boolean'),
+('iptv_session_cookies', '', 'string'),
 ('iptv_sync_interval_hours', '1', 'number');
 
 -- Insert sample users
