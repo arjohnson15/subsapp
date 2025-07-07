@@ -330,8 +330,6 @@ select option:checked {
 table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 1000px;
-    table-layout: fixed; /* This ensures consistent column widths */
 }
 
 th, td {
@@ -340,60 +338,6 @@ th, td {
     white-space: nowrap;
     vertical-align: middle;
     font-size: 0.9rem;
-}
-
-/* FIXED COLUMN WIDTHS - Matching header alignment */
-/* Column 1: Name */
-th:nth-child(1), td:nth-child(1) { 
-    width: 120px;
-    text-align: left;
-    min-width: 120px;
-}
-
-/* Column 2: Email */
-th:nth-child(2), td:nth-child(2) { 
-    width: 200px;
-    text-align: left;
-    min-width: 200px;
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Column 3: Owner */
-th:nth-child(3), td:nth-child(3) { 
-    width: 100px;
-    text-align: left;
-    min-width: 100px;
-}
-
-/* Column 4: Tags */
-th:nth-child(4), td:nth-child(4) { 
-    width: 180px;
-    text-align: center; /* Both header and cells centered */
-    min-width: 180px;
-}
-
-/* Column 5: Plex Expiration */
-th:nth-child(5), td:nth-child(5) { 
-    width: 140px;
-    text-align: center; /* Both header and cells centered */
-    min-width: 140px;
-}
-
-/* Column 6: IPTV Expiration */
-th:nth-child(6), td:nth-child(6) { 
-    width: 140px;
-    text-align: center; /* Both header and cells centered */
-    min-width: 140px;
-}
-
-/* Column 7: Actions */
-th:nth-child(7), td:nth-child(7) { 
-    width: 200px;
-    text-align: center; /* Both header and cells centered */
-    min-width: 200px;
-    padding: 8px 4px; /* Tighter padding for action buttons */
 }
 
 /* Override any inline styles on headers */
