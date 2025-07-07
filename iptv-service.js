@@ -48,21 +48,23 @@ async getSettings() {
   try {
     const result = await db.query('SELECT * FROM settings');
     
-    // ADD THIS DEBUG LINE:
     console.log('🔍 DEBUG: Raw database result:', result);
     
-    // Handle different return formats from mysql2
+    // Keep this line as it was:
     const rows = Array.isArray(result) ? result[0] : result;
     
-    console.log('🔍 DEBUG: Processed rows:', rows);
+    // ADD THIS FIX - rows is the array we want to loop through:
+    const settingsArray = rows;
     
-    if (!rows || !Array.isArray(rows)) {
+    console.log('🔍 DEBUG: Settings array:', settingsArray);
+    
+    if (!settingsArray || !Array.isArray(settingsArray)) {
       console.log('⚠️ No settings found in database');
       return {};
     }
     
     const settings = {};
-    rows.forEach(row => {
+    settingsArray.forEach(row => {
       if (row.setting_key && row.setting_key.startsWith('iptv_')) {
         settings[row.setting_key] = row.setting_value;
       }
