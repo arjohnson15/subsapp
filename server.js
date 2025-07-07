@@ -19,6 +19,7 @@ const emailScheduleRoutes = require('./routes-email-schedules');
 const multer = require('multer');
 const plexService = require('./plex-service');
 const emailService = require('./email-service');
+const iptvRoutes = require('./routes-iptv');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -66,11 +67,30 @@ app.use('/api/plex', plexRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/owners', ownerRoutes);
 app.use('/api/email-schedules', emailScheduleRoutes);
+app.use('/api/iptv', iptvRoutes);
 
 // Serve main application
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+const iptvService = require('./iptv-service');
+
+// IPTV Hourly Sync
+cron.schedule('0 * * * *', async () => {
+  try {
+    await iptvService.initialize();
+    await iptvService.syncCreditBalance();
+    await iptvService.ensureAuthenticated();
+    console.log('✅ IPTV hourly sync completed');
+  } catch (error) {
+    console.error('❌ IPTV hourly sync failed:', error);
+  }
+});
+
+// Initialize IPTV service on startup
+iptvService.initialize().catch(console.error);
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -114,6 +134,8 @@ async function initializeApp() {
         console.error('❌ Email service test error:', error);
       }
     }, 3000);
+	
+
 
     // ===== AUTOMATED EMAIL SCHEDULING =====
     

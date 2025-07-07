@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const db = require('./database-config');
 const plexService = require('./plex-service');
+const iptvService = require('./iptv-service');
 const router = express.Router();
 
 router.post('/:id/check-pending-invites', async (req, res) => {
@@ -711,6 +712,15 @@ try {
   }
 
   console.log(`✅ Subscription processing completed for user ${userId}`);
+  
+  // Handle IPTV tag changes
+if (tags !== undefined) {
+  const [oldUserRows] = await db.query('SELECT tags FROM users WHERE id = ?', [req.params.id]);
+  const oldTags = oldUserRows[0]?.tags ? JSON.parse(oldUserRows[0].tags) : [];
+  const newTags = Array.isArray(tags) ? tags : JSON.parse(tags || '[]');
+  
+  await handleIPTVTagChange(req.params.id, oldTags, newTags);
+}
 
 } catch (subscriptionError) {
   console.error('❌ SUBSCRIPTION ERROR:', subscriptionError);
@@ -1101,5 +1111,25 @@ router.get('/:id/plex-status', async (req, res) => {
     });
   }
 });
+
+async function handleIPTVTagChange(userId, oldTags, newTags) {
+  const hadIPTV = oldTags && oldTags.includes('IPTV');
+  const hasIPTV = newTags && newTags.includes('IPTV');
+  
+  if (hadIPTV && !hasIPTV) {
+    console.log(`🔄 Clearing IPTV data for user ${userId} (tag removed)`);
+    
+    await db.query(`
+      UPDATE users SET 
+        iptv_username = NULL, iptv_password = NULL, iptv_line_id = NULL,
+        iptv_package_id = NULL, iptv_package_name = NULL, iptv_expiration = NULL,
+        iptv_channel_group_id = NULL, iptv_connections = NULL, iptv_is_trial = FALSE,
+        implayer_code = NULL, updated_at = NOW()
+      WHERE id = ?
+    `, [userId]);
+    
+    console.log(`✅ IPTV data cleared for user ${userId}`);
+  }
+}
 
 module.exports = router;

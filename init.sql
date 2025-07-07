@@ -70,7 +70,7 @@ CREATE TABLE email_templates (
   name VARCHAR(255) NOT NULL UNIQUE,
   subject VARCHAR(500) NOT NULL,
   body TEXT NOT NULL,
-  template_type ENUM('welcome', 'renewal-7day', 'renewal-2day', 'expired', 'manual') NOT NULL,
+  template_type ENUM('welcome', 'renewal-7day', 'renewal-2day', 'expired', 'manual', 'custom') NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );

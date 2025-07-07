@@ -327,6 +327,8 @@
     border-radius: 8px;
     min-height: 300px;
     font-size: var(--font-sm);
+	overflow-y: visible;
+    height: auto;
 }
 
 .dynamic-fields {
@@ -649,8 +651,7 @@ textarea:focus {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
     width: 100%;
     max-width: 100%;
-    overflow-y: auto;
-    max-height: 600px;
+    overflow-y: visible;
 }
 
 .template-preview-large h1,
