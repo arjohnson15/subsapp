@@ -1,4 +1,4 @@
-// iptv-service.js - IPTV Panel API Integration Service - FIXED VERSION
+// iptv-service.js - IPTV Panel API Integration Service - FIXED DATABASE VERSION
 const axios = require('axios');
 const db = require('./database-config');
 
@@ -51,61 +51,58 @@ class IPTVService {
    * Load IPTV settings from database - FIXED VERSION
    */
   async loadSettings() {
-    const connection = await db.getConnection();
     try {
-      const [rows] = await connection.execute(
+      const rows = await db.query(
         'SELECT setting_key, setting_value FROM settings WHERE setting_key LIKE "iptv_%"'
       );
+      
+      const settings = {};
+      if (Array.isArray(rows)) {
+        rows.forEach(row => {
+          settings[row.setting_key] = row.setting_value;
+        });
+      }
+      
+      return settings;
+    } catch (error) {
+      console.error('❌ Error loading IPTV settings:', error);
+      return {};
+    }
+  }
+
+  /**
+   * Get IPTV settings from database - FIXED VERSION
+   */
+  async getSettings() {
+    try {
+      const rows = await db.query(`
+        SELECT setting_key, setting_value 
+        FROM settings 
+        WHERE setting_key IN (
+          'iptv_panel_base_url',
+          'iptv_panel_login_url', 
+          'iptv_panel_username',
+          'iptv_panel_password',
+          'iptv_package_id_for_bouquets',
+          'iptv_csrf_token',
+          'iptv_session_cookies',
+          'iptv_csrf_expires',
+          'iptv_credits_balance'
+        )
+      `);
+      
+      if (!rows || !Array.isArray(rows) || rows.length === 0) {
+        console.log('⚠️ No IPTV settings found in database');
+        return {};
+      }
       
       const settings = {};
       rows.forEach(row => {
         settings[row.setting_key] = row.setting_value;
       });
       
+      console.log('🔍 DEBUG: Loaded IPTV settings:', settings);
       return settings;
-    } finally {
-      connection.release();
-    }
-  }
-
-  /**
-   * Get IPTV settings from database - SIMPLE FIX
-   */
-  async getSettings() {
-    try {
-      const connection = await db.getConnection();
-      try {
-        const [rows] = await connection.execute(`
-          SELECT setting_key, setting_value 
-          FROM settings 
-          WHERE setting_key IN (
-            'iptv_panel_base_url',
-            'iptv_panel_login_url', 
-            'iptv_panel_username',
-            'iptv_panel_password',
-            'iptv_package_id_for_bouquets',
-            'iptv_csrf_token',
-            'iptv_session_cookies',
-            'iptv_csrf_expires',
-            'iptv_credits_balance'
-          )
-        `);
-        
-        if (!rows || !Array.isArray(rows) || rows.length === 0) {
-          console.log('⚠️ No IPTV settings found in database');
-          return {};
-        }
-        
-        const settings = {};
-        rows.forEach(row => {
-          settings[row.setting_key] = row.setting_value;
-        });
-        
-        console.log('🔍 DEBUG: Loaded IPTV settings:', settings);
-        return settings;
-      } finally {
-        connection.release();
-      }
     } catch (error) {
       console.error('❌ Error getting IPTV settings:', error);
       return {};
@@ -113,32 +110,28 @@ class IPTVService {
   }
 
   /**
-   * DEBUG: Direct settings check
+   * DEBUG: Direct settings check - FIXED VERSION
    */
   async debugSettings() {
     try {
       console.log('🔧 DEBUG: Checking database connection...');
-      const connection = await db.getConnection();
-      try {
-        const [testResult] = await connection.execute('SELECT COUNT(*) as count FROM settings');
-        console.log('🔧 DEBUG: Total settings in database:', testResult);
-        
-        console.log('🔧 DEBUG: Getting all settings...');
-        const [allSettings] = await connection.execute('SELECT * FROM settings ORDER BY setting_key');
-        console.log('🔧 DEBUG: All settings:', allSettings);
-        
-        console.log('🔧 DEBUG: Looking for IPTV URLs specifically...');
-        const [urlSettings] = await connection.execute(`
-          SELECT setting_key, setting_value 
-          FROM settings 
-          WHERE setting_key IN ('iptv_panel_base_url', 'iptv_panel_login_url')
-        `);
-        console.log('🔧 DEBUG: URL settings:', urlSettings);
-        
-        return urlSettings;
-      } finally {
-        connection.release();
-      }
+      
+      const testResult = await db.query('SELECT COUNT(*) as count FROM settings');
+      console.log('🔧 DEBUG: Total settings in database:', testResult);
+      
+      console.log('🔧 DEBUG: Getting all settings...');
+      const allSettings = await db.query('SELECT * FROM settings ORDER BY setting_key');
+      console.log('🔧 DEBUG: All settings:', allSettings);
+      
+      console.log('🔧 DEBUG: Looking for IPTV URLs specifically...');
+      const urlSettings = await db.query(`
+        SELECT setting_key, setting_value 
+        FROM settings 
+        WHERE setting_key IN ('iptv_panel_base_url', 'iptv_panel_login_url')
+      `);
+      console.log('🔧 DEBUG: URL settings:', urlSettings);
+      
+      return urlSettings;
     } catch (error) {
       console.error('❌ DEBUG: Database error:', error);
       return null;
@@ -149,15 +142,15 @@ class IPTVService {
    * Update setting in database - FIXED VERSION
    */
   async updateSetting(key, value) {
-    const connection = await db.getConnection();
     try {
-      await connection.execute(
-        'INSERT INTO settings (setting_key, setting_value, setting_type) VALUES (?, ?, "text") ' +
+      await db.query(
+        'INSERT INTO settings (setting_key, setting_value, setting_type) VALUES (?, ?, "string") ' +
         'ON DUPLICATE KEY UPDATE setting_value = ?',
         [key, value, value]
       );
-    } finally {
-      connection.release();
+    } catch (error) {
+      console.error('❌ Error updating setting:', error);
+      throw error;
     }
   }
 
@@ -222,23 +215,23 @@ class IPTVService {
     }
   }
 
-  /**
-   * Login to IPTV panel - WITH PROPER CSRF TOKEN EXTRACTION
+/**
+   * Login to IPTV panel - FIXED COOKIE EXTRACTION
    */
   async loginToPanel() {
     try {
       console.log('🔐 Logging into IPTV panel...');
       
-      // Step 1: Get CSRF token (this also captures session cookies)
+      // Step 1: Get initial CSRF token
       const initialCsrfToken = await this.getCSRFToken();
       
-      // Step 2: Login using the session cookies
+      // Step 2: Login with the token
       const formData = new URLSearchParams();
       formData.append('username', this.username);
       formData.append('password', this.password);
       formData.append('_token', initialCsrfToken);
 
-      console.log('🔐 Posting login with session cookies...');
+      console.log('🔐 Posting login with credentials...');
 
       const response = await axios.post(this.loginURL, formData, {
         headers: {
@@ -256,57 +249,61 @@ class IPTVService {
 
       console.log('🔐 Login successful! Status:', response.status);
 
-      // Step 3: CRITICAL - Extract the NEW CSRF token from response cookies
+      // Step 3: Extract NEW cookies and CSRF token from response
       const setCookieHeaders = response.headers['set-cookie'];
-      if (setCookieHeaders) {
-        const newCookies = setCookieHeaders.map(cookie => cookie.split(';')[0]).join('; ');
-        this.sessionCookies = newCookies;
+      if (setCookieHeaders && Array.isArray(setCookieHeaders)) {
+        // Build cookie string from all Set-Cookie headers
+        const cookieParts = [];
+        let newCsrfToken = null;
         
-        // Extract the updated CSRF token from XSRF-TOKEN cookie
-        const xsrfCookie = setCookieHeaders.find(cookie => cookie.startsWith('XSRF-TOKEN='));
-        if (xsrfCookie) {
-          try {
-            // Get the cookie value (everything after XSRF-TOKEN=, before the first semicolon)
-            const cookieValue = xsrfCookie.split('=')[1].split(';')[0];
-            // Decode the URL-encoded value
-            const decodedValue = decodeURIComponent(cookieValue);
-            // Parse the JSON to get the Laravel encrypted cookie structure
-            const tokenData = JSON.parse(decodedValue);
-            
-            // The actual CSRF token is in the 'value' field
-            if (tokenData.value) {
-              this.csrfToken = tokenData.value;
-              console.log('🔑 Extracted updated CSRF token from cookie:', this.csrfToken.substring(0, 10) + '...');
+        setCookieHeaders.forEach(cookie => {
+          const cookiePart = cookie.split(';')[0]; // Get just the name=value part
+          cookieParts.push(cookiePart);
+          
+          // Extract CSRF token from XSRF-TOKEN cookie
+          if (cookie.startsWith('XSRF-TOKEN=')) {
+            try {
+              const cookieValue = cookie.split('=')[1].split(';')[0];
+              const decodedValue = decodeURIComponent(cookieValue);
+              const tokenData = JSON.parse(decodedValue);
+              if (tokenData.value) {
+                newCsrfToken = tokenData.value;
+                console.log('🔑 Extracted NEW CSRF token from login response');
+              }
+            } catch (error) {
+              console.log('⚠️ Could not parse XSRF-TOKEN cookie, will use login token');
             }
-          } catch (error) {
-            console.log('⚠️ Could not extract CSRF token from cookie, keeping login token');
-            // Keep the login token if extraction fails
-            this.csrfToken = initialCsrfToken;
           }
-        } else {
-          // No XSRF-TOKEN cookie found, keep the login token
-          this.csrfToken = initialCsrfToken;
-        }
+        });
         
-        console.log('🍪 Updated session cookies after login');
+        // Update session cookies
+        this.sessionCookies = cookieParts.join('; ');
+        console.log('🍪 Updated session cookies:', this.sessionCookies.substring(0, 100) + '...');
+        
+        // Use new CSRF token if found, otherwise keep the login token
+        this.csrfToken = newCsrfToken || initialCsrfToken;
+        console.log('🔑 Using CSRF token:', this.csrfToken.substring(0, 20) + '...');
+      } else {
+        // No new cookies, keep what we have
+        this.csrfToken = initialCsrfToken;
+        console.log('🔑 Keeping initial CSRF token');
       }
 
-      // Store authentication data
-      this.csrfExpires = new Date(Date.now() + (60 * 60 * 1000));
+      // Store authentication data with expiration
+      this.csrfExpires = new Date(Date.now() + (60 * 60 * 1000)); // 1 hour
       
       // Save to database
       await this.updateSetting('iptv_csrf_token', this.csrfToken);
       await this.updateSetting('iptv_session_cookies', this.sessionCookies);
       await this.updateSetting('iptv_csrf_expires', this.csrfExpires.toISOString());
       
-      console.log('✅ Successfully logged into IPTV panel with updated CSRF token');
+      console.log('✅ Successfully logged into IPTV panel');
       return true;
     } catch (error) {
       console.error('❌ Login failed:', error.message);
       if (error.response) {
         console.error('🔍 Status:', error.response.status);
         console.error('🔍 Headers:', Object.keys(error.response.headers));
-        console.error('🔍 Data sample:', error.response.data?.toString().substring(0, 200));
       }
       throw new Error(`Login failed: ${error.message}`);
     }
@@ -329,11 +326,13 @@ class IPTVService {
     return await this.loginToPanel();
   }
 
-  /**
-   * Make authenticated API request - WITH SESSION COOKIES AND RETRY LOGIC
+/**
+   * Make authenticated API request - ENHANCED CSRF HANDLING
    */
   async makeAPIRequest(endpoint, data = {}, method = 'POST') {
-    await this.ensureAuthenticated();
+    // ALWAYS get fresh authentication for API calls
+    console.log(`🔄 Making API request to ${endpoint} - getting fresh auth...`);
+    await this.loginToPanel();
 
     const url = `${this.baseURL}${endpoint}`;
 
@@ -353,45 +352,17 @@ class IPTVService {
           'X-Requested-With': 'XMLHttpRequest',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           'Accept': '*/*',
-          'Cookie': this.sessionCookies || ''
+          'Cookie': this.sessionCookies || '',
+          'Referer': this.loginURL  // Add referer header
         }
       });
 
+      console.log(`✅ API request to ${endpoint} successful`);
       return response.data;
     } catch (error) {
       console.error(`❌ API request failed for ${endpoint}:`, error.message);
-      
-      // If authentication failed and we haven't already retried, try once more with fresh login
-      if ((error.response?.status === 401 || error.response?.status === 403 || error.response?.status === 419) && !this.retryInProgress) {
-        console.log('🔄 Authentication error, trying fresh login...');
-        this.retryInProgress = true;
-        
-        try {
-          await this.loginToPanel();
-          
-          const retryResponse = await axios({
-            method,
-            url,
-            data: method === 'GET' ? undefined : new URLSearchParams({ '_token': this.csrfToken, ...data }),
-            params: method === 'GET' ? { _token: this.csrfToken, ...data } : undefined,
-            timeout: 15000,
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'X-CSRF-TOKEN': this.csrfToken,
-              'X-Requested-With': 'XMLHttpRequest',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-              'Accept': '*/*',
-              'Cookie': this.sessionCookies || ''
-            }
-          });
-          
-          this.retryInProgress = false;
-          return retryResponse.data;
-        } catch (retryError) {
-          this.retryInProgress = false;
-          throw retryError;
-        }
-      }
+      console.error(`🔍 Response status:`, error.response?.status);
+      console.error(`🔍 Response data:`, error.response?.data);
       
       throw error;
     }
@@ -446,24 +417,92 @@ class IPTVService {
     }
   }
 
-  /**
-   * Get packages from IPTV panel
+
+/**
+   * Get packages from IPTV panel - DEBUG VERSION
    */
   async getPackagesFromPanel() {
     try {
-      const response = await this.makeAPIRequest('/lines/packages');
+      console.log('📦 Getting packages (subscription plans) from panel...');
       
-      if (response && Array.isArray(response)) {
-        return response;
+      // Ensure we're authenticated first
+      await this.loginToPanel();
+      
+      // Get the create user page which contains the package dropdown
+      const response = await axios.get(`${this.baseURL}/lines/create/0/line`, {
+        timeout: 15000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Cookie': this.sessionCookies || '',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Referer': this.baseURL
+        }
+      });
+
+      const htmlContent = response.data;
+      
+      // DEBUG: Save the HTML content to see what we're getting
+      console.log('🔍 HTML response length:', htmlContent.length);
+      console.log('🔍 First 500 chars:', htmlContent.substring(0, 500));
+      
+      // Look for the select element with id="package"
+      const selectMatch = htmlContent.match(/<select[^>]*id=["']package["'][^>]*>(.*?)<\/select>/s);
+      if (!selectMatch) {
+        console.log('❌ Could not find package select element');
+        console.log('🔍 Looking for any select elements...');
+        const anySelectMatch = htmlContent.match(/<select[^>]*>(.*?)<\/select>/gs);
+        console.log('🔍 Found select elements:', anySelectMatch ? anySelectMatch.length : 0);
+        return [];
       }
       
-      // Handle different response formats
-      if (response && response.packages) {
-        return response.packages;
+      const selectContent = selectMatch[1];
+      console.log('🔍 Select content length:', selectContent.length);
+      
+      const packages = [];
+      
+      // More flexible regex that handles various whitespace and quote variations
+      const optionRegex = /<option\s+value=["']?(\d+)["']?\s+data-credits=["']?(\d+)["']?\s+data-duration=["']?(\d+)["']?\s+data-duration-in=["']?([^"'\s>]+)["']?\s+data-connections=["']?(\d+)["']?[^>]*>\s*([^<]+?)\s*<\/option>/gi;
+      
+      let match;
+      let matchCount = 0;
+      while ((match = optionRegex.exec(selectContent)) !== null) {
+        matchCount++;
+        const [, id, credits, duration, durationUnit, connections, description] = match;
+        
+        console.log(`🔍 Found option: ID=${id}, Credits=${credits}, Duration=${duration}, Connections=${connections}`);
+        
+        // Skip the empty "Select one please" option
+        if (id && id !== '' && description.trim() !== 'Select one please') {
+          // Extract package name (everything before the first " - ")
+          const fullDescription = description.trim();
+          const nameMatch = fullDescription.match(/^([^-]+?)(?:\s*-|$)/);
+          const packageName = nameMatch ? nameMatch[1].trim() : fullDescription;
+          
+          packages.push({
+            id: id,
+            name: packageName,
+            connections: parseInt(connections),
+            duration_months: parseInt(duration),
+            duration_unit: durationUnit,
+            credits: parseInt(credits),
+            description: fullDescription
+          });
+        }
       }
       
-      console.warn('⚠️ Unexpected packages response format:', response);
-      return [];
+      console.log(`🔍 Regex found ${matchCount} option elements, ${packages.length} valid packages`);
+      
+      if (packages.length === 0) {
+        // Let's try a simpler approach - just find all option tags
+        const allOptions = selectContent.match(/<option[^>]*>.*?<\/option>/gi);
+        console.log('🔍 Found option tags:', allOptions ? allOptions.length : 0);
+        if (allOptions) {
+          console.log('🔍 First few options:', allOptions.slice(0, 3));
+        }
+      }
+      
+      console.log(`✅ Found ${packages.length} packages from panel`);
+      return packages;
     } catch (error) {
       console.error('❌ Failed to get packages:', error);
       throw new Error(`Failed to get packages: ${error.message}`);
@@ -471,24 +510,111 @@ class IPTVService {
   }
 
   /**
-   * Get bouquets for a specific package
+   * Get bouquets from IPTV panel - FIXED CSRF HANDLING
    */
   async getBouquetsFromPanel(packageId = null) {
     try {
-      const pkgId = packageId || this.packageIdForBouquets;
-      const response = await this.makeAPIRequest('/lines/packages', { package_id: pkgId });
+      console.log('📺 Getting bouquets (channel groups) from panel...');
       
-      if (response && response.bouquets) {
-        return response.bouquets;
+      // Use the package ID from settings
+      const pkgId = packageId || this.packageIdForBouquets || '175';
+      
+      // Make the API request with more robust error handling
+      let response;
+      let attempts = 0;
+      const maxAttempts = 3;
+      
+      while (attempts < maxAttempts) {
+        attempts++;
+        console.log(`🔄 Attempt ${attempts} to get bouquets...`);
+        
+        try {
+          // Fresh login each time
+          await this.loginToPanel();
+          
+          // Add a small delay to ensure session is ready
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          response = await axios({
+            method: 'POST',
+            url: `${this.baseURL}/lines/packages`,
+            data: new URLSearchParams({
+              '_token': this.csrfToken,
+              'package_id': pkgId,
+              'trial': '0'
+            }),
+            timeout: 15000,
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'X-CSRF-TOKEN': this.csrfToken,
+              'X-Requested-With': 'XMLHttpRequest',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Accept': '*/*',
+              'Cookie': this.sessionCookies || '',
+              'Referer': this.baseURL + '/dashboard'  // Try dashboard as referer
+            }
+          });
+          
+          console.log(`✅ API request successful on attempt ${attempts}`);
+          break;
+          
+        } catch (error) {
+          console.error(`❌ Attempt ${attempts} failed:`, error.response?.status, error.response?.data);
+          
+          if (attempts === maxAttempts) {
+            throw error;
+          }
+          
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       }
       
-      console.warn('⚠️ Unexpected bouquets response format:', response);
+      console.log('🔍 Bouquets response:', response.data);
+      
+      if (response.data && response.data.bouquets) {
+        // Convert to our format
+        const bouquets = response.data.bouquets.map(bouquet => ({
+          id: bouquet.id.toString(),
+          name: bouquet.bouquet_name,
+          category: this.categorizeBouquet(bouquet.bouquet_name)
+        }));
+        
+        console.log(`✅ Found ${bouquets.length} bouquets`);
+        return bouquets;
+      }
+      
+      console.warn('⚠️ Unexpected bouquets response format:', response.data);
       return [];
     } catch (error) {
       console.error('❌ Failed to get bouquets:', error);
       throw new Error(`Failed to get bouquets: ${error.message}`);
     }
   }
+  
+    /**
+   * Categorize bouquet based on name
+   */
+  categorizeBouquet(name) {
+    const lowerName = name.toLowerCase();
+    
+    if (lowerName.includes('sport') || lowerName.includes('nba') || lowerName.includes('nfl') || lowerName.includes('mlb') || lowerName.includes('nhl')) {
+      return 'Sports';
+    } else if (lowerName.includes('movie') || lowerName.includes('cinema') || lowerName.includes('24/7')) {
+      return 'Entertainment';
+    } else if (lowerName.includes('news') || lowerName.includes('noticias')) {
+      return 'News';
+    } else if (lowerName.includes('kids') || lowerName.includes('infantil')) {
+      return 'Kids';
+    } else if (lowerName.includes('adult')) {
+      return 'Adult';
+    } else if (lowerName.includes('usa') || lowerName.includes('canada') || lowerName.includes('uk')) {
+      return 'Regional';
+    } else {
+      return 'General';
+    }
+  }
+  
 
   /**
    * Get all users from IPTV panel
@@ -783,43 +909,41 @@ class IPTVService {
   }
 
   /**
-   * Sync packages from panel to database
+   * Sync packages from panel to database - CORRECTED
    */
   async syncPackagesFromPanel() {
     try {
-      console.log('📦 Syncing packages from panel...');
+      console.log('📦 Syncing packages (subscription plans) from panel...');
+      
+      // Login fresh for this operation
+      await this.loginToPanel();
       
       const packages = await this.getPackagesFromPanel();
       
-      const connection = await db.getConnection();
-      try {
-        // Clear existing packages
-        await connection.execute('DELETE FROM iptv_packages');
+      // Clear existing packages
+      await db.query('DELETE FROM iptv_packages');
+      
+      // Insert new packages
+      for (const pkg of packages) {
+        const packageType = this.determinePackageType(pkg.id, pkg.name);
         
-        // Insert new packages
-        for (const pkg of packages) {
-          const packageType = this.determinePackageType(pkg.id, pkg.name);
-          
-          await connection.execute(`
-            INSERT INTO iptv_packages (package_id, name, connections, duration, credits, package_type, synced_at)
-            VALUES (?, ?, ?, ?, ?, ?, NOW())
-          `, [
-            pkg.id,
-            pkg.name || `Package ${pkg.id}`,
-            pkg.connections || 1,
-            pkg.duration || '1 month',
-            pkg.credits || 1,
-            packageType
-          ]);
-        }
-        
-         await this.updateSetting('iptv_last_sync', new Date().toISOString());
-        console.log(`✅ Synced ${packages.length} packages from panel`);
-        
-        return packages.length;
-      } finally {
-        connection.release();
+        await db.query(`
+          INSERT INTO iptv_packages (package_id, name, connections, duration_months, credits, package_type, synced_at)
+          VALUES (?, ?, ?, ?, ?, ?, NOW())
+        `, [
+          pkg.id,
+          pkg.name,
+          pkg.connections,
+          pkg.duration_months,
+          pkg.credits,
+          packageType
+        ]);
       }
+      
+      await this.updateSetting('iptv_last_sync', new Date().toISOString());
+      console.log(`✅ Synced ${packages.length} packages from panel`);
+      
+      return packages.length;
     } catch (error) {
       console.error('❌ Failed to sync packages:', error);
       throw error;
@@ -827,36 +951,31 @@ class IPTVService {
   }
 
   /**
-   * Sync bouquets from panel to database
+   * Sync bouquets from panel to database - CORRECTED
    */
   async syncBouquetsFromPanel() {
     try {
-      console.log('📺 Syncing bouquets from panel...');
+      console.log('📺 Syncing bouquets (channel groups) from panel...');
       
       const bouquets = await this.getBouquetsFromPanel();
       
-      const connection = await db.getConnection();
-      try {
-        // Clear existing bouquets
-        await connection.execute('DELETE FROM iptv_bouquets');
-        
-        // Insert new bouquets
-        for (const bouquet of bouquets) {
-          await connection.execute(`
-            INSERT INTO iptv_bouquets (bouquet_id, name, category, synced_at)
-            VALUES (?, ?, ?, NOW())
-          `, [
-            bouquet.id,
-            bouquet.name || `Bouquet ${bouquet.id}`,
-            bouquet.category || 'General'
-          ]);
-        }
-        
-        console.log(`✅ Synced ${bouquets.length} bouquets from panel`);
-        return bouquets.length;
-      } finally {
-        connection.release();
+      // Clear existing bouquets
+      await db.query('DELETE FROM iptv_bouquets');
+      
+      // Insert new bouquets
+      for (const bouquet of bouquets) {
+        await db.query(`
+          INSERT INTO iptv_bouquets (bouquet_id, name, category, synced_at)
+          VALUES (?, ?, ?, NOW())
+        `, [
+          bouquet.id,
+          bouquet.name,
+          bouquet.category
+        ]);
       }
+      
+      console.log(`✅ Synced ${bouquets.length} bouquets from panel`);
+      return bouquets.length;
     } catch (error) {
       console.error('❌ Failed to sync bouquets:', error);
       throw error;
@@ -864,21 +983,16 @@ class IPTVService {
   }
 
   /**
-   * Get package info from local database
+   * Get package info from local database - FIXED VERSION
    */
   async getPackageInfo(packageId) {
     try {
-      const connection = await db.getConnection();
-      try {
-        const [rows] = await connection.execute(
-          'SELECT * FROM iptv_packages WHERE package_id = ? AND is_active = true',
-          [packageId]
-        );
-        
-        return (Array.isArray(rows) && rows.length > 0) ? rows[0] : null;
-      } finally {
-        connection.release();
-      }
+      const rows = await db.query(
+        'SELECT * FROM iptv_packages WHERE package_id = ? AND is_active = true',
+        [packageId]
+      );
+      
+      return (Array.isArray(rows) && rows.length > 0) ? rows[0] : null;
     } catch (error) {
       console.error(`❌ Failed to get package info for ${packageId}:`, error);
       return null;
@@ -900,28 +1014,23 @@ class IPTVService {
   }
 
   /**
-   * Log IPTV activity
+   * Log IPTV activity - FIXED VERSION
    */
   async logActivity(userId, lineId, action, packageId, creditsUsed, success, errorMessage, apiResponse) {
     try {
-      const connection = await db.getConnection();
-      try {
-        await connection.execute(`
-          INSERT INTO iptv_activity_log (user_id, line_id, action, package_id, credits_used, success, error_message, api_response, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
-        `, [
-          userId,
-          lineId,
-          action,
-          packageId,
-          creditsUsed,
-          success,
-          errorMessage,
-          JSON.stringify(apiResponse)
-        ]);
-      } finally {
-        connection.release();
-      }
+      await db.query(`
+        INSERT INTO iptv_activity_log (user_id, line_id, action, package_id, credits_used, success, error_message, api_response, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      `, [
+        userId,
+        lineId,
+        action,
+        packageId,
+        creditsUsed,
+        success,
+        errorMessage,
+        JSON.stringify(apiResponse)
+      ]);
     } catch (error) {
       console.error('❌ Failed to log IPTV activity:', error);
     }
@@ -932,23 +1041,18 @@ class IPTVService {
    */
   async getAvailablePackages() {
     try {
-      const connection = await db.getConnection();
-      try {
-        const [rows] = await connection.execute(`
-          SELECT * FROM iptv_packages 
-          WHERE is_active = true 
-          ORDER BY package_type, duration, connections
-        `);
-        
-        if (!rows || !Array.isArray(rows)) {
-          console.log('⚠️ No packages found in database');
-          return [];
-        }
-        
-        return rows;
-      } finally {
-        connection.release();
+      const rows = await db.query(`
+        SELECT * FROM iptv_packages 
+        WHERE is_active = true 
+        ORDER BY package_type, duration_months, connections
+      `);
+      
+      if (!rows || !Array.isArray(rows)) {
+        console.log('⚠️ No packages found in database');
+        return [];
       }
+      
+      return rows;
     } catch (error) {
       console.error('❌ Failed to get available packages:', error);
       return []; // Always return empty array on error
@@ -960,23 +1064,18 @@ class IPTVService {
    */
   async getChannelGroups() {
     try {
-      const connection = await db.getConnection();
-      try {
-        const [rows] = await connection.execute(`
-          SELECT * FROM iptv_channel_groups 
-          WHERE is_active = true 
-          ORDER BY name
-        `);
-        
-        if (!rows || !Array.isArray(rows)) {
-          console.log('⚠️ No channel groups found in database');
-          return [];
-        }
-        
-        return rows;
-      } finally {
-        connection.release();
+      const rows = await db.query(`
+        SELECT * FROM iptv_channel_groups 
+        WHERE is_active = true 
+        ORDER BY name
+      `);
+      
+      if (!rows || !Array.isArray(rows)) {
+        console.log('⚠️ No channel groups found in database');
+        return [];
       }
+      
+      return rows;
     } catch (error) {
       console.error('❌ Failed to get channel groups:', error);
       return []; // Always return empty array on error
@@ -984,24 +1083,19 @@ class IPTVService {
   }
 
   /**
-   * Create new channel group
+   * Create new channel group - FIXED VERSION
    */
   async createChannelGroup(name, description, bouquetIds) {
     try {
-      const connection = await db.getConnection();
-      try {
-        const [result] = await connection.execute(`
-          INSERT INTO iptv_channel_groups (name, description, bouquet_ids, created_at)
-          VALUES (?, ?, ?, NOW())
-        `, [name, description, JSON.stringify(bouquetIds)]);
-        
-        const insertId = result.insertId;
-        
-        console.log(`✅ Created channel group: ${name}`);
-        return insertId;
-      } finally {
-        connection.release();
-      }
+      const result = await db.query(`
+        INSERT INTO iptv_channel_groups (name, description, bouquet_ids, created_at)
+        VALUES (?, ?, ?, NOW())
+      `, [name, description, JSON.stringify(bouquetIds)]);
+      
+      const insertId = result.insertId;
+      
+      console.log(`✅ Created channel group: ${name}`);
+      return insertId;
     } catch (error) {
       console.error(`❌ Failed to create channel group ${name}:`, error);
       throw error;
@@ -1009,23 +1103,18 @@ class IPTVService {
   }
 
   /**
-   * Update channel group
+   * Update channel group - FIXED VERSION
    */
   async updateChannelGroup(id, name, description, bouquetIds) {
     try {
-      const connection = await db.getConnection();
-      try {
-        await connection.execute(`
-          UPDATE iptv_channel_groups 
-          SET name = ?, description = ?, bouquet_ids = ?, updated_at = NOW()
-          WHERE id = ?
-        `, [name, description, JSON.stringify(bouquetIds), id]);
-        
-        console.log(`✅ Updated channel group: ${name}`);
-        return true;
-      } finally {
-        connection.release();
-      }
+      await db.query(`
+        UPDATE iptv_channel_groups 
+        SET name = ?, description = ?, bouquet_ids = ?, updated_at = NOW()
+        WHERE id = ?
+      `, [name, description, JSON.stringify(bouquetIds), id]);
+      
+      console.log(`✅ Updated channel group: ${name}`);
+      return true;
     } catch (error) {
       console.error(`❌ Failed to update channel group ${id}:`, error);
       throw error;
@@ -1033,26 +1122,21 @@ class IPTVService {
   }
 
   /**
-   * Delete channel group
+   * Delete channel group - FIXED VERSION
    */
   async deleteChannelGroup(id) {
     try {
-      const connection = await db.getConnection();
-      try {
-        // Set users using this group to NULL
-        await connection.execute(
-          'UPDATE users SET iptv_channel_group_id = NULL WHERE iptv_channel_group_id = ?',
-          [id]
-        );
-        
-        // Delete the group
-        await connection.execute('DELETE FROM iptv_channel_groups WHERE id = ?', [id]);
-        
-        console.log(`✅ Deleted channel group: ${id}`);
-        return true;
-      } finally {
-        connection.release();
-      }
+      // Set users using this group to NULL
+      await db.query(
+        'UPDATE users SET iptv_channel_group_id = NULL WHERE iptv_channel_group_id = ?',
+        [id]
+      );
+      
+      // Delete the group
+      await db.query('DELETE FROM iptv_channel_groups WHERE id = ?', [id]);
+      
+      console.log(`✅ Deleted channel group: ${id}`);
+      return true;
     } catch (error) {
       console.error(`❌ Failed to delete channel group ${id}:`, error);
       throw error;
@@ -1113,19 +1197,18 @@ class IPTVService {
   }
 
   /**
-   * Get user IPTV details from database
+   * Get user IPTV details from database - FIXED VERSION
    */
   async getUserIPTVDetails(userId) {
-    const connection = await db.getConnection();
     try {
-      const [rows] = await connection.execute(
+      const rows = await db.query(
         'SELECT iptv_line_id, iptv_username, iptv_password, iptv_package_id, iptv_package_name, ' +
         'iptv_expiration, iptv_credits_used, iptv_channel_group_id, iptv_connections, iptv_is_trial, implayer_code ' +
         'FROM users WHERE id = ?',
         [userId]
       );
       
-      if (rows.length === 0) {
+      if (!rows || !Array.isArray(rows) || rows.length === 0) {
         return null;
       }
       
@@ -1140,16 +1223,16 @@ class IPTVService {
       }
       
       return user;
-    } finally {
-      connection.release();
+    } catch (error) {
+      console.error('❌ Failed to get user IPTV details:', error);
+      return null;
     }
   }
 
   /**
-   * Update user IPTV details in database
+   * Update user IPTV details in database - FIXED VERSION
    */
   async updateUserIPTVDetails(userId, iptvData) {
-    const connection = await db.getConnection();
     try {
       const updateFields = [];
       const updateValues = [];
@@ -1168,24 +1251,24 @@ class IPTVService {
       
       updateValues.push(userId);
       
-      await connection.execute(
+      await db.query(
         `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`,
         updateValues
       );
       
       await this.logActivity(userId, null, 'update_user_iptv', null, 0, true, null, null);
-    } finally {
-      connection.release();
+    } catch (error) {
+      console.error('❌ Failed to update user IPTV details:', error);
+      throw error;
     }
   }
 
   /**
-   * Clear user IPTV data
+   * Clear user IPTV data - FIXED VERSION
    */
   async clearUserIPTVData(userId) {
-    const connection = await db.getConnection();
     try {
-      await connection.execute(
+      await db.query(
         'UPDATE users SET iptv_line_id = NULL, iptv_username = NULL, iptv_password = NULL, ' +
         'iptv_package_id = NULL, iptv_package_name = NULL, iptv_expiration = NULL, ' +
         'iptv_credits_used = 0, iptv_channel_group_id = NULL, iptv_connections = NULL, ' +
@@ -1194,24 +1277,25 @@ class IPTVService {
       );
       
       await this.logActivity(userId, null, 'clear_user_iptv', null, 0, true, null, null);
-    } finally {
-      connection.release();
+    } catch (error) {
+      console.error('❌ Failed to clear user IPTV data:', error);
+      throw error;
     }
   }
 
   /**
-   * Get activity logs
+   * Get activity logs - FIXED VERSION
    */
   async getActivityLogs(limit = 100) {
-    const connection = await db.getConnection();
     try {
-      const [rows] = await connection.execute(
+      const rows = await db.query(
         'SELECT * FROM iptv_activity_log ORDER BY created_at DESC LIMIT ?',
         [limit]
       );
-      return rows;
-    } finally {
-      connection.release();
+      return rows || [];
+    } catch (error) {
+      console.error('❌ Failed to get activity logs:', error);
+      return [];
     }
   }
 }
