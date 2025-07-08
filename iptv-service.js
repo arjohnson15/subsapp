@@ -154,14 +154,31 @@ class IPTVService {
     }
   }
 
-  /**
-   * Check if we have valid authentication - FIXED FOR CSRF AND COOKIES
+
+/**
+   * Check if we have valid authentication - RELAXED FOR BETTER SESSION REUSE
    */
   isAuthenticated() {
-    if (!this.csrfToken) return false;
-    if (!this.csrfExpires) return false;
-    if (!this.sessionCookies) return false;  // We DO need session cookies
-    return new Date() < this.csrfExpires;
+    // If we don't have basic auth components, definitely not authenticated
+    if (!this.csrfToken || !this.sessionCookies) {
+      console.log('🔍 Not authenticated: missing token or cookies');
+      return false;
+    }
+    
+    // If we have expiration time and it's passed, not authenticated
+    if (this.csrfExpires && new Date() > this.csrfExpires) {
+      console.log('🔍 Not authenticated: token expired');
+      return false;
+    }
+    
+    // If we don't have expiration time but have token/cookies, assume valid for 45 minutes
+    if (!this.csrfExpires) {
+      console.log('🔍 No expiration set, assuming session is valid');
+      return true;
+    }
+    
+    console.log('🔍 Session appears valid, reusing existing authentication');
+    return true;
   }
 
   /**
@@ -217,54 +234,16 @@ class IPTVService {
 
 
 /**
-   * Login to IPTV panel - IMPROVED SESSION HANDLING
+   * Login to IPTV panel - SET LONGER EXPIRATION
    */
   async loginToPanel() {
     try {
       console.log('🔐 Logging into IPTV panel...');
       
-      // Step 1: Get login page and extract CSRF token
-      console.log('🔑 Getting CSRF token from:', this.loginURL);
-      const loginPageResponse = await axios({
-        method: 'GET',
-        url: this.loginURL,
-        timeout: 15000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Connection': 'keep-alive',
-          'Upgrade-Insecure-Requests': '1'
-        }
-      });
-
-      // Extract CSRF token from form
-      const csrfMatch = loginPageResponse.data.match(/name="?_token"?\s+value="([^"]+)"/);
-      const metaCsrfMatch = loginPageResponse.data.match(/name="csrf-token"\s+content="([^"]+)"/);
+      // Step 1: Get CSRF token and initial cookies
+      const csrfToken = await this.getCSRFToken();
       
-      if (!csrfMatch && !metaCsrfMatch) {
-        throw new Error('Could not find CSRF token in login page');
-      }
-      
-      const csrfToken = csrfMatch ? csrfMatch[1] : metaCsrfMatch[1];
-      console.log('CSRF Token found:', csrfToken.substring(0, 20) + '...');
-      
-      // Extract and store initial session cookies
-      const setCookieHeaders = loginPageResponse.headers['set-cookie'] || [];
-      let sessionCookies = '';
-      
-      setCookieHeaders.forEach(cookie => {
-        const cookiePart = cookie.split(';')[0];
-        if (cookiePart.includes('XSRF-TOKEN') || cookiePart.includes('management_session')) {
-          sessionCookies += cookiePart + '; ';
-        }
-      });
-      
-      console.log('🍪 Captured session cookies for login:', sessionCookies.substring(0, 50) + '...');
-
-      // Step 2: Perform login with credentials
-      console.log('📤 Posting login with credentials...');
+      // Step 2: Login
       const loginResponse = await axios({
         method: 'POST',
         url: this.loginURL,
@@ -276,73 +255,64 @@ class IPTVService {
         timeout: 15000,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-          'Accept-Encoding': 'gzip, deflate, br',
+          'X-CSRF-TOKEN': csrfToken,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Referer': this.loginURL,
-          'Origin': this.baseURL,
-          'Connection': 'keep-alive',
-          'Cookie': sessionCookies,
-          'Upgrade-Insecure-Requests': '1'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Cookie': this.sessionCookies || ''
         },
-        maxRedirects: 0,  // Don't follow redirects automatically
-        validateStatus: function (status) {
-          return status >= 200 && status < 400; // Accept redirects as success
-        }
+        maxRedirects: 5,
+        validateStatus: (status) => status >= 200 && status < 400
       });
 
       console.log('✅ Login successful! Status:', loginResponse.status);
 
-      // Step 3: Extract updated session cookies from login response
-      const loginSetCookieHeaders = loginResponse.headers['set-cookie'] || [];
-      let updatedSessionCookies = sessionCookies;
+      // Step 3: Extract cookies and get fresh CSRF from dashboard
+      const setCookieHeaders = loginResponse.headers['set-cookie'] || [];
+      let cookieParts = [];
       
-      loginSetCookieHeaders.forEach(cookie => {
+      setCookieHeaders.forEach(cookie => {
         const cookiePart = cookie.split(';')[0];
-        if (cookiePart.includes('XSRF-TOKEN')) {
-          // Replace or add XSRF-TOKEN
-          updatedSessionCookies = updatedSessionCookies.replace(/XSRF-TOKEN=[^;]*;?\s*/, '');
-          updatedSessionCookies += cookiePart + '; ';
-        } else if (cookiePart.includes('management_session')) {
-          // Replace or add management_session
-          updatedSessionCookies = updatedSessionCookies.replace(/management_session=[^;]*;?\s*/, '');
-          updatedSessionCookies += cookiePart + '; ';
-        }
+        cookieParts.push(cookiePart);
       });
-
-      // Step 4: Get fresh CSRF token from dashboard or any authenticated page
+      
+      this.sessionCookies = cookieParts.join('; ');
+      
+      // Step 4: Get fresh CSRF token from dashboard
       console.log('🔄 Getting fresh CSRF token from dashboard...');
       const dashboardResponse = await axios({
         method: 'GET',
-        url: this.baseURL + '/dashboard',
+        url: this.loginURL,
         timeout: 15000,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Cookie': updatedSessionCookies,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Cookie': this.sessionCookies,
           'Referer': this.loginURL
         }
       });
 
-      // Extract fresh CSRF token for API calls
       const freshCsrfMatch = dashboardResponse.data.match(/name="?csrf-token"?\s+content="([^"]+)"/);
       const freshMetaCsrfMatch = dashboardResponse.data.match(/name="?_token"?\s+value="([^"]+)"/);
       
-      const freshCsrfToken = freshCsrfMatch ? freshCsrfMatch[1] : (freshMetaCsrfMatch ? freshMetaCsrfMatch[1] : csrfToken);
+      this.csrfToken = freshCsrfMatch ? freshCsrfMatch[1] : (freshMetaCsrfMatch ? freshMetaCsrfMatch[1] : csrfToken);
       
-      // Store the tokens and cookies
-      this.csrfToken = freshCsrfToken;
-      this.sessionCookies = updatedSessionCookies.trim();
+      // Set expiration for 45 minutes (be more generous)
+      this.csrfExpires = new Date(Date.now() + (45 * 60 * 1000));
       
-      console.log('🔐 Updated session cookies:', this.sessionCookies.substring(0, 50) + '...');
+      // Save to database
+      await this.updateSetting('iptv_csrf_token', this.csrfToken);
+      await this.updateSetting('iptv_session_cookies', this.sessionCookies);
+      await this.updateSetting('iptv_csrf_expires', this.csrfExpires.toISOString());
+      
+      console.log('🍪 Updated session cookies:', this.sessionCookies.substring(0, 100) + '...');
       console.log('🔑 Using CSRF token:', this.csrfToken.substring(0, 20) + '...');
       
       console.log('✅ Successfully logged into IPTV panel');
       return true;
       
     } catch (error) {
-      console.error('❌ Failed to login to IPTV panel:', error.message);
+      console.error('❌ Login failed:', error.message);
       throw new Error(`Login failed: ${error.message}`);
     }
   }
@@ -455,14 +425,14 @@ class IPTVService {
     }
   }
 
- /**
-   * Get packages from IPTV panel - IMPROVED SESSION PERSISTENCE
+/**
+   * Get packages from IPTV panel - BETTER SESSION REUSE
    */
   async getPackagesFromPanel() {
     try {
       console.log('📦 Getting packages from panel...');
       
-      // Only login if we don't have valid authentication
+      // Only login if we absolutely need to
       if (!this.isAuthenticated()) {
         console.log('🔄 No valid session, logging in...');
         await this.loginToPanel();
@@ -470,42 +440,34 @@ class IPTVService {
         console.log('✅ Using existing valid session');
       }
       
-      // Add a delay to ensure session is fully established
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Get the package creation page HTML
+      // Make the request
       const response = await axios({
         method: 'GET',
         url: `${this.baseURL}/lines/create/0/line`,
         timeout: 15000,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
+          'User-Agent': 'PostmanRuntime/7.44.1',
+          'Accept': '*/*',
+          'Cache-Control': 'no-cache',
+          'Host': 'panel.pinkpony.lol',
           'Accept-Encoding': 'gzip, deflate, br',
           'Connection': 'keep-alive',
-          'Cookie': this.sessionCookies,
-          'Referer': this.baseURL + '/dashboard',
-          'Upgrade-Insecure-Requests': '1'
+          'Cookie': this.sessionCookies
         }
       });
       
       const htmlContent = response.data;
       console.log('📄 Got HTML response, length:', htmlContent.length);
       
-      // Debug: Check if we got an actual page or an error/redirect
-      if (htmlContent.length < 100) {
-        console.log('⚠️ HTML response too short, might be an error or redirect');
-        console.log('📄 HTML content:', htmlContent);
-        throw new Error('Received invalid HTML response (too short)');
-      }
-      
-      // Check if we got redirected to login page
-      if (htmlContent.includes('login') && htmlContent.includes('username') && htmlContent.length < 200000) {
+      // If we got redirected AND the content is short, session expired
+      if (htmlContent.includes('login') && htmlContent.includes('username') && htmlContent.length < 50000) {
         console.log('⚠️ Got redirected to login page, session expired');
-        // Clear invalid session and retry once
+        
+        // Clear session and try ONE more time
         this.csrfToken = null;
         this.sessionCookies = null;
+        this.csrfExpires = null;
+        
         console.log('🔄 Retrying with fresh login...');
         await this.loginToPanel();
         
@@ -528,42 +490,7 @@ class IPTVService {
         return this.parsePackageOptions(retryResponse.data);
       }
       
-      // Find the package select element with more robust matching
-      const selectRegex = /<select[^>]*(?:name="package"|id="package")[^>]*>(.*?)<\/select>/s;
-      const selectMatch = htmlContent.match(selectRegex);
-      
-      if (!selectMatch) {
-        console.log('❌ Could not find package select element');
-        console.log('🔍 Searching for any select with package options...');
-        
-        // Try to find any select that contains package options
-        const allSelects = htmlContent.match(/<select[^>]*>(.*?)<\/select>/gs);
-        console.log('🔍 Found select elements:', allSelects ? allSelects.length : 0);
-        
-        if (allSelects) {
-          // Look for the one with data-credits attributes
-          for (let i = 0; i < allSelects.length; i++) {
-            if (allSelects[i].includes('data-credits')) {
-              console.log('🎯 Found select with data-credits attributes');
-              const match = allSelects[i].match(/<select[^>]*>(.*?)<\/select>/s);
-              if (match) {
-                return this.parsePackageOptions(match[1]);
-              }
-            }
-          }
-        }
-        
-        // Log some of the HTML content for debugging
-        console.log('🔍 HTML preview (first 500 chars):', htmlContent.substring(0, 500));
-        console.log('🔍 Checking for form elements...');
-        const formMatches = htmlContent.match(/<form[^>]*>.*?<\/form>/gs);
-        console.log('🔍 Found forms:', formMatches ? formMatches.length : 0);
-        
-        throw new Error('Package select element not found in HTML');
-      }
-      
-      const selectContent = selectMatch[1];
-      return this.parsePackageOptions(selectContent);
+      return this.parsePackageOptions(htmlContent);
       
     } catch (error) {
       console.error('❌ Failed to get packages:', error);
@@ -949,103 +876,107 @@ class IPTVService {
     }
   }
 
-  /**
-   * Sync credit balance from panel with enhanced parsing
-   */
-  async syncCreditsFromPanel() {
-    try {
-      console.log('🔄 Syncing credit balance from panel...');
-      await this.ensureAuthenticated();
-      
-      // Get dashboard page with authentication
-      const response = await axios.get(`${this.baseURL}/dashboard`, {
-        timeout: 15000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Cookie': this.sessionCookies || '',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9'
-        }
-      });
-
-      const htmlContent = response.data;
-      let credits = 0;
-      
-      // Multiple parsing patterns for credit extraction
-      const patterns = [
-        // Pattern 1: <div class="label label-warning">Credits: 8</div>
-        /Credits:\s*(\d+)/i,
-        
-        // Pattern 2: JSON-like structure
-        /["']credits["']:\s*["']?(\d+)["']?/i,
-        
-        // Pattern 3: Credit balance variations
-        /credit[_\s]*balance["']?\s*[:=]\s*["']?(\d+)["']?/i,
-        
-        // Pattern 4: Laravel blade variable patterns
-        /\{\{\s*\$credits\s*\}\}\s*(\d+)/i,
-        
-        // Pattern 5: Data attributes
-        /data-credits\s*=\s*["'](\d+)["']/i
-      ];
-      
-      for (let i = 0; i < patterns.length; i++) {
-        const match = htmlContent.match(patterns[i]);
-        if (match) {
-          credits = parseInt(match[1], 10);
-          console.log(`✅ Found credits using pattern ${i + 1}:`, credits);
-          break;
-        }
+/**
+ * Sync credit balance from panel with enhanced parsing
+ * REPLACE this method in your existing iptv-service.js file
+ */
+async syncCreditsFromPanel() {
+  try {
+    console.log('🔄 Syncing credit balance from panel...');
+    
+    // Check current authentication status
+    console.log('🔍 Current authentication status:');
+    console.log('  - CSRF Token:', this.csrfToken ? 'Present' : 'Missing');
+    console.log('  - Session Cookies:', this.sessionCookies ? 'Present' : 'Missing');
+    console.log('  - CSRF Expires:', this.csrfExpires);
+    console.log('  - Is Authenticated:', this.isAuthenticated());
+    
+    // Force fresh login for now to test
+    console.log('🔄 Forcing fresh login to test...');
+    await this.loginToPanel();
+    
+    // Try to get the cookies directly from the last successful response
+    // Sometimes the cookies get updated during the login flow
+    console.log('🔍 Checking if we need to use updated cookies...');
+    
+    // Debug logging after authentication
+    console.log('🔍 After fresh login:');
+    console.log('🔍 Base URL:', this.baseURL);
+    console.log('🔍 Session cookies:', this.sessionCookies?.substring(0, 100) + '...');
+    console.log('🔍 CSRF token:', this.csrfToken?.substring(0, 20) + '...');
+    
+    // Try a small delay before the request
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // GET the credits page with our session
+    console.log('🔄 Getting credits from /rlogs/credits...');
+    console.log('🔍 Making request to:', `${this.baseURL}/rlogs/credits`);
+    console.log('🔍 Using cookies:', this.sessionCookies);
+    
+    const response = await axios.get(`${this.baseURL}/rlogs/credits`, {
+      timeout: 15000,
+      headers: {
+        'User-Agent': 'PostmanRuntime/7.44.1',
+        'Accept': '*/*',
+        'Cache-Control': 'no-cache',
+        'Cookie': this.sessionCookies,
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive'
       }
+    });
 
-      if (credits === 0) {
-        console.log('⚠️ Could not parse credits from dashboard, trying API...');
-        try {
-          const apiResponse = await this.makeAPIRequest('/logs/credits', {}, 'GET');
-          if (apiResponse && typeof apiResponse.balance !== 'undefined') {
-            credits = parseInt(apiResponse.balance, 10);
-            console.log('✅ Found credits via API:', credits);
-          }
-        } catch (apiError) {
-          console.log('⚠️ Credits API also failed:', apiError.message);
-        }
-      }
-
-      this.creditsBalance = credits;
-      await this.updateSetting('iptv_credits_balance', credits.toString());
-      
-      console.log('✅ Credit balance synced:', credits, 'credits');
-      return credits;
-      
-    } catch (error) {
-      console.error('❌ Failed to sync credits:', error.message);
-      throw error;
-    }
-  }
-
-  /**
-   * Get current credit balance from panel
-   */
-  async getCreditBalance() {
-    try {
-      const response = await this.makeAPIRequest('/logs/credits', {}, 'GET');
-      
-      if (response && typeof response.balance !== 'undefined') {
-        return parseInt(response.balance);
-      }
-      
-      // Handle different response formats
-      if (response && typeof response.credits !== 'undefined') {
-        return parseInt(response.credits);
-      }
-      
-      console.warn('⚠️ Unexpected credits response format:', response);
+    const htmlContent = response.data;
+    let credits = 0;
+    
+    console.log('📊 Credits Response Status:', response.status);
+    console.log('📊 Response Headers:', response.headers);
+    console.log('📊 HTML Length:', htmlContent.length);
+    console.log('📊 Complete HTML Response:', htmlContent);
+    
+    if (htmlContent === 'no access.' || htmlContent.includes('no access')) {
+      console.log('❌ Authentication failed - got "no access" response');
+      console.log('🔍 Request details that failed:');
+      console.log('  - URL:', `${this.baseURL}/rlogs/credits`);
+      console.log('  - Cookie header:', this.sessionCookies);
+      console.log('  - Cookie length:', this.sessionCookies?.length);
       return 0;
-    } catch (error) {
-      console.error('❌ Failed to get credit balance:', error);
-      throw new Error(`Failed to get credit balance: ${error.message}`);
     }
+    
+    // Parse credits: <div class="label label-warning">Credits: 58</div>
+    const creditMatch = htmlContent.match(/label-warning[^>]*>\s*Credits:\s*(\d+)/i);
+    
+    if (creditMatch && creditMatch[1]) {
+      credits = parseInt(creditMatch[1], 10);
+      console.log(`✅ Found credits: ${credits}`);
+    } else {
+      console.log('⚠️ Could not find credits in HTML');
+      
+      // Debug: show any mention of "credit"
+      if (htmlContent.toLowerCase().includes('credit')) {
+        const creditIndex = htmlContent.toLowerCase().indexOf('credit');
+        const start = Math.max(0, creditIndex - 50);
+        const end = Math.min(htmlContent.length, creditIndex + 100);
+        console.log('📝 Credit context:', htmlContent.substring(start, end));
+      } else {
+        console.log('🔍 No "credit" found in HTML');
+        if (htmlContent.includes('no access')) {
+          console.log('⚠️ Got "no access" - authentication may have failed');
+        }
+      }
+    }
+
+    // Update local storage
+    this.creditsBalance = credits;
+    await this.updateSetting('iptv_credits_balance', credits.toString());
+    
+    console.log('✅ Credit balance synced:', credits, 'credits');
+    return credits;
+    
+  } catch (error) {
+    console.error('❌ Failed to sync credits:', error.message);
+    throw error;
   }
+}
 
   /**
    * Update local credit balance in database
