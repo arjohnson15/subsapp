@@ -215,96 +215,134 @@ class IPTVService {
     }
   }
 
+
 /**
-   * Login to IPTV panel - FIXED COOKIE EXTRACTION
+   * Login to IPTV panel - IMPROVED SESSION HANDLING
    */
   async loginToPanel() {
     try {
       console.log('🔐 Logging into IPTV panel...');
       
-      // Step 1: Get initial CSRF token
-      const initialCsrfToken = await this.getCSRFToken();
-      
-      // Step 2: Login with the token
-      const formData = new URLSearchParams();
-      formData.append('username', this.username);
-      formData.append('password', this.password);
-      formData.append('_token', initialCsrfToken);
-
-      console.log('🔐 Posting login with credentials...');
-
-      const response = await axios.post(this.loginURL, formData, {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'X-CSRF-TOKEN': initialCsrfToken,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Referer': this.loginURL,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Cookie': this.sessionCookies || ''
-        },
+      // Step 1: Get login page and extract CSRF token
+      console.log('🔑 Getting CSRF token from:', this.loginURL);
+      const loginPageResponse = await axios({
+        method: 'GET',
+        url: this.loginURL,
         timeout: 15000,
-        maxRedirects: 5,
-        validateStatus: (status) => status >= 200 && status < 400
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1'
+        }
       });
 
-      console.log('🔐 Login successful! Status:', response.status);
-
-      // Step 3: Extract NEW cookies and CSRF token from response
-      const setCookieHeaders = response.headers['set-cookie'];
-      if (setCookieHeaders && Array.isArray(setCookieHeaders)) {
-        // Build cookie string from all Set-Cookie headers
-        const cookieParts = [];
-        let newCsrfToken = null;
-        
-        setCookieHeaders.forEach(cookie => {
-          const cookiePart = cookie.split(';')[0]; // Get just the name=value part
-          cookieParts.push(cookiePart);
-          
-          // Extract CSRF token from XSRF-TOKEN cookie
-          if (cookie.startsWith('XSRF-TOKEN=')) {
-            try {
-              const cookieValue = cookie.split('=')[1].split(';')[0];
-              const decodedValue = decodeURIComponent(cookieValue);
-              const tokenData = JSON.parse(decodedValue);
-              if (tokenData.value) {
-                newCsrfToken = tokenData.value;
-                console.log('🔑 Extracted NEW CSRF token from login response');
-              }
-            } catch (error) {
-              console.log('⚠️ Could not parse XSRF-TOKEN cookie, will use login token');
-            }
-          }
-        });
-        
-        // Update session cookies
-        this.sessionCookies = cookieParts.join('; ');
-        console.log('🍪 Updated session cookies:', this.sessionCookies.substring(0, 100) + '...');
-        
-        // Use new CSRF token if found, otherwise keep the login token
-        this.csrfToken = newCsrfToken || initialCsrfToken;
-        console.log('🔑 Using CSRF token:', this.csrfToken.substring(0, 20) + '...');
-      } else {
-        // No new cookies, keep what we have
-        this.csrfToken = initialCsrfToken;
-        console.log('🔑 Keeping initial CSRF token');
-      }
-
-      // Store authentication data with expiration
-      this.csrfExpires = new Date(Date.now() + (60 * 60 * 1000)); // 1 hour
+      // Extract CSRF token from form
+      const csrfMatch = loginPageResponse.data.match(/name="?_token"?\s+value="([^"]+)"/);
+      const metaCsrfMatch = loginPageResponse.data.match(/name="csrf-token"\s+content="([^"]+)"/);
       
-      // Save to database
-      await this.updateSetting('iptv_csrf_token', this.csrfToken);
-      await this.updateSetting('iptv_session_cookies', this.sessionCookies);
-      await this.updateSetting('iptv_csrf_expires', this.csrfExpires.toISOString());
+      if (!csrfMatch && !metaCsrfMatch) {
+        throw new Error('Could not find CSRF token in login page');
+      }
+      
+      const csrfToken = csrfMatch ? csrfMatch[1] : metaCsrfMatch[1];
+      console.log('CSRF Token found:', csrfToken.substring(0, 20) + '...');
+      
+      // Extract and store initial session cookies
+      const setCookieHeaders = loginPageResponse.headers['set-cookie'] || [];
+      let sessionCookies = '';
+      
+      setCookieHeaders.forEach(cookie => {
+        const cookiePart = cookie.split(';')[0];
+        if (cookiePart.includes('XSRF-TOKEN') || cookiePart.includes('management_session')) {
+          sessionCookies += cookiePart + '; ';
+        }
+      });
+      
+      console.log('🍪 Captured session cookies for login:', sessionCookies.substring(0, 50) + '...');
+
+      // Step 2: Perform login with credentials
+      console.log('📤 Posting login with credentials...');
+      const loginResponse = await axios({
+        method: 'POST',
+        url: this.loginURL,
+        data: new URLSearchParams({
+          '_token': csrfToken,
+          'username': this.username,
+          'password': this.password
+        }),
+        timeout: 15000,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Referer': this.loginURL,
+          'Origin': this.baseURL,
+          'Connection': 'keep-alive',
+          'Cookie': sessionCookies,
+          'Upgrade-Insecure-Requests': '1'
+        },
+        maxRedirects: 0,  // Don't follow redirects automatically
+        validateStatus: function (status) {
+          return status >= 200 && status < 400; // Accept redirects as success
+        }
+      });
+
+      console.log('✅ Login successful! Status:', loginResponse.status);
+
+      // Step 3: Extract updated session cookies from login response
+      const loginSetCookieHeaders = loginResponse.headers['set-cookie'] || [];
+      let updatedSessionCookies = sessionCookies;
+      
+      loginSetCookieHeaders.forEach(cookie => {
+        const cookiePart = cookie.split(';')[0];
+        if (cookiePart.includes('XSRF-TOKEN')) {
+          // Replace or add XSRF-TOKEN
+          updatedSessionCookies = updatedSessionCookies.replace(/XSRF-TOKEN=[^;]*;?\s*/, '');
+          updatedSessionCookies += cookiePart + '; ';
+        } else if (cookiePart.includes('management_session')) {
+          // Replace or add management_session
+          updatedSessionCookies = updatedSessionCookies.replace(/management_session=[^;]*;?\s*/, '');
+          updatedSessionCookies += cookiePart + '; ';
+        }
+      });
+
+      // Step 4: Get fresh CSRF token from dashboard or any authenticated page
+      console.log('🔄 Getting fresh CSRF token from dashboard...');
+      const dashboardResponse = await axios({
+        method: 'GET',
+        url: this.baseURL + '/dashboard',
+        timeout: 15000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Cookie': updatedSessionCookies,
+          'Referer': this.loginURL
+        }
+      });
+
+      // Extract fresh CSRF token for API calls
+      const freshCsrfMatch = dashboardResponse.data.match(/name="?csrf-token"?\s+content="([^"]+)"/);
+      const freshMetaCsrfMatch = dashboardResponse.data.match(/name="?_token"?\s+value="([^"]+)"/);
+      
+      const freshCsrfToken = freshCsrfMatch ? freshCsrfMatch[1] : (freshMetaCsrfMatch ? freshMetaCsrfMatch[1] : csrfToken);
+      
+      // Store the tokens and cookies
+      this.csrfToken = freshCsrfToken;
+      this.sessionCookies = updatedSessionCookies.trim();
+      
+      console.log('🔐 Updated session cookies:', this.sessionCookies.substring(0, 50) + '...');
+      console.log('🔑 Using CSRF token:', this.csrfToken.substring(0, 20) + '...');
       
       console.log('✅ Successfully logged into IPTV panel');
       return true;
+      
     } catch (error) {
-      console.error('❌ Login failed:', error.message);
-      if (error.response) {
-        console.error('🔍 Status:', error.response.status);
-        console.error('🔍 Headers:', Object.keys(error.response.headers));
-      }
+      console.error('❌ Failed to login to IPTV panel:', error.message);
       throw new Error(`Login failed: ${error.message}`);
     }
   }
@@ -417,15 +455,23 @@ class IPTVService {
     }
   }
 
-/**
-   * Get packages from IPTV panel - FIXED HTML PARSING
+ /**
+   * Get packages from IPTV panel - IMPROVED SESSION PERSISTENCE
    */
   async getPackagesFromPanel() {
     try {
       console.log('📦 Getting packages from panel...');
       
-      // Ensure we're logged in
-      await this.loginToPanel();
+      // Only login if we don't have valid authentication
+      if (!this.isAuthenticated()) {
+        console.log('🔄 No valid session, logging in...');
+        await this.loginToPanel();
+      } else {
+        console.log('✅ Using existing valid session');
+      }
+      
+      // Add a delay to ensure session is fully established
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Get the package creation page HTML
       const response = await axios({
@@ -433,17 +479,56 @@ class IPTVService {
         url: `${this.baseURL}/lines/create/0/line`,
         timeout: 15000,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Cookie': this.sessionCookies || ''
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Cookie': this.sessionCookies,
+          'Referer': this.baseURL + '/dashboard',
+          'Upgrade-Insecure-Requests': '1'
         }
       });
       
       const htmlContent = response.data;
       console.log('📄 Got HTML response, length:', htmlContent.length);
       
+      // Debug: Check if we got an actual page or an error/redirect
+      if (htmlContent.length < 100) {
+        console.log('⚠️ HTML response too short, might be an error or redirect');
+        console.log('📄 HTML content:', htmlContent);
+        throw new Error('Received invalid HTML response (too short)');
+      }
+      
+      // Check if we got redirected to login page
+      if (htmlContent.includes('login') && htmlContent.includes('username') && htmlContent.length < 200000) {
+        console.log('⚠️ Got redirected to login page, session expired');
+        // Clear invalid session and retry once
+        this.csrfToken = null;
+        this.sessionCookies = null;
+        console.log('🔄 Retrying with fresh login...');
+        await this.loginToPanel();
+        
+        // Retry the request
+        const retryResponse = await axios({
+          method: 'GET',
+          url: `${this.baseURL}/lines/create/0/line`,
+          timeout: 15000,
+          headers: {
+            'User-Agent': 'PostmanRuntime/7.44.1',
+            'Accept': '*/*',
+            'Cache-Control': 'no-cache',
+            'Host': 'panel.pinkpony.lol',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Cookie': this.sessionCookies
+          }
+        });
+        
+        return this.parsePackageOptions(retryResponse.data);
+      }
+      
       // Find the package select element with more robust matching
-      // Look for select with name="package" or id="package"
       const selectRegex = /<select[^>]*(?:name="package"|id="package")[^>]*>(.*?)<\/select>/s;
       const selectMatch = htmlContent.match(selectRegex);
       
@@ -467,6 +552,12 @@ class IPTVService {
             }
           }
         }
+        
+        // Log some of the HTML content for debugging
+        console.log('🔍 HTML preview (first 500 chars):', htmlContent.substring(0, 500));
+        console.log('🔍 Checking for form elements...');
+        const formMatches = htmlContent.match(/<form[^>]*>.*?<\/form>/gs);
+        console.log('🔍 Found forms:', formMatches ? formMatches.length : 0);
         
         throw new Error('Package select element not found in HTML');
       }
@@ -569,8 +660,8 @@ class IPTVService {
     return packages;
   }
 
-  /**
-   * Get bouquets from IPTV panel - FIXED CSRF HANDLING
+ /**
+   * Get bouquets from IPTV panel - FIXED CSRF AND SESSION HANDLING
    */
   async getBouquetsFromPanel(packageId = null) {
     try {
@@ -579,58 +670,42 @@ class IPTVService {
       // Use the package ID from settings
       const pkgId = packageId || this.packageIdForBouquets || '175';
       
-      // Make the API request with more robust error handling
-      let response;
-      let attempts = 0;
-      const maxAttempts = 3;
+      // Ensure fresh login and session
+      await this.loginToPanel();
       
-      while (attempts < maxAttempts) {
-        attempts++;
-        console.log(`🔄 Attempt ${attempts} to get bouquets...`);
-        
-        try {
-          // Fresh login each time
-          await this.loginToPanel();
-          
-          // Add a small delay to ensure session is ready
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          response = await axios({
-            method: 'POST',
-            url: `${this.baseURL}/lines/packages`,
-            data: new URLSearchParams({
-              '_token': this.csrfToken,
-              'package_id': pkgId,
-              'trial': '0'
-            }),
-            timeout: 15000,
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'X-CSRF-TOKEN': this.csrfToken,
-              'X-Requested-With': 'XMLHttpRequest',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-              'Accept': '*/*',
-              'Cookie': this.sessionCookies || '',
-              'Referer': this.baseURL + '/dashboard'  // Try dashboard as referer
-            }
-          });
-          
-          console.log(`✅ API request successful on attempt ${attempts}`);
-          break;
-          
-        } catch (error) {
-          console.error(`❌ Attempt ${attempts} failed:`, error.response?.status, error.response?.data);
-          
-          if (attempts === maxAttempts) {
-            throw error;
-          }
-          
-          // Wait before retry
-          await new Promise(resolve => setTimeout(resolve, 2000));
+      // Add delay to ensure session is ready
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Make the API request with improved headers and error handling
+      const response = await axios({
+        method: 'POST',
+        url: `${this.baseURL}/lines/packages`,
+        data: new URLSearchParams({
+          '_token': this.csrfToken,
+          'package_id': pkgId,
+          'trial': '0'
+        }),
+        timeout: 15000,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRF-TOKEN': this.csrfToken,
+          'X-Requested-With': 'XMLHttpRequest',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json, text/javascript, */*; q=0.01',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Origin': this.baseURL,
+          'Referer': this.baseURL + '/lines/create/0/line',  // Use the form page as referer
+          'Cookie': this.sessionCookies,
+          'Connection': 'keep-alive',
+          'Sec-Fetch-Dest': 'empty',
+          'Sec-Fetch-Mode': 'cors',
+          'Sec-Fetch-Site': 'same-origin'
         }
-      }
+      });
       
-      console.log('🔍 Bouquets response:', response.data);
+      console.log('🔍 Bouquets response status:', response.status);
+      console.log('🔍 Bouquets response data:', response.data);
       
       if (response.data && response.data.bouquets) {
         // Convert to our format
@@ -646,8 +721,58 @@ class IPTVService {
       
       console.warn('⚠️ Unexpected bouquets response format:', response.data);
       return [];
+      
     } catch (error) {
-      console.error('❌ Failed to get bouquets:', error);
+      console.error('❌ Failed to get bouquets:', error.message);
+      
+      // If it's a CSRF error, try one more time with fresh login
+      if (error.response && error.response.status === 419) {
+        console.log('🔄 CSRF error, attempting fresh login and retry...');
+        try {
+          // Force fresh login
+          this.csrfToken = null;
+          this.sessionCookies = null;
+          await this.loginToPanel();
+          
+          // Wait a bit longer before retry
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          const retryResponse = await axios({
+            method: 'POST',
+            url: `${this.baseURL}/lines/packages`,
+            data: new URLSearchParams({
+              '_token': this.csrfToken,
+              'package_id': packageId || this.packageIdForBouquets || '175',
+              'trial': '0'
+            }),
+            timeout: 15000,
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'X-CSRF-TOKEN': this.csrfToken,
+              'X-Requested-With': 'XMLHttpRequest',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Accept': 'application/json, text/javascript, */*; q=0.01',
+              'Origin': this.baseURL,
+              'Referer': this.baseURL + '/lines/create/0/line',
+              'Cookie': this.sessionCookies
+            }
+          });
+          
+          if (retryResponse.data && retryResponse.data.bouquets) {
+            const bouquets = retryResponse.data.bouquets.map(bouquet => ({
+              id: bouquet.id.toString(),
+              name: bouquet.bouquet_name,
+              category: this.categorizeBouquet(bouquet.bouquet_name)
+            }));
+            
+            console.log(`✅ Retry successful! Found ${bouquets.length} bouquets`);
+            return bouquets;
+          }
+        } catch (retryError) {
+          console.error('❌ Retry also failed:', retryError.message);
+        }
+      }
+      
       throw new Error(`Failed to get bouquets: ${error.message}`);
     }
   }
@@ -1010,35 +1135,58 @@ class IPTVService {
     }
   }
 
-  /**
-   * Sync bouquets from panel to database - CORRECTED
+/**
+   * Sync bouquets from panel to database - FIXED INSERTION
    */
   async syncBouquetsFromPanel() {
     try {
       console.log('📺 Syncing bouquets (channel groups) from panel...');
       
       const bouquets = await this.getBouquetsFromPanel();
+      console.log(`🔍 Got ${bouquets.length} bouquets from panel, starting database insertion...`);
       
-      // Clear existing bouquets
-      await db.query('DELETE FROM iptv_bouquets');
+      let insertedCount = 0;
       
-      // Insert new bouquets
+      // Insert/update bouquets one by one
       for (const bouquet of bouquets) {
-        await db.query(`
-          INSERT INTO iptv_bouquets (bouquet_id, name, category, synced_at)
-          VALUES (?, ?, ?, NOW())
-        `, [
-          bouquet.id,
-          bouquet.name,
-          bouquet.category
-        ]);
+        try {
+          // Use INSERT ... ON DUPLICATE KEY UPDATE pattern
+          await db.query(`
+            INSERT INTO iptv_bouquets (bouquet_id, name, category, synced_at)
+            VALUES (?, ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE 
+              name = VALUES(name),
+              category = VALUES(category),
+              synced_at = NOW(),
+              is_active = true
+          `, [
+            bouquet.id,
+            bouquet.name,
+            bouquet.category || 'General'
+          ]);
+          
+          insertedCount++;
+          
+          if (insertedCount % 20 === 0) {
+            console.log(`🔄 Inserted ${insertedCount}/${bouquets.length} bouquets...`);
+          }
+        } catch (insertError) {
+          console.error(`❌ Failed to insert bouquet ${bouquet.id}:`, insertError);
+          // Continue with other bouquets
+        }
       }
       
-      console.log(`✅ Synced ${bouquets.length} bouquets from panel`);
-      return bouquets.length;
+      console.log(`✅ Successfully synced ${insertedCount} bouquets from panel`);
+      
+      // Verify insertion by counting
+      const countResult = await db.query('SELECT COUNT(*) as total FROM iptv_bouquets WHERE is_active = true');
+      const totalInDB = Array.isArray(countResult) ? countResult[0].total : countResult.total;
+      console.log(`🔍 Database now contains ${totalInDB} active bouquets`);
+      
+      return insertedCount;
     } catch (error) {
       console.error('❌ Failed to sync bouquets:', error);
-      throw error;
+      throw new Error(`Failed to sync bouquets: ${error.message}`);
     }
   }
 

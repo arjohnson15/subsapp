@@ -90,24 +90,41 @@ router.post('/sync-packages', async (req, res) => {
 });
 
 /**
- * GET /api/iptv/bouquets - Get all bouquets
+ * GET /api/iptv/bouquets - Get all bouquets - FIXED VERSION
  */
 router.get('/bouquets', async (req, res) => {
   try {
+    console.log('🔍 Getting bouquets from database...');
+    
     const result = await db.query(`
-      SELECT * FROM iptv_bouquets 
+      SELECT bouquet_id, name, category, is_active, synced_at 
+      FROM iptv_bouquets 
       WHERE is_active = true 
       ORDER BY category, name
     `);
     
-    // Handle different return formats from mysql2
-    const rows = Array.isArray(result) ? result[0] : result;
+    console.log('🔍 Database result type:', typeof result);
+    console.log('🔍 Database result length:', Array.isArray(result) ? result.length : 'not array');
     
-    if (!rows || !Array.isArray(rows)) {
+    // Handle different return formats from mysql2
+    let rows;
+    if (Array.isArray(result)) {
+      rows = result;
+    } else if (result && Array.isArray(result[0])) {
+      rows = result[0];
+    } else {
+      console.log('🔍 Unexpected result format:', result);
+      rows = [];
+    }
+    
+    console.log('🔍 Final rows count:', rows.length);
+    
+    if (!rows || rows.length === 0) {
       return res.json({
         success: true,
         bouquets: {},
-        total: 0
+        total: 0,
+        message: 'No bouquets found in database'
       });
     }
     
@@ -118,8 +135,15 @@ router.get('/bouquets', async (req, res) => {
       if (!groupedBouquets[category]) {
         groupedBouquets[category] = [];
       }
-      groupedBouquets[category].push(bouquet);
+      groupedBouquets[category].push({
+        id: bouquet.bouquet_id,
+        name: bouquet.name,
+        category: bouquet.category,
+        synced_at: bouquet.synced_at
+      });
     });
+    
+    console.log('✅ Returning', rows.length, 'bouquets in', Object.keys(groupedBouquets).length, 'categories');
     
     res.json({
       success: true,
