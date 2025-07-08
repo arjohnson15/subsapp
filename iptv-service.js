@@ -417,96 +417,156 @@ class IPTVService {
     }
   }
 
-
 /**
-   * Get packages from IPTV panel - DEBUG VERSION
+   * Get packages from IPTV panel - FIXED HTML PARSING
    */
   async getPackagesFromPanel() {
     try {
-      console.log('📦 Getting packages (subscription plans) from panel...');
+      console.log('📦 Getting packages from panel...');
       
-      // Ensure we're authenticated first
+      // Ensure we're logged in
       await this.loginToPanel();
       
-      // Get the create user page which contains the package dropdown
-      const response = await axios.get(`${this.baseURL}/lines/create/0/line`, {
+      // Get the package creation page HTML
+      const response = await axios({
+        method: 'GET',
+        url: `${this.baseURL}/lines/create/0/line`,
         timeout: 15000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Cookie': this.sessionCookies || '',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Referer': this.baseURL
+          'Cookie': this.sessionCookies || ''
         }
       });
-
+      
       const htmlContent = response.data;
+      console.log('📄 Got HTML response, length:', htmlContent.length);
       
-      // DEBUG: Save the HTML content to see what we're getting
-      console.log('🔍 HTML response length:', htmlContent.length);
-      console.log('🔍 First 500 chars:', htmlContent.substring(0, 500));
+      // Find the package select element with more robust matching
+      // Look for select with name="package" or id="package"
+      const selectRegex = /<select[^>]*(?:name="package"|id="package")[^>]*>(.*?)<\/select>/s;
+      const selectMatch = htmlContent.match(selectRegex);
       
-      // Look for the select element with id="package"
-      const selectMatch = htmlContent.match(/<select[^>]*id=["']package["'][^>]*>(.*?)<\/select>/s);
       if (!selectMatch) {
         console.log('❌ Could not find package select element');
-        console.log('🔍 Looking for any select elements...');
-        const anySelectMatch = htmlContent.match(/<select[^>]*>(.*?)<\/select>/gs);
-        console.log('🔍 Found select elements:', anySelectMatch ? anySelectMatch.length : 0);
-        return [];
+        console.log('🔍 Searching for any select with package options...');
+        
+        // Try to find any select that contains package options
+        const allSelects = htmlContent.match(/<select[^>]*>(.*?)<\/select>/gs);
+        console.log('🔍 Found select elements:', allSelects ? allSelects.length : 0);
+        
+        if (allSelects) {
+          // Look for the one with data-credits attributes
+          for (let i = 0; i < allSelects.length; i++) {
+            if (allSelects[i].includes('data-credits')) {
+              console.log('🎯 Found select with data-credits attributes');
+              const match = allSelects[i].match(/<select[^>]*>(.*?)<\/select>/s);
+              if (match) {
+                return this.parsePackageOptions(match[1]);
+              }
+            }
+          }
+        }
+        
+        throw new Error('Package select element not found in HTML');
       }
       
       const selectContent = selectMatch[1];
-      console.log('🔍 Select content length:', selectContent.length);
+      return this.parsePackageOptions(selectContent);
       
-      const packages = [];
-      
-      // More flexible regex that handles various whitespace and quote variations
-      const optionRegex = /<option\s+value=["']?(\d+)["']?\s+data-credits=["']?(\d+)["']?\s+data-duration=["']?(\d+)["']?\s+data-duration-in=["']?([^"'\s>]+)["']?\s+data-connections=["']?(\d+)["']?[^>]*>\s*([^<]+?)\s*<\/option>/gi;
-      
-      let match;
-      let matchCount = 0;
-      while ((match = optionRegex.exec(selectContent)) !== null) {
-        matchCount++;
-        const [, id, credits, duration, durationUnit, connections, description] = match;
-        
-        console.log(`🔍 Found option: ID=${id}, Credits=${credits}, Duration=${duration}, Connections=${connections}`);
-        
-        // Skip the empty "Select one please" option
-        if (id && id !== '' && description.trim() !== 'Select one please') {
-          // Extract package name (everything before the first " - ")
-          const fullDescription = description.trim();
-          const nameMatch = fullDescription.match(/^([^-]+?)(?:\s*-|$)/);
-          const packageName = nameMatch ? nameMatch[1].trim() : fullDescription;
-          
-          packages.push({
-            id: id,
-            name: packageName,
-            connections: parseInt(connections),
-            duration_months: parseInt(duration),
-            duration_unit: durationUnit,
-            credits: parseInt(credits),
-            description: fullDescription
-          });
-        }
-      }
-      
-      console.log(`🔍 Regex found ${matchCount} option elements, ${packages.length} valid packages`);
-      
-      if (packages.length === 0) {
-        // Let's try a simpler approach - just find all option tags
-        const allOptions = selectContent.match(/<option[^>]*>.*?<\/option>/gi);
-        console.log('🔍 Found option tags:', allOptions ? allOptions.length : 0);
-        if (allOptions) {
-          console.log('🔍 First few options:', allOptions.slice(0, 3));
-        }
-      }
-      
-      console.log(`✅ Found ${packages.length} packages from panel`);
-      return packages;
     } catch (error) {
       console.error('❌ Failed to get packages:', error);
       throw new Error(`Failed to get packages: ${error.message}`);
     }
+  }
+
+  /**
+   * Parse package options from select HTML content
+   */
+  parsePackageOptions(selectContent) {
+    console.log('🔍 Parsing package options...');
+    
+    const packages = [];
+    
+    // Updated regex to handle the exact format from your HTML
+    const optionRegex = /<option\s+value="(\d+)"\s+data-credits="(\d+)"\s+data-duration="(\d+)"\s+data-duration-in="([^"]+)"\s+data-connections="(\d+)"[^>]*>\s*([^<]+?)\s*<\/option>/gi;
+    
+    let match;
+    let matchCount = 0;
+    
+    while ((match = optionRegex.exec(selectContent)) !== null) {
+      matchCount++;
+      const [, id, credits, duration, durationUnit, connections, description] = match;
+      
+      console.log(`🔍 Found package: ID=${id}, Credits=${credits}, Duration=${duration} ${durationUnit}, Connections=${connections}`);
+      
+      // Skip empty options or "Select one please" 
+      if (id && id !== '' && !description.includes('Select one please')) {
+        // Clean up description and extract package name
+        const fullDescription = description.trim();
+        
+        // Extract package type/name (everything before the first " - ")
+        const nameMatch = fullDescription.match(/^([^-]+?)(?:\s*-|$)/);
+        let packageName = nameMatch ? nameMatch[1].trim() : fullDescription;
+        
+        // Determine package type based on description
+        let packageType = 'basic';
+        if (fullDescription.toUpperCase().includes('LIVE TV ONLY')) {
+          packageType = 'live_tv_only';
+          packageName = 'Live TV Only';
+        } else if (fullDescription.toUpperCase().includes('USA, CAN, UK, LAT, SPORTS')) {
+          packageType = 'full_service';  
+          packageName = 'Full Service';
+        } else if (fullDescription.includes('Con.') && fullDescription.includes('month')) {
+          packageType = 'basic';
+          packageName = 'Basic Package';
+        }
+        
+        packages.push({
+          id: id,
+          name: packageName,
+          connections: parseInt(connections),
+          duration_months: parseInt(duration),
+          duration_unit: durationUnit,
+          credits: parseInt(credits),
+          description: fullDescription,
+          package_type: packageType
+        });
+      }
+    }
+    
+    console.log(`🔍 Regex found ${matchCount} option elements, extracted ${packages.length} valid packages`);
+    
+    // If no matches, try a more flexible regex
+    if (packages.length === 0) {
+      console.log('🔄 Trying more flexible parsing...');
+      
+      // Try to match any option with data attributes, being more flexible with whitespace and quotes
+      const flexibleRegex = /<option[^>]*value=["']?(\d+)["']?[^>]*data-credits=["']?(\d+)["']?[^>]*data-duration=["']?(\d+)["']?[^>]*data-duration-in=["']?([^"'\s>]+)["']?[^>]*data-connections=["']?(\d+)["']?[^>]*>\s*([^<]+?)\s*<\/option>/gi;
+      
+      let flexMatch;
+      while ((flexMatch = flexibleRegex.exec(selectContent)) !== null) {
+        const [, id, credits, duration, durationUnit, connections, description] = flexMatch;
+        
+        if (id && !description.includes('Select one please')) {
+          console.log(`🔍 Flexible match: ID=${id}, Credits=${credits}`);
+          
+          packages.push({
+            id: id,
+            name: description.trim().split(' - ')[0] || 'Package',
+            connections: parseInt(connections),
+            duration_months: parseInt(duration), 
+            duration_unit: durationUnit,
+            credits: parseInt(credits),
+            description: description.trim(),
+            package_type: 'basic'
+          });
+        }
+      }
+    }
+    
+    console.log(`✅ Successfully parsed ${packages.length} packages from panel`);
+    return packages;
   }
 
   /**
