@@ -41,33 +41,38 @@ class IPTVService {
     }
   }
 
-  /**
-   * Get IPTV settings from database
-   */
+/**
+ * Get IPTV settings from database - SIMPLE FIX
+ */
 async getSettings() {
   try {
-    const result = await db.query('SELECT * FROM settings');
+    const result = await db.query(`
+      SELECT setting_key, setting_value 
+      FROM settings 
+      WHERE setting_key IN (
+        'iptv_panel_base_url',
+        'iptv_panel_login_url', 
+        'iptv_panel_username',
+        'iptv_panel_password',
+        'iptv_package_id_for_bouquets',
+        'iptv_csrf_token',
+        'iptv_session_cookies',
+        'iptv_csrf_expires',
+        'iptv_credits_balance'
+      )
+    `);
     
-    console.log('🔍 DEBUG: Raw database result:', result);
+    // Since result is already the array of rows, use it directly
+    const rows = result;
     
-    // Keep this line as it was:
-    const rows = Array.isArray(result) ? result[0] : result;
-    
-    // ADD THIS FIX - rows is the array we want to loop through:
-    const settingsArray = rows;
-    
-    console.log('🔍 DEBUG: Settings array:', settingsArray);
-    
-    if (!settingsArray || !Array.isArray(settingsArray)) {
-      console.log('⚠️ No settings found in database');
+    if (!rows || !Array.isArray(rows) || rows.length === 0) {
+      console.log('⚠️ No IPTV settings found in database');
       return {};
     }
     
     const settings = {};
-    settingsArray.forEach(row => {
-      if (row.setting_key && row.setting_key.startsWith('iptv_')) {
-        settings[row.setting_key] = row.setting_value;
-      }
+    rows.forEach(row => {
+      settings[row.setting_key] = row.setting_value;
     });
     
     console.log('🔍 DEBUG: Loaded IPTV settings:', settings);
@@ -75,6 +80,34 @@ async getSettings() {
   } catch (error) {
     console.error('❌ Error getting IPTV settings:', error);
     return {};
+  }
+}
+
+/**
+ * DEBUG: Direct settings check
+ */
+async debugSettings() {
+  try {
+    console.log('🔧 DEBUG: Checking database connection...');
+    const testResult = await db.query('SELECT COUNT(*) as count FROM settings');
+    console.log('🔧 DEBUG: Total settings in database:', testResult);
+    
+    console.log('🔧 DEBUG: Getting all settings...');
+    const allSettings = await db.query('SELECT * FROM settings ORDER BY setting_key');
+    console.log('🔧 DEBUG: All settings:', allSettings);
+    
+    console.log('🔧 DEBUG: Looking for IPTV URLs specifically...');
+    const urlSettings = await db.query(`
+      SELECT setting_key, setting_value 
+      FROM settings 
+      WHERE setting_key IN ('iptv_panel_base_url', 'iptv_panel_login_url')
+    `);
+    console.log('🔧 DEBUG: URL settings:', urlSettings);
+    
+    return urlSettings;
+  } catch (error) {
+    console.error('❌ DEBUG: Database error:', error);
+    return null;
   }
 }
 
@@ -89,104 +122,139 @@ async getSettings() {
     `, [value, key]);
   }
 
-  /**
-   * Check if we have valid authentication
-   */
-  isAuthenticated() {
-    if (!this.csrfToken) return false;
-    if (!this.csrfExpires) return false;
-	if (!this.sessionCookies) return false;
-    return new Date() < this.csrfExpires;
-  }
+/**
+ * Check if we have valid authentication - FIXED FOR CSRF ONLY
+ */
+isAuthenticated() {
+  if (!this.csrfToken) return false;
+  if (!this.csrfExpires) return false;
+  return new Date() < this.csrfExpires;
+}
 
-  /**
-   * Get CSRF token from login page
-   */
-  async getCSRFToken() {
-    try {
-      console.log('🔑 Getting CSRF token from:', this.loginURL);
-	  console.log('🔍 DEBUG: loginURL type:', typeof this.loginURL);
-	  console.log('🔍 DEBUG: loginURL value:', JSON.stringify(this.loginURL));
-      
-      const response = await axios.get(this.loginURL, {
-        timeout: 10000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-
-      // Extract CSRF token from HTML form
-      const htmlContent = response.data;
-      const tokenMatch = htmlContent.match(/name="_token"\s+value="([^"]+)"/);
-      
-      if (!tokenMatch) {
-        throw new Error('CSRF token not found in login page');
+/**
+ * Get CSRF token from login page - WITH COOKIE CAPTURE
+ */
+async getCSRFToken() {
+  try {
+    console.log('🔑 Getting CSRF token from:', this.loginURL);
+    
+    const response = await axios.get(this.loginURL, {
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       }
+    });
 
-      const token = tokenMatch[1];
-      console.log('✅ CSRF token extracted successfully');
-      
-      return token;
-    } catch (error) {
-      console.error('❌ Failed to get CSRF token:', error.message);
-      throw new Error(`Failed to get CSRF token: ${error.message}`);
+    // Extract CSRF token using EXACT same logic as your Postman script
+    const responseText = response.data;
+    let csrfToken = null;
+    
+    // First look for form token
+    const tokenMatch = responseText.match(/name="_token"\s+value="([^"]+)"/);
+    if (tokenMatch) {
+      csrfToken = tokenMatch[1];
+      console.log("CSRF Token found:", tokenMatch[1]);
     }
+    
+    // Then look for meta token (this will overwrite form token if present)
+    const metaMatch = responseText.match(/name="csrf-token"\s+content="([^"]+)"/);
+    if (metaMatch) {
+      csrfToken = metaMatch[1];
+      console.log("Meta CSRF Token found:", metaMatch[1]);
+    }
+    
+    if (!csrfToken) {
+      throw new Error('CSRF token not found in login page');
+    }
+    
+    // CRITICAL: Capture the session cookies that came with the CSRF token
+    const setCookieHeaders = response.headers['set-cookie'];
+    if (setCookieHeaders) {
+      this.sessionCookies = setCookieHeaders.map(cookie => cookie.split(';')[0]).join('; ');
+      console.log('🍪 Captured session cookies for login:', this.sessionCookies.substring(0, 50) + '...');
+    }
+    
+    return csrfToken;
+  } catch (error) {
+    console.error('❌ Failed to get CSRF token:', error.message);
+    throw new Error(`Failed to get CSRF token: ${error.message}`);
   }
+}
 
-  /**
-   * Login to IPTV panel and get session
-   */
+/**
+ * Login to IPTV panel - WITH SESSION COOKIES LIKE POSTMAN
+ */
 async loginToPanel() {
   try {
     console.log('🔐 Logging into IPTV panel...');
     
-    // Step 1: Get fresh CSRF token
+    // Step 1: Get CSRF token (this also captures session cookies)
     const csrfToken = await this.getCSRFToken();
     
-    // Step 2: Perform login with proper headers matching your Postman screenshots
-    const loginData = new URLSearchParams({
-      '_token': csrfToken,
-      'username': this.username,
-      'password': this.password
-    });
+    // Step 2: Login using the session cookies (like Postman does automatically)
+    const formData = new URLSearchParams();
+    formData.append('username', this.username);
+    formData.append('password', this.password);
+    formData.append('_token', csrfToken);
 
-    const response = await axios.post(this.loginURL, loginData, {
-      timeout: 10000,
+    console.log('🔐 Posting login with session cookies...');
+    console.log('🍪 Using cookies:', this.sessionCookies ? 'YES' : 'NO');
+
+    const response = await axios.post(this.loginURL, formData, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'X-CSRF-TOKEN': csrfToken,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Referer': this.loginURL,
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'X-Requested-With': 'XMLHttpRequest'
+        'Cookie': this.sessionCookies || ''  // Send the session cookies!
       },
-      maxRedirects: 0,
-      validateStatus: (status) => status < 400 // Accept redirects as success
+      timeout: 15000,
+      maxRedirects: 5,  // Follow redirects like Postman
+      validateStatus: (status) => status >= 200 && status < 400
     });
 
-    // Step 3: Extract and store session cookies from response
+    console.log('🔐 Login successful! Status:', response.status);
+
+    // Update session cookies with any new ones from login response
     const setCookieHeaders = response.headers['set-cookie'];
-    let sessionCookies = '';
     if (setCookieHeaders) {
-      sessionCookies = setCookieHeaders.map(cookie => cookie.split(';')[0]).join('; ');
+      const newCookies = setCookieHeaders.map(cookie => cookie.split(';')[0]).join('; ');
+      this.sessionCookies = newCookies;
+      console.log('🍪 Updated session cookies after login');
     }
 
-    // Store the authentication data
+    // Store authentication data
     this.csrfToken = csrfToken;
-    this.sessionCookies = sessionCookies;
-    this.csrfExpires = new Date(Date.now() + (60 * 60 * 1000)); // 1 hour from now
+    this.csrfExpires = new Date(Date.now() + (60 * 60 * 1000));
     
     // Save to database
     await this.updateSetting('iptv_csrf_token', csrfToken);
-    await this.updateSetting('iptv_session_cookies', sessionCookies);
+    await this.updateSetting('iptv_session_cookies', this.sessionCookies);
     await this.updateSetting('iptv_csrf_expires', this.csrfExpires.toISOString());
     
     console.log('✅ Successfully logged into IPTV panel');
     return true;
   } catch (error) {
-    console.error('❌ Failed to login to IPTV panel:', error.message);
+    console.error('❌ Login failed:', error.message);
+    if (error.response) {
+      console.error('🔍 Status:', error.response.status);
+      console.error('🔍 Headers:', Object.keys(error.response.headers));
+      console.error('🔍 Data sample:', error.response.data?.toString().substring(0, 200));
+    }
     throw new Error(`Login failed: ${error.message}`);
   }
+}
+
+/**
+ * Check if we have valid authentication - UPDATED FOR COOKIES
+ */
+isAuthenticated() {
+  if (!this.csrfToken) return false;
+  if (!this.csrfExpires) return false;
+  if (!this.sessionCookies) return false;  // We DO need session cookies
+  return new Date() < this.csrfExpires;
 }
 
   /**
@@ -206,23 +274,22 @@ async ensureAuthenticated() {
   return await this.loginToPanel();
 }
 
-  /**
-   * Make authenticated API request
-   */
+/**
+ * Make authenticated API request - WITH SESSION COOKIES
+ */
 async makeAPIRequest(endpoint, data = {}, method = 'POST') {
   await this.ensureAuthenticated();
 
   const url = `${this.baseURL}${endpoint}`;
-  const requestData = new URLSearchParams({
-    '_token': this.csrfToken,
-    ...data
-  });
 
   try {
     const response = await axios({
       method,
       url,
-      data: method === 'GET' ? undefined : requestData,
+      data: method === 'GET' ? undefined : new URLSearchParams({
+        '_token': this.csrfToken,
+        ...data
+      }),
       params: method === 'GET' ? { _token: this.csrfToken, ...data } : undefined,
       timeout: 15000,
       headers: {
@@ -230,8 +297,8 @@ async makeAPIRequest(endpoint, data = {}, method = 'POST') {
         'X-CSRF-TOKEN': this.csrfToken,
         'X-Requested-With': 'XMLHttpRequest',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Cookie': this.sessionCookies || '', // ADD THIS LINE
-        'Accept': '*/*' // ADD THIS LINE
+        'Accept': '*/*',
+        'Cookie': this.sessionCookies || ''
       }
     });
 
@@ -240,7 +307,7 @@ async makeAPIRequest(endpoint, data = {}, method = 'POST') {
     console.error(`❌ API request failed for ${endpoint}:`, error.message);
     
     // If authentication failed, try once more with fresh login
-    if (error.response?.status === 401 || error.response?.status === 403 || error.response?.status === 419) { // ADD 419 to this check
+    if (error.response?.status === 401 || error.response?.status === 403 || error.response?.status === 419) {
       console.log('🔄 Authentication error, trying fresh login...');
       await this.loginToPanel();
       
@@ -255,8 +322,8 @@ async makeAPIRequest(endpoint, data = {}, method = 'POST') {
           'X-CSRF-TOKEN': this.csrfToken,
           'X-Requested-With': 'XMLHttpRequest',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Cookie': this.sessionCookies || '', // ADD THIS LINE
-          'Accept': '*/*' // ADD THIS LINE
+          'Accept': '*/*',
+          'Cookie': this.sessionCookies || ''
         }
       });
       
@@ -267,12 +334,16 @@ async makeAPIRequest(endpoint, data = {}, method = 'POST') {
   }
 }
 
-  /**
-   * Test connection to IPTV panel
-   */
+/**
+ * Test connection to IPTV panel - CLEAN VERSION
+ */
 async testConnection() {
   try {
     await this.initialize();
+    
+    if (!this.loginURL) {
+      throw new Error('Login URL is empty - settings not configured');
+    }
     
     // Force a fresh login to test the complete flow
     console.log('🧪 Testing connection with fresh authentication...');
@@ -286,16 +357,15 @@ async testConnection() {
       success: true,
       message: `Connection successful. Found ${packages.length} packages. Authentication working properly.`,
       packages: packages.length,
-      csrf_token: this.csrfToken ? 'Present' : 'Missing',
-      session_cookies: this.sessionCookies ? 'Present' : 'Missing'
+      csrf_token: this.csrfToken ? 'Present' : 'Missing'
     };
   } catch (error) {
+    console.error('❌ Test connection failed:', error);
     return {
       success: false,
       message: error.message,
       error: error.toString(),
-      csrf_token: this.csrfToken ? 'Present' : 'Missing',
-      session_cookies: this.sessionCookies ? 'Present' : 'Missing'
+      csrf_token: this.csrfToken ? 'Present' : 'Missing'
     };
   }
 }
