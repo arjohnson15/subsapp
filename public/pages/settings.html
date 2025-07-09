@@ -102,43 +102,34 @@
         <div class="form-group">
             <label for="iptvPanelLoginUrl">Login URL:</label>
             <input type="text" id="iptvPanelLoginUrl" name="iptv_panel_login_url" placeholder="https://panel.pinkpony.lol/login/rwykjyh" value="">
-            <small style="color: #4fc3f7;">Full login URL including the unique path</small>
+            <small style="color: #4fc3f7;">Full login URL including any unique path</small>
         </div>
         
         <div class="form-group">
             <label for="iptvPanelUsername">Panel Username:</label>
-            <input type="text" id="iptvPanelUsername" name="iptv_panel_username" placeholder="johnsonflix" value="">
-            <small style="color: #4fc3f7;">Your IPTV panel login username</small>
+            <input type="text" id="iptvPanelUsername" name="iptv_panel_username" placeholder="your-username" value="">
         </div>
         
         <div class="form-group">
             <label for="iptvPanelPassword">Panel Password:</label>
-            <input type="password" id="iptvPanelPassword" name="iptv_panel_password" placeholder="••••••••" value="">
-            <small style="color: #4fc3f7;">Your IPTV panel login password</small>
+            <input type="password" id="iptvPanelPassword" name="iptv_panel_password" placeholder="your-password" value="">
         </div>
         
         <div class="form-group">
             <label for="iptvPackageIdForBouquets">Package ID for Bouquets:</label>
-            <input type="text" id="iptvPackageIdForBouquets" name="iptv_package_id_for_bouquets" placeholder="34" value="">
-            <small style="color: #4fc3f7;">Package ID to use when fetching available bouquets (usually 34)</small>
+            <input type="text" id="iptvPackageIdForBouquets" name="iptv_package_id_for_bouquets" placeholder="175" value="">
+            <small style="color: #4fc3f7;">Package ID to use when fetching available bouquets</small>
         </div>
     </div>
     
-    <!-- Connection Test and Status -->
-    <div style="margin-top: 25px;">
-        <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px;">
-            <button type="button" class="btn" onclick="SettingsIPTV.testPanelConnection()" style="background: linear-gradient(45deg, #4fc3f7, #29b6f6);">
-                <span id="testConnectionText">Test Connection</span>
-            </button>
-            <button type="button" class="btn" onclick="SettingsIPTV.syncPackagesFromPanel()" style="background: linear-gradient(45deg, #ff9800, #ff5722);">
-                Sync Packages
-            </button>
-            <button type="button" class="btn" onclick="SettingsIPTV.syncBouquetsFromPanel()" style="background: linear-gradient(45deg, #9c27b0, #e91e63);">
-                Sync Bouquets
-            </button>
-        </div>
-        
-        <div id="iptvConnectionStatus" style="padding: 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.3); border: 1px solid #333; display: none;">
+    <div style="margin-top: 20px;">
+        <button class="btn btn-test" onclick="SettingsIPTV.testPanelConnection()">Test Connection</button>
+        <small style="color: #4fc3f7; margin-left: 15px;">Verify panel credentials and connection</small>
+    </div>
+    
+    <!-- Connection Status Display -->
+    <div style="margin-top: 15px;">
+        <div style="background: rgba(0, 0, 0, 0.3); padding: 10px 15px; border-radius: 6px; border: 1px solid #333;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <span id="connectionStatusText" style="color: #fff;">Ready to test connection...</span>
                 <span id="connectionStatusIcon" style="font-size: 1.2rem;">⚪</span>
@@ -146,18 +137,43 @@
         </div>
     </div>
     
-    <!-- Credit Balance Display -->
+    <!-- IPTV Statistics Grid -->
     <div style="margin-top: 25px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(76, 175, 80, 0.1); padding: 15px; border-radius: 8px; border: 1px solid #4caf50;">
-            <div>
-                <span style="color: #4caf50; font-weight: 500; font-size: 1.1rem;">Available Credits: </span>
-                <span id="currentCreditBalance" style="color: #fff; font-size: 1.3rem; font-weight: bold;">Loading...</span>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+            <!-- Available Credits -->
+            <div style="background: rgba(76, 175, 80, 0.1); padding: 15px; border-radius: 8px; border: 1px solid #4caf50; text-align: center;">
+                <div style="color: #4caf50; font-size: 1.8rem; font-weight: bold;" id="currentCreditBalance">-</div>
+                <div style="color: #4caf50; font-weight: 500; margin: 5px 0;">Available Credits</div>
+                <div style="display: flex; justify-content: center; gap: 5px; align-items: center; margin-top: 8px;">
+                    <button type="button" class="btn btn-sm" onclick="SettingsIPTV.syncCreditsBalance()" style="background: linear-gradient(45deg, #4caf50, #8bc34a); font-size: 0.8rem; padding: 4px 8px;">
+                        Sync
+                    </button>
+                </div>
+                <div id="lastCreditSync" style="color: #81c784; font-size: 0.75rem; margin-top: 5px;">Never synced</div>
             </div>
-            <div style="display: flex; gap: 10px;">
-                <button type="button" class="btn" onclick="SettingsIPTV.syncCreditsBalance()" style="background: linear-gradient(45deg, #4caf50, #8bc34a);">
-                    Sync Credits
-                </button>
-                <span id="lastCreditSync" style="color: #4fc3f7; font-size: 0.85rem; align-self: center;">Never synced</span>
+            
+            <!-- Total Packages -->
+            <div style="background: rgba(33, 150, 243, 0.1); padding: 15px; border-radius: 8px; border: 1px solid #2196f3; text-align: center;">
+                <div style="color: #2196f3; font-size: 1.8rem; font-weight: bold;" id="totalPackagesCount">-</div>
+                <div style="color: #2196f3; font-weight: 500; margin: 5px 0;">Total Packages</div>
+                <div style="display: flex; justify-content: center; gap: 5px; align-items: center; margin-top: 8px;">
+                    <button type="button" class="btn btn-sm" onclick="SettingsIPTV.syncPackagesFromPanel()" style="background: linear-gradient(45deg, #2196f3, #64b5f6); font-size: 0.8rem; padding: 4px 8px;">
+                        Sync
+                    </button>
+                </div>
+                <div id="lastPackageSync" style="color: #64b5f6; font-size: 0.75rem; margin-top: 5px;">Never synced</div>
+            </div>
+            
+            <!-- Total Bouquets -->
+            <div style="background: rgba(156, 39, 176, 0.1); padding: 15px; border-radius: 8px; border: 1px solid #9c27b0; text-align: center;">
+                <div style="color: #9c27b0; font-size: 1.8rem; font-weight: bold;" id="totalBouquetsCount">-</div>
+                <div style="color: #9c27b0; font-weight: 500; margin: 5px 0;">Total Bouquets</div>
+                <div style="display: flex; justify-content: center; gap: 5px; align-items: center; margin-top: 8px;">
+                    <button type="button" class="btn btn-sm" onclick="SettingsIPTV.syncBouquetsFromPanel()" style="background: linear-gradient(45deg, #9c27b0, #ba68c8); font-size: 0.8rem; padding: 4px 8px;">
+                        Sync
+                    </button>
+                </div>
+                <div id="lastBouquetSync" style="color: #ba68c8; font-size: 0.75rem; margin-top: 5px;">Never synced</div>
             </div>
         </div>
     </div>
@@ -175,32 +191,24 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label for="channelGroupName">Group Name:</label>
-                    <input type="text" id="channelGroupName" name="name" required placeholder="e.g., Premium Package, USA + Sports, Canada Package">
+                    <input type="text" id="channelGroupName" required>
                 </div>
                 <div class="form-group">
                     <label for="channelGroupDescription">Description:</label>
-                    <input type="text" id="channelGroupDescription" name="description" placeholder="e.g., USA, CAN, UK, LAT, SPORTS, 24/7, VOD, PPV, ADULT">
+                    <input type="text" id="channelGroupDescription">
                 </div>
             </div>
             
-            <div class="form-group" style="margin-top: 15px;">
-                <label>Available Bouquets:</label>
-                <div id="bouquetSelectionContainer" style="max-height: 400px; overflow-y: auto; background: rgba(0, 0, 0, 0.2); padding: 15px; border-radius: 8px; border: 1px solid #333; margin-top: 10px;">
-                    <div style="text-align: center; color: #666; padding: 20px;">
-                        Loading bouquets... <br>
-                        <small>Click "Sync Bouquets" above if this doesn't load</small>
-                    </div>
-                </div>
-                <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button type="button" class="btn btn-secondary" onclick="Settings.selectAllBouquets()" style="font-size: 0.85rem; padding: 6px 12px;">Select All</button>
-                    <button type="button" class="btn btn-secondary" onclick="Settings.clearAllBouquets()" style="font-size: 0.85rem; padding: 6px 12px;">Clear All</button>
-                    <button type="button" class="btn" onclick="Settings.loadBouquetsForSelection()" style="font-size: 0.85rem; padding: 6px 12px; background: linear-gradient(45deg, #4fc3f7, #29b6f6);">Refresh Bouquets</button>
+            <div class="form-group">
+                <label>Select Bouquets:</label>
+                <div id="bouquetSelector" style="background: rgba(0,0,0,0.5); border: 1px solid #333; border-radius: 4px; padding: 10px; max-height: 300px; overflow-y: auto;">
+                    <p style="color: #666; text-align: center;">Loading bouquets...</p>
                 </div>
             </div>
             
-            <div style="text-align: center; margin-top: 20px;">
-                <button type="submit" class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a);">Save Channel Group</button>
+            <div style="text-align: right; margin-top: 15px;">
                 <button type="button" class="btn btn-secondary" onclick="Settings.hideChannelGroupForm()">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="margin-left: 10px;">Save Channel Group</button>
             </div>
         </form>
     </div>
@@ -263,29 +271,6 @@
             <button type="button" class="btn" onclick="IPTV.saveDefaultGroups()" style="background: linear-gradient(45deg, #4caf50, #8bc34a);">
                 <i class="fas fa-save"></i> Save Default Settings
             </button>
-        </div>
-    </div>
-    
-    <!-- Usage Statistics -->
-    <div style="margin-top: 20px; padding: 15px; background: rgba(33, 150, 243, 0.1); border: 1px solid #2196f3; border-radius: 8px;">
-        <h4 style="color: #2196f3; margin-bottom: 10px;">Channel Group Statistics</h4>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; text-align: center;">
-            <div>
-                <div style="color: #4fc3f7; font-size: 1.5rem; font-weight: bold;" id="totalGroupsCount">-</div>
-                <div style="color: #fff; font-size: 0.9rem;">Total Groups</div>
-            </div>
-            <div>
-                <div style="color: #4caf50; font-size: 1.5rem; font-weight: bold;" id="activeGroupsCount">-</div>
-                <div style="color: #fff; font-size: 0.9rem;">Active Groups</div>
-            </div>
-            <div>
-                <div style="color: #ff9800; font-size: 1.5rem; font-weight: bold;" id="totalBouquetsCount">-</div>
-                <div style="color: #fff; font-size: 0.9rem;">Total Bouquets</div>
-            </div>
-            <div>
-                <div style="color: #e91e63; font-size: 1.5rem; font-weight: bold;" id="usersWithIPTVCount">-</div>
-                <div style="color: #fff; font-size: 0.9rem;">Users with IPTV</div>
-            </div>
         </div>
     </div>
 </div>

@@ -2002,19 +2002,17 @@ async viewChannelGroup(groupId) {
 // Clean export - no merging, no IPTV conflicts
 window.Settings = Settings;
 
-// Create dedicated settings page IPTV functions
+// Enhanced SettingsIPTV functions with DATABASE PERSISTENCE
+// REPLACE your existing SettingsIPTV object in settings.js with this:
+
 window.SettingsIPTV = {
     async testPanelConnection() {
         console.log('🔧 Testing IPTV panel connection...');
         
         try {
-            const button = document.getElementById('testConnectionText');
-            const statusDiv = document.getElementById('iptvConnectionStatus');
             const statusText = document.getElementById('connectionStatusText');
             const statusIcon = document.getElementById('connectionStatusIcon');
 
-            if (button) button.textContent = 'Testing...';
-            if (statusDiv) statusDiv.style.display = 'block';
             if (statusText) statusText.textContent = 'Testing connection...';
             if (statusIcon) statusIcon.textContent = '🔄';
 
@@ -2060,10 +2058,33 @@ window.SettingsIPTV = {
     async syncPackagesFromPanel() {
         try {
             Utils.showNotification('Syncing packages from panel...', 'info');
+            
             const response = await fetch('/api/iptv/sync-packages', { method: 'POST' });
             const data = await response.json();
+            
             if (data.success) {
-                Utils.showNotification(`Synced ${data.count || 0} packages`, 'success');
+                const count = data.count || 0;
+                
+                // Update the display immediately
+                const countElement = document.getElementById('totalPackagesCount');
+                if (countElement) {
+                    countElement.textContent = count;
+                }
+                
+                // Update last sync time
+                const syncTime = new Date().toLocaleString();
+                const syncElement = document.getElementById('lastPackageSync');
+                if (syncElement) {
+                    syncElement.textContent = syncTime;
+                }
+                
+                // SAVE TO DATABASE - packages count and sync time
+                await API.Settings.update({
+                    'iptv_packages_count': count,
+                    'iptv_packages_last_sync': new Date().toISOString()
+                });
+                
+                Utils.showNotification(`Synced ${count} packages`, 'success');
             } else {
                 throw new Error(data.message);
             }
@@ -2076,10 +2097,33 @@ window.SettingsIPTV = {
     async syncBouquetsFromPanel() {
         try {
             Utils.showNotification('Syncing bouquets from panel...', 'info');
+            
             const response = await fetch('/api/iptv/sync-bouquets', { method: 'POST' });
             const data = await response.json();
+            
             if (data.success) {
-                Utils.showNotification(`Synced ${data.count || 0} bouquets`, 'success');
+                const count = data.count || 0;
+                
+                // Update the display immediately
+                const countElement = document.getElementById('totalBouquetsCount');
+                if (countElement) {
+                    countElement.textContent = count;
+                }
+                
+                // Update last sync time
+                const syncTime = new Date().toLocaleString();
+                const syncElement = document.getElementById('lastBouquetSync');
+                if (syncElement) {
+                    syncElement.textContent = syncTime;
+                }
+                
+                // SAVE TO DATABASE - bouquets count and sync time
+                await API.Settings.update({
+                    'iptv_bouquets_count': count,
+                    'iptv_bouquets_last_sync': new Date().toISOString()
+                });
+                
+                Utils.showNotification(`Synced ${count} bouquets`, 'success');
             } else {
                 throw new Error(data.message);
             }
@@ -2092,12 +2136,32 @@ window.SettingsIPTV = {
     async syncCreditsBalance() {
         try {
             Utils.showNotification('Syncing credit balance...', 'info');
+            
             const response = await fetch('/api/iptv/sync-credits', { method: 'POST' });
             const data = await response.json();
+            
             if (data.success) {
-                const element = document.getElementById('currentCreditBalance');
-                if (element) element.textContent = data.credits;
-                Utils.showNotification(`Credit balance: ${data.credits}`, 'success');
+                const credits = data.credits || 0;
+                
+                // Update the display immediately
+                const creditElement = document.getElementById('currentCreditBalance');
+                if (creditElement) {
+                    creditElement.textContent = credits;
+                }
+                
+                // Update last sync time
+                const syncTime = new Date().toLocaleString();
+                const syncElement = document.getElementById('lastCreditSync');
+                if (syncElement) {
+                    syncElement.textContent = syncTime;
+                }
+                
+                // SAVE TO DATABASE - credits are already saved by the API, but let's save sync time
+                await API.Settings.update({
+                    'iptv_credits_last_sync': new Date().toISOString()
+                });
+                
+                Utils.showNotification(`Credit balance: ${credits}`, 'success');
             } else {
                 throw new Error(data.message);
             }
@@ -2105,8 +2169,127 @@ window.SettingsIPTV = {
             console.error('Failed to sync credits:', error);
             Utils.showNotification('Failed to sync credits', 'error');
         }
+    },
+
+    // NEW: Load initial statistics from DATABASE when page loads
+    async loadIPTVStatistics() {
+        try {
+            console.log('📊 Loading IPTV statistics from database...');
+            
+            // Load settings from database
+            const settings = await API.Settings.getAll();
+            
+            // Load packages count from database
+            if (settings.iptv_packages_count !== undefined) {
+                const countElement = document.getElementById('totalPackagesCount');
+                if (countElement) {
+                    countElement.textContent = settings.iptv_packages_count || 0;
+                }
+                console.log(`📦 Loaded packages count from DB: ${settings.iptv_packages_count}`);
+            }
+            
+            // Load packages last sync from database
+            if (settings.iptv_packages_last_sync) {
+                const syncElement = document.getElementById('lastPackageSync');
+                if (syncElement) {
+                    const syncDate = new Date(settings.iptv_packages_last_sync);
+                    syncElement.textContent = syncDate.toLocaleString();
+                }
+            }
+            
+            // Load bouquets count from database
+            if (settings.iptv_bouquets_count !== undefined) {
+                const countElement = document.getElementById('totalBouquetsCount');
+                if (countElement) {
+                    countElement.textContent = settings.iptv_bouquets_count || 0;
+                }
+                console.log(`📺 Loaded bouquets count from DB: ${settings.iptv_bouquets_count}`);
+            }
+            
+            // Load bouquets last sync from database
+            if (settings.iptv_bouquets_last_sync) {
+                const syncElement = document.getElementById('lastBouquetSync');
+                if (syncElement) {
+                    const syncDate = new Date(settings.iptv_bouquets_last_sync);
+                    syncElement.textContent = syncDate.toLocaleString();
+                }
+            }
+            
+            // Load current credit balance from database (already handled in main settings)
+            if (settings.iptv_credits_balance !== undefined) {
+                const creditElement = document.getElementById('currentCreditBalance');
+                if (creditElement) {
+                    creditElement.textContent = settings.iptv_credits_balance || 0;
+                }
+                console.log(`💳 Loaded credits from DB: ${settings.iptv_credits_balance}`);
+            }
+            
+            // Load credits last sync from database
+            if (settings.iptv_credits_last_sync) {
+                const syncElement = document.getElementById('lastCreditSync');
+                if (syncElement) {
+                    const syncDate = new Date(settings.iptv_credits_last_sync);
+                    syncElement.textContent = syncDate.toLocaleString();
+                }
+            }
+            
+            console.log('✅ IPTV statistics loaded from database');
+            
+        } catch (error) {
+            console.error('❌ Failed to load IPTV statistics from database:', error);
+            
+            // Set default values if loading fails
+            const elements = [
+                { id: 'totalPackagesCount', value: '-' },
+                { id: 'totalBouquetsCount', value: '-' },
+                { id: 'currentCreditBalance', value: '-' }
+            ];
+            
+            elements.forEach(({ id, value }) => {
+                const element = document.getElementById(id);
+                if (element) element.textContent = value;
+            });
+        }
+    },
+
+    // Initialize IPTV statistics when settings page loads
+    async initializeIPTVSection() {
+        console.log('🚀 Initializing IPTV settings section...');
+        
+        // Load initial statistics from database
+        await this.loadIPTVStatistics();
+        
+        console.log('✅ IPTV settings section initialized');
     }
 };
+
+// Add initialization function to main Settings object
+Settings.initializeIPTVSection = async function() {
+    if (typeof SettingsIPTV !== 'undefined' && SettingsIPTV.initializeIPTVSection) {
+        await SettingsIPTV.initializeIPTVSection();
+    }
+};
+
+// Auto-initialize when settings page loads
+$(document).ready(function() {
+    // Check if we're on the settings page
+    if (window.location.hash === '#settings' || 
+        window.location.pathname.includes('settings') || 
+        document.querySelector('.settings-section')) {
+        
+        console.log('🔄 Settings page detected, initializing IPTV section...');
+        
+        // Small delay to ensure DOM is ready
+        setTimeout(() => {
+            if (typeof SettingsIPTV !== 'undefined') {
+                SettingsIPTV.initializeIPTVSection();
+            }
+        }, 500);
+    }
+});
+
+console.log('✅ Enhanced SettingsIPTV functions with database persistence loaded');
+
 
 // Export settings functions for onclick handlers
 window.addOwner = Settings.addOwner.bind(Settings);

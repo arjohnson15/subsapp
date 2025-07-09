@@ -212,7 +212,12 @@ INSERT INTO settings (setting_key, setting_value, setting_type) VALUES
 ('iptv_last_sync', '', 'string'),
 ('iptv_auto_sync_enabled', 'true', 'boolean'),
 ('iptv_session_cookies', '', 'string'),
-('iptv_sync_interval_hours', '1', 'number');
+('iptv_sync_interval_hours', '1', 'number'),
+('iptv_packages_count', '0', 'number'),
+('iptv_bouquets_count', '0', 'number'),
+('iptv_packages_last_sync', '', 'string'),
+('iptv_bouquets_last_sync', '', 'string'),
+('iptv_credits_last_sync', '', 'string');
 
 -- Insert sample users
 INSERT INTO users (name, email, owner_id, plex_email, iptv_username, iptv_password, implayer_code, device_count, bcc_owner_renewal, tags) VALUES
