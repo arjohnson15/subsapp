@@ -1659,7 +1659,7 @@ const Settings = {
                     <td>${createdDate}</td>
                     <td>
                         <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-info" onclick="Settings.viewChannelGroup(${group.id})" title="View">
+                            <button class="btn btn-outline-info" onclick="IPTV.viewChannelGroup(${group.id})" title="View">
                                 <i class="fas fa-eye"></i>
                             </button>
                             <button class="btn btn-outline-warning" onclick="Settings.editChannelGroup(${group.id})" title="Edit">

@@ -1176,56 +1176,142 @@ renderChannelGroupsTable(groups, tableBody) {
     tableBody.innerHTML = rows;
 }
 
-  /**
-   * View specific channel group details
-   */
-  async viewChannelGroup(groupId) {
-    try {
-      const response = await fetch(`/api/iptv/channel-groups/${groupId}`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+/**
+ * View specific channel group details with bouquet names
+ */
+async viewChannelGroup(groupId) {
+  try {
+    // Fetch both group data and bouquets data
+    const [groupResponse, bouquetsResponse] = await Promise.all([
+      fetch(`/api/iptv/channel-groups/${groupId}`),
+      fetch('/api/iptv/bouquets')
+    ]);
+    
+    if (!groupResponse.ok) {
+      throw new Error(`HTTP ${groupResponse.status}`);
+    }
+    
+    const groupData = await groupResponse.json();
+    const bouquetsData = await bouquetsResponse.json();
+    const group = groupData.channelGroup || groupData;
+    
+    // Get bouquet details for this group
+    const groupBouquetIds = group.bouquet_ids || [];
+    const allBouquets = bouquetsData.bouquets || {};
+    
+    // Find bouquets that match this group's IDs
+    const groupBouquets = [];
+    for (const category in allBouquets) {
+      allBouquets[category].forEach(bouquet => {
+        if (groupBouquetIds.includes(bouquet.id.toString())) {
+          groupBouquets.push({
+            ...bouquet,
+            category: category
+          });
+        }
+      });
+    }
+    
+    // Sort bouquets by category then name
+    groupBouquets.sort((a, b) => {
+      if (a.category !== b.category) {
+        return a.category.localeCompare(b.category);
       }
+      return a.name.localeCompare(b.name);
+    });
+    
+    // Create bouquets HTML
+    let bouquetsHTML = '';
+    if (groupBouquets.length === 0) {
+      bouquetsHTML = '<div style="text-align: center; color: #666; padding: 20px;">No bouquets found in this group</div>';
+    } else {
+      // Group by category for display
+      const categorizedBouquets = {};
+      groupBouquets.forEach(bouquet => {
+        if (!categorizedBouquets[bouquet.category]) {
+          categorizedBouquets[bouquet.category] = [];
+        }
+        categorizedBouquets[bouquet.category].push(bouquet);
+      });
       
-      const data = await response.json();
-      const group = data.channelGroup || data;
-      
-      // Show group details in a modal-like overlay
-      const modalHTML = `
-        <div id="groupViewModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px;">
-          <div style="background: #1a1a1a; color: #fff; border-radius: 8px; border: 1px solid #333; max-width: 600px; width: 100%; max-height: 80%; overflow: hidden; display: flex; flex-direction: column;">
-            <div style="padding: 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
-              <h3 style="margin: 0; color: #4fc3f7;">${group.name}</h3>
-              <button onclick="document.getElementById('groupViewModal').remove()" style="background: #f44336; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">
-                <i class="fas fa-times"></i> Close
-              </button>
-            </div>
-            <div style="padding: 20px; overflow-y: auto; flex: 1;">
-              <p><strong>Description:</strong> ${group.description || 'No description'}</p>
-              <p><strong>Bouquet Count:</strong> ${group.bouquet_ids ? JSON.parse(group.bouquet_ids).length : 0}</p>
-              <p><strong>Created:</strong> ${new Date(group.created_at).toLocaleString()}</p>
-              <p><strong>Status:</strong> ${group.is_active ? 'Active' : 'Inactive'}</p>
-              
-              <h4 style="color: #4fc3f7; margin-top: 20px;">Bouquet IDs:</h4>
-              <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 4px; font-family: monospace; word-break: break-all;">
-                ${group.bouquet_ids ? JSON.parse(group.bouquet_ids).join(', ') : 'No bouquets'}
+      // Generate HTML by category
+      for (const category in categorizedBouquets) {
+        bouquetsHTML += `
+          <div style="margin-bottom: 25px;">
+            <h4 style="color: #4fc3f7; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #333;">
+              ${category} (${categorizedBouquets[category].length} bouquets)
+            </h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px;">
+        `;
+        
+        categorizedBouquets[category].forEach(bouquet => {
+          bouquetsHTML += `
+            <div style="background: rgba(79, 195, 247, 0.1); padding: 12px; border-radius: 6px; border: 1px solid #4fc3f7;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #fff; font-weight: 500;">${bouquet.name}</span>
+                <span style="color: #4fc3f7; font-size: 0.9rem; font-family: monospace;">ID: ${bouquet.id}</span>
               </div>
             </div>
+          `;
+        });
+        
+        bouquetsHTML += '</div></div>';
+      }
+    }
+    
+    // Show group details in a modal
+    const modalHTML = `
+      <div id="groupViewModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px;">
+        <div style="background: #1a1a1a; color: #fff; border-radius: 8px; border: 1px solid #333; max-width: 900px; width: 100%; max-height: 90%; overflow: hidden; display: flex; flex-direction: column;">
+          <div style="padding: 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 style="margin: 0; color: #4fc3f7;">${group.name}</h3>
+              <p style="margin: 5px 0 0 0; color: #ccc; font-size: 0.9rem;">${group.description || 'No description'}</p>
+            </div>
+            <button onclick="document.getElementById('groupViewModal').remove()" style="background: #f44336; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">
+              <i class="fas fa-times"></i> Close
+            </button>
+          </div>
+          
+          <div style="padding: 20px; overflow-y: auto; flex: 1;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
+              <div style="background: rgba(76, 175, 80, 0.1); padding: 15px; border-radius: 6px; border: 1px solid #4caf50;">
+                <div style="color: #4caf50; font-size: 1.2rem; font-weight: bold;">${groupBouquets.length}</div>
+                <div style="color: #fff; font-size: 0.9rem;">Total Bouquets</div>
+              </div>
+              <div style="background: rgba(33, 150, 243, 0.1); padding: 15px; border-radius: 6px; border: 1px solid #2196f3;">
+                <div style="color: #2196f3; font-size: 1.2rem; font-weight: bold;">${Object.keys(categorizedBouquets || {}).length}</div>
+                <div style="color: #fff; font-size: 0.9rem;">Categories</div>
+              </div>
+              <div style="background: rgba(255, 152, 0, 0.1); padding: 15px; border-radius: 6px; border: 1px solid #ff9800;">
+                <div style="color: #ff9800; font-size: 1.2rem; font-weight: bold;">${group.is_active ? 'Active' : 'Inactive'}</div>
+                <div style="color: #fff; font-size: 0.9rem;">Status</div>
+              </div>
+              <div style="background: rgba(156, 39, 176, 0.1); padding: 15px; border-radius: 6px; border: 1px solid #9c27b0;">
+                <div style="color: #9c27b0; font-size: 1.2rem; font-weight: bold;">${new Date(group.created_at).toLocaleDateString()}</div>
+                <div style="color: #fff; font-size: 0.9rem;">Created</div>
+              </div>
+            </div>
+            
+            <h4 style="color: #4fc3f7; margin-bottom: 15px;">Included Bouquets:</h4>
+            ${bouquetsHTML}
           </div>
         </div>
-      `;
-      
-      // Remove existing modal and add new one
-      const existingModal = document.getElementById('groupViewModal');
-      if (existingModal) {
-        existingModal.remove();
-      }
-      document.body.insertAdjacentHTML('beforeend', modalHTML);
-      
-    } catch (error) {
-      console.error('❌ Failed to view channel group:', error);
-      showNotification('Failed to load channel group details', 'error');
+      </div>
+    `;
+    
+    // Remove existing modal and add new one
+    const existingModal = document.getElementById('groupViewModal');
+    if (existingModal) {
+      existingModal.remove();
     }
-  },
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+  } catch (error) {
+    console.error('❌ Failed to view channel group:', error);
+    showNotification('Failed to load channel group details', 'error');
+  }
+}
 
   /**
    * Edit channel group
