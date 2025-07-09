@@ -1,4 +1,4 @@
-// Enhanced Settings Management Functions with Subscription Management + File Upload
+// Enhanced Settings Management Functions with Fixed Initialization and Sorting
 console.log('📋 Loading enhanced Settings.js...');
 
 const Settings = {
@@ -19,6 +19,20 @@ const Settings = {
             await this.loadSubscriptions();
             this.loadPlexStatus();
             this.setupSubscriptionEventListeners();
+            
+            // Initialize channel groups section if it exists
+            if (document.getElementById('channelGroupsTableBody')) {
+                try {
+                    console.log('📺 Initializing IPTV channel groups...');
+                    if (window.IPTV && typeof window.IPTV.initChannelGroupsSection === 'function') {
+                        await window.IPTV.initChannelGroupsSection();
+                    } else {
+                        console.warn('IPTV module not available for channel groups');
+                    }
+                } catch (error) {
+                    console.warn('Channel groups initialization failed:', error);
+                }
+            }
             
             // Only try to load email schedules if the table exists on the page
             if (document.getElementById('schedulesTableBody')) {
@@ -45,19 +59,19 @@ const Settings = {
                 }
             }
             
-// Only try to load tags if the container exists
-if (document.getElementById('targetTagsContainer')) {
-    try {
-        console.log('🏷️ Loading available tags...');
-        await this.loadAvailableTags();
-        this.populateTagsContainer(); // ADD THIS LINE
-    } catch (error) {
-        console.warn('Could not load available tags:', error);
-        // Set fallback tags
-        this.availableTags = ['Plex 1', 'Plex 2', 'IPTV'];
-        this.populateTagsContainer(); // This line stays
-    }
-}
+            // Only try to load tags if the container exists
+            if (document.getElementById('targetTagsContainer')) {
+                try {
+                    console.log('🏷️ Loading available tags...');
+                    await this.loadAvailableTags();
+                    this.populateTagsContainer();
+                } catch (error) {
+                    console.warn('Could not load available tags:', error);
+                    // Set fallback tags
+                    this.availableTags = ['Plex 1', 'Plex 2', 'IPTV'];
+                    this.populateTagsContainer();
+                }
+            }
             
             console.log('✅ Settings initialization complete');
             
@@ -120,58 +134,58 @@ if (document.getElementById('targetTagsContainer')) {
         }
     },
     
-populateSettingFields(settings) {
-    const fieldMapping = {
-        'smtpHost': 'smtp_host',
-        'smtpPort': 'smtp_port',
-        'smtpUser': 'smtp_user',
-        'smtpPass': 'smtp_pass',
-        'paypalLink': 'paypal_link',
-        'venmoLink': 'venmo_link',
-        'cashappLink': 'cashapp_link'
-    };
-    
-    Object.keys(fieldMapping).forEach(fieldId => {
-        const element = document.getElementById(fieldId);
-        const settingKey = fieldMapping[fieldId];
+    populateSettingFields(settings) {
+        const fieldMapping = {
+            'smtpHost': 'smtp_host',
+            'smtpPort': 'smtp_port',
+            'smtpUser': 'smtp_user',
+            'smtpPass': 'smtp_pass',
+            'paypalLink': 'paypal_link',
+            'venmoLink': 'venmo_link',
+            'cashappLink': 'cashapp_link'
+        };
         
-        if (element && settings[settingKey] !== undefined) {
-            if (fieldId === 'smtpHost' && !settings[settingKey]) {
-                element.value = 'smtp.gmail.com'; // Default
-            } else if (fieldId === 'smtpPort' && !settings[settingKey]) {
-                element.value = '587'; // Default
-            } else {
-                element.value = settings[settingKey] || '';
+        Object.keys(fieldMapping).forEach(fieldId => {
+            const element = document.getElementById(fieldId);
+            const settingKey = fieldMapping[fieldId];
+            
+            if (element && settings[settingKey] !== undefined) {
+                if (fieldId === 'smtpHost' && !settings[settingKey]) {
+                    element.value = 'smtp.gmail.com'; // Default
+                } else if (fieldId === 'smtpPort' && !settings[settingKey]) {
+                    element.value = '587'; // Default
+                } else {
+                    element.value = settings[settingKey] || '';
+                }
             }
-        }
-    });
+        });
 
-    // IPTV Panel Settings
-    if (settings.iptv_panel_base_url) {
-        const element = document.getElementById('iptvPanelBaseUrl');
-        if (element) element.value = settings.iptv_panel_base_url;
-    }
-    if (settings.iptv_panel_login_url) {
-        const element = document.getElementById('iptvPanelLoginUrl');
-        if (element) element.value = settings.iptv_panel_login_url;
-    }
-    if (settings.iptv_panel_username) {
-        const element = document.getElementById('iptvPanelUsername');
-        if (element) element.value = settings.iptv_panel_username;
-    }
-    if (settings.iptv_panel_password) {
-        const element = document.getElementById('iptvPanelPassword');
-        if (element) element.value = settings.iptv_panel_password;
-    }
-    if (settings.iptv_package_id_for_bouquets) {
-        const element = document.getElementById('iptvPackageIdForBouquets');
-        if (element) element.value = settings.iptv_package_id_for_bouquets;
-    }
-    if (settings.iptv_credits_balance) {
-        const element = document.getElementById('currentCreditBalance');
-        if (element) element.textContent = settings.iptv_credits_balance;
-    }
-},
+        // IPTV Panel Settings
+        if (settings.iptv_panel_base_url) {
+            const element = document.getElementById('iptvPanelBaseUrl');
+            if (element) element.value = settings.iptv_panel_base_url;
+        }
+        if (settings.iptv_panel_login_url) {
+            const element = document.getElementById('iptvPanelLoginUrl');
+            if (element) element.value = settings.iptv_panel_login_url;
+        }
+        if (settings.iptv_panel_username) {
+            const element = document.getElementById('iptvPanelUsername');
+            if (element) element.value = settings.iptv_panel_username;
+        }
+        if (settings.iptv_panel_password) {
+            const element = document.getElementById('iptvPanelPassword');
+            if (element) element.value = settings.iptv_panel_password;
+        }
+        if (settings.iptv_package_id_for_bouquets) {
+            const element = document.getElementById('iptvPackageIdForBouquets');
+            if (element) element.value = settings.iptv_package_id_for_bouquets;
+        }
+        if (settings.iptv_credits_balance) {
+            const element = document.getElementById('currentCreditBalance');
+            if (element) element.textContent = settings.iptv_credits_balance;
+        }
+    },
     
     loadPlexStatus() {
         // Just set initial status text, don't auto-test connections
@@ -198,37 +212,37 @@ populateSettingFields(settings) {
         }
     },
     
-renderOwnersTable(owners) {
-    const tbody = document.getElementById('ownersTableBody');
-    if (!tbody) {
-        console.log('⚠️ Owners table body not found - probably not on management page');
-        return;
-    }
-    
-    if (!owners || owners.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No owners found</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = owners.map(owner => `
-        <tr>
-            <td>${owner.name}</td>
-            <td>${owner.email}</td>
-            <td>
-                <span class="status-badge ${owner.active !== false ? 'status-active' : 'status-inactive'}">
-                    ${owner.active !== false ? 'Active' : 'Inactive'}
-                </span>
-            </td>
-            <td>${Utils.formatDate(owner.created_at)}</td>
-            <td>
-                <button class="btn btn-small" onclick="Settings.editOwner(${owner.id})">Edit</button>
-                <button class="btn btn-small btn-danger" onclick="Settings.deleteOwner(${owner.id})">Delete</button>
-            </td>
-        </tr>
-    `).join('');
-    
-    console.log(`✅ Rendered ${owners.length} owners`);
-},
+    renderOwnersTable(owners) {
+        const tbody = document.getElementById('ownersTableBody');
+        if (!tbody) {
+            console.log('⚠️ Owners table body not found - probably not on management page');
+            return;
+        }
+        
+        if (!owners || owners.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No owners found</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = owners.map(owner => `
+            <tr>
+                <td>${owner.name}</td>
+                <td>${owner.email}</td>
+                <td>
+                    <span class="status-badge ${owner.active !== false ? 'status-active' : 'status-inactive'}">
+                        ${owner.active !== false ? 'Active' : 'Inactive'}
+                    </span>
+                </td>
+                <td>${Utils.formatDate(owner.created_at)}</td>
+                <td>
+                    <button class="btn btn-small" onclick="Settings.editOwner(${owner.id})">Edit</button>
+                    <button class="btn btn-small btn-danger" onclick="Settings.deleteOwner(${owner.id})">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+        
+        console.log(`✅ Rendered ${owners.length} owners`);
+    },
         
     async addOwner() {
         const name = document.getElementById('ownerName')?.value;
@@ -312,18 +326,28 @@ renderOwnersTable(owners) {
         return await this.addOwner();
     },
     
-    // Subscription Management Functions
+    // Subscription Management Functions - FIXED SORTING
     async loadSubscriptions() {
         try {
             console.log('📊 Loading subscriptions from API...');
             const subscriptions = await API.Subscription.getAll();
             console.log('📊 Subscriptions loaded:', subscriptions.length);
             
-            // Store in global state
-            window.AppState.subscriptionTypes = subscriptions;
+            // FIXED: Sort by type first (plex before iptv), then alphabetically by name
+            const sortedSubscriptions = subscriptions.sort((a, b) => {
+                // First sort by type (plex comes before iptv)
+                if (a.type !== b.type) {
+                    if (a.type === 'plex' && b.type === 'iptv') return -1;
+                    if (a.type === 'iptv' && b.type === 'plex') return 1;
+                }
+                // Then sort alphabetically by name
+                return a.name.localeCompare(b.name);
+            });
             
-            this.renderSubscriptionsTable(subscriptions);
-            // Note: updateSubscriptionStats() removed since we removed the stats section
+            // Store in global state
+            window.AppState.subscriptionTypes = sortedSubscriptions;
+            
+            this.renderSubscriptionsTable(sortedSubscriptions);
         } catch (error) {
             console.error('❌ Error loading subscriptions:', error);
             Utils.handleError(error, 'Loading subscriptions');
@@ -403,147 +427,145 @@ renderOwnersTable(owners) {
         }
     },
 
-async saveSchedule(event) {
-    event.preventDefault();
-    
-    try {
-        Utils.showLoading();
+    async saveSchedule(event) {
+        event.preventDefault();
         
-        // Collect form data manually to handle complex fields
-        const form = event.target;
-        const formData = new FormData(form);
-        
-        // Get basic form data
-        const scheduleData = {
-            name: formData.get('name'),
-            schedule_type: formData.get('schedule_type'),
-            email_template_id: parseInt(formData.get('email_template_id')),
-            exclude_users_with_setting: formData.get('exclude_users_with_setting') === 'on',
-            active: formData.get('active') === 'on'
-        };
-        
-        // Handle conditional fields
-        if (scheduleData.schedule_type === 'expiration_reminder') {
-            scheduleData.days_before_expiration = parseInt(formData.get('days_before_expiration'));
-            scheduleData.subscription_type = formData.get('subscription_type');
-        } else if (scheduleData.schedule_type === 'specific_date') {
-            scheduleData.scheduled_date = formData.get('scheduled_date');
-            scheduleData.scheduled_time = formData.get('scheduled_time');
-        }
-        
-        // Collect selected target tags
-        const targetTags = [];
-        const tagCheckboxes = document.querySelectorAll('#targetTagsContainer input[type="checkbox"]:checked');
-        tagCheckboxes.forEach(checkbox => {
-            targetTags.push(checkbox.value);
-        });
-        scheduleData.target_tags = targetTags;
-        
-        console.log('📅 Saving schedule data:', scheduleData);
-        
-        // Determine if editing
-        const scheduleId = formData.get('id');
-        const isEditing = scheduleId && scheduleId !== '';
-        
-        const url = isEditing ? `/email-schedules/${scheduleId}` : '/email-schedules';
-        const method = isEditing ? 'PUT' : 'POST';
-
-        const response = await fetch(`/api${url}`, {
-            method: method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(scheduleData)
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('❌ Server validation errors:', errorData);
+        try {
+            Utils.showLoading();
             
-            // Show specific validation errors if available
-            if (errorData.errors && Array.isArray(errorData.errors)) {
-                const errorMessages = errorData.errors.map(err => err.msg || err.message).join('\n');
-                throw new Error(`Validation errors:\n${errorMessages}`);
-            } else {
-                throw new Error(errorData.error || 'Failed to save schedule');
+            // Collect form data manually to handle complex fields
+            const form = event.target;
+            const formData = new FormData(form);
+            
+            // Get basic form data
+            const scheduleData = {
+                name: formData.get('name'),
+                schedule_type: formData.get('schedule_type'),
+                email_template_id: parseInt(formData.get('email_template_id')),
+                exclude_users_with_setting: formData.get('exclude_users_with_setting') === 'on',
+                active: formData.get('active') === 'on'
+            };
+            
+            // Handle conditional fields
+            if (scheduleData.schedule_type === 'expiration_reminder') {
+                scheduleData.days_before_expiration = parseInt(formData.get('days_before_expiration'));
+                scheduleData.subscription_type = formData.get('subscription_type');
+            } else if (scheduleData.schedule_type === 'specific_date') {
+                scheduleData.scheduled_date = formData.get('scheduled_date');
+                scheduleData.scheduled_time = formData.get('scheduled_time');
             }
-        }
-
-        Utils.showNotification(`Email schedule ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
-        this.hideScheduleForm();
-        await this.loadEmailSchedules();
-        
-    } catch (error) {
-        console.error('❌ Error saving schedule:', error);
-        Utils.handleError(error, 'Saving email schedule');
-    } finally {
-        Utils.hideLoading();
-    }
-},
-
-// REPLACE the renderSchedulesTable function in your settings.js with this original version:
-
-renderSchedulesTable(schedules) {
-    const tbody = document.getElementById('schedulesTableBody');
-    if (!tbody) return;
-
-    if (schedules.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No email schedules found</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = schedules.map(schedule => {
-        let details = '';
-        if (schedule.schedule_type === 'specific_date' && schedule.next_run) {
-            // Convert UTC time to Central Time for display
-            const utcDate = new Date(schedule.next_run);
-            const centralTime = utcDate.toLocaleString('en-US', {
-                timeZone: 'America/Chicago',
-                year: 'numeric',
-                month: 'numeric',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
+            
+            // Collect selected target tags
+            const targetTags = [];
+            const tagCheckboxes = document.querySelectorAll('#targetTagsContainer input[type="checkbox"]:checked');
+            tagCheckboxes.forEach(checkbox => {
+                targetTags.push(checkbox.value);
             });
-            details = `${centralTime} <span style="color: #888; font-size: 0.9em;">(Central Time)</span>`;
-        } else if (schedule.schedule_type === 'expiration_reminder') {
-            details = `${schedule.days_before_expiration} days before ${schedule.subscription_type} expiration`;
+            scheduleData.target_tags = targetTags;
+            
+            console.log('📅 Saving schedule data:', scheduleData);
+            
+            // Determine if editing
+            const scheduleId = formData.get('id');
+            const isEditing = scheduleId && scheduleId !== '';
+            
+            const url = isEditing ? `/email-schedules/${scheduleId}` : '/email-schedules';
+            const method = isEditing ? 'PUT' : 'POST';
+
+            const response = await fetch(`/api${url}`, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(scheduleData)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('❌ Server validation errors:', errorData);
+                
+                // Show specific validation errors if available
+                if (errorData.errors && Array.isArray(errorData.errors)) {
+                    const errorMessages = errorData.errors.map(err => err.msg || err.message).join('\n');
+                    throw new Error(`Validation errors:\n${errorMessages}`);
+                } else {
+                    throw new Error(errorData.error || 'Failed to save schedule');
+                }
+            }
+
+            Utils.showNotification(`Email schedule ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
+            this.hideScheduleForm();
+            await this.loadEmailSchedules();
+            
+        } catch (error) {
+            console.error('❌ Error saving schedule:', error);
+            Utils.handleError(error, 'Saving email schedule');
+        } finally {
+            Utils.hideLoading();
+        }
+    },
+
+    renderSchedulesTable(schedules) {
+        const tbody = document.getElementById('schedulesTableBody');
+        if (!tbody) return;
+
+        if (schedules.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No email schedules found</td></tr>';
+            return;
         }
 
-        let targetInfo = '';
-        if (schedule.target_tags && schedule.target_tags.length > 0) {
-            targetInfo = ` (Tags: ${schedule.target_tags.join(', ')})`;
-        }
+        tbody.innerHTML = schedules.map(schedule => {
+            let details = '';
+            if (schedule.schedule_type === 'specific_date' && schedule.next_run) {
+                // Convert UTC time to Central Time for display
+                const utcDate = new Date(schedule.next_run);
+                const centralTime = utcDate.toLocaleString('en-US', {
+                    timeZone: 'America/Chicago',
+                    year: 'numeric',
+                    month: 'numeric',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                });
+                details = `${centralTime} <span style="color: #888; font-size: 0.9em;">(Central Time)</span>`;
+            } else if (schedule.schedule_type === 'expiration_reminder') {
+                details = `${schedule.days_before_expiration} days before ${schedule.subscription_type} expiration`;
+            }
 
-        return `
-            <tr>
-                <td>${schedule.name}</td>
-                <td><span class="status-badge ${schedule.schedule_type === 'expiration_reminder' ? 'status-info' : 'status-warning'}">${schedule.schedule_type.replace('_', ' ').toUpperCase()}</span></td>
-                <td>${details}${targetInfo}</td>
-                <td>${schedule.template_name || 'Unknown'}</td>
-                <td>
-                    <span class="status-badge ${schedule.active ? 'status-active' : 'status-inactive'}">
-                        ${schedule.active ? 'Active' : 'Inactive'}
-                    </span>
-                </td>
-                <td>${schedule.last_run ? new Date(schedule.last_run).toLocaleString('en-US', {timeZone: 'America/Chicago'}) : 'Never'}</td>
-                <td class="actions">
-                    <button onclick="Settings.editSchedule(${schedule.id})" class="btn-icon" title="Edit">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button onclick="Settings.toggleSchedule(${schedule.id})" class="btn-icon" title="Toggle Status">
-                        <i class="fas fa-power-off"></i>
-                    </button>
-                    <button onclick="Settings.testSchedule(${schedule.id})" class="btn-icon" title="Test Run">
-                        <i class="fas fa-play"></i>
-                    </button>
-                    <button onclick="Settings.deleteSchedule(${schedule.id})" class="btn-icon" title="Delete">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
-    }).join('');
-},
+            let targetInfo = '';
+            if (schedule.target_tags && schedule.target_tags.length > 0) {
+                targetInfo = ` (Tags: ${schedule.target_tags.join(', ')})`;
+            }
+
+            return `
+                <tr>
+                    <td>${schedule.name}</td>
+                    <td><span class="status-badge ${schedule.schedule_type === 'expiration_reminder' ? 'status-info' : 'status-warning'}">${schedule.schedule_type.replace('_', ' ').toUpperCase()}</span></td>
+                    <td>${details}${targetInfo}</td>
+                    <td>${schedule.template_name || 'Unknown'}</td>
+                    <td>
+                        <span class="status-badge ${schedule.active ? 'status-active' : 'status-inactive'}">
+                            ${schedule.active ? 'Active' : 'Inactive'}
+                        </span>
+                    </td>
+                    <td>${schedule.last_run ? new Date(schedule.last_run).toLocaleString('en-US', {timeZone: 'America/Chicago'}) : 'Never'}</td>
+                    <td class="actions">
+                        <button onclick="Settings.editSchedule(${schedule.id})" class="btn-icon" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="Settings.toggleSchedule(${schedule.id})" class="btn-icon" title="Toggle Status">
+                            <i class="fas fa-power-off"></i>
+                        </button>
+                        <button onclick="Settings.testSchedule(${schedule.id})" class="btn-icon" title="Test Run">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <button onclick="Settings.deleteSchedule(${schedule.id})" class="btn-icon" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
 
     async editSchedule(id) {
         try {
@@ -635,85 +657,70 @@ renderSchedulesTable(schedules) {
         }
     },
 
-// REPLACE this entire function
-populateTagsContainer() {
-    const container = document.getElementById('targetTagsContainer');
-    if (!container) return;
+    populateTagsContainer() {
+        const container = document.getElementById('targetTagsContainer');
+        if (!container) return;
 
-    // Define available tags with nice display names
-    const availableTags = [
-        { value: 'IPTV', label: 'IPTV', class: 'tag-iptv' },
-        { value: 'Plex 1', label: 'Plex 1', class: 'tag-plex1' },
-        { value: 'Plex 2', label: 'Plex 2', class: 'tag-plex2' }
-    ];
+        // Define available tags with nice display names
+        const availableTags = [
+            { value: 'IPTV', label: 'IPTV', class: 'tag-iptv' },
+            { value: 'Plex 1', label: 'Plex 1', class: 'tag-plex1' },
+            { value: 'Plex 2', label: 'Plex 2', class: 'tag-plex2' }
+        ];
 
-    container.innerHTML = availableTags.map(tag => {
-        return `
-            <div class="tag-checkbox-item ${tag.class}">
-                <input type="checkbox" 
-                       id="targetTag_${tag.value.replace(/\s+/g, '')}" 
-                       name="target_tags" 
-                       value="${tag.value}">
-                <label for="targetTag_${tag.value.replace(/\s+/g, '')}">${tag.label}</label>
-            </div>
-        `;
-    }).join('');
-},
+        container.innerHTML = availableTags.map(tag => {
+            return `
+                <div class="tag-checkbox-item ${tag.class}">
+                    <input type="checkbox" 
+                           id="targetTag_${tag.value.replace(/\s+/g, '')}" 
+                           name="target_tags" 
+                           value="${tag.value}">
+                    <label for="targetTag_${tag.value.replace(/\s+/g, '')}">${tag.label}</label>
+                </div>
+            `;
+        }).join('');
+    },
     
-renderSubscriptionsTable(subscriptions) {
-    const tbody = document.getElementById('subscriptionsTableBody');
-    if (!tbody) {
-        console.log('⚠️ Subscriptions table body not found - probably not on management page');
-        return;
-    }
-    
-    if (!subscriptions || subscriptions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No subscription types found</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = subscriptions.map(sub => `
-        <tr>
-            <td>${sub.name}</td>
-            <td>
-                <span class="status-badge ${sub.type === 'plex' ? 'status-info' : 'status-warning'}">
-                    ${sub.type.toUpperCase()}
-                </span>
-            </td>
-            <td>${sub.duration_months} month${sub.duration_months > 1 ? 's' : ''}</td>
-            <td>${sub.streams ? `${sub.streams} streams` : 'N/A'}</td>
-            <td>$${parseFloat(sub.price || 0).toFixed(2)}</td>
-            <td>
-                <span class="status-badge ${sub.active ? 'status-active' : 'status-inactive'}">
-                    ${sub.active ? 'Active' : 'Inactive'}
-                </span>
-            </td>
-            <td>
-                <button class="btn btn-small" onclick="Settings.editSubscription(${sub.id})">Edit</button>
-                <button class="btn btn-small btn-danger" onclick="Settings.deleteSubscription(${sub.id})">Delete</button>
-            </td>
-        </tr>
-    `).join('');
-    
-    console.log(`✅ Rendered ${subscriptions.length} subscription types`);
-},
-        
-    sortSubscriptions(field) {
-        if (this.currentSortField === field) {
-            this.currentSortDirection = this.currentSortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            this.currentSortField = field;
-            this.currentSortDirection = 'asc';
+    renderSubscriptionsTable(subscriptions) {
+        const tbody = document.getElementById('subscriptionsTableBody');
+        if (!tbody) {
+            console.log('⚠️ Subscriptions table body not found - probably not on management page');
+            return;
         }
         
-        window.AppState.subscriptionTypes = Utils.sortArray(
-            window.AppState.subscriptionTypes, 
-            field, 
-            this.currentSortDirection
-        );
+        if (!subscriptions || subscriptions.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No subscription types found</td></tr>';
+            return;
+        }
         
-        this.renderSubscriptionsTable();
+        tbody.innerHTML = subscriptions.map(sub => `
+            <tr>
+                <td>${sub.name}</td>
+                <td>
+                    <span class="status-badge ${sub.type === 'plex' ? 'status-info' : 'status-warning'}">
+                        ${sub.type.toUpperCase()}
+                    </span>
+                </td>
+                <td>${sub.duration_months} month${sub.duration_months > 1 ? 's' : ''}</td>
+                <td>${sub.streams ? `${sub.streams} streams` : 'N/A'}</td>
+                <td>$${parseFloat(sub.price || 0).toFixed(2)}</td>
+                <td>
+                    <span class="status-badge ${sub.active ? 'status-active' : 'status-inactive'}">
+                        ${sub.active ? 'Active' : 'Inactive'}
+                    </span>
+                </td>
+                <td>
+                    <button class="btn btn-small" onclick="Settings.editSubscription(${sub.id})">Edit</button>
+                    <button class="btn btn-small btn-danger" onclick="Settings.deleteSubscription(${sub.id})">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+        
+        console.log(`✅ Rendered ${subscriptions.length} subscription types`);
     },
+        
+    // FIXED: Remove sortSubscriptions function that was breaking the table
+    // The table headers should not be clickable for sorting to prevent breaking display
     
     showSubscriptionForm() {
         console.log('📝 Showing subscription form...');
@@ -882,7 +889,7 @@ renderSubscriptionsTable(subscriptions) {
         }
     },
 	
-	    async deleteSubscription(subscriptionId) {
+    async deleteSubscription(subscriptionId) {
         try {
             const subscription = window.AppState.subscriptionTypes.find(sub => sub.id === subscriptionId);
             if (!subscription) return;
@@ -982,50 +989,50 @@ renderSubscriptionsTable(subscriptions) {
         }
     },
 
-async saveAllSettings() {
-    try {
-        // First upload any pending files
-        await this.uploadPendingFiles();
-        
-        const settingsData = {
-            // Branding settings (text only - files already uploaded above)
-            app_title: document.getElementById('appTitle')?.value?.trim() || '',
-            app_subtitle: document.getElementById('appSubtitle')?.value?.trim() || '',
+    async saveAllSettings() {
+        try {
+            // First upload any pending files
+            await this.uploadPendingFiles();
             
-            // Email settings
-            smtp_host: document.getElementById('smtpHost')?.value || 'smtp.gmail.com',
-            smtp_port: parseInt(document.getElementById('smtpPort')?.value) || 587,
-            smtp_user: document.getElementById('smtpUser')?.value || '',
-            smtp_pass: document.getElementById('smtpPass')?.value || '',
+            const settingsData = {
+                // Branding settings (text only - files already uploaded above)
+                app_title: document.getElementById('appTitle')?.value?.trim() || '',
+                app_subtitle: document.getElementById('appSubtitle')?.value?.trim() || '',
+                
+                // Email settings
+                smtp_host: document.getElementById('smtpHost')?.value || 'smtp.gmail.com',
+                smtp_port: parseInt(document.getElementById('smtpPort')?.value) || 587,
+                smtp_user: document.getElementById('smtpUser')?.value || '',
+                smtp_pass: document.getElementById('smtpPass')?.value || '',
+                
+                // Payment settings
+                paypal_link: document.getElementById('paypalLink')?.value || '',
+                venmo_link: document.getElementById('venmoLink')?.value || '',
+                cashapp_link: document.getElementById('cashappLink')?.value || '',
+                
+                // IPTV Panel Configuration
+                iptv_panel_base_url: document.getElementById('iptvPanelBaseUrl')?.value || '',
+                iptv_panel_login_url: document.getElementById('iptvPanelLoginUrl')?.value || '',
+                iptv_panel_username: document.getElementById('iptvPanelUsername')?.value || '',
+                iptv_panel_password: document.getElementById('iptvPanelPassword')?.value || '',
+                iptv_package_id_for_bouquets: document.getElementById('iptvPackageIdForBouquets')?.value || ''
+            };
             
-            // Payment settings
-            paypal_link: document.getElementById('paypalLink')?.value || '',
-            venmo_link: document.getElementById('venmoLink')?.value || '',
-            cashapp_link: document.getElementById('cashappLink')?.value || '',
+            // Save text settings (only if there are any changes)
+            if (Object.values(settingsData).some(value => value !== '')) {
+                await API.Settings.update(settingsData);
+            }
             
-            // IPTV Panel Configuration
-            iptv_panel_base_url: document.getElementById('iptvPanelBaseUrl')?.value || '',
-            iptv_panel_login_url: document.getElementById('iptvPanelLoginUrl')?.value || '',
-            iptv_panel_username: document.getElementById('iptvPanelUsername')?.value || '',
-            iptv_panel_password: document.getElementById('iptvPanelPassword')?.value || '',
-            iptv_package_id_for_bouquets: document.getElementById('iptvPackageIdForBouquets')?.value || ''
-        };
-        
-        // Save text settings (only if there are any changes)
-        if (Object.values(settingsData).some(value => value !== '')) {
-            await API.Settings.update(settingsData);
+            Utils.showNotification('Settings saved successfully!', 'success');
+            
+            // Apply branding immediately
+            const allSettings = await API.Settings.getAll();
+            this.applyBranding(allSettings);
+            
+        } catch (error) {
+            Utils.handleError(error, 'Saving settings');
         }
-        
-        Utils.showNotification('Settings saved successfully!', 'success');
-        
-        // Apply branding immediately
-        const allSettings = await API.Settings.getAll();
-        this.applyBranding(allSettings);
-        
-    } catch (error) {
-        Utils.handleError(error, 'Saving settings');
-    }
-},
+    },
 
     // NEW: Upload pending files
     async uploadPendingFiles() {
@@ -1253,7 +1260,7 @@ async saveAllSettings() {
         return await this.syncAllPlexLibraries();
     },
 
-// Email alias
+    // Email alias
     async sendTestEmail() {
         return await this.testEmailConnection();
     },
@@ -1319,7 +1326,7 @@ async saveAllSettings() {
     }
 };
 
-/// Clean export - no merging, no IPTV conflicts
+// Clean export - no merging, no IPTV conflicts
 window.Settings = Settings;
 
 // Create dedicated settings page IPTV functions
@@ -1435,11 +1442,11 @@ window.testEmailConnection = Settings.testEmailConnection.bind(Settings);
 window.showOwnerForm = Settings.showOwnerForm.bind(Settings);
 window.hideOwnerForm = Settings.hideOwnerForm.bind(Settings);
 window.saveOwner = Settings.saveOwner.bind(Settings);
-window.sortSubscriptions = Settings.sortSubscriptions.bind(Settings);
 window.showSubscriptionForm = Settings.showSubscriptionForm.bind(Settings);
 window.hideSubscriptionForm = Settings.hideSubscriptionForm.bind(Settings);
 window.saveSubscription = Settings.saveSubscription.bind(Settings);
 window.syncAllPlexLibraries = Settings.syncAllPlexLibraries.bind(Settings);
 window.sendTestEmail = Settings.sendTestEmail.bind(Settings);
+window.testPlexConnection = Settings.testPlexConnection.bind(Settings);
 
-console.log('✅ Settings.js loaded cleanly with dedicated SettingsIPTV functions');
+console.log('✅ Settings.js loaded cleanly with fixed initialization and sorting');

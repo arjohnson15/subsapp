@@ -1114,67 +1114,67 @@ const IPTV = {
     }
   },
 
-  /**
-   * Render channel groups table (updated)
-   */
-  renderChannelGroupsTable(groups, tableBody) {
+// REPLACEMENT SECTION FOR iptv.js - renderChannelGroupsTable function
+// Replace the renderChannelGroupsTable function in your iptv.js with this version
+
+/**
+ * Render channel groups table (FIXED - No Star Icon)
+ */
+renderChannelGroupsTable(groups, tableBody) {
     if (groups.length === 0) {
-      tableBody.innerHTML = `
-        <tr>
-          <td colspan="6" style="text-align: center; color: #666;">
-            <p>No channel groups created yet.</p>
-            <button class="btn btn-primary" onclick="IPTV.showChannelGroupForm()">
-              <i class="fas fa-plus"></i> Create Your First Group
-            </button>
-          </td>
-        </tr>
-      `;
-      return;
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; color: #666;">
+                    <p>No channel groups created yet.</p>
+                    <button class="btn btn-primary" onclick="IPTV.showChannelGroupForm()">
+                        <i class="fas fa-plus"></i> Create Your First Group
+                    </button>
+                </td>
+            </tr>
+        `;
+        return;
     }
     
     const rows = groups.map(group => {
-      const bouquetIds = Array.isArray(group.bouquet_ids) ? 
-        group.bouquet_ids : 
-        (typeof group.bouquet_ids === 'string' ? JSON.parse(group.bouquet_ids || '[]') : []);
-      
-      const bouquetCount = bouquetIds.length;
-      const status = group.is_active ? 
-        '<span class="badge badge-success">Active</span>' : 
-        '<span class="badge badge-secondary">Inactive</span>';
-      
-      const createdDate = new Date(group.created_at).toLocaleDateString();
-      
-      return `
-        <tr>
-          <td style="font-weight: bold; color: #4fc3f7;">${group.name}</td>
-          <td>${group.description || 'No description'}</td>
-          <td>
-            <span class="badge badge-info">${bouquetCount} bouquets</span>
-          </td>
-          <td>${status}</td>
-          <td>${createdDate}</td>
-          <td>
-            <div class="btn-group btn-group-sm">
-              <button class="btn btn-outline-info" onclick="IPTV.viewChannelGroup(${group.id})" title="View">
-                <i class="fas fa-eye"></i>
-              </button>
-              <button class="btn btn-outline-warning" onclick="IPTV.editChannelGroup(${group.id})" title="Edit">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button class="btn btn-outline-danger" onclick="IPTV.deleteChannelGroup(${group.id})" title="Delete">
-                <i class="fas fa-trash"></i>
-              </button>
-              <button class="btn btn-outline-success" onclick="IPTV.setAsDefault(${group.id}, 'trial')" title="Set as Default Trial">
-                <i class="fas fa-star"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
-      `;
+        const bouquetIds = Array.isArray(group.bouquet_ids) ? 
+            group.bouquet_ids : 
+            (typeof group.bouquet_ids === 'string' ? JSON.parse(group.bouquet_ids || '[]') : []);
+        
+        const bouquetCount = bouquetIds.length;
+        const status = group.is_active ? 
+            '<span class="badge badge-success">Active</span>' : 
+            '<span class="badge badge-secondary">Inactive</span>';
+        
+        const createdDate = new Date(group.created_at).toLocaleDateString();
+        
+        return `
+            <tr>
+                <td style="font-weight: bold; color: #4fc3f7;">${group.name}</td>
+                <td>${group.description || 'No description'}</td>
+                <td>
+                    <span class="badge badge-info">${bouquetCount} bouquets</span>
+                </td>
+                <td>${status}</td>
+                <td>${createdDate}</td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-info" onclick="IPTV.viewChannelGroup(${group.id})" title="View">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="IPTV.editChannelGroup(${group.id})" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="IPTV.deleteChannelGroup(${group.id})" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
     }).join('');
     
     tableBody.innerHTML = rows;
-  },
+}
 
   /**
    * View specific channel group details

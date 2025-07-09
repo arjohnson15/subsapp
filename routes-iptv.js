@@ -224,6 +224,56 @@ router.get('/channel-groups', async (req, res) => {
 });
 
 /**
+ * GET /api/iptv/channel-groups/:id - Get specific channel group by ID - NEW ROUTE
+ */
+router.get('/channel-groups/:id', [
+  param('id').isInt().withMessage('Invalid group ID'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await db.query(`
+      SELECT id, name, description, bouquet_ids, is_active, created_at, updated_at
+      FROM iptv_channel_groups 
+      WHERE id = ?
+    `, [id]);
+    
+    // Handle different return formats from mysql2
+    const rows = Array.isArray(result) ? result[0] : result;
+    
+    if (!rows || !Array.isArray(rows) || rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Channel group not found'
+      });
+    }
+    
+    const group = rows[0];
+    
+    // Parse bouquet_ids JSON
+    const parsedGroup = {
+      ...group,
+      bouquet_ids: typeof group.bouquet_ids === 'string' 
+        ? JSON.parse(group.bouquet_ids) 
+        : group.bouquet_ids
+    };
+    
+    res.json({
+      success: true,
+      channelGroup: parsedGroup
+    });
+  } catch (error) {
+    console.error('❌ Error getting channel group:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get channel group',
+      error: error.message
+    });
+  }
+});
+
+/**
  * POST /api/iptv/channel-groups - Create new channel group
  */
 router.post('/channel-groups', [

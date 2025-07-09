@@ -130,12 +130,12 @@
             <button type="button" class="btn" onclick="SettingsIPTV.testPanelConnection()" style="background: linear-gradient(45deg, #4fc3f7, #29b6f6);">
                 <span id="testConnectionText">Test Connection</span>
             </button>
-<button type="button" class="btn" onclick="SettingsIPTV.syncPackagesFromPanel()" style="background: linear-gradient(45deg, #ff9800, #ff5722);">
-    Sync Packages
-</button>
-<button type="button" class="btn" onclick="SettingsIPTV.syncBouquetsFromPanel()" style="background: linear-gradient(45deg, #9c27b0, #e91e63);">
-    Sync Bouquets
-</button>
+            <button type="button" class="btn" onclick="SettingsIPTV.syncPackagesFromPanel()" style="background: linear-gradient(45deg, #ff9800, #ff5722);">
+                Sync Packages
+            </button>
+            <button type="button" class="btn" onclick="SettingsIPTV.syncBouquetsFromPanel()" style="background: linear-gradient(45deg, #9c27b0, #e91e63);">
+                Sync Bouquets
+            </button>
         </div>
         
         <div id="iptvConnectionStatus" style="padding: 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.3); border: 1px solid #333; display: none;">
@@ -154,9 +154,9 @@
                 <span id="currentCreditBalance" style="color: #fff; font-size: 1.3rem; font-weight: bold;">Loading...</span>
             </div>
             <div style="display: flex; gap: 10px;">
-<button type="button" class="btn" onclick="SettingsIPTV.syncCreditsBalance()" style="background: linear-gradient(45deg, #4caf50, #8bc34a);">
-    Sync Credits
-</button>
+                <button type="button" class="btn" onclick="SettingsIPTV.syncCreditsBalance()" style="background: linear-gradient(45deg, #4caf50, #8bc34a);">
+                    Sync Credits
+                </button>
                 <span id="lastCreditSync" style="color: #4fc3f7; font-size: 0.85rem; align-self: center;">Never synced</span>
             </div>
         </div>
@@ -296,20 +296,20 @@
     <p style="color: #4fc3f7; margin-bottom: 20px;">Test connections and sync library information from Plex servers.</p>
     
     <div class="form-grid">
-<div class="form-group">
-    <label>Plex 1 Status:</label>
-    <div style="display: flex; align-items: center; gap: 10px;">
-        <span id="plex1Status" class="connection-status"></span>
-        <button class="btn btn-test" onclick="testPlexConnection('plex1')">Test Connection</button>
-    </div>
-</div>
-<div class="form-group">
-    <label>Plex 2 Status:</label>
-    <div style="display: flex; align-items: center; gap: 10px;">
-        <span id="plex2Status" class="connection-status"></span>
-        <button class="btn btn-test" onclick="testPlexConnection('plex2')">Test Connection</button>
-    </div>
-</div>
+        <div class="form-group">
+            <label>Plex 1 Status:</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="plex1Status" class="connection-status"></span>
+                <button class="btn btn-test" onclick="testPlexConnection('plex1')">Test Connection</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Plex 2 Status:</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="plex2Status" class="connection-status"></span>
+                <button class="btn btn-test" onclick="testPlexConnection('plex2')">Test Connection</button>
+            </div>
+        </div>
     </div>
     
     <div style="margin-top: 20px;">
@@ -398,7 +398,7 @@
     </div>
 </div>
 
-<!-- Subscription Management Section -->
+<!-- Subscription Management Section - FIXED HEADERS -->
 <div class="settings-section">
     <h3>Subscription Management</h3>
     <p style="color: #4fc3f7; margin-bottom: 20px;">Manage subscription types available for users. Create Plex and IPTV subscription plans.</p>
@@ -454,16 +454,16 @@
         </form>
     </div>
     
-    <!-- Subscriptions Table -->
+    <!-- Subscriptions Table - FIXED: Removed clickable headers -->
     <div class="table-container">
         <table class="data-table subscriptions-table">
             <thead>
                 <tr>
-                    <th style="cursor: pointer;" onclick="Settings.sortSubscriptions('name')">Name</th>
-                    <th style="cursor: pointer;" onclick="Settings.sortSubscriptions('type')">Type</th>
-                    <th style="cursor: pointer;" onclick="Settings.sortSubscriptions('duration_months')">Duration</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Duration</th>
                     <th>Streams</th>
-                    <th style="cursor: pointer;" onclick="Settings.sortSubscriptions('price')">Price</th>
+                    <th>Price</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
@@ -523,22 +523,22 @@
             </div>
 
             <!-- Specific Date Fields -->
-<div id="specificDateFields" style="display: none; margin: 20px 0; padding: 20px; background: rgba(255, 193, 7, 0.1); border-left: 3px solid #ffc107; border-radius: 4px;">
-    <h5 style="color: #f57c00; margin: 0 0 15px 0; font-size: 14px; font-weight: 600;">SPECIFIC DATE/TIME SETTINGS</h5>
-    <div class="form-grid">
-        <div class="form-group">
-            <label for="scheduledDate">Date:</label>
-            <input type="date" id="scheduledDate" name="scheduled_date" class="clean-date-input">
-        </div>
-<div class="form-group">
-    <label for="scheduledTime">Time:</label>
-    <input type="time" id="scheduledTime" name="scheduled_time" class="clean-time-input">
-    <small style="color: #888; font-size: 0.85em; display: block; margin-top: 5px;">
-        ⏰ Enter time in Central Time (CT/CDT)
-    </small>
-</div>
-    </div>
-</div>
+            <div id="specificDateFields" style="display: none; margin: 20px 0; padding: 20px; background: rgba(255, 193, 7, 0.1); border-left: 3px solid #ffc107; border-radius: 4px;">
+                <h5 style="color: #f57c00; margin: 0 0 15px 0; font-size: 14px; font-weight: 600;">SPECIFIC DATE/TIME SETTINGS</h5>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="scheduledDate">Date:</label>
+                        <input type="date" id="scheduledDate" name="scheduled_date" class="clean-date-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="scheduledTime">Time:</label>
+                        <input type="time" id="scheduledTime" name="scheduled_time" class="clean-time-input">
+                        <small style="color: #888; font-size: 0.85em; display: block; margin-top: 5px;">
+                            ⏰ Enter time in Central Time (CT/CDT)
+                        </small>
+                    </div>
+                </div>
+            </div>
 
             <div class="form-group">
                 <label for="emailTemplate">Email Template:</label>
@@ -547,8 +547,7 @@
                 </select>
             </div>
 
-
-<div class="form-group">
+            <div class="form-group">
                 <label for="targetTags">Target User Tags (Optional):</label>
                 <div id="targetTagsContainer" class="tags-container">
                     <!-- Dynamic tag checkboxes will be inserted here -->
@@ -556,21 +555,21 @@
                 <small>Leave blank to target all users matching other criteria</small>
             </div>
 
-<div style="margin: 25px 0; padding: 20px; background: rgba(79, 195, 247, 0.05); border-radius: 6px;">
-    <div class="clean-checkbox-group" style="margin-bottom: 15px;">
-        <label class="clean-checkbox-label">
-            <input type="checkbox" id="excludeAutomated" name="exclude_users_with_setting" checked>
-            <span class="clean-checkbox-text">Exclude users who opted out of automated emails</span>
-        </label>
-    </div>
+            <div style="margin: 25px 0; padding: 20px; background: rgba(79, 195, 247, 0.05); border-radius: 6px;">
+                <div class="clean-checkbox-group" style="margin-bottom: 15px;">
+                    <label class="clean-checkbox-label">
+                        <input type="checkbox" id="excludeAutomated" name="exclude_users_with_setting" checked>
+                        <span class="clean-checkbox-text">Exclude users who opted out of automated emails</span>
+                    </label>
+                </div>
 
-    <div class="clean-checkbox-group">
-        <label class="clean-checkbox-label">
-            <input type="checkbox" id="scheduleActive" name="active" checked>
-            <span class="clean-checkbox-text">Active (schedule will run automatically)</span>
-        </label>
-    </div>
-</div>
+                <div class="clean-checkbox-group">
+                    <label class="clean-checkbox-label">
+                        <input type="checkbox" id="scheduleActive" name="active" checked>
+                        <span class="clean-checkbox-text">Active (schedule will run automatically)</span>
+                    </label>
+                </div>
+            </div>
             
             <div style="text-align: center; margin-top: 20px;">
                 <button type="submit" class="btn">Save Schedule</button>
@@ -725,6 +724,7 @@
     text-align: left;
     font-weight: 600;
     border-bottom: 1px solid #4fc3f7;
+    /* REMOVED: cursor: pointer; - This was causing the sorting issue */
 }
 
 .data-table td {
@@ -789,5 +789,45 @@
 .btn-delete {
     background: linear-gradient(135deg, #f44336, #e91e63);
     color: #fff;
+}
+
+/* FIXED: Channel Groups Actions - Removed Star Icon */
+.channel-groups-table .actions .btn-group {
+    display: flex;
+    gap: 5px;
+}
+
+.channel-groups-table .actions button {
+    padding: 6px 8px;
+    font-size: 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.channel-groups-table .actions .btn-outline-info {
+    background: rgba(33, 150, 243, 0.1);
+    color: #2196f3;
+    border: 1px solid #2196f3;
+}
+
+.channel-groups-table .actions .btn-outline-warning {
+    background: rgba(255, 152, 0, 0.1);
+    color: #ff9800;
+    border: 1px solid #ff9800;
+}
+
+.channel-groups-table .actions .btn-outline-danger {
+    background: rgba(244, 67, 54, 0.1);
+    color: #f44336;
+    border: 1px solid #f44336;
+}
+
+/* REMOVED: .btn-outline-success styles for star icon since we're removing it */
+
+.channel-groups-table .actions button:hover {
+    opacity: 0.8;
+    transform: translateY(-1px);
 }
 </style>
