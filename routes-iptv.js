@@ -231,26 +231,49 @@ router.get('/channel-groups/:id', [
   handleValidationErrors
 ], async (req, res) => {
   console.log('🔍 Channel group route called with ID:', req.params.id); // ADD THIS LINE
-  try {
-    const { id } = req.params;
-    
-    const result = await db.query(`
-      SELECT id, name, description, bouquet_ids, is_active, created_at, updated_at
-      FROM iptv_channel_groups 
-      WHERE id = ?
-    `, [id]);
-    
-    // Handle different return formats from mysql2
-    const rows = Array.isArray(result) ? result[0] : result;
-    
-    if (!rows || !Array.isArray(rows) || rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Channel group not found'
-      });
-    }
-    
-    const group = rows[0];
+try {
+  const { id } = req.params;
+  console.log('🔍 Looking for channel group ID:', id);
+  
+  const result = await db.query(`
+    SELECT id, name, description, bouquet_ids, is_active, created_at, updated_at
+    FROM iptv_channel_groups 
+    WHERE id = ?
+  `, [id]);
+  
+  console.log('🔍 Database result:', result);
+  console.log('🔍 Result type:', typeof result);
+  console.log('🔍 Is array?:', Array.isArray(result));
+  
+// Handle different return formats from mysql2
+const rows = Array.isArray(result) ? result[0] : result;
+
+console.log('🔍 Processed rows:', rows);
+console.log('🔍 Rows type:', typeof rows);
+console.log('🔍 Rows is array?:', Array.isArray(rows));
+
+// If rows is an array, get the first item. If it's an object, use it directly
+let group;
+if (Array.isArray(rows)) {
+  if (rows.length === 0) {
+    console.log('❌ No rows found in array');
+    return res.status(404).json({
+      success: false,
+      message: 'Channel group not found'
+    });
+  }
+  group = rows[0];
+} else if (rows && typeof rows === 'object') {
+  // Single object result
+  group = rows;
+} else {
+  console.log('❌ Invalid result format');
+  return res.status(404).json({
+    success: false,
+    message: 'Channel group not found'
+  });
+}
+  console.log('✅ Found group:', group);
     
     // Parse bouquet_ids JSON
     const parsedGroup = {
