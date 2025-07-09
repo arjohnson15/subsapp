@@ -1677,8 +1677,6 @@ const Settings = {
         tableBody.innerHTML = rows;
     },
 
-// REPLACEMENT SECTION for settings.js - viewChannelGroup function
-// Replace the viewChannelGroup function in your settings.js with this fixed version
 
 async viewChannelGroup(groupId) {
     try {
@@ -1741,13 +1739,15 @@ async viewChannelGroup(groupId) {
             return a.name.localeCompare(b.name);
         });
         
+        // FIXED: Declare categorizedBouquets in proper scope
+        const categorizedBouquets = {};
+        
         // Create bouquets HTML
         let bouquetsHTML = '';
         if (groupBouquets.length === 0) {
             bouquetsHTML = '<div style="text-align: center; color: #666; padding: 20px;">No bouquets found in this group</div>';
         } else {
             // Group by category for display
-            const categorizedBouquets = {};
             groupBouquets.forEach(bouquet => {
                 if (!categorizedBouquets[bouquet.category]) {
                     categorizedBouquets[bouquet.category] = [];
@@ -1801,7 +1801,7 @@ async viewChannelGroup(groupId) {
                                 <div style="color: #fff; font-size: 0.9rem;">Total Bouquets</div>
                             </div>
                             <div style="background: rgba(33, 150, 243, 0.1); padding: 15px; border-radius: 6px; border: 1px solid #2196f3;">
-                                <div style="color: #2196f3; font-size: 1.2rem; font-weight: bold;">${Object.keys(categorizedBouquets || {}).length}</div>
+                                <div style="color: #2196f3; font-size: 1.2rem; font-weight: bold;">${Object.keys(categorizedBouquets).length}</div>
                                 <div style="color: #fff; font-size: 0.9rem;">Categories</div>
                             </div>
                             <div style="background: rgba(255, 152, 0, 0.1); padding: 15px; border-radius: 6px; border: 1px solid #ff9800;">
