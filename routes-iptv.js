@@ -230,6 +230,7 @@ router.get('/channel-groups/:id', [
   param('id').isInt().withMessage('Invalid group ID'),
   handleValidationErrors
 ], async (req, res) => {
+  console.log('🔍 Channel group route called with ID:', req.params.id); // ADD THIS LINE
   try {
     const { id } = req.params;
     
