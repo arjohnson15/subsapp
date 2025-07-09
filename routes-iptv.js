@@ -734,6 +734,26 @@ router.post('/test-connection', async (req, res) => {
 });
 
 /**
+ * GET /api/iptv/debug-auth - Debug current authentication state
+ */
+router.get('/debug-auth', async (req, res) => {
+  try {
+    await iptvService.initialize();
+    
+    res.json({
+      csrf_token: iptvService.csrfToken ? iptvService.csrfToken.substring(0, 20) + '...' : 'None',
+      session_cookies: iptvService.sessionCookies ? iptvService.sessionCookies.substring(0, 100) + '...' : 'None',
+      csrf_expires: iptvService.csrfExpires,
+      is_authenticated: iptvService.isAuthenticated(),
+      base_url: iptvService.baseURL,
+      login_url: iptvService.loginURL
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/iptv/activity/:userId - Get IPTV activity log for user
  */
 router.get('/activity/:userId', [
