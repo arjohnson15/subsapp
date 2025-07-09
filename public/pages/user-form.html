@@ -122,10 +122,10 @@
                 </div>
             </div>
         </div>
-		
-		<!-- IPTV Management Section -->
-        <div class="library-group" id="iptvManagementGroup" style="display: none;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+
+        <!-- IPTV Subscription Management Section -->
+        <div class="subscription-section" id="iptvSection">
+            <div class="subscription-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h5>IPTV Subscription Management</h5>
                 <div class="iptv-actions">
                     <button type="button" class="btn btn-sync" style="padding: 6px 12px; font-size: 0.8rem;" onclick="IPTV.syncUserStatus()">Sync Status</button>
@@ -164,11 +164,6 @@
                             <span id="currentCreditsUsed" style="color: #fff; font-weight: 500;">0</span>
                         </div>
                     </div>
-                    <div style="margin-top: 15px; display: flex; gap: 10px; align-items: center;">
-                        <span style="color: #4fc3f7; font-size: 0.9rem;">Stream URLs:</span>
-                        <button type="button" class="btn" style="padding: 4px 8px; font-size: 0.8rem;" onclick="IPTV.generateStreamUrls()">Generate M3U</button>
-                        <button type="button" class="btn" style="padding: 4px 8px; font-size: 0.8rem; background: linear-gradient(45deg, #ff9800, #ff5722);" onclick="IPTV.generateImplayerCode()">Generate iMPlayer</button>
-                    </div>
                 </div>
             </div>
 
@@ -192,39 +187,24 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(76, 175, 80, 0.1); padding: 12px; border-radius: 8px; border: 1px solid #4caf50;">
                     <div>
                         <span style="color: #4caf50; font-weight: 500;">Available Credits: </span>
-                        <span id="availableCredits" style="color: #fff; font-size: 1.2rem; font-weight: bold;">Loading...</span>
+                        <span id="currentCreditBalance" style="color: #fff; font-size: 1.2rem; font-weight: bold;">Loading...</span>
                     </div>
-                    <button type="button" class="btn" style="padding: 6px 12px; font-size: 0.8rem; background: linear-gradient(45deg, #4caf50, #8bc34a);" onclick="IPTV.syncCredits()">Sync Balance</button>
+                    <button type="button" class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a); padding: 6px 12px; font-size: 0.8rem;" onclick="SettingsIPTV.syncCreditsBalance()">Sync Credits</button>
                 </div>
             </div>
 
             <!-- Package Selection -->
             <div class="form-section">
                 <h6 style="color: #4fc3f7; margin-bottom: 15px;">Package Selection</h6>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <div>
-                        <label style="color: #fff; margin-right: 15px;">Filter by Type:</label>
-                        <select id="packageTypeFilter" onchange="IPTV.filterPackages()" style="padding: 6px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px;">
-                            <option value="">All Packages</option>
-                            <option value="trial">Trial Packages (Free)</option>
-                            <option value="basic">Basic Packages</option>
-                            <option value="full">Full Service Packages</option>
-                            <option value="live_tv">Live TV Only</option>
-                        </select>
-                    </div>
-                    <button type="button" class="btn" style="padding: 6px 12px; font-size: 0.8rem;" onclick="IPTV.loadPackages()">Refresh Packages</button>
-                </div>
+                <select id="iptvPackageSelect" style="width: 100%; padding: 10px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px; margin-bottom: 15px;" onchange="IPTV.onPackageChange(this.value)">
+                    <option value="">Loading packages...</option>
+                </select>
                 
-                <div id="packageSelection" style="max-height: 400px; overflow-y: auto; border: 1px solid #333; border-radius: 8px; background: rgba(0, 0, 0, 0.3);">
-                    <div style="padding: 20px; text-align: center; color: #666;">
-                        Loading packages...
-                    </div>
-                </div>
-                
-                <div id="selectedPackageInfo" style="margin-top: 15px; padding: 12px; background: rgba(76, 175, 80, 0.1); border: 1px solid #4caf50; border-radius: 8px; display: none;">
+                <!-- Package Summary -->
+                <div id="iptvPackageSummary" style="background: rgba(0, 0, 0, 0.5); padding: 15px; border-radius: 8px; border: 1px solid #4fc3f7; margin-bottom: 15px; display: none;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
-                            <span style="color: #4caf50; font-weight: 500;">Selected: </span>
+                            <span style="color: #4fc3f7;">Selected: </span>
                             <span id="selectedPackageName" style="color: #fff; font-weight: bold;"></span>
                         </div>
                         <div>
@@ -258,57 +238,23 @@
                             <input type="text" id="iptvUsernameField" placeholder="Enter username" style="flex: 1; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px;">
                             <button type="button" class="btn" style="padding: 8px 12px; font-size: 0.8rem;" onclick="IPTV.generateUsername()">Generate</button>
                         </div>
-                        <small style="color: #4fc3f7; font-size: 0.85rem;">Required for new subscriptions. Disabled when extending.</small>
+                        <small style="color: #4fc3f7; font-size: 0.85rem;">Required for new subscriptions.</small>
                     </div>
                     <div class="form-group">
                         <label for="iptvPasswordField" style="color: #fff;">Password:</label>
                         <div style="display: flex; gap: 8px;">
-                            <input type="text" id="iptvPasswordField" placeholder="Auto-generated if blank" style="flex: 1; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px;">
+                            <input type="text" id="iptvPasswordField" placeholder="Enter password" style="flex: 1; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px;">
                             <button type="button" class="btn" style="padding: 8px 12px; font-size: 0.8rem;" onclick="IPTV.generatePassword()">Generate</button>
                         </div>
-                        <small style="color: #4fc3f7; font-size: 0.85rem;">Optional - will be auto-generated if left blank.</small>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Package Summary -->
-            <div class="form-section" id="iptvPackageSummary" style="display: none;">
-                <h6 style="color: #4fc3f7; margin-bottom: 15px;">Subscription Summary</h6>
-                <div style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 8px; border: 1px solid #333;">
-                    <div class="summary-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                        <div class="summary-item">
-                            <label style="color: #4fc3f7; font-size: 0.9rem;">Package:</label>
-                            <span id="summaryPackage" style="color: #fff; font-weight: 500;"></span>
-                        </div>
-                        <div class="summary-item">
-                            <label style="color: #4fc3f7; font-size: 0.9rem;">Duration:</label>
-                            <span id="summaryDuration" style="color: #fff; font-weight: 500;"></span>
-                        </div>
-                        <div class="summary-item">
-                            <label style="color: #4fc3f7; font-size: 0.9rem;">Connections:</label>
-                            <span id="summaryConnections" style="color: #fff; font-weight: 500;"></span>
-                        </div>
-                        <div class="summary-item">
-                            <label style="color: #4fc3f7; font-size: 0.9rem;">Credits:</label>
-                            <span id="summaryCredits" style="color: #fff; font-weight: 500;"></span>
-                        </div>
-                        <div class="summary-item">
-                            <label style="color: #4fc3f7; font-size: 0.9rem;">Channel Group:</label>
-                            <span id="summaryChannelGroup" style="color: #fff; font-weight: 500;"></span>
-                        </div>
-                        <div class="summary-item">
-                            <label style="color: #4fc3f7; font-size: 0.9rem;">New Expiration:</label>
-                            <span id="summaryExpiration" style="color: #fff; font-weight: 500;"></span>
-                        </div>
+                        <small style="color: #4fc3f7; font-size: 0.85rem;">Required for new subscriptions.</small>
                     </div>
                 </div>
             </div>
 
             <!-- Action Buttons -->
             <div class="form-section">
-                <div style="display: flex; gap: 15px; align-items: center; justify-content: center; flex-wrap: wrap;">
-                    <button type="button" class="btn btn-secondary" onclick="IPTV.clearSelection()" style="padding: 10px 20px;">Clear Selection</button>
-                    <button type="button" id="createTrialBtn" class="btn" style="background: linear-gradient(45deg, #ff9800, #ff5722); padding: 10px 20px;" onclick="IPTV.createTrialSubscription()">Create Trial (24h)</button>
+                <div style="display: flex; gap: 15px; justify-content: center;">
+                    <button type="button" id="createTrialBtn" class="btn" style="background: linear-gradient(45deg, #ff9800, #ff5722); padding: 10px 20px;" onclick="IPTV.createTrialSubscription()">Create Trial Subscription</button>
                     <button type="button" id="createPaidBtn" class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a); padding: 10px 20px;" onclick="IPTV.createPaidSubscription()">Create Paid Subscription</button>
                     <button type="button" id="extendBtn" class="btn" style="background: linear-gradient(45deg, #2196f3, #03a9f4); padding: 10px 20px; display: none;" onclick="IPTV.extendSubscription()">Extend Subscription</button>
                 </div>
@@ -404,7 +350,6 @@
         <div style="text-align: center; margin-top: 30px;">
             <button type="submit" class="btn">Save User</button>
             <button type="button" class="btn btn-secondary" onclick="showPage('users')">Cancel</button>
-            <button type="button" class="btn" style="background: linear-gradient(45deg, #9c27b0, #e91e63);" onclick="forceLoadLibraries()">Force Load Libraries</button>
         </div>
     </form>
 </div>
