@@ -418,7 +418,7 @@ th.sortable .sort-arrow {
 }
 
 .table-container th[data-sort]::after {
-    content: '⇅';
+    content: '?';
     position: absolute;
     right: 8px;
     top: 50%;
@@ -433,12 +433,12 @@ th.sortable .sort-arrow {
 }
 
 .table-container th[data-sort].asc::after {
-    content: '↑';
+    content: '?';
     color: #4fc3f7;
 }
 
 .table-container th[data-sort].desc::after {
-    content: '↓';
+    content: '?';
     color: #4fc3f7;
 }
 
@@ -2128,7 +2128,7 @@ tbody tr:hover {
 /* Remove the old "scroll to see more" indicator and replace with better one */
 @media (max-width: 768px) {
     .table-container::before {
-        content: "👆 Scroll horizontally to see all columns 👆";
+        content: "?? Scroll horizontally to see all columns ??";
         display: block;
         text-align: center;
         color: #4fc3f7;
