@@ -537,9 +537,9 @@ if (data && (data.regular || data.fourk)) {
 function toggleIptvManagementByTag(isChecked) {
     console.log(`🔧 Toggling IPTV management: ${isChecked}`);
     
-    const iptvGroup = document.getElementById('iptvManagementGroup');
+    const iptvGroup = document.getElementById('iptvSection');
     if (!iptvGroup) {
-        console.error(`❌ IPTV management group not found`);
+        console.error(`❌ IPTV section not found`);
         return;
     }
     
@@ -563,7 +563,7 @@ function toggleIptvManagementByTag(isChecked) {
         }
     }
     
-    console.log(`✅ IPTV management section ${isChecked ? 'shown' : 'hidden'}`);
+    console.log(`✅ IPTV section ${isChecked ? 'shown' : 'hidden'}`);
 }
 
 // Test Plex connection quietly

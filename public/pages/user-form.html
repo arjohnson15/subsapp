@@ -39,7 +39,7 @@
                     <label for="tag-plex2">Plex 2</label>
                 </div>
                 <div class="checkbox-item">
-                    <input type="checkbox" id="tag-iptv" name="tags" value="IPTV">
+                    <input type="checkbox" id="tag-iptv" name="tags" value="IPTV" onchange="toggleIptvManagementByTag(this.checked)">
                     <label for="tag-iptv">IPTV</label>
                 </div>
             </div>
@@ -124,7 +124,7 @@
         </div>
 
         <!-- IPTV Subscription Management Section -->
-        <div class="subscription-section" id="iptvSection">
+        <div class="subscription-section" id="iptvSection" style="display: none;">
             <div class="subscription-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h5>IPTV Subscription Management</h5>
                 <div class="iptv-actions">
