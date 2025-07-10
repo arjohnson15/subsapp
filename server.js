@@ -79,12 +79,40 @@ const iptvService = require('./iptv-service');
 // IPTV Hourly Sync
 cron.schedule('0 * * * *', async () => {
   try {
+    console.log('🔄 Starting IPTV hourly sync...');
+    
+    // Initialize service
     await iptvService.initialize();
+    
+    // Sync credits (fast operation)
+    console.log('💰 Syncing credit balance...');
     await iptvService.syncCreditBalance();
+    
+    // Sync packages (moderate operation)
+    console.log('📦 Syncing packages...');
+    const packageCount = await iptvService.syncPackagesFromPanel();
+    console.log(`✅ Synced ${packageCount} packages`);
+    
+    // Sync bouquets (longer operation)
+    console.log('📺 Syncing bouquets...');
+    const bouquetCount = await iptvService.syncBouquetsFromPanel();
+    console.log(`✅ Synced ${bouquetCount} bouquets`);
+    
+    // Ensure authentication is still valid
     await iptvService.ensureAuthenticated();
-    console.log('✅ IPTV hourly sync completed');
+    
+    console.log('✅ IPTV hourly sync completed successfully');
+    
   } catch (error) {
     console.error('❌ IPTV hourly sync failed:', error);
+    
+    // Log specific error details for debugging
+    if (error.message) {
+      console.error('Error message:', error.message);
+    }
+    if (error.response) {
+      console.error('API response status:', error.response.status);
+    }
   }
 });
 
