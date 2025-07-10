@@ -1363,169 +1363,235 @@ async init() {
         }
     },
 
-    async loadBouquetsForSelection() {
-        try {
-            console.log('📺 Loading bouquets for selection...');
-            
-            const response = await fetch('/api/iptv/bouquets');
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            const data = await response.json();
-            const bouquets = data.bouquets || data;
-            
-            console.log(`✅ Loaded bouquets for selection:`, bouquets);
-            
-            const container = document.getElementById('bouquetSelectionContainer');
-            if (!container) {
-                console.error('❌ Bouquet selection container not found');
-                return;
-            }
-            
-            // Clear existing content
-            container.innerHTML = '';
-            
-            // Create bouquet selection interface
-            Object.keys(bouquets).forEach(category => {
-                const categoryDiv = document.createElement('div');
-                categoryDiv.style.marginBottom = '15px';
-                
-                // Category header with select all button
-                const categoryHeader = document.createElement('div');
-                categoryHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 8px; background: rgba(0,0,0,0.4); border-radius: 4px;';
-                categoryHeader.innerHTML = `
-                    <span style="color: #4fc3f7; font-weight: bold;">${category} (${bouquets[category].length})</span>
-                    <button type="button" class="btn btn-sm" style="background: #4fc3f7; color: #000; padding: 4px 8px; font-size: 0.75rem;" onclick="Settings.selectCategoryBouquets('${category}')">
-                        Select All
-                    </button>
-                `;
-                categoryDiv.appendChild(categoryHeader);
-                
-                // Bouquets in this category
-                const bouquetsGrid = document.createElement('div');
-                bouquetsGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-left: 15px;';
-                
-                bouquets[category].forEach(bouquet => {
-                    const bouquetDiv = document.createElement('div');
-                    bouquetDiv.style.cssText = 'display: flex; align-items: center; gap: 8px; padding: 6px; background: rgba(255,255,255,0.05); border-radius: 4px;';
-                    
-                    bouquetDiv.innerHTML = `
-                        <input type="checkbox" id="bouquet_${bouquet.id}" value="${bouquet.id}" data-category="${category}" style="margin: 0;">
-                        <label for="bouquet_${bouquet.id}" style="color: #fff; cursor: pointer; font-size: 0.85rem; margin: 0; flex: 1;">${bouquet.name}</label>
-                    `;
-                    
-                    bouquetsGrid.appendChild(bouquetDiv);
-                });
-                
-                categoryDiv.appendChild(bouquetsGrid);
-                container.appendChild(categoryDiv);
-            });
-            
-        } catch (error) {
-            console.error('❌ Failed to load bouquets for selection:', error);
-            const container = document.getElementById('bouquetSelectionContainer');
-            if (container) {
-                container.innerHTML = '<div style="text-align: center; color: #f44336; padding: 20px;">Failed to load bouquets</div>';
-            }
-        }
-    },
-
-    selectCategoryBouquets(category) {
-        const checkboxes = document.querySelectorAll(`input[data-category="${category}"]`);
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = true;
-        });
-        Utils.showNotification(`Selected all ${category} bouquets`, 'success');
-    },
-
-    selectAllBouquets() {
-        const checkboxes = document.querySelectorAll('#bouquetSelectionContainer input[type="checkbox"]');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = true;
-        });
-        Utils.showNotification('Selected all bouquets', 'success');
-    },
-
-    clearAllBouquets() {
-        const checkboxes = document.querySelectorAll('#bouquetSelectionContainer input[type="checkbox"]');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = false;
-        });
-        Utils.showNotification('Cleared all selections', 'info');
-    },
-
-    async saveChannelGroup(event) {
-        if (event) {
-            event.preventDefault();
+async loadBouquetsForSelection() {
+    try {
+        console.log('📺 Loading bouquets for selection...');
+        
+        const response = await fetch('/api/iptv/bouquets');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
-        try {
-            const form = document.getElementById('channelGroupForm');
-            const editingId = form.getAttribute('data-editing-id');
-            const isEditing = !!editingId;
-            
-            const name = document.getElementById('channelGroupName').value.trim();
-            const description = document.getElementById('channelGroupDescription').value.trim();
-            
-            // Get selected bouquet IDs
-            const selectedCheckboxes = document.querySelectorAll('#bouquetSelectionContainer input[type="checkbox"]:checked');
-            const bouquetIds = Array.from(selectedCheckboxes).map(cb => cb.value);
-            
-            // Validation
-            if (!name) {
-                Utils.showNotification('Please enter a group name', 'error');
-                return;
-            }
-            
-            if (bouquetIds.length === 0) {
-                Utils.showNotification('Please select at least one bouquet', 'error');
-                return;
-            }
-            
-            console.log(`💾 ${isEditing ? 'Updating' : 'Creating'} channel group:`, { 
-                name, 
-                description, 
-                bouquet_count: bouquetIds.length,
-                bouquet_ids: bouquetIds 
-            });
-            
-            const url = isEditing ? `/api/iptv/channel-groups/${editingId}` : '/api/iptv/channel-groups';
-            const method = isEditing ? 'PUT' : 'POST';
-            
-            const response = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    name: name,
-                    description: description,
-                    bouquet_ids: bouquetIds
-                })
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-                throw new Error(errorData.error || `HTTP ${response.status}`);
-            }
-            
-            const result = await response.json();
-            console.log(`✅ Channel group ${isEditing ? 'updated' : 'created'}:`, result);
-            
-            Utils.showNotification(`Channel group "${name}" ${isEditing ? 'updated' : 'created'} with ${bouquetIds.length} bouquets!`, 'success');
-            
-            // Hide form and refresh list
-            this.hideChannelGroupForm();
-            form.removeAttribute('data-editing-id');
-            
-            await this.loadChannelGroups();
-            
-        } catch (error) {
-            console.error(`❌ Failed to ${editingId ? 'update' : 'create'} channel group:`, error);
-            Utils.showNotification(`Failed to ${editingId ? 'update' : 'create'} channel group: ${error.message}`, 'error');
+        const data = await response.json();
+        const bouquets = data.bouquets || data;
+        
+        console.log(`✅ Loaded bouquets for selection:`, bouquets);
+        
+        // Use the correct container ID from the HTML (bouquetSelector)
+        const container = document.getElementById('bouquetSelector');
+        if (!container) {
+            console.error('❌ Bouquet selector container not found');
+            return;
         }
-    },
+        
+        // Clear existing content
+        container.innerHTML = '';
+        
+        // Check if we have bouquets
+        if (!bouquets || Object.keys(bouquets).length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #f44336; padding: 20px;">No bouquets found. Please sync bouquets first.</div>';
+            return;
+        }
+        
+        // Add select all/clear buttons at the top
+        const controlsDiv = document.createElement('div');
+        controlsDiv.style.cssText = 'display: flex; gap: 10px; margin-bottom: 15px; padding: 12px; background: rgba(79, 195, 247, 0.1); border-radius: 6px; border: 1px solid rgba(79, 195, 247, 0.3);';
+        controlsDiv.innerHTML = `
+            <button type="button" class="btn btn-sm" style="background: #4fc3f7; color: #000; padding: 8px 16px; font-size: 0.85rem; border-radius: 4px; font-weight: 500;" onclick="Settings.selectAllBouquets()">
+                <i class="fas fa-check-double"></i> Select All
+            </button>
+            <button type="button" class="btn btn-sm" style="background: #666; color: #fff; padding: 8px 16px; font-size: 0.85rem; border-radius: 4px; font-weight: 500;" onclick="Settings.clearAllBouquets()">
+                <i class="fas fa-times"></i> Clear All
+            </button>
+        `;
+        container.appendChild(controlsDiv);
+        
+        // Create bouquet selection interface
+        Object.keys(bouquets).forEach(category => {
+            const categoryDiv = document.createElement('div');
+            categoryDiv.style.cssText = 'margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden;';
+            
+            // Category header with select all button
+            const categoryHeader = document.createElement('div');
+            categoryHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: linear-gradient(45deg, rgba(0,0,0,0.6), rgba(79, 195, 247, 0.1)); border-bottom: 1px solid rgba(255,255,255,0.1);';
+            categoryHeader.innerHTML = `
+                <div>
+                    <span style="color: #4fc3f7; font-weight: bold; font-size: 1rem;">${category}</span>
+                    <span style="color: #ccc; font-size: 0.85rem; margin-left: 8px;">(${bouquets[category].length} bouquets)</span>
+                </div>
+                <button type="button" class="btn btn-sm" style="background: rgba(79, 195, 247, 0.8); color: #000; padding: 6px 12px; font-size: 0.75rem; border-radius: 4px; font-weight: 500;" onclick="Settings.selectCategoryBouquets('${category}')">
+                    <i class="fas fa-check"></i> Select All
+                </button>
+            `;
+            categoryDiv.appendChild(categoryHeader);
+            
+            // Bouquets container with better spacing
+            const bouquetsContainer = document.createElement('div');
+            bouquetsContainer.style.cssText = 'padding: 15px;';
+            
+            // Bouquets grid with improved layout
+            const bouquetsGrid = document.createElement('div');
+            bouquetsGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px;';
+            
+            bouquets[category].forEach(bouquet => {
+                const bouquetDiv = document.createElement('div');
+                bouquetDiv.style.cssText = `
+                    display: flex; 
+                    align-items: flex-start; 
+                    gap: 12px; 
+                    padding: 12px; 
+                    background: rgba(255,255,255,0.03); 
+                    border: 1px solid rgba(255,255,255,0.1); 
+                    border-radius: 6px; 
+                    transition: all 0.2s ease;
+                    min-height: 60px;
+                `;
+                
+                // Add hover effect
+                bouquetDiv.addEventListener('mouseenter', function() {
+                    this.style.background = 'rgba(79, 195, 247, 0.1)';
+                    this.style.borderColor = 'rgba(79, 195, 247, 0.3)';
+                });
+                
+                bouquetDiv.addEventListener('mouseleave', function() {
+                    this.style.background = 'rgba(255,255,255,0.03)';
+                    this.style.borderColor = 'rgba(255,255,255,0.1)';
+                });
+                
+                bouquetDiv.innerHTML = `
+                    <div style="margin-top: 2px;">
+                        <input type="checkbox" id="bouquet_${bouquet.id}" value="${bouquet.id}" data-category="${category}" 
+                               style="width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: #4fc3f7;">
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <label for="bouquet_${bouquet.id}" style="color: #fff; cursor: pointer; font-size: 0.9rem; margin: 0; line-height: 1.4; display: block; word-wrap: break-word; overflow-wrap: break-word;">
+                            <div style="font-weight: 500; margin-bottom: 4px;">
+                                ${bouquet.name}
+                            </div>
+                            <div style="color: #888; font-size: 0.75rem; font-family: 'Courier New', monospace;">
+                                ID: ${bouquet.id} • ${category}
+                            </div>
+                        </label>
+                    </div>
+                `;
+                
+                bouquetsGrid.appendChild(bouquetDiv);
+            });
+            
+            bouquetsContainer.appendChild(bouquetsGrid);
+            categoryDiv.appendChild(bouquetsContainer);
+            container.appendChild(categoryDiv);
+        });
+        
+    } catch (error) {
+        console.error('❌ Failed to load bouquets for selection:', error);
+        const container = document.getElementById('bouquetSelector');
+        if (container) {
+            container.innerHTML = '<div style="text-align: center; color: #f44336; padding: 20px;">Failed to load bouquets. Please try syncing bouquets first.</div>';
+        }
+    }
+},
+
+selectCategoryBouquets(category) {
+    const checkboxes = document.querySelectorAll(`input[data-category="${category}"]`);
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    Utils.showNotification(`Selected all ${category} bouquets`, 'success');
+},
+
+selectAllBouquets() {
+    // Fixed: Changed from #bouquetSelectionContainer to #bouquetSelector
+    const checkboxes = document.querySelectorAll('#bouquetSelector input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    Utils.showNotification('Selected all bouquets', 'success');
+},
+
+clearAllBouquets() {
+    // Fixed: Changed from #bouquetSelectionContainer to #bouquetSelector
+    const checkboxes = document.querySelectorAll('#bouquetSelector input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    Utils.showNotification('Cleared all selections', 'info');
+},
+
+async saveChannelGroup(event) {
+    if (event) {
+        event.preventDefault();
+    }
+    
+    try {
+        const form = document.getElementById('channelGroupForm');
+        const editingId = form.getAttribute('data-editing-id');
+        const isEditing = !!editingId;
+        
+        const name = document.getElementById('channelGroupName').value.trim();
+        const description = document.getElementById('channelGroupDescription').value.trim();
+        
+        // Fixed: Changed from #bouquetSelectionContainer to #bouquetSelector
+        const selectedCheckboxes = document.querySelectorAll('#bouquetSelector input[type="checkbox"]:checked');
+        const bouquetIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+        
+        // Debug logging
+        console.log('🔍 Debug info:', {
+            container: document.getElementById('bouquetSelector'),
+            allCheckboxes: document.querySelectorAll('#bouquetSelector input[type="checkbox"]').length,
+            selectedCheckboxes: selectedCheckboxes.length,
+            bouquetIds: bouquetIds
+        });
+        
+        // Validation
+        if (!name) {
+            Utils.showNotification('Please enter a group name', 'error');
+            return;
+        }
+        
+        if (bouquetIds.length === 0) {
+            Utils.showNotification('Please select at least one bouquet', 'error');
+            return;
+        }
+        
+        console.log(`💾 ${isEditing ? 'Updating' : 'Creating'} channel group:`, { 
+            name, 
+            description, 
+            bouquet_count: bouquetIds.length,
+            bouquet_ids: bouquetIds 
+        });
+        
+        const url = isEditing ? `/api/iptv/channel-groups/${editingId}` : '/api/iptv/channel-groups';
+        const method = isEditing ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: name,
+                description: description,
+                bouquet_ids: bouquetIds,
+                is_active: true
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            Utils.showNotification(`Channel group ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
+            this.hideChannelGroupForm();
+            await this.loadChannelGroups(); // Refresh the table
+        } else {
+            throw new Error(result.message || 'Failed to save channel group');
+        }
+        
+    } catch (error) {
+        console.error('❌ Failed to save channel group:', error);
+        Utils.showNotification('Failed to save channel group: ' + error.message, 'error');
+    }
+},
 
     async viewBouquetDetails() {
         try {
@@ -1975,38 +2041,39 @@ async viewChannelGroup(groupId) {
         }
     },
 
-    async saveDefaultGroups() {
-        try {
-            const trialGroupId = document.getElementById('defaultTrialGroup').value;
-            const paidGroupId = document.getElementById('defaultPaidGroup').value;
-            
-            const settings = {};
-            if (trialGroupId) {
-                settings.iptv_default_trial_group = trialGroupId;
-            }
-            if (paidGroupId) {
-                settings.iptv_default_paid_group = paidGroupId;
-            }
-            
-            const response = await fetch('/api/settings', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(settings)
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            
-            Utils.showNotification('Default group settings saved successfully', 'success');
-            
-        } catch (error) {
-            console.error('❌ Failed to save default group settings:', error);
-            Utils.showNotification('Failed to save default group settings', 'error');
+async saveDefaultGroups() {
+    try {
+        const trialGroupId = document.getElementById('defaultTrialGroup').value;
+        const paidGroupId = document.getElementById('defaultPaidGroup').value;
+        
+        const settings = {};
+        if (trialGroupId) {
+            settings.iptv_default_trial_group = trialGroupId;
         }
+        if (paidGroupId) {
+            settings.iptv_default_paid_group = paidGroupId;
+        }
+        
+        // Changed from POST to PUT
+        const response = await fetch('/api/settings', {
+            method: 'PUT',  // FIXED: Changed from POST to PUT
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(settings)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        Utils.showNotification('Default group settings saved successfully', 'success');
+        
+    } catch (error) {
+        console.error('❌ Failed to save default group settings:', error);
+        Utils.showNotification('Failed to save default group settings', 'error');
     }
+}
 };
 
 // Clean export - no merging, no IPTV conflicts
