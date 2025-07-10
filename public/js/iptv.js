@@ -62,22 +62,48 @@ const IPTV = {
     }
   },
 
-  /**
-   * Load current credit balance
-   */
-  async loadCreditBalance() {
+/**
+ * Load current credit balance
+ */
+async loadCreditBalance() {
+  try {
+    console.log('💳 Loading credit balance from database...');
+    
+    // Load from settings API (same as settings page)
+    const response = await fetch('/api/settings');
+    const data = await response.json();
+    
+    if (data.success && data.settings) {
+      const creditSetting = data.settings.find(s => s.setting_key === 'iptv_credits_balance');
+      if (creditSetting) {
+        this.creditBalance = parseInt(creditSetting.setting_value) || 0;
+        console.log(`💳 Loaded credits from database: ${this.creditBalance}`);
+      } else {
+        // Fallback to API if not in settings
+        const creditResponse = await fetch('/api/iptv/credits');
+        const creditData = await creditResponse.json();
+        if (creditData.success) {
+          this.creditBalance = creditData.credits;
+        }
+      }
+    }
+    
+    this.updateCreditDisplay();
+  } catch (error) {
+    console.error('❌ Failed to load credit balance:', error);
+    // Try alternative method
     try {
       const response = await fetch('/api/iptv/credits');
       const data = await response.json();
-      
       if (data.success) {
         this.creditBalance = data.credits;
         this.updateCreditDisplay();
       }
-    } catch (error) {
-      console.error('❌ Failed to load credit balance:', error);
+    } catch (fallbackError) {
+      console.error('❌ Fallback credit loading also failed:', fallbackError);
     }
-  },
+  }
+},
 
   /**
    * Bind IPTV-related event listeners
@@ -222,40 +248,61 @@ const IPTV = {
     }
   },
 
-  /**
-   * Populate package selection dropdown
-   */
-  populatePackageSelect() {
-    const select = $('#iptvPackageSelect');
-    select.empty().append('<option value="">Select Package...</option>');
-    
-    // Add package groups
-    Object.keys(this.packages).forEach(type => {
-      if (this.packages[type].length > 0) {
-        const groupLabel = type.replace('_', ' ').toUpperCase();
-        select.append(`<optgroup label="${groupLabel}">`);
-        
-        this.packages[type].forEach(pkg => {
-          const label = `${pkg.name} (${pkg.connections} conn, ${pkg.duration_months}mo, ${pkg.credits} credits)`;
-          select.append(`<option value="${pkg.package_id}" data-type="${type}">${label}</option>`);
-        });
-        
-        select.append('</optgroup>');
-      }
-    });
-  },
+/**
+ * Populate package selection dropdown
+ */
+populatePackageSelect() {
+  const select = document.getElementById('iptvPackageSelect');
+  if (!select) {
+    console.warn('Package select element not found');
+    return;
+  }
+  
+  select.innerHTML = '<option value="">Select Package...</option>';
+  
+  // Add package groups
+  Object.keys(this.packages).forEach(type => {
+    if (this.packages[type] && this.packages[type].length > 0) {
+      const groupLabel = type.replace('_', ' ').toUpperCase();
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = groupLabel;
+      
+      this.packages[type].forEach(pkg => {
+        const option = document.createElement('option');
+        option.value = pkg.package_id;
+        option.dataset.type = type;
+        option.textContent = `${pkg.name} (${pkg.connections} conn, ${pkg.duration_months}mo, ${pkg.credits} credits)`;
+        optgroup.appendChild(option);
+      });
+      
+      select.appendChild(optgroup);
+    }
+  });
+  
+  console.log('✅ Package dropdown populated');
+},
 
-  /**
-   * Populate channel group selection dropdown
-   */
-  populateChannelGroupSelect() {
-    const select = $('#iptvChannelGroupSelect');
-    select.empty().append('<option value="">Select Channel Group...</option>');
-    
-    this.channelGroups.forEach(group => {
-      select.append(`<option value="${group.id}">${group.name}</option>`);
-    });
-  },
+/**
+ * Populate channel group selection dropdown  
+ */
+populateChannelGroupSelect() {
+  const select = document.getElementById('iptvChannelGroupSelect');
+  if (!select) {
+    console.warn('Channel group select element not found');
+    return;
+  }
+  
+  select.innerHTML = '<option value="">Select Channel Group...</option>';
+  
+  this.channelGroups.forEach(group => {
+    const option = document.createElement('option');
+    option.value = group.id;
+    option.textContent = group.name;
+    select.appendChild(option);
+  });
+  
+  console.log('✅ Channel group dropdown populated');
+},
 
   /**
    * Handle package selection change
@@ -350,13 +397,29 @@ const IPTV = {
     }
   },
 
-  /**
-   * Update credit display
-   */
-  updateCreditDisplay() {
-    $('#currentCredits').text(this.creditBalance);
-    $('.credit-balance').text(this.creditBalance);
-  },
+  
+/**
+ * Update credit display in the UI
+ */
+updateCreditDisplay() {
+  const creditElements = [
+    'currentCredits', 
+    'currentCreditBalance', 
+    '.credit-balance'
+  ];
+  
+  creditElements.forEach(selector => {
+    const element = selector.startsWith('.') ? 
+      document.querySelector(selector) : 
+      document.getElementById(selector);
+    
+    if (element) {
+      element.textContent = this.creditBalance;
+    }
+  });
+  
+  console.log(`💳 Updated credit display: ${this.creditBalance}`);
+},
 
   /**
    * Generate random username

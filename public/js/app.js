@@ -250,6 +250,23 @@ async function initUserFormPage() {
     }
 }
 
+// Handle IPTV tag toggling
+function toggleIptvManagementByTag(show) {
+  const section = document.getElementById('iptvManagementSection');
+  if (section) {
+    section.style.display = show ? 'block' : 'none';
+    
+    if (show && window.IPTV) {
+      // Ensure IPTV module is initialized when section is shown
+      setTimeout(() => {
+        if (typeof window.IPTV.init === 'function') {
+          window.IPTV.init();
+        }
+      }, 100);
+    }
+  }
+}
+
 // Setup user form event listeners
 function setupUserFormEventListeners() {
     console.log('?? Setting up user form event listeners...');
@@ -537,7 +554,7 @@ if (data && (data.regular || data.fourk)) {
 function toggleIptvManagementByTag(isChecked) {
     console.log(`🔧 Toggling IPTV management: ${isChecked}`);
     
-    const iptvGroup = document.getElementById('iptvSection');
+    const iptvGroup = document.getElementById('iptvSection');  // ← Use the correct ID
     if (!iptvGroup) {
         console.error(`❌ IPTV section not found`);
         return;
@@ -547,20 +564,16 @@ function toggleIptvManagementByTag(isChecked) {
         iptvGroup.style.display = 'block';
         
         // Initialize IPTV functionality when shown
-        if (window.IPTV && typeof window.IPTV.initializeForUser === 'function') {
+        if (window.IPTV && typeof window.IPTV.init === 'function') {
             console.log('🚀 Initializing IPTV for user...');
-            window.IPTV.initializeForUser();
+            setTimeout(() => {
+                window.IPTV.init();
+            }, 100);
         } else {
-            console.warn('⚠️ IPTV module not available or initializeForUser function missing');
+            console.warn('⚠️ IPTV module not available or init function missing');
         }
     } else {
         iptvGroup.style.display = 'none';
-        
-        // Clear IPTV data when hidden
-        if (window.IPTV && typeof window.IPTV.clearUserData === 'function') {
-            console.log('🧹 Clearing IPTV user data...');
-            window.IPTV.clearUserData();
-        }
     }
     
     console.log(`✅ IPTV section ${isChecked ? 'shown' : 'hidden'}`);
