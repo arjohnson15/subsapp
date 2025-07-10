@@ -222,10 +222,18 @@ async function initializePage(pageId) {
 // Initialize user form page specifically
 async function initUserFormPage() {
     try {
-        console.log('?? Setting up user form page...');
+        console.log('🔧 Setting up user form page...');
         
         // Wait a bit for the HTML to be fully loaded
         await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // CRITICAL: Initialize IPTV module for user form page
+        if (window.IPTV && typeof window.IPTV.init === 'function') {
+            console.log('📺 Initializing IPTV module for user form...');
+            await window.IPTV.init();
+        } else {
+            console.warn('⚠️ IPTV module not available during user form initialization');
+        }
         
         // Setup form event listeners
         setupUserFormEventListeners();
@@ -236,6 +244,14 @@ async function initUserFormPage() {
         // Load Plex libraries
         await loadPlexLibrariesForUserForm();
         
+        // ADD THIS NEW SECTION - Load IPTV credits from database
+        if (window.UserFormIPTV && typeof window.UserFormIPTV.loadCreditBalance === 'function') {
+            console.log('💳 Loading credits for user form...');
+            setTimeout(() => {
+                window.UserFormIPTV.loadCreditBalance();
+            }, 500);
+        }
+        
         // If editing a user, populate the form
         if (window.AppState.editingUserId) {
             setTimeout(async () => {
@@ -243,28 +259,60 @@ async function initUserFormPage() {
             }, 500);
         }
         
-        console.log('? User form page setup complete');
+        console.log('✅ User form page setup complete');
     } catch (error) {
-        console.error('? Error setting up user form:', error);
+        console.error('❌ Error setting up user form:', error);
         Utils.handleError(error, 'Setting up user form');
     }
 }
 
-// Handle IPTV tag toggling
+// Also update the toggleIptvManagementByTag function to ensure IPTV is available
 function toggleIptvManagementByTag(show) {
-  const section = document.getElementById('iptvManagementSection');
-  if (section) {
-    section.style.display = show ? 'block' : 'none';
-    
-    if (show && window.IPTV) {
-      // Ensure IPTV module is initialized when section is shown
-      setTimeout(() => {
-        if (typeof window.IPTV.init === 'function') {
-          window.IPTV.init();
-        }
-      }, 100);
+    const section = document.getElementById('iptvSection'); // Use correct ID
+    if (!section) {
+        console.error('❌ IPTV section not found');
+        return;
     }
-  }
+    
+    if (show) {
+        section.style.display = 'block';
+        
+        // Initialize IPTV functionality when shown
+        if (window.IPTV) {
+            console.log('📺 IPTV module available, setting up user...');
+            
+            // Set current user if we're editing
+            if (window.AppState.editingUserId) {
+                window.IPTV.currentUser = window.AppState.editingUserId;
+            }
+            
+            // Initialize if not already done
+            if (typeof window.IPTV.init === 'function') {
+                setTimeout(() => {
+                    window.IPTV.init();
+                }, 100);
+            }
+            
+            // Load user status if editing
+            if (window.AppState.editingUserId && typeof window.IPTV.loadUserStatus === 'function') {
+                setTimeout(() => {
+                    console.log('📺 Loading IPTV status for user:', window.AppState.editingUserId);
+                    window.IPTV.loadUserStatus(window.AppState.editingUserId);
+                }, 300);
+            }
+        } else {
+            console.warn('⚠️ IPTV module not available when showing IPTV section');
+        }
+    } else {
+        section.style.display = 'none';
+        
+        // Clear IPTV current user
+        if (window.IPTV) {
+            window.IPTV.currentUser = null;
+        }
+    }
+    
+    console.log(`✅ IPTV section ${show ? 'shown' : 'hidden'}`);
 }
 
 // Setup user form event listeners

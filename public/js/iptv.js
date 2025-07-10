@@ -63,7 +63,7 @@ const IPTV = {
   },
 
 /**
- * Load current credit balance
+ * Load current credit balance from database (matching settings page approach)
  */
 async loadCreditBalance() {
   try {
@@ -74,34 +74,25 @@ async loadCreditBalance() {
     const data = await response.json();
     
     if (data.success && data.settings) {
+      // Find the credit balance setting
       const creditSetting = data.settings.find(s => s.setting_key === 'iptv_credits_balance');
       if (creditSetting) {
         this.creditBalance = parseInt(creditSetting.setting_value) || 0;
         console.log(`💳 Loaded credits from database: ${this.creditBalance}`);
       } else {
-        // Fallback to API if not in settings
-        const creditResponse = await fetch('/api/iptv/credits');
-        const creditData = await creditResponse.json();
-        if (creditData.success) {
-          this.creditBalance = creditData.credits;
-        }
+        // If setting doesn't exist, default to 0
+        this.creditBalance = 0;
+        console.log('💳 No credit balance setting found, defaulting to 0');
       }
+    } else {
+      throw new Error('Failed to load settings');
     }
     
     this.updateCreditDisplay();
   } catch (error) {
     console.error('❌ Failed to load credit balance:', error);
-    // Try alternative method
-    try {
-      const response = await fetch('/api/iptv/credits');
-      const data = await response.json();
-      if (data.success) {
-        this.creditBalance = data.credits;
-        this.updateCreditDisplay();
-      }
-    } catch (fallbackError) {
-      console.error('❌ Fallback credit loading also failed:', fallbackError);
-    }
+    this.creditBalance = 0;
+    this.updateCreditDisplay();
   }
 },
 
@@ -399,7 +390,7 @@ populateChannelGroupSelect() {
 
   
 /**
- * Update credit display in the UI
+ * Update credit display in the UI (enhanced version)
  */
 updateCreditDisplay() {
   const creditElements = [
@@ -419,7 +410,7 @@ updateCreditDisplay() {
   });
   
   console.log(`💳 Updated credit display: ${this.creditBalance}`);
-},
+}
 
   /**
    * Generate random username
@@ -650,33 +641,66 @@ updateCreditDisplay() {
     }
   },
 
-  /**
-   * Sync credit balance from panel
-   */
-  async syncCredits() {
-    const button = $('#syncCreditsBtn');
-    const originalText = button.html();
-    button.html('<i class="fas fa-spinner fa-spin"></i>').prop('disabled', true);
+/**
+ * Sync credit balance from panel (matching settings page approach)
+ */
+async syncCredits() {
+  // Find the sync button using the existing onclick pattern in your HTML
+  const button = document.querySelector('button[onclick*="IPTV.syncCredits"]');
+  
+  if (!button) {
+    console.error('❌ Sync credits button not found');
+    return;
+  }
+  
+  const originalText = button.innerHTML;
+  button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  button.disabled = true;
+  
+  try {
+    console.log('💳 Syncing credit balance from panel...');
     
-    try {
-      const response = await fetch('/api/iptv/sync-credits', { method: 'POST' });
-      const data = await response.json();
+    // Use the same API endpoint as settings page
+    const response = await fetch('/api/iptv/sync-credits', { method: 'POST' });
+    const data = await response.json();
+    
+    if (data.success) {
+      const credits = data.credits || 0;
       
-      if (data.success) {
-        this.creditBalance = data.credits;
-        this.updateCreditDisplay();
-        showNotification(`Credit balance synced: ${data.credits} credits`, 'success');
+      // Update local balance
+      this.creditBalance = credits;
+      
+      // Update the display immediately
+      this.updateCreditDisplay();
+      
+      // Show success notification
+      if (window.Utils && window.Utils.showNotification) {
+        window.Utils.showNotification(`Credit balance synced: ${credits} credits`, 'success');
+      } else if (window.showNotification) {
+        window.showNotification(`Credit balance synced: ${credits} credits`, 'success');
       } else {
-        throw new Error(data.message);
+        console.log(`✅ Credit balance synced: ${credits} credits`);
       }
       
-    } catch (error) {
-      console.error('❌ Failed to sync credits:', error);
-      showNotification(`Failed to sync credits: ${error.message}`, 'error');
-    } finally {
-      button.html(originalText).prop('disabled', false);
+      console.log(`✅ Credit balance synced successfully: ${credits} credits`);
+    } else {
+      throw new Error(data.message || 'Sync failed');
     }
-  },
+  } catch (error) {
+    console.error('❌ Failed to sync credits:', error);
+    
+    // Show error notification
+    if (window.Utils && window.Utils.showNotification) {
+      window.Utils.showNotification(`Failed to sync credits: ${error.message}`, 'error');
+    } else if (window.showNotification) {
+      window.showNotification(`Failed to sync credits: ${error.message}`, 'error');
+    }
+  } finally {
+    // Restore button state
+    button.innerHTML = originalText;
+    button.disabled = false;
+  }
+},
 
   /**
    * Test IPTV panel connection
@@ -1807,7 +1831,6 @@ $(document).ready(() => {
 
 // Clean export for user management pages - no merging conflicts
 window.IPTVUser = IPTV;
-
 console.log('📺 IPTV user module loaded cleanly');
 
 // Save any existing functions that might have been created by settings.js
@@ -1857,3 +1880,120 @@ if (missingSettingsFunctions.length > 0) {
 } else {
   console.log('✅ All required IPTV functions are available');
 }
+
+// Initialize when document is ready OR when called explicitly
+$(document).ready(() => {
+  // Always try to initialize IPTV if we're on any page
+  console.log('📺 Document ready, checking if IPTV should initialize...');
+  
+  // Initialize IPTV for any page (not just specific ones)
+  if (typeof window.IPTV.init === 'function') {
+    window.IPTV.init().catch(error => {
+      console.warn('⚠️ IPTV initialization had issues (this may be normal):', error.message);
+    });
+  }
+});
+
+// CRITICAL: Make sure syncCredits is available globally for onclick handlers
+window.syncIPTVCredits = function() {
+  if (window.IPTV && typeof window.IPTV.syncCredits === 'function') {
+    return window.IPTV.syncCredits();
+  } else {
+    console.error('❌ IPTV.syncCredits not available');
+    alert('IPTV module not loaded properly. Please refresh the page.');
+  }
+};
+
+// UserFormIPTV module - Copy of SettingsIPTV pattern
+const UserFormIPTV = {
+    /**
+     * Load credit balance from database (exact copy of settings page pattern)
+     */
+    async loadCreditBalance() {
+        try {
+            console.log('💳 Loading credit balance from database...');
+            
+            // Load settings from database (same as settings page)
+            const settings = await API.Settings.getAll();
+            
+            // Load current credit balance from database
+            if (settings.iptv_credits_balance !== undefined) {
+                const creditElement = document.getElementById('currentCreditBalance');
+                if (creditElement) {
+                    creditElement.textContent = settings.iptv_credits_balance || 0;
+                }
+                
+                // Update IPTV object balance too
+                if (window.IPTV) {
+                    window.IPTV.creditBalance = parseInt(settings.iptv_credits_balance) || 0;
+                }
+                
+                console.log(`💳 Loaded credits from DB: ${settings.iptv_credits_balance}`);
+            } else {
+                // Default to 0 if not found
+                const creditElement = document.getElementById('currentCreditBalance');
+                if (creditElement) {
+                    creditElement.textContent = '0';
+                }
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to load credit balance from database:', error);
+            
+            // Set default values if loading fails
+            const creditElement = document.getElementById('currentCreditBalance');
+            if (creditElement) {
+                creditElement.textContent = '-';
+            }
+        }
+    },
+
+    /**
+     * Sync credit balance (exact copy of settings page pattern)
+     */
+    async syncCredits() {
+        try {
+            if (window.Utils && window.Utils.showNotification) {
+                window.Utils.showNotification('Syncing credit balance...', 'info');
+            }
+            
+            const response = await fetch('/api/iptv/sync-credits', { method: 'POST' });
+            const data = await response.json();
+            
+            if (data.success) {
+                const credits = data.credits || 0;
+                
+                // Update the display immediately
+                const creditElement = document.getElementById('currentCreditBalance');
+                if (creditElement) {
+                    creditElement.textContent = credits;
+                }
+                
+                // Update IPTV object balance too
+                if (window.IPTV) {
+                    window.IPTV.creditBalance = credits;
+                }
+                
+                if (window.Utils && window.Utils.showNotification) {
+                    window.Utils.showNotification(`Credit balance: ${credits}`, 'success');
+                } else if (window.showNotification) {
+                    window.showNotification(`Credit balance: ${credits}`, 'success');
+                }
+            } else {
+                throw new Error(data.message);
+            }
+        } catch (error) {
+            console.error('Failed to sync credits:', error);
+            if (window.Utils && window.Utils.showNotification) {
+                window.Utils.showNotification('Failed to sync credits', 'error');
+            } else if (window.showNotification) {
+                window.showNotification('Failed to sync credits', 'error');
+            }
+        }
+    }
+};
+
+// Make it globally available for onclick handlers (same pattern as settings)
+window.UserFormIPTV = UserFormIPTV;
+
+console.log('✅ UserFormIPTV module loaded and available globally');
