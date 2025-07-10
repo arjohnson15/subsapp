@@ -151,10 +151,6 @@ const IPTV = {
     $(document).on('click', '#iptvClearBtn', () => this.clearSelection());
     $(document).on('click', '#iptvSyncBtn', () => this.syncUserStatus());
 
-    // Generate username/password buttons
-    $(document).on('click', '#generateUsernameBtn', () => this.generateUsername());
-    $(document).on('click', '#generatePasswordBtn', () => this.generatePassword());
-
     // Credit sync button
     $(document).on('click', '#syncCreditsBtn', () => this.syncCredits());
 
@@ -477,28 +473,6 @@ const IPTV = {
     });
     
     console.log(`💳 Updated credit display: ${this.creditBalance}`);
-  },
-
-  /**
-   * Generate random username
-   */
-  generateUsername() {
-    const prefix = 'user';
-    const random = Math.random().toString(36).substring(2, 8);
-    const username = prefix + random;
-    $('#iptvUsername').val(username);
-  },
-
-  /**
-   * Generate random password
-   */
-  generatePassword() {
-    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-    let password = '';
-    for (let i = 0; i < 12; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    $('#iptvPassword').val(password);
   },
 
   /**

@@ -232,19 +232,13 @@
                 <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
                     <div class="form-group">
                         <label for="iptvUsernameField" style="color: #fff;">Username:</label>
-                        <div style="display: flex; gap: 8px;">
-                            <input type="text" id="iptvUsernameField" placeholder="Enter username" style="flex: 1; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px;">
-                            <button type="button" class="btn" style="padding: 8px 12px; font-size: 0.8rem;" onclick="IPTV.generateUsername()">Generate</button>
-                        </div>
-                        <small style="color: #4fc3f7; font-size: 0.85rem;">Required for new subscriptions.</small>
+                        <input type="text" id="iptvUsernameField" placeholder="Leave blank for auto-generation" style="width: 100%; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px;">
+                        <small style="color: #4fc3f7; font-size: 0.85rem;">Leave blank and the IPTV panel will auto-generate.</small>
                     </div>
                     <div class="form-group">
                         <label for="iptvPasswordField" style="color: #fff;">Password:</label>
-                        <div style="display: flex; gap: 8px;">
-                            <input type="text" id="iptvPasswordField" placeholder="Enter password" style="flex: 1; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px;">
-                            <button type="button" class="btn" style="padding: 8px 12px; font-size: 0.8rem;" onclick="IPTV.generatePassword()">Generate</button>
-                        </div>
-                        <small style="color: #4fc3f7; font-size: 0.85rem;">Required for new subscriptions.</small>
+                        <input type="text" id="iptvPasswordField" placeholder="Leave blank for auto-generation" style="width: 100%; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px;">
+                        <small style="color: #4fc3f7; font-size: 0.85rem;">Leave blank and the IPTV panel will auto-generate.</small>
                     </div>
                 </div>
                 
@@ -263,6 +257,8 @@
                     <button type="button" id="createPaidBtn" class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a); padding: 10px 20px;" onclick="IPTV.createPaidSubscription()">Create Paid Subscription</button>
                     <button type="button" id="extendBtn" class="btn" style="background: linear-gradient(45deg, #2196f3, #03a9f4); padding: 10px 20px; display: none;" onclick="IPTV.extendSubscription()">Extend Subscription</button>
                 </div>
+            </div>
+        </div>
 
         <div class="form-group">
             <label>Subscription Information:</label>
