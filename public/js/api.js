@@ -174,12 +174,6 @@ async sendTestEmail(recipientEmail) {
         body: JSON.stringify({ to: recipientEmail })
     });
 },
-
-async sendRenewalReminders() {
-    return await apiCall('/email/send-renewal-reminders', {
-        method: 'POST'
-    });
-},
     
     async getLogs() {
         return await apiCall('/email/logs');

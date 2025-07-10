@@ -198,7 +198,7 @@ async function initializeApp() {
     console.log('✅ Hourly specific date email scheduler activated');
 
     // Daily renewal reminders AND expiration reminder schedules (runs at 1 pm UTC 8am Central every day)
-    cron.schedule('0 13 * * *', async () => {
+    cron.schedule('0 17 * * *', async () => {
       const timestamp = new Date().toLocaleString();
       console.log('');
       console.log('📧='.repeat(50));
@@ -212,14 +212,6 @@ async function initializeApp() {
           await emailService.initializeTransporter();
         }
 
-        // Process built-in renewal reminders (7-day and 2-day)
-        const builtInResult = await emailService.sendRenewalReminders();
-        
-        if (builtInResult.success) {
-          console.log(`✅ Built-in renewal reminders completed: ${builtInResult.sent} emails sent`);
-        } else {
-          console.log(`❌ Built-in renewal reminders failed: ${builtInResult.error}`);
-        }
 
         // Process custom expiration reminder schedules
         await emailService.processExpirationReminders();

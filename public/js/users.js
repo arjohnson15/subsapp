@@ -1051,6 +1051,8 @@ userHasPendingInvites(user) {
 },
     
 
+// REPLACE ONLY THE saveUser FUNCTION - find this in your users.js and replace just this function:
+
 async saveUser(event) {
     event.preventDefault();
     console.log('🎯 Form submission triggered - starting save process');
@@ -1075,11 +1077,11 @@ async saveUser(event) {
         userData.exclude_bulk_emails = document.getElementById('excludeBulkEmails')?.checked || false;
         userData.exclude_automated_emails = document.getElementById('excludeAutomatedEmails')?.checked || false;
 
-        // CRITICAL FIX: Collect manual expiration dates from the form
-        userData.plex_expiration = formData.get('plex_expiration') || null;
-        userData.iptv_expiration = formData.get('iptv_expiration') || null;
+        // FIXED: Use empty string instead of null for backend validation
+        userData.plex_expiration = formData.get('plex_expiration') || '';
+        userData.iptv_expiration = formData.get('iptv_expiration') || '';
         
-        console.log('🗓️ Manual expiration dates collected:', {
+        console.log('🗓️ Manual expiration dates collected (fixed):', {
             plex_expiration: userData.plex_expiration,
             iptv_expiration: userData.iptv_expiration
         });
@@ -1109,11 +1111,11 @@ async saveUser(event) {
         if (plexSubscription === 'free') {
             userData.plex_subscription = 'free';
             userData.plex_is_free = true;
-            // Keep manual expiration date if provided, otherwise null
+            // Keep manual expiration date if provided, otherwise empty string
         } else if (plexSubscription === 'remove') {
             // FIXED: Properly handle remove case
             userData.plex_subscription = 'remove';
-            userData.plex_expiration = null; // Override manual date for removal
+            userData.plex_expiration = ''; // Use empty string instead of null
             userData.plex_is_free = false;
         } else if (plexSubscription && plexSubscription !== '') {
             // Paid subscription - use manual expiration if provided
@@ -1131,7 +1133,7 @@ async saveUser(event) {
         if (iptvSubscription === 'remove') {
             // FIXED: Properly handle remove case
             userData.iptv_subscription = 'remove';
-            userData.iptv_expiration = null; // Override manual date for removal
+            userData.iptv_expiration = ''; // Use empty string instead of null
             userData.iptv_is_free = false;
         } else if (iptvSubscription && iptvSubscription !== '') {
             // Paid subscription - use manual expiration if provided

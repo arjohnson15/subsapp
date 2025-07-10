@@ -181,11 +181,14 @@ async function initializePage(pageId) {
             }
             break;
             
-        case 'users':
-            if (window.Users && window.Users.init) {
-                await window.Users.init();
-            }
-            break;
+case 'users':
+    // Safer initialization for Users module
+    if (window.Users && typeof window.Users.init === 'function') {
+        await window.Users.init();
+    } else {
+        console.warn('⚠️ Users module not ready yet');
+    }
+    break;
             
         case 'user-form':
             console.log('?? Initializing user form page...');
@@ -944,12 +947,89 @@ window.Dashboard = {
     }
 };
 
+
+// Add this function definition RIGHT HERE - before the "Make functions globally available" comment
+window.preSelectUserLibraries = function(serverGroup, user = null) {
+    console.log(`🔧 Pre-selecting libraries for ${serverGroup}...`);
+    
+    // Get user data - prefer passed parameter, fall back to global state
+    let currentUserData = user;
+    if (!currentUserData && window.AppState && window.AppState.currentUserData) {
+        currentUserData = window.AppState.currentUserData;
+    }
+    
+    if (!currentUserData) {
+        console.log('❌ No user data available for pre-selection');
+        return;
+    }
+    
+    if (!currentUserData.plex_libraries || !currentUserData.plex_libraries[serverGroup]) {
+        console.log(`ℹ️ No library data for ${serverGroup}`);
+        return;
+    }
+    
+    const userLibraries = currentUserData.plex_libraries[serverGroup];
+    let selectedCount = 0;
+    
+    // Helper function to extract library ID from various formats
+    const extractLibraryId = (lib) => {
+        if (typeof lib === 'object' && lib !== null) {
+            return lib.id || lib.key || lib.ratingKey || lib.libraryId || lib.value || lib.library_id || lib.sectionId;
+        }
+        return lib; // Assume it's already a string/number ID
+    };
+    
+    // Helper function to find checkbox by ID
+    const findCheckbox = (serverGroup, type, libId) => {
+        let checkbox = document.querySelector(`input[name="${serverGroup}_${type}"][value="${libId}"]`);
+        if (!checkbox) {
+            checkbox = document.getElementById(`${serverGroup}_${type}_${libId}`);
+        }
+        if (!checkbox) {
+            checkbox = document.querySelector(`input[name="${serverGroup}_${type}"][value="${String(libId)}"]`);
+        }
+        return checkbox;
+    };
+    
+    // Pre-select regular libraries
+    if (userLibraries.regular && Array.isArray(userLibraries.regular)) {
+        userLibraries.regular.forEach(lib => {
+            const libId = extractLibraryId(lib);
+            if (!libId) return;
+            
+            const checkbox = findCheckbox(serverGroup, 'regular', libId);
+            if (checkbox) {
+                checkbox.checked = true;
+                selectedCount++;
+            }
+        });
+    }
+    
+    // Pre-select 4K libraries  
+    if (userLibraries.fourk && Array.isArray(userLibraries.fourk)) {
+        userLibraries.fourk.forEach(lib => {
+            const libId = extractLibraryId(lib);
+            if (!libId) return;
+            
+            const checkbox = findCheckbox(serverGroup, 'fourk', libId);
+            if (checkbox) {
+                checkbox.checked = true;
+                selectedCount++;
+            }
+        });
+    }
+    
+    console.log(`📊 Pre-selected ${selectedCount} libraries for ${serverGroup}`);
+};
+
 // Make functions globally available for onclick handlers
 window.showPage = showPage;
 window.closeModal = Utils.closeModal;
 window.togglePlexLibrariesByTag = togglePlexLibrariesByTag;
 window.populateUserForm = populateUserForm;
-window.preSelectUserLibraries = preSelectUserLibraries;
+window.preSelectUserLibraries = preSelectUserLibraries; // ← This line stays as is
+
+
 
 // Auto-calculation functions for subscriptions
 window.calculateNewPlexExpiration = function() {

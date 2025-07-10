@@ -163,23 +163,34 @@ const IPTV = {
   },
 
   /**
-   * Show IPTV section when IPTV tag is checked
+   * Show IPTV section when IPTV tag is checked (FIXED - populate dropdowns after section is shown)
    */
   showIPTVSection(userId) {
+    console.log('📺 Showing IPTV section for user:', userId);
     this.currentUser = userId;
     
-    // Show the IPTV section
+    // Show the IPTV section FIRST
     $('#iptvSection').show();
     
     // Load user's current IPTV status
     this.loadUserStatus(userId);
     
-    // Populate dropdowns
-    this.populatePackageSelect();
-    this.populateChannelGroupSelect();
+    // NOW populate dropdowns (after the section is visible)
+    console.log('📺 Populating dropdowns after section is shown...');
+    const packageSuccess = this.populatePackageSelect();
+    const channelSuccess = this.populateChannelGroupSelect();
+    
+    if (!packageSuccess) {
+      console.error('❌ Failed to populate package dropdown');
+    }
+    if (!channelSuccess) {
+      console.error('❌ Failed to populate channel group dropdown');
+    }
     
     // Update credit display
     this.updateCreditDisplay();
+    
+    console.log('✅ IPTV section shown and dropdowns populated');
   },
 
   /**
@@ -273,17 +284,27 @@ const IPTV = {
     }
   },
 
-  /**
-   * Populate package selection dropdown
+ 
+/**
+   * Populate package selection dropdown (FIXED - with better error handling and debugging)
    */
   populatePackageSelect() {
     const select = document.getElementById('iptvPackageSelect');
     if (!select) {
-      console.warn('Package select element not found');
-      return;
+      console.warn('📦 Package select element not found - IPTV section may not be visible yet');
+      return false;
     }
     
+    console.log('📦 Populating package dropdown with data:', this.packages);
+    
     select.innerHTML = '<option value="">Select Package...</option>';
+    
+    // Check if we have package data
+    if (!this.packages || Object.keys(this.packages).length === 0) {
+      console.warn('📦 No package data available to populate');
+      select.innerHTML = '<option value="">No packages available</option>';
+      return false;
+    }
     
     // Add package groups
     Object.keys(this.packages).forEach(type => {
@@ -291,6 +312,8 @@ const IPTV = {
         const groupLabel = type.replace('_', ' ').toUpperCase();
         const optgroup = document.createElement('optgroup');
         optgroup.label = groupLabel;
+        
+        console.log(`📦 Adding ${groupLabel} group with ${this.packages[type].length} packages`);
         
         this.packages[type].forEach(pkg => {
           const option = document.createElement('option');
@@ -304,20 +327,30 @@ const IPTV = {
       }
     });
     
-    console.log('✅ Package dropdown populated');
+    console.log('✅ Package dropdown populated successfully');
+    return true;
   },
 
   /**
-   * Populate channel group selection dropdown  
+   * Populate channel group selection dropdown (FIXED - with better error handling and debugging)
    */
   populateChannelGroupSelect() {
     const select = document.getElementById('iptvChannelGroupSelect');
     if (!select) {
-      console.warn('Channel group select element not found');
-      return;
+      console.warn('📺 Channel group select element not found - IPTV section may not be visible yet');
+      return false;
     }
     
+    console.log('📺 Populating channel group dropdown with data:', this.channelGroups);
+    
     select.innerHTML = '<option value="">Select Channel Group...</option>';
+    
+    // Check if we have channel group data
+    if (!this.channelGroups || this.channelGroups.length === 0) {
+      console.warn('📺 No channel group data available to populate');
+      select.innerHTML = '<option value="">No channel groups available</option>';
+      return false;
+    }
     
     this.channelGroups.forEach(group => {
       const option = document.createElement('option');
@@ -326,7 +359,8 @@ const IPTV = {
       select.appendChild(option);
     });
     
-    console.log('✅ Channel group dropdown populated');
+    console.log(`✅ Channel group dropdown populated with ${this.channelGroups.length} groups`);
+    return true;
   },
 
   /**

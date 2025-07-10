@@ -299,15 +299,5 @@ router.get('/user-data/:userId', async (req, res) => {
   }
 });
 
-// Trigger manual renewal reminders
-router.post('/send-renewal-reminders', async (req, res) => {
-  try {
-    const result = await emailService.sendRenewalReminders();
-    res.json(result);
-  } catch (error) {
-    console.error('Error sending renewal reminders:', error);
-    res.status(500).json({ error: 'Failed to send renewal reminders' });
-  }
-});
 
 module.exports = router;
