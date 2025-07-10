@@ -1232,41 +1232,36 @@ const IPTV = {
     }
   },
 
-  /**
-   * Load and display channel groups in the settings table
-   */
-  async loadChannelGroups() {
-    try {
-      console.log('📋 Loading channel groups...');
-      
-      const response = await fetch('/api/iptv/channel-groups');
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      const groups = data.channelGroups || data;
-      console.log(`✅ Loaded ${groups.length} channel groups`);
-      
-      // Update the table
-      const tableBody = document.getElementById('channelGroupsTableBody');
-      if (tableBody) {
-        this.renderChannelGroupsTable(groups, tableBody);
-      }
-      
-      return groups;
-      
-    } catch (error) {
-      console.error('❌ Failed to load channel groups:', error);
-      showNotification('Failed to load channel groups: ' + error.message, 'error');
-      
-      const tableBody = document.getElementById('channelGroupsTableBody');
-      if (tableBody) {
-        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #f44336;">Failed to load channel groups</td></tr>';
-      }
-      return [];
+/**
+ * Load channel groups from API (FIXED - properly store in this.channelGroups)
+ */
+async loadChannelGroups() {
+  try {
+    console.log('📺 Loading channel groups...');
+    
+    const response = await fetch('/api/iptv/channel-groups');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-  },
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      // FIXED: Store the channel groups in this.channelGroups
+      this.channelGroups = data.channelGroups || [];
+      console.log(`📺 Loaded ${this.channelGroups.length} channel groups`);
+      console.log('📺 Channel groups data:', this.channelGroups);
+    } else {
+      console.warn('📺 API returned success:false for channel groups');
+      this.channelGroups = [];
+    }
+    
+  } catch (error) {
+    console.error('❌ Failed to load channel groups:', error);
+    this.channelGroups = [];
+    showNotification('Failed to load channel groups', 'error');
+  }
+},
 
   /**
    * Render channel groups table (FIXED - No Star Icon)

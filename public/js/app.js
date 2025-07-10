@@ -304,35 +304,69 @@ function toggleIptvManagementByTag(show) {
     }
     
     if (show) {
+        // FIRST: Show the section
         section.style.display = 'block';
         
-        // Initialize IPTV functionality when shown
+        // SECOND: Check if IPTV module is available
         if (window.IPTV) {
-            console.log('📺 IPTV module available, setting up user...');
+            console.log('📺 IPTV module available, populating dropdowns...');
             
             // Set current user if we're editing
             if (window.AppState.editingUserId) {
                 window.IPTV.currentUser = window.AppState.editingUserId;
             }
             
-            // Initialize if not already done
-            if (typeof window.IPTV.init === 'function') {
-                setTimeout(() => {
-                    window.IPTV.init();
-                }, 100);
-            }
+            // THIRD: Populate dropdowns now that section is visible
+            setTimeout(() => {
+                console.log('📦 Attempting to populate IPTV dropdowns...');
+                
+                // Call populate functions directly (they already have the data)
+                if (typeof window.IPTV.populatePackageSelect === 'function') {
+                    const packageSuccess = window.IPTV.populatePackageSelect();
+                    console.log(`📦 Package dropdown population: ${packageSuccess ? 'SUCCESS' : 'FAILED'}`);
+                }
+                
+                if (typeof window.IPTV.populateChannelGroupSelect === 'function') {
+                    const channelSuccess = window.IPTV.populateChannelGroupSelect();
+                    console.log(`📺 Channel group dropdown population: ${channelSuccess ? 'SUCCESS' : 'FAILED'}`);
+                }
+                
+                // Update credit display
+                if (typeof window.IPTV.updateCreditDisplay === 'function') {
+                    window.IPTV.updateCreditDisplay();
+                }
+                
+                console.log('✅ IPTV dropdowns population complete');
+            }, 100); // Small delay to ensure DOM is ready
+            
         } else {
             console.warn('⚠️ IPTV module not available when showing IPTV section');
-            // Try to wait for it and then initialize
+            // Try to wait for it and then populate
             let attempts = 0;
             const checkInterval = setInterval(() => {
                 attempts++;
                 if (window.IPTV) {
                     console.log('✅ IPTV module now available');
                     clearInterval(checkInterval);
-                    if (typeof window.IPTV.init === 'function') {
-                        window.IPTV.init();
+                    
+                    // Set current user
+                    if (window.AppState.editingUserId) {
+                        window.IPTV.currentUser = window.AppState.editingUserId;
                     }
+                    
+                    // Populate dropdowns
+                    setTimeout(() => {
+                        if (typeof window.IPTV.populatePackageSelect === 'function') {
+                            window.IPTV.populatePackageSelect();
+                        }
+                        if (typeof window.IPTV.populateChannelGroupSelect === 'function') {
+                            window.IPTV.populateChannelGroupSelect();
+                        }
+                        if (typeof window.IPTV.updateCreditDisplay === 'function') {
+                            window.IPTV.updateCreditDisplay();
+                        }
+                    }, 100);
+                    
                 } else if (attempts > 20) {
                     console.error('❌ IPTV module never became available');
                     clearInterval(checkInterval);
@@ -634,30 +668,67 @@ if (data && (data.regular || data.fourk)) {
     }
 }
 
+
 // Toggle IPTV management section visibility
 function toggleIptvManagementByTag(isChecked) {
     console.log(`🔧 Toggling IPTV management: ${isChecked}`);
     
-    const iptvGroup = document.getElementById('iptvSection');  // ← Use the correct ID
+    const iptvGroup = document.getElementById('iptvSection');
     if (!iptvGroup) {
         console.error(`❌ IPTV section not found`);
         return;
     }
     
     if (isChecked) {
+        // FIRST: Show the section
         iptvGroup.style.display = 'block';
         
-        // Initialize IPTV functionality when shown
-        if (window.IPTV && typeof window.IPTV.init === 'function') {
-            console.log('🚀 Initializing IPTV for user...');
+        // SECOND: Check if IPTV module is available and populate dropdowns
+        if (window.IPTV) {
+            console.log('📺 IPTV module available, populating dropdowns...');
+            
+            // Set current user if we're editing
+            if (window.AppState.editingUserId) {
+                window.IPTV.currentUser = window.AppState.editingUserId;
+            }
+            
+            // THIRD: Populate dropdowns now that section is visible (with delay for DOM)
             setTimeout(() => {
-                window.IPTV.init();
-            }, 100);
+                console.log('📦 Attempting to populate IPTV dropdowns...');
+                
+                // Call populate functions directly (they already have the data)
+                if (typeof window.IPTV.populatePackageSelect === 'function') {
+                    const packageSuccess = window.IPTV.populatePackageSelect();
+                    console.log(`📦 Package dropdown population: ${packageSuccess ? 'SUCCESS' : 'FAILED'}`);
+                } else {
+                    console.error('❌ populatePackageSelect function not found');
+                }
+                
+                if (typeof window.IPTV.populateChannelGroupSelect === 'function') {
+                    const channelSuccess = window.IPTV.populateChannelGroupSelect();
+                    console.log(`📺 Channel group dropdown population: ${channelSuccess ? 'SUCCESS' : 'FAILED'}`);
+                } else {
+                    console.error('❌ populateChannelGroupSelect function not found');
+                }
+                
+                // Update credit display
+                if (typeof window.IPTV.updateCreditDisplay === 'function') {
+                    window.IPTV.updateCreditDisplay();
+                }
+                
+                console.log('✅ IPTV dropdowns population complete');
+            }, 200); // Increased delay to ensure DOM is ready
+            
         } else {
-            console.warn('⚠️ IPTV module not available or init function missing');
+            console.warn('⚠️ IPTV module not available when showing IPTV section');
         }
     } else {
         iptvGroup.style.display = 'none';
+        
+        // Clear IPTV current user
+        if (window.IPTV) {
+            window.IPTV.currentUser = null;
+        }
     }
     
     console.log(`✅ IPTV section ${isChecked ? 'shown' : 'hidden'}`);
