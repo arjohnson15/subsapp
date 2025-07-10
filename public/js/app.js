@@ -219,7 +219,6 @@ async function initializePage(pageId) {
     }
 }
 
-// Initialize user form page specifically
 async function initUserFormPage() {
     try {
         console.log('🔧 Setting up user form page...');
@@ -227,12 +226,37 @@ async function initUserFormPage() {
         // Wait a bit for the HTML to be fully loaded
         await new Promise(resolve => setTimeout(resolve, 100));
         
+        // DEBUG: Check what IPTV objects are available
+        console.log('🔍 Available IPTV objects:', {
+            'window.IPTV': !!window.IPTV,
+            'window.IPTVUser': !!window.IPTVUser,
+            'window.UserFormIPTV': !!window.UserFormIPTV,
+            'IPTV_functions': window.IPTV ? Object.keys(window.IPTV).filter(k => typeof window.IPTV[k] === 'function') : []
+        });
+        
         // CRITICAL: Initialize IPTV module for user form page
         if (window.IPTV && typeof window.IPTV.init === 'function') {
             console.log('📺 Initializing IPTV module for user form...');
             await window.IPTV.init();
         } else {
             console.warn('⚠️ IPTV module not available during user form initialization');
+            // Try to wait for it to load
+            let attempts = 0;
+            const maxAttempts = 10;
+            while (!window.IPTV && attempts < maxAttempts) {
+                console.log(`⏳ Waiting for IPTV module... attempt ${attempts + 1}`);
+                await new Promise(resolve => setTimeout(resolve, 200));
+                attempts++;
+            }
+            
+            if (window.IPTV) {
+                console.log('✅ IPTV module loaded after waiting');
+                if (typeof window.IPTV.init === 'function') {
+                    await window.IPTV.init();
+                }
+            } else {
+                console.error('❌ IPTV module never loaded');
+            }
         }
         
         // Setup form event listeners
@@ -244,7 +268,7 @@ async function initUserFormPage() {
         // Load Plex libraries
         await loadPlexLibrariesForUserForm();
         
-        // ADD THIS NEW SECTION - Load IPTV credits from database
+        // Load IPTV credits from database
         if (window.UserFormIPTV && typeof window.UserFormIPTV.loadCreditBalance === 'function') {
             console.log('💳 Loading credits for user form...');
             setTimeout(() => {
@@ -266,9 +290,11 @@ async function initUserFormPage() {
     }
 }
 
-// Also update the toggleIptvManagementByTag function to ensure IPTV is available
+
 function toggleIptvManagementByTag(show) {
-    const section = document.getElementById('iptvSection'); // Use correct ID
+    console.log(`🔧 Toggling IPTV management: ${show}`);
+    
+    const section = document.getElementById('iptvSection');
     if (!section) {
         console.error('❌ IPTV section not found');
         return;
@@ -292,16 +318,23 @@ function toggleIptvManagementByTag(show) {
                     window.IPTV.init();
                 }, 100);
             }
-            
-            // Load user status if editing
-            if (window.AppState.editingUserId && typeof window.IPTV.loadUserStatus === 'function') {
-                setTimeout(() => {
-                    console.log('📺 Loading IPTV status for user:', window.AppState.editingUserId);
-                    window.IPTV.loadUserStatus(window.AppState.editingUserId);
-                }, 300);
-            }
         } else {
             console.warn('⚠️ IPTV module not available when showing IPTV section');
+            // Try to wait for it and then initialize
+            let attempts = 0;
+            const checkInterval = setInterval(() => {
+                attempts++;
+                if (window.IPTV) {
+                    console.log('✅ IPTV module now available');
+                    clearInterval(checkInterval);
+                    if (typeof window.IPTV.init === 'function') {
+                        window.IPTV.init();
+                    }
+                } else if (attempts > 20) {
+                    console.error('❌ IPTV module never became available');
+                    clearInterval(checkInterval);
+                }
+            }, 100);
         }
     } else {
         section.style.display = 'none';

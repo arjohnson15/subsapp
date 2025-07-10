@@ -1,4 +1,4 @@
-// public/js/iptv.js - IPTV Frontend Module
+// public/js/iptv.js - IPTV Frontend Module (COMPLETE VERSION - SYNTAX FIXED)
 const IPTV = {
   packages: {},
   channelGroups: [],
@@ -63,38 +63,72 @@ const IPTV = {
   },
 
 /**
- * Load current credit balance from database (matching settings page approach)
- */
-async loadCreditBalance() {
-  try {
-    console.log('💳 Loading credit balance from database...');
-    
-    // Load from settings API (same as settings page)
-    const response = await fetch('/api/settings');
-    const data = await response.json();
-    
-    if (data.success && data.settings) {
-      // Find the credit balance setting
-      const creditSetting = data.settings.find(s => s.setting_key === 'iptv_credits_balance');
-      if (creditSetting) {
-        this.creditBalance = parseInt(creditSetting.setting_value) || 0;
-        console.log(`💳 Loaded credits from database: ${this.creditBalance}`);
-      } else {
-        // If setting doesn't exist, default to 0
-        this.creditBalance = 0;
-        console.log('💳 No credit balance setting found, defaulting to 0');
+   * Load current credit balance from database (FIXED - handles both response formats)
+   */
+  async loadCreditBalance() {
+    try {
+      console.log('💳 Loading credit balance from database...');
+      
+      // Load from settings API (same as settings page)
+      const response = await fetch('/api/settings');
+      const data = await response.json();
+      
+      console.log('💳 Settings API response:', data);
+      
+      // Handle FLAT OBJECT format (your current API response)
+      if (data.iptv_credits_balance !== undefined) {
+        this.creditBalance = parseInt(data.iptv_credits_balance) || 0;
+        console.log(`💳 Loaded credits from FLAT response: ${this.creditBalance}`);
       }
-    } else {
-      throw new Error('Failed to load settings');
+      // Handle ARRAY format (expected format)
+      else if (data.success && data.settings && Array.isArray(data.settings)) {
+        const creditSetting = data.settings.find(s => s.setting_key === 'iptv_credits_balance');
+        if (creditSetting && creditSetting.setting_value !== undefined) {
+          this.creditBalance = parseInt(creditSetting.setting_value) || 0;
+          console.log(`💳 Loaded credits from ARRAY response: ${this.creditBalance}`);
+        } else {
+          this.creditBalance = 0;
+          console.log('💳 No credit balance setting found in array, defaulting to 0');
+        }
+      }
+      // Handle case where settings exist but no success flag
+      else if (data.settings && Array.isArray(data.settings)) {
+        const creditSetting = data.settings.find(s => s.setting_key === 'iptv_credits_balance');
+        if (creditSetting && creditSetting.setting_value !== undefined) {
+          this.creditBalance = parseInt(creditSetting.setting_value) || 0;
+          console.log(`💳 Loaded credits from array (no success flag): ${this.creditBalance}`);
+        } else {
+          this.creditBalance = 0;
+          console.log('💳 No credit balance setting found in array (no success flag), defaulting to 0');
+        }
+      }
+      // Fallback - try to find any iptv_credits_balance property
+      else {
+        // Search all properties for iptv_credits_balance
+        let found = false;
+        for (const key in data) {
+          if (key === 'iptv_credits_balance') {
+            this.creditBalance = parseInt(data[key]) || 0;
+            console.log(`💳 Found credits in property search: ${this.creditBalance}`);
+            found = true;
+            break;
+          }
+        }
+        
+        if (!found) {
+          this.creditBalance = 0;
+          console.log('💳 No credit balance found anywhere, defaulting to 0');
+        }
+      }
+      
+      this.updateCreditDisplay();
+      
+    } catch (error) {
+      console.error('❌ Failed to load credit balance:', error);
+      this.creditBalance = 0;
+      this.updateCreditDisplay();
     }
-    
-    this.updateCreditDisplay();
-  } catch (error) {
-    console.error('❌ Failed to load credit balance:', error);
-    this.creditBalance = 0;
-    this.updateCreditDisplay();
-  }
-},
+  },
 
   /**
    * Bind IPTV-related event listeners
@@ -239,61 +273,61 @@ async loadCreditBalance() {
     }
   },
 
-/**
- * Populate package selection dropdown
- */
-populatePackageSelect() {
-  const select = document.getElementById('iptvPackageSelect');
-  if (!select) {
-    console.warn('Package select element not found');
-    return;
-  }
-  
-  select.innerHTML = '<option value="">Select Package...</option>';
-  
-  // Add package groups
-  Object.keys(this.packages).forEach(type => {
-    if (this.packages[type] && this.packages[type].length > 0) {
-      const groupLabel = type.replace('_', ' ').toUpperCase();
-      const optgroup = document.createElement('optgroup');
-      optgroup.label = groupLabel;
-      
-      this.packages[type].forEach(pkg => {
-        const option = document.createElement('option');
-        option.value = pkg.package_id;
-        option.dataset.type = type;
-        option.textContent = `${pkg.name} (${pkg.connections} conn, ${pkg.duration_months}mo, ${pkg.credits} credits)`;
-        optgroup.appendChild(option);
-      });
-      
-      select.appendChild(optgroup);
+  /**
+   * Populate package selection dropdown
+   */
+  populatePackageSelect() {
+    const select = document.getElementById('iptvPackageSelect');
+    if (!select) {
+      console.warn('Package select element not found');
+      return;
     }
-  });
-  
-  console.log('✅ Package dropdown populated');
-},
+    
+    select.innerHTML = '<option value="">Select Package...</option>';
+    
+    // Add package groups
+    Object.keys(this.packages).forEach(type => {
+      if (this.packages[type] && this.packages[type].length > 0) {
+        const groupLabel = type.replace('_', ' ').toUpperCase();
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = groupLabel;
+        
+        this.packages[type].forEach(pkg => {
+          const option = document.createElement('option');
+          option.value = pkg.package_id;
+          option.dataset.type = type;
+          option.textContent = `${pkg.name} (${pkg.connections} conn, ${pkg.duration_months}mo, ${pkg.credits} credits)`;
+          optgroup.appendChild(option);
+        });
+        
+        select.appendChild(optgroup);
+      }
+    });
+    
+    console.log('✅ Package dropdown populated');
+  },
 
-/**
- * Populate channel group selection dropdown  
- */
-populateChannelGroupSelect() {
-  const select = document.getElementById('iptvChannelGroupSelect');
-  if (!select) {
-    console.warn('Channel group select element not found');
-    return;
-  }
-  
-  select.innerHTML = '<option value="">Select Channel Group...</option>';
-  
-  this.channelGroups.forEach(group => {
-    const option = document.createElement('option');
-    option.value = group.id;
-    option.textContent = group.name;
-    select.appendChild(option);
-  });
-  
-  console.log('✅ Channel group dropdown populated');
-},
+  /**
+   * Populate channel group selection dropdown  
+   */
+  populateChannelGroupSelect() {
+    const select = document.getElementById('iptvChannelGroupSelect');
+    if (!select) {
+      console.warn('Channel group select element not found');
+      return;
+    }
+    
+    select.innerHTML = '<option value="">Select Channel Group...</option>';
+    
+    this.channelGroups.forEach(group => {
+      const option = document.createElement('option');
+      option.value = group.id;
+      option.textContent = group.name;
+      select.appendChild(option);
+    });
+    
+    console.log('✅ Channel group dropdown populated');
+  },
 
   /**
    * Handle package selection change
@@ -388,29 +422,28 @@ populateChannelGroupSelect() {
     }
   },
 
-  
-/**
- * Update credit display in the UI (enhanced version)
- */
-updateCreditDisplay() {
-  const creditElements = [
-    'currentCredits', 
-    'currentCreditBalance', 
-    '.credit-balance'
-  ];
-  
-  creditElements.forEach(selector => {
-    const element = selector.startsWith('.') ? 
-      document.querySelector(selector) : 
-      document.getElementById(selector);
+  /**
+   * Update credit display in the UI (enhanced version)
+   */
+  updateCreditDisplay() {
+    const creditElements = [
+      'currentCredits', 
+      'currentCreditBalance', 
+      '.credit-balance'
+    ];
     
-    if (element) {
-      element.textContent = this.creditBalance;
-    }
-  });
-  
-  console.log(`💳 Updated credit display: ${this.creditBalance}`);
-}
+    creditElements.forEach(selector => {
+      const element = selector.startsWith('.') ? 
+        document.querySelector(selector) : 
+        document.getElementById(selector);
+      
+      if (element) {
+        element.textContent = this.creditBalance;
+      }
+    });
+    
+    console.log(`💳 Updated credit display: ${this.creditBalance}`);
+  },
 
   /**
    * Generate random username
@@ -641,66 +674,66 @@ updateCreditDisplay() {
     }
   },
 
-/**
- * Sync credit balance from panel (matching settings page approach)
- */
-async syncCredits() {
-  // Find the sync button using the existing onclick pattern in your HTML
-  const button = document.querySelector('button[onclick*="IPTV.syncCredits"]');
-  
-  if (!button) {
-    console.error('❌ Sync credits button not found');
-    return;
-  }
-  
-  const originalText = button.innerHTML;
-  button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-  button.disabled = true;
-  
-  try {
-    console.log('💳 Syncing credit balance from panel...');
+  /**
+   * Sync credit balance from panel (matching settings page approach)
+   */
+  async syncCredits() {
+    // Find the sync button using the existing onclick pattern in your HTML
+    const button = document.querySelector('button[onclick*="IPTV.syncCredits"]');
     
-    // Use the same API endpoint as settings page
-    const response = await fetch('/api/iptv/sync-credits', { method: 'POST' });
-    const data = await response.json();
+    if (!button) {
+      console.error('❌ Sync credits button not found');
+      return;
+    }
     
-    if (data.success) {
-      const credits = data.credits || 0;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    button.disabled = true;
+    
+    try {
+      console.log('💳 Syncing credit balance from panel...');
       
-      // Update local balance
-      this.creditBalance = credits;
+      // Use the same API endpoint as settings page
+      const response = await fetch('/api/iptv/sync-credits', { method: 'POST' });
+      const data = await response.json();
       
-      // Update the display immediately
-      this.updateCreditDisplay();
-      
-      // Show success notification
-      if (window.Utils && window.Utils.showNotification) {
-        window.Utils.showNotification(`Credit balance synced: ${credits} credits`, 'success');
-      } else if (window.showNotification) {
-        window.showNotification(`Credit balance synced: ${credits} credits`, 'success');
+      if (data.success) {
+        const credits = data.credits || 0;
+        
+        // Update local balance
+        this.creditBalance = credits;
+        
+        // Update the display immediately
+        this.updateCreditDisplay();
+        
+        // Show success notification
+        if (window.Utils && window.Utils.showNotification) {
+          window.Utils.showNotification(`Credit balance synced: ${credits} credits`, 'success');
+        } else if (window.showNotification) {
+          window.showNotification(`Credit balance synced: ${credits} credits`, 'success');
+        } else {
+          console.log(`✅ Credit balance synced: ${credits} credits`);
+        }
+        
+        console.log(`✅ Credit balance synced successfully: ${credits} credits`);
       } else {
-        console.log(`✅ Credit balance synced: ${credits} credits`);
+        throw new Error(data.message || 'Sync failed');
       }
+    } catch (error) {
+      console.error('❌ Failed to sync credits:', error);
       
-      console.log(`✅ Credit balance synced successfully: ${credits} credits`);
-    } else {
-      throw new Error(data.message || 'Sync failed');
+      // Show error notification
+      if (window.Utils && window.Utils.showNotification) {
+        window.Utils.showNotification(`Failed to sync credits: ${error.message}`, 'error');
+      } else if (window.showNotification) {
+        window.showNotification(`Failed to sync credits: ${error.message}`, 'error');
+      }
+    } finally {
+      // Restore button state
+      button.innerHTML = originalText;
+      button.disabled = false;
     }
-  } catch (error) {
-    console.error('❌ Failed to sync credits:', error);
-    
-    // Show error notification
-    if (window.Utils && window.Utils.showNotification) {
-      window.Utils.showNotification(`Failed to sync credits: ${error.message}`, 'error');
-    } else if (window.showNotification) {
-      window.showNotification(`Failed to sync credits: ${error.message}`, 'error');
-    }
-  } finally {
-    // Restore button state
-    button.innerHTML = originalText;
-    button.disabled = false;
-  }
-},
+  },
 
   /**
    * Test IPTV panel connection
@@ -1201,204 +1234,201 @@ async syncCredits() {
     }
   },
 
-// REPLACEMENT SECTION FOR iptv.js - renderChannelGroupsTable function
-// Replace the renderChannelGroupsTable function in your iptv.js with this version
-
-/**
- * Render channel groups table (FIXED - No Star Icon)
- */
-renderChannelGroupsTable(groups, tableBody) {
+  /**
+   * Render channel groups table (FIXED - No Star Icon)
+   */
+  renderChannelGroupsTable(groups, tableBody) {
     if (groups.length === 0) {
-        tableBody.innerHTML = `
-            <tr>
-                <td colspan="6" style="text-align: center; color: #666;">
-                    <p>No channel groups created yet.</p>
-                    <button class="btn btn-primary" onclick="IPTV.showChannelGroupForm()">
-                        <i class="fas fa-plus"></i> Create Your First Group
-                    </button>
-                </td>
-            </tr>
-        `;
-        return;
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; color: #666;">
+            <p>No channel groups created yet.</p>
+            <button class="btn btn-primary" onclick="IPTV.showChannelGroupForm()">
+              <i class="fas fa-plus"></i> Create Your First Group
+            </button>
+          </td>
+        </tr>
+      `;
+      return;
     }
     
     const rows = groups.map(group => {
-        const bouquetIds = Array.isArray(group.bouquet_ids) ? 
-            group.bouquet_ids : 
-            (typeof group.bouquet_ids === 'string' ? JSON.parse(group.bouquet_ids || '[]') : []);
-        
-        const bouquetCount = bouquetIds.length;
-        const status = group.is_active ? 
-            '<span class="badge badge-success">Active</span>' : 
-            '<span class="badge badge-secondary">Inactive</span>';
-        
-        const createdDate = new Date(group.created_at).toLocaleDateString();
-        
-        return `
-            <tr>
-                <td style="font-weight: bold; color: #4fc3f7;">${group.name}</td>
-                <td>${group.description || 'No description'}</td>
-                <td>
-                    <span class="badge badge-info">${bouquetCount} bouquets</span>
-                </td>
-                <td>${status}</td>
-                <td>${createdDate}</td>
-                <td>
-                    <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-info" onclick="IPTV.viewChannelGroup(${group.id})" title="View">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button class="btn btn-outline-warning" onclick="IPTV.editChannelGroup(${group.id})" title="Edit">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn btn-outline-danger" onclick="IPTV.deleteChannelGroup(${group.id})" title="Delete">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `;
+      const bouquetIds = Array.isArray(group.bouquet_ids) ? 
+        group.bouquet_ids : 
+        (typeof group.bouquet_ids === 'string' ? JSON.parse(group.bouquet_ids || '[]') : []);
+      
+      const bouquetCount = bouquetIds.length;
+      const status = group.is_active ? 
+        '<span class="badge badge-success">Active</span>' : 
+        '<span class="badge badge-secondary">Inactive</span>';
+      
+      const createdDate = new Date(group.created_at).toLocaleDateString();
+      
+      return `
+        <tr>
+          <td style="font-weight: bold; color: #4fc3f7;">${group.name}</td>
+          <td>${group.description || 'No description'}</td>
+          <td>
+            <span class="badge badge-info">${bouquetCount} bouquets</span>
+          </td>
+          <td>${status}</td>
+          <td>${createdDate}</td>
+          <td>
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-outline-info" onclick="IPTV.viewChannelGroup(${group.id})" title="View">
+                <i class="fas fa-eye"></i>
+              </button>
+              <button class="btn btn-outline-warning" onclick="IPTV.editChannelGroup(${group.id})" title="Edit">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button class="btn btn-outline-danger" onclick="IPTV.deleteChannelGroup(${group.id})" title="Delete">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
     }).join('');
     
     tableBody.innerHTML = rows;
-}
+  },
 
-/**
- * View specific channel group details with bouquet names
- */
-async viewChannelGroup(groupId) {
-  try {
-    // Fetch both group data and bouquets data
-    const [groupResponse, bouquetsResponse] = await Promise.all([
-      fetch(`/api/iptv/channel-groups/${groupId}`),
-      fetch('/api/iptv/bouquets')
-    ]);
-    
-    if (!groupResponse.ok) {
-      throw new Error(`HTTP ${groupResponse.status}`);
-    }
-    
-    const groupData = await groupResponse.json();
-    const bouquetsData = await bouquetsResponse.json();
-    const group = groupData.channelGroup || groupData;
-    
-    // Get bouquet details for this group
-    const groupBouquetIds = group.bouquet_ids || [];
-    const allBouquets = bouquetsData.bouquets || {};
-    
-    // Find bouquets that match this group's IDs
-    const groupBouquets = [];
-    for (const category in allBouquets) {
-      allBouquets[category].forEach(bouquet => {
-        if (groupBouquetIds.includes(bouquet.id.toString())) {
-          groupBouquets.push({
-            ...bouquet,
-            category: category
-          });
-        }
-      });
-    }
-    
-    // Sort bouquets by category then name
-    groupBouquets.sort((a, b) => {
-      if (a.category !== b.category) {
-        return a.category.localeCompare(b.category);
+  /**
+   * View specific channel group details with bouquet names
+   */
+  async viewChannelGroup(groupId) {
+    try {
+      // Fetch both group data and bouquets data
+      const [groupResponse, bouquetsResponse] = await Promise.all([
+        fetch(`/api/iptv/channel-groups/${groupId}`),
+        fetch('/api/iptv/bouquets')
+      ]);
+      
+      if (!groupResponse.ok) {
+        throw new Error(`HTTP ${groupResponse.status}`);
       }
-      return a.name.localeCompare(b.name);
-    });
-    
-    // Create bouquets HTML
-    let bouquetsHTML = '';
-    if (groupBouquets.length === 0) {
-      bouquetsHTML = '<div style="text-align: center; color: #666; padding: 20px;">No bouquets found in this group</div>';
-    } else {
-      // Group by category for display
-      const categorizedBouquets = {};
-      groupBouquets.forEach(bouquet => {
-        if (!categorizedBouquets[bouquet.category]) {
-          categorizedBouquets[bouquet.category] = [];
+      
+      const groupData = await groupResponse.json();
+      const bouquetsData = await bouquetsResponse.json();
+      const group = groupData.channelGroup || groupData;
+      
+      // Get bouquet details for this group
+      const groupBouquetIds = group.bouquet_ids || [];
+      const allBouquets = bouquetsData.bouquets || {};
+      
+      // Find bouquets that match this group's IDs
+      const groupBouquets = [];
+      for (const category in allBouquets) {
+        allBouquets[category].forEach(bouquet => {
+          if (groupBouquetIds.includes(bouquet.id.toString())) {
+            groupBouquets.push({
+              ...bouquet,
+              category: category
+            });
+          }
+        });
+      }
+      
+      // Sort bouquets by category then name
+      groupBouquets.sort((a, b) => {
+        if (a.category !== b.category) {
+          return a.category.localeCompare(b.category);
         }
-        categorizedBouquets[bouquet.category].push(bouquet);
+        return a.name.localeCompare(b.name);
       });
       
-      // Generate HTML by category
-      for (const category in categorizedBouquets) {
-        bouquetsHTML += `
-          <div style="margin-bottom: 25px;">
-            <h4 style="color: #4fc3f7; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #333;">
-              ${category} (${categorizedBouquets[category].length} bouquets)
-            </h4>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px;">
-        `;
-        
-        categorizedBouquets[category].forEach(bouquet => {
-          bouquetsHTML += `
-            <div style="background: rgba(79, 195, 247, 0.1); padding: 12px; border-radius: 6px; border: 1px solid #4fc3f7;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: #fff; font-weight: 500;">${bouquet.name}</span>
-                <span style="color: #4fc3f7; font-size: 0.9rem; font-family: monospace;">ID: ${bouquet.id}</span>
-              </div>
-            </div>
-          `;
+      // Create bouquets HTML
+      let bouquetsHTML = '';
+      if (groupBouquets.length === 0) {
+        bouquetsHTML = '<div style="text-align: center; color: #666; padding: 20px;">No bouquets found in this group</div>';
+      } else {
+        // Group by category for display
+        const categorizedBouquets = {};
+        groupBouquets.forEach(bouquet => {
+          if (!categorizedBouquets[bouquet.category]) {
+            categorizedBouquets[bouquet.category] = [];
+          }
+          categorizedBouquets[bouquet.category].push(bouquet);
         });
         
-        bouquetsHTML += '</div></div>';
-      }
-    }
-    
-    // Show group details in a modal
-    const modalHTML = `
-      <div id="groupViewModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px;">
-        <div style="background: #1a1a1a; color: #fff; border-radius: 8px; border: 1px solid #333; max-width: 900px; width: 100%; max-height: 90%; overflow: hidden; display: flex; flex-direction: column;">
-          <div style="padding: 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <h3 style="margin: 0; color: #4fc3f7;">${group.name}</h3>
-              <p style="margin: 5px 0 0 0; color: #ccc; font-size: 0.9rem;">${group.description || 'No description'}</p>
-            </div>
-            <button onclick="document.getElementById('groupViewModal').remove()" style="background: #f44336; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">
-              <i class="fas fa-times"></i> Close
-            </button>
-          </div>
+        // Generate HTML by category
+        for (const category in categorizedBouquets) {
+          bouquetsHTML += `
+            <div style="margin-bottom: 25px;">
+              <h4 style="color: #4fc3f7; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #333;">
+                ${category} (${categorizedBouquets[category].length} bouquets)
+              </h4>
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px;">
+          `;
           
-          <div style="padding: 20px; overflow-y: auto; flex: 1;">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
-              <div style="background: rgba(76, 175, 80, 0.1); padding: 15px; border-radius: 6px; border: 1px solid #4caf50;">
-                <div style="color: #4caf50; font-size: 1.2rem; font-weight: bold;">${groupBouquets.length}</div>
-                <div style="color: #fff; font-size: 0.9rem;">Total Bouquets</div>
+          categorizedBouquets[category].forEach(bouquet => {
+            bouquetsHTML += `
+              <div style="background: rgba(79, 195, 247, 0.1); padding: 12px; border-radius: 6px; border: 1px solid #4fc3f7;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="color: #fff; font-weight: 500;">${bouquet.name}</span>
+                  <span style="color: #4fc3f7; font-size: 0.9rem; font-family: monospace;">ID: ${bouquet.id}</span>
+                </div>
               </div>
-              <div style="background: rgba(33, 150, 243, 0.1); padding: 15px; border-radius: 6px; border: 1px solid #2196f3;">
-                <div style="color: #2196f3; font-size: 1.2rem; font-weight: bold;">${Object.keys(categorizedBouquets || {}).length}</div>
-                <div style="color: #fff; font-size: 0.9rem;">Categories</div>
+            `;
+          });
+          
+          bouquetsHTML += '</div></div>';
+        }
+      }
+      
+      // Show group details in a modal
+      const modalHTML = `
+        <div id="groupViewModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px;">
+          <div style="background: #1a1a1a; color: #fff; border-radius: 8px; border: 1px solid #333; max-width: 900px; width: 100%; max-height: 90%; overflow: hidden; display: flex; flex-direction: column;">
+            <div style="padding: 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h3 style="margin: 0; color: #4fc3f7;">${group.name}</h3>
+                <p style="margin: 5px 0 0 0; color: #ccc; font-size: 0.9rem;">${group.description || 'No description'}</p>
               </div>
-              <div style="background: rgba(255, 152, 0, 0.1); padding: 15px; border-radius: 6px; border: 1px solid #ff9800;">
-                <div style="color: #ff9800; font-size: 1.2rem; font-weight: bold;">${group.is_active ? 'Active' : 'Inactive'}</div>
-                <div style="color: #fff; font-size: 0.9rem;">Status</div>
-              </div>
-              <div style="background: rgba(156, 39, 176, 0.1); padding: 15px; border-radius: 6px; border: 1px solid #9c27b0;">
-                <div style="color: #9c27b0; font-size: 1.2rem; font-weight: bold;">${new Date(group.created_at).toLocaleDateString()}</div>
-                <div style="color: #fff; font-size: 0.9rem;">Created</div>
-              </div>
+              <button onclick="document.getElementById('groupViewModal').remove()" style="background: #f44336; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">
+                <i class="fas fa-times"></i> Close
+              </button>
             </div>
             
-            <h4 style="color: #4fc3f7; margin-bottom: 15px;">Included Bouquets:</h4>
-            ${bouquetsHTML}
+            <div style="padding: 20px; overflow-y: auto; flex: 1;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                <div style="background: rgba(76, 175, 80, 0.1); padding: 15px; border-radius: 6px; border: 1px solid #4caf50;">
+                  <div style="color: #4caf50; font-size: 1.2rem; font-weight: bold;">${groupBouquets.length}</div>
+                  <div style="color: #fff; font-size: 0.9rem;">Total Bouquets</div>
+                </div>
+                <div style="background: rgba(33, 150, 243, 0.1); padding: 15px; border-radius: 6px; border: 1px solid #2196f3;">
+                  <div style="color: #2196f3; font-size: 1.2rem; font-weight: bold;">${Object.keys(categorizedBouquets || {}).length}</div>
+                  <div style="color: #fff; font-size: 0.9rem;">Categories</div>
+                </div>
+                <div style="background: rgba(255, 152, 0, 0.1); padding: 15px; border-radius: 6px; border: 1px solid #ff9800;">
+                  <div style="color: #ff9800; font-size: 1.2rem; font-weight: bold;">${group.is_active ? 'Active' : 'Inactive'}</div>
+                  <div style="color: #fff; font-size: 0.9rem;">Status</div>
+                </div>
+                <div style="background: rgba(156, 39, 176, 0.1); padding: 15px; border-radius: 6px; border: 1px solid #9c27b0;">
+                  <div style="color: #9c27b0; font-size: 1.2rem; font-weight: bold;">${new Date(group.created_at).toLocaleDateString()}</div>
+                  <div style="color: #fff; font-size: 0.9rem;">Created</div>
+                </div>
+              </div>
+              
+              <h4 style="color: #4fc3f7; margin-bottom: 15px;">Included Bouquets:</h4>
+              ${bouquetsHTML}
+            </div>
           </div>
         </div>
-      </div>
-    `;
-    
-    // Remove existing modal and add new one
-    const existingModal = document.getElementById('groupViewModal');
-    if (existingModal) {
-      existingModal.remove();
+      `;
+      
+      // Remove existing modal and add new one
+      const existingModal = document.getElementById('groupViewModal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+      document.body.insertAdjacentHTML('beforeend', modalHTML);
+      
+    } catch (error) {
+      console.error('❌ Failed to view channel group:', error);
+      showNotification('Failed to load channel group details', 'error');
     }
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    
-  } catch (error) {
-    console.error('❌ Failed to view channel group:', error);
-    showNotification('Failed to load channel group details', 'error');
-  }
-}
+  },
 
   /**
    * Edit channel group
@@ -1821,6 +1851,10 @@ async viewChannelGroup(groupId) {
   }
 };
 
+// CRITICAL FIX: Export to global scope FIRST, before any other logic
+window.IPTV = IPTV;
+window.IPTVUser = IPTV;
+
 // Initialize when document is ready
 $(document).ready(() => {
   // Initialize IPTV module if we're on a page that needs it
@@ -1829,80 +1863,7 @@ $(document).ready(() => {
   }
 });
 
-// Clean export for user management pages - no merging conflicts
-window.IPTVUser = IPTV;
 console.log('📺 IPTV user module loaded cleanly');
-
-// Save any existing functions that might have been created by settings.js
-const existingIptvFunctions = { ...window.IPTV };
-
-// Merge this IPTV object's functions, but don't overwrite existing ones
-Object.keys(IPTV).forEach(key => {
-  if (typeof IPTV[key] === 'function') {
-    // Only add if it doesn't exist or if the existing one is not a function
-    if (!existingIptvFunctions[key] || typeof existingIptvFunctions[key] !== 'function') {
-      window.IPTV[key] = IPTV[key];
-    } else {
-      // Keep the existing function (from settings.js) and add this one with a suffix
-      window.IPTV[key + '_userForm'] = IPTV[key];
-    }
-  } else {
-    // Non-function properties can be overwritten
-    window.IPTV[key] = IPTV[key];
-  }
-});
-
-// Restore any existing functions that we want to keep
-Object.keys(existingIptvFunctions).forEach(key => {
-  if (typeof existingIptvFunctions[key] === 'function' && !window.IPTV[key]) {
-    window.IPTV[key] = existingIptvFunctions[key];
-  }
-});
-
-console.log('📺 IPTV module loaded and properly merged with existing functions');
-console.log('🔍 Available IPTV functions:', Object.keys(window.IPTV).filter(k => typeof window.IPTV[k] === 'function'));
-
-// CRITICAL: Make sure the settings page functions are still available
-const requiredSettingsFunctions = [
-  'testPanelConnection',
-  'syncPackagesFromPanel', 
-  'syncBouquetsFromPanel',
-  'syncCreditsBalance'
-];
-
-const missingSettingsFunctions = requiredSettingsFunctions.filter(funcName => {
-  return typeof window.IPTV[funcName] !== 'function';
-});
-
-if (missingSettingsFunctions.length > 0) {
-  console.warn('⚠️ Missing IPTV functions after merge:', missingSettingsFunctions);
-  console.log('📋 Available functions:', Object.keys(window.IPTV).filter(k => typeof window.IPTV[k] === 'function'));
-} else {
-  console.log('✅ All required IPTV functions are available');
-}
-
-// Initialize when document is ready OR when called explicitly
-$(document).ready(() => {
-  // Always try to initialize IPTV if we're on any page
-  console.log('📺 Document ready, checking if IPTV should initialize...');
-  
-  // Initialize IPTV for any page (not just specific ones)
-  if (typeof window.IPTV.init === 'function') {
-    window.IPTV.init().catch(error => {
-      console.warn('⚠️ IPTV initialization had issues (this may be normal):', error.message);
-    });
-  }
-});
-
-// CRITICAL: Make sure syncCredits is available globally for onclick handlers
-window.syncIPTVCredits = function() {
-  if (window.IPTV && typeof window.IPTV.syncCredits === 'function') {
-    return window.IPTV.syncCredits();
-  } else {
-    console.error('❌ IPTV.syncCredits not available');
-    alert('IPTV module not loaded properly. Please refresh the page.');
-  }
-};
 
 // UserFormIPTV module - Copy of SettingsIPTV pattern
 const UserFormIPTV = {
@@ -1914,26 +1875,30 @@ const UserFormIPTV = {
             console.log('💳 Loading credit balance from database...');
             
             // Load settings from database (same as settings page)
-            const settings = await API.Settings.getAll();
+            const response = await fetch('/api/settings');
+            const data = await response.json();
             
             // Load current credit balance from database
-            if (settings.iptv_credits_balance !== undefined) {
-                const creditElement = document.getElementById('currentCreditBalance');
-                if (creditElement) {
-                    creditElement.textContent = settings.iptv_credits_balance || 0;
-                }
-                
-                // Update IPTV object balance too
-                if (window.IPTV) {
-                    window.IPTV.creditBalance = parseInt(settings.iptv_credits_balance) || 0;
-                }
-                
-                console.log(`💳 Loaded credits from DB: ${settings.iptv_credits_balance}`);
-            } else {
-                // Default to 0 if not found
-                const creditElement = document.getElementById('currentCreditBalance');
-                if (creditElement) {
-                    creditElement.textContent = '0';
+            if (data.success && data.settings) {
+                const creditSetting = data.settings.find(s => s.setting_key === 'iptv_credits_balance');
+                if (creditSetting) {
+                    const creditElement = document.getElementById('currentCreditBalance');
+                    if (creditElement) {
+                        creditElement.textContent = creditSetting.setting_value || 0;
+                    }
+                    
+                    // Update IPTV object balance too
+                    if (window.IPTV) {
+                        window.IPTV.creditBalance = parseInt(creditSetting.setting_value) || 0;
+                    }
+                    
+                    console.log(`💳 Loaded credits from DB: ${creditSetting.setting_value}`);
+                } else {
+                    // Default to 0 if not found
+                    const creditElement = document.getElementById('currentCreditBalance');
+                    if (creditElement) {
+                        creditElement.textContent = '0';
+                    }
                 }
             }
             
@@ -1995,5 +1960,41 @@ const UserFormIPTV = {
 
 // Make it globally available for onclick handlers (same pattern as settings)
 window.UserFormIPTV = UserFormIPTV;
+
+// CRITICAL: Make sure syncCredits is available globally for onclick handlers
+window.syncIPTVCredits = function() {
+  if (window.IPTV && typeof window.IPTV.syncCredits === 'function') {
+    return window.IPTV.syncCredits();
+  } else {
+    console.error('❌ IPTV.syncCredits not available');
+    alert('IPTV module not loaded properly. Please refresh the page.');
+  }
+};
+
+// Simple compatibility check - only merge if there are existing functions
+if (typeof window.IPTV === 'object' && window.IPTV !== IPTV) {
+  console.log('📺 Merging with existing IPTV functions...');
+  
+  // Save any existing functions that might have been created by settings.js
+  const existingIptvFunctions = { ...window.IPTV };
+  
+  // Merge existing functions back into our IPTV object
+  Object.keys(existingIptvFunctions).forEach(key => {
+    if (typeof existingIptvFunctions[key] === 'function' && !IPTV[key]) {
+      IPTV[key] = existingIptvFunctions[key];
+    }
+  });
+  
+  // Re-assign the merged object
+  window.IPTV = IPTV;
+  window.IPTVUser = IPTV;
+  
+  console.log('📺 IPTV module merged with existing functions');
+} else {
+  console.log('📺 IPTV module loaded as primary');
+}
+
+console.log('📺 IPTV module loaded and properly merged with existing functions');
+console.log('🔍 Available IPTV functions:', Object.keys(window.IPTV).filter(k => typeof window.IPTV[k] === 'function'));
 
 console.log('✅ UserFormIPTV module loaded and available globally');
