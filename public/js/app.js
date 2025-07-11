@@ -810,7 +810,7 @@ if (user.tags && Array.isArray(user.tags)) {
                 // Load current IPTV status for this user
                 if (window.IPTV && typeof window.IPTV.loadUserStatus === 'function') {
                     setTimeout(() => {
-                        window.IPTV.loadUserStatus(user);
+                        window.IPTV.loadUserStatus(user.id);
                     }, 500); // Small delay to ensure UI is ready
                 }
             }

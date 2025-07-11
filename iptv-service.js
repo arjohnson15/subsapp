@@ -1305,6 +1305,32 @@ class IPTVService {
     }
   }
   
+/**
+ * Get all panel users using /lines/data endpoint
+ */
+async getAllPanelUsers() {
+  try {
+    console.log('🔍 Fetching all panel users from /lines/data...');
+    
+    await this.ensureAuthenticated();
+    
+    const response = await this.makeAuthenticatedRequest('GET', '/lines/data');
+    
+    if (response && response.data) {
+      const users = Array.isArray(response.data) ? response.data : [];
+      console.log(`✅ Retrieved ${users.length} users from panel`);
+      return users;
+    }
+    
+    console.warn('⚠️ No user data returned from panel');
+    return [];
+    
+  } catch (error) {
+    console.error('❌ Failed to get panel users:', error);
+    throw error;
+  }
+}
+  
   /**
    * Get all users data from panel
    * This calls the /lines/data endpoint to retrieve all users

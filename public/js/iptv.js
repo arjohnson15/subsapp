@@ -168,46 +168,36 @@ const IPTV = {
     $(document).on('click', '#testIPTVConnectionBtn', () => this.testConnection());
   },
 
-  /**
-   * Show IPTV section when IPTV tag is checked (FIXED - populate dropdowns after section is shown)
-   */
-  showIPTVSection(userId) {
-    console.log('📺 Showing IPTV section for user:', userId);
-    this.currentUser = userId;
-    
-    // Show the IPTV section FIRST
-    const section = document.getElementById('iptvSection');
-    if (section) {
-      section.style.display = 'block';
-    }
-    
-    // Load user's current IPTV status
-    this.loadUserStatus(userId);
-    
-    // NOW populate dropdowns (after the section is visible)
-    setTimeout(() => {
-      const packageSuccess = this.populatePackageSelect();
-      const channelSuccess = this.populateChannelGroupSelect();
-      
-      if (!packageSuccess) {
-        console.error('❌ Failed to populate package dropdown');
-      }
-      if (!channelSuccess) {
-        console.error('❌ Failed to populate channel group dropdown');
-      }
-      
-      // Update credit display
-      this.updateCreditDisplay();
-      
-      // Load default channel group based on trial setting
-      this.loadDefaultChannelGroup();
-      
-      // Initialize form state
-      this.handleActionChange();
-    }, 100);
-    
-    console.log('✅ IPTV section shown and dropdowns populated');
-  },
+/**
+ * Show IPTV section when IPTV tag is checked - Updated for check existing feature
+ */
+showIPTVSection(userId) {
+  console.log('📺 Showing IPTV section for user:', userId);
+  
+  this.currentUser = userId;
+  
+  // Show the main IPTV section
+  const section = document.getElementById('iptvSection');
+  if (section) {
+    section.style.display = 'block';
+  }
+  
+  // Load user's current IPTV status to determine which interface to show
+  this.loadUserStatus(userId).then(() => {
+    this.updateStatusInterface();
+  });
+  
+  // Continue with other initialization
+  setTimeout(() => {
+    this.populatePackageSelect();
+    this.populateChannelGroupSelect();
+    this.updateCreditDisplay();
+    this.loadDefaultChannelGroup();
+    this.handleActionChange();
+  }, 100);
+  
+  console.log('✅ IPTV section shown');
+},
 
   /**
    * Hide IPTV section when IPTV tag is unchecked
@@ -221,23 +211,34 @@ const IPTV = {
     this.clearForm();
   },
 
-  /**
-   * Load user's current IPTV status
-   */
-  async loadUserStatus(userId) {
-    try {
-      const response = await fetch(`/api/iptv/user/${userId}`);
-      const data = await response.json();
+/**
+ * Load user's current IPTV status - Updated to track existing data
+ */
+async loadUserStatus(userId) {
+  try {
+    const response = await fetch(`/api/iptv/user/${userId}`);
+    const data = await response.json();
+    
+    if (data.success) {
+      // Store the user's IPTV status
+      this.userHasExistingIPTVData = !!(
+        data.user.iptv_line_id || 
+        data.user.iptv_username || 
+        data.user.iptv_expiration
+      );
       
-      if (data.success) {
-        this.displayUserStatus(data.user);
-      } else if (response.status !== 404) {
-        throw new Error(data.message);
-      }
-    } catch (error) {
-      console.error('❌ Failed to load user IPTV status:', error);
+      this.displayUserStatus(data.user);
+    } else if (response.status !== 404) {
+      throw new Error(data.message);
+    } else {
+      // User not found in IPTV data - mark as new IPTV user
+      this.userHasExistingIPTVData = false;
     }
-  },
+  } catch (error) {
+    console.error('❌ Failed to load user IPTV status:', error);
+    this.userHasExistingIPTVData = false;
+  }
+},
 
   /**
    * Display user's current IPTV status in the Current Status section
@@ -1721,7 +1722,263 @@ const UserFormIPTV = {
         window.showNotification('Failed to sync credits', 'error');
       }
     }
+  },
+  
+/**
+ * Update the status interface based on user's current IPTV data
+ */
+updateStatusInterface() {
+  const statusDisplay = document.getElementById('iptvStatusDisplay');
+  const checkExistingInterface = document.getElementById('checkExistingInterface');
+  
+  if (this.userHasExistingIPTVData) {
+    // User has IPTV data - show normal status display
+    if (statusDisplay) statusDisplay.style.display = 'block';
+    if (checkExistingInterface) checkExistingInterface.style.display = 'none';
+  } else {
+    // User has no IPTV data - show check existing interface
+    if (statusDisplay) statusDisplay.style.display = 'none';
+    if (checkExistingInterface) {
+      checkExistingInterface.style.display = 'block';
+      this.initializeCheckExistingInterface();
+    }
   }
+},
+
+/**
+ * Initialize the check existing interface
+ */
+initializeCheckExistingInterface() {
+  const usernameInput = document.getElementById('existingIptvUsername');
+  const checkBtn = document.getElementById('checkAccessBtn');
+  
+  if (usernameInput && checkBtn) {
+    // Remove existing listeners to prevent duplicates
+    usernameInput.removeEventListener('input', this.handleUsernameInput);
+    checkBtn.removeEventListener('click', this.handleCheckAccess);
+    
+    // Add input event listener
+    this.handleUsernameInput = () => {
+      const username = usernameInput.value.trim();
+      checkBtn.disabled = username.length === 0;
+    };
+    
+    this.handleCheckAccess = () => {
+      this.checkExistingAccess();
+    };
+    
+    usernameInput.addEventListener('input', this.handleUsernameInput);
+    checkBtn.addEventListener('click', this.handleCheckAccess);
+  }
+},
+
+/**
+ * Check for existing IPTV access
+ */
+async checkExistingAccess() {
+  const usernameInput = document.getElementById('existingIptvUsername');
+  const checkBtn = document.getElementById('checkAccessBtn');
+  const resultsDiv = document.getElementById('accessCheckResults');
+  
+  if (!usernameInput || !checkBtn || !resultsDiv) return;
+  
+  const username = usernameInput.value.trim();
+  
+  if (!username) {
+    this.showAccessCheckError('Please enter an IPTV username');
+    return;
+  }
+  
+  // Show loading state
+  const originalBtnContent = checkBtn.innerHTML;
+  checkBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching...';
+  checkBtn.disabled = true;
+  usernameInput.disabled = true;
+  
+  try {
+    console.log(`🔍 Checking for existing IPTV access: ${username}`);
+    
+    // Get current user ID
+    const userId = this.getCurrentUserId();
+    if (!userId) {
+      throw new Error('User ID not found');
+    }
+    
+    // Make API call
+    const response = await fetch('/api/iptv/match-existing-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        user_id: parseInt(userId),
+        iptv_username: username
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.message || `HTTP ${response.status}`);
+    }
+    
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to find user');
+    }
+    
+    // Show success results
+    this.showAccessCheckSuccess(result.iptv_data);
+    
+  } catch (error) {
+    console.error('❌ Error checking existing access:', error);
+    this.showAccessCheckError(error.message);
+  } finally {
+    // Restore button state
+    checkBtn.innerHTML = originalBtnContent;
+    checkBtn.disabled = false;
+    usernameInput.disabled = false;
+  }
+},
+
+/**
+ * Show successful access check results
+ */
+showAccessCheckSuccess(iptvData) {
+  const resultsDiv = document.getElementById('accessCheckResults');
+  if (!resultsDiv) return;
+  
+  resultsDiv.className = 'access-results success';
+  resultsDiv.style.display = 'block';
+  
+  resultsDiv.innerHTML = `
+    <div class="success-message">
+      <i class="fas fa-check-circle" style="color: #28a745; margin-right: 8px;"></i>
+      <strong>IPTV Account Found!</strong>
+    </div>
+    
+    <div class="found-user-info">
+      <div class="info-item">
+        <span class="label">Username:</span>
+        <span class="value">${iptvData.username}</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Line ID:</span>
+        <span class="value">${iptvData.line_id}</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Expiration:</span>
+        <span class="value">${iptvData.expiration_formatted}</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Connections:</span>
+        <span class="value">${iptvData.connections} max</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Status:</span>
+        <span class="value">${iptvData.enabled ? 'Active' : 'Inactive'}</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Account Type:</span>
+        <span class="value">${iptvData.is_trial ? 'Trial' : 'Paid'}</span>
+      </div>
+    </div>
+    
+    <button type="button" class="btn link-account-btn" 
+            style="background: linear-gradient(45deg, #28a745, #34ce57); color: #fff; border: none; padding: 10px; border-radius: 4px; font-weight: bold; width: 100%; margin-top: 15px;"
+            onclick="window.IPTV.linkExistingAccount()">
+      <i class="fas fa-link"></i> Account Successfully Linked
+    </button>
+  `;
+  
+  // Store the data for potential linking
+  this.foundIPTVData = iptvData;
+  
+  // Show notification
+  if (window.Utils && window.Utils.showNotification) {
+    window.Utils.showNotification(
+      `Successfully found and linked IPTV account: ${iptvData.username}`, 
+      'success'
+    );
+  }
+  
+  // Update the interface after a short delay to show the success state
+  setTimeout(() => {
+    this.userHasExistingIPTVData = true;
+    this.updateStatusInterface();
+    this.loadUserStatus(this.currentUser); // Refresh the status display
+  }, 2000);
+},
+
+/**
+ * Show error message for access check
+ */
+showAccessCheckError(message) {
+  const resultsDiv = document.getElementById('accessCheckResults');
+  if (!resultsDiv) return;
+  
+  resultsDiv.className = 'access-results error';
+  resultsDiv.style.display = 'block';
+  
+  resultsDiv.innerHTML = `
+    <div class="error-message">
+      <i class="fas fa-exclamation-triangle" style="color: #dc3545; margin-right: 8px;"></i>
+      <strong>No Account Found</strong>
+    </div>
+    <p style="margin: 10px 0 0 0; color: #b0b0b0;">
+      ${message}
+    </p>
+    <p style="margin: 10px 0 0 0; color: #888; font-size: 12px;">
+      If the user needs a new IPTV account, use the "Create New Subscription" options below.
+    </p>
+  `;
+  
+  // Show notification
+  if (window.Utils && window.Utils.showNotification) {
+    window.Utils.showNotification(message, 'error');
+  }
+},
+
+/**
+ * Handle successful account linking (called by button)
+ */
+linkExistingAccount() {
+  // This is called after successful linking - just update the interface
+  this.userHasExistingIPTVData = true;
+  this.updateStatusInterface();
+  
+  // Clear the found data
+  this.foundIPTVData = null;
+},
+
+/**
+ * Get current user ID using multiple methods
+ */
+getCurrentUserId() {
+  // Method 1: Form field
+  const userIdField = document.getElementById('userId');
+  if (userIdField && userIdField.value) {
+    return userIdField.value;
+  }
+  
+  // Method 2: URL parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlUserId = urlParams.get('id');
+  if (urlUserId) {
+    return urlUserId;
+  }
+  
+  // Method 3: IPTV module state
+  if (this.currentUser) {
+    return this.currentUser;
+  }
+  
+  // Method 4: App state
+  if (window.AppState && window.AppState.editingUserId) {
+    return window.AppState.editingUserId;
+  }
+  
+  return null;
+}
 };
 
 // Make it globally available for onclick handlers (same pattern as settings)

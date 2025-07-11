@@ -2183,3 +2183,75 @@ table tbody td:last-child .btn-small:nth-child(3) {
 table tbody td:last-child .btn-small:nth-child(4) { 
     background: linear-gradient(45deg, #f44336, #e91e63) !important; 
 }
+
+/* Check Existing IPTV Access Styling */
+.iptv-status-container {
+  margin-bottom: 20px;
+}
+
+.check-existing-interface {
+  color: #ffffff;
+}
+
+.interface-description {
+  color: #b0b0b0;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.existing-access-form {
+  background: rgba(0, 0, 0, 0.8);
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #4fc3f7;
+}
+
+.access-results {
+  margin-top: 15px;
+  padding: 15px;
+  background: #252525;
+  border-radius: 4px;
+  border-left: 3px solid #007bff;
+}
+
+.access-results.success {
+  border-left-color: #28a745;
+  background: rgba(40, 167, 69, 0.1);
+}
+
+.access-results.error {
+  border-left-color: #dc3545;
+  background: rgba(220, 53, 69, 0.1);
+}
+
+.found-user-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.found-user-info .info-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid #333;
+}
+
+.found-user-info .info-item:last-child {
+  border-bottom: none;
+}
+
+.found-user-info .label {
+  font-weight: bold;
+  color: #b0b0b0;
+}
+
+.found-user-info .value {
+  color: #fff;
+}
+
+.link-account-btn {
+  margin-top: 15px;
+  width: 100%;
+}

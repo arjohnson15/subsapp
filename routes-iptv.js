@@ -769,6 +769,137 @@ router.post('/subscription', [
 });
 
 /**
+ * POST /api/iptv/match-existing-user - Match existing IPTV panel user to local user
+ */
+router.post('/match-existing-user', [
+  body('user_id').isInt().withMessage('Invalid user ID'),
+  body('iptv_username').notEmpty().withMessage('IPTV username is required'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { user_id, iptv_username } = req.body;
+    
+    console.log(`🔍 Searching for existing IPTV user: ${iptv_username} for local user ID: ${user_id}`);
+    
+    await iptvService.initialize();
+    
+    // Get user data from local database
+    const userResult = await db.query('SELECT * FROM users WHERE id = ?', [user_id]);
+    let user = null;
+    if (Array.isArray(userResult) && userResult.length > 0) {
+      user = userResult[0];
+    } else if (userResult && Array.isArray(userResult[0]) && userResult[0].length > 0) {
+      user = userResult[0][0];
+    }
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Local user not found'
+      });
+    }
+    
+    // Search for IPTV user in panel using /lines/data endpoint
+    const panelUsers = await iptvService.getAllPanelUsers();
+    
+    if (!panelUsers || !Array.isArray(panelUsers)) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve panel users data'
+      });
+    }
+    
+    // Find matching user by username
+    const matchingUser = panelUsers.find(panelUser => 
+      panelUser.username === iptv_username
+    );
+    
+    if (!matchingUser) {
+      return res.status(404).json({
+        success: false,
+        message: `IPTV user '${iptv_username}' not found in panel`
+      });
+    }
+    
+    console.log('✅ Found matching IPTV user:', matchingUser);
+    
+    // Extract and format the data
+    const expirationDate = matchingUser.expire_date 
+      ? new Date(matchingUser.expire_date * 1000) // Convert Unix timestamp
+      : null;
+    
+    const expirationForDB = expirationDate ? 
+      expirationDate.toISOString().slice(0, 19).replace('T', ' ') : null;
+    
+    // Generate M3U URL
+    const m3uUrl = iptvService.generateM3UPlusURL(matchingUser.username, matchingUser.password);
+    
+    // Update local user with retrieved IPTV data
+    await db.query(`
+      UPDATE users SET 
+        iptv_username = ?,
+        iptv_password = ?,
+        iptv_line_id = ?,
+        iptv_expiration = ?,
+        iptv_connections = ?,
+        iptv_is_trial = ?,
+        iptv_m3u_url = ?,
+        updated_at = NOW()
+      WHERE id = ?
+    `, [
+      matchingUser.username,
+      matchingUser.password,
+      matchingUser.id,
+      expirationForDB,
+      matchingUser.user_connection || matchingUser.connections || 0,
+      matchingUser.is_trial || 0,
+      m3uUrl,
+      user_id
+    ]);
+    
+    // Log the activity
+    await iptvService.logActivity(
+      user_id, 
+      matchingUser.id, 
+      'match_existing', 
+      null, 
+      0, 
+      true, 
+      'Matched existing IPTV user from panel', 
+      matchingUser
+    );
+    
+    console.log(`✅ Successfully matched and updated user ${user_id} with IPTV data`);
+    
+    // Return the matched user data
+    res.json({
+      success: true,
+      message: 'Successfully matched existing IPTV user',
+      iptv_data: {
+        username: matchingUser.username,
+        line_id: matchingUser.id,
+        expiration: expirationForDB,
+        expiration_formatted: expirationDate ? expirationDate.toLocaleDateString() : 'None',
+        connections: matchingUser.user_connection || matchingUser.connections || 0,
+        active_connections: matchingUser.active_connections || 0,
+        is_trial: Boolean(matchingUser.is_trial),
+        enabled: Boolean(matchingUser.enabled),
+        m3u_url: m3uUrl,
+        panel_data: matchingUser
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error matching existing IPTV user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to match existing IPTV user',
+      error: error.message
+    });
+  }
+});
+
+/**
  * GET /api/iptv/sync-user/:id - Sync single user from panel
  */
 router.get('/sync-user/:id', [
