@@ -535,18 +535,30 @@ router.post('/subscription', [
     
     console.log('✅ Found package:', { id: packageInfo.package_id, name: packageInfo.package_name, type: packageInfo.package_type });
     
-    // Get channel group bouquets - FIXED QUERY RESULT HANDLING
+// Get channel group bouquets - ENHANCED DEBUGGING
     const channelGroupResult = await db.query('SELECT bouquet_ids FROM iptv_channel_groups WHERE id = ?', [channel_group_id]);
     console.log('📊 Raw channel group query result:', channelGroupResult);
+    console.log('📊 Channel group result type:', typeof channelGroupResult);
+    console.log('📊 Channel group result is array:', Array.isArray(channelGroupResult));
+    console.log('📊 Channel group result length:', channelGroupResult?.length);
     
     let channelGroup = null;
     if (Array.isArray(channelGroupResult) && channelGroupResult.length > 0) {
       channelGroup = channelGroupResult[0];
+      console.log('📊 Used direct array access - channelGroup:', channelGroup);
     } else if (channelGroupResult && Array.isArray(channelGroupResult[0]) && channelGroupResult[0].length > 0) {
       channelGroup = channelGroupResult[0][0];
+      console.log('📊 Used nested array access - channelGroup:', channelGroup);
     } else if (channelGroupResult && channelGroupResult.bouquet_ids) {
       channelGroup = channelGroupResult;
+      console.log('📊 Used direct object access - channelGroup:', channelGroup);
     }
+    
+    console.log('📊 Final channelGroup value:', channelGroup);
+    console.log('📊 channelGroup type:', typeof channelGroup);
+    console.log('📊 channelGroup has bouquet_ids:', !!channelGroup?.bouquet_ids);
+    console.log('📊 bouquet_ids value:', channelGroup?.bouquet_ids);
+    console.log('📊 bouquet_ids type:', typeof channelGroup?.bouquet_ids);
     
     if (!channelGroup || !channelGroup.bouquet_ids) {
       console.error('❌ Channel group not found for ID:', channel_group_id);
@@ -559,17 +571,21 @@ router.post('/subscription', [
     
     console.log('✅ Found channel group with bouquets:', channelGroup.bouquet_ids);
     
-    // Parse bouquet IDs (stored as JSON array)
-    let bouquetIds = [];
-    try {
-      bouquetIds = JSON.parse(channelGroup.bouquet_ids);
-    } catch (error) {
-      console.error('❌ Error parsing bouquet IDs:', error);
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid channel group configuration'
-      });
+    // Handle bouquet IDs - keep as comma-separated string for IPTV API
+    let bouquetIds = channelGroup.bouquet_ids;
+    
+    // If it's stored as JSON array, convert to comma-separated string
+    if (typeof bouquetIds === 'string' && bouquetIds.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(bouquetIds);
+        bouquetIds = parsed.join(',');
+      } catch (error) {
+        console.warn('⚠️ Failed to parse JSON bouquet IDs, using as-is');
+      }
     }
+    
+    console.log('✅ Final bouquet IDs for API:', bouquetIds);
+    console.log('✅ Bouquet IDs type:', typeof bouquetIds);
     
     // Check credits for paid subscriptions
     if (action === 'create_paid') {
