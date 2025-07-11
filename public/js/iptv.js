@@ -372,10 +372,43 @@ handleTrialCheckboxChange(event) {
       option.textContent = group.name;
       select.appendChild(option);
     });
+	
+	this.setDefaultChannelGroup();
     
     console.log(`✅ Channel group dropdown populated with ${this.channelGroups.length} groups`);
     return true;
   },
+  
+ /**
+ * Set default channel group based on trial state
+ */
+setDefaultChannelGroup() {
+  const select = document.getElementById('iptvChannelGroupSelect');
+  const trialCheckbox = document.getElementById('iptvTrialUser');
+  
+  if (!select) return;
+  
+  const isTrialUser = trialCheckbox ? trialCheckbox.checked : false;
+  
+  console.log(`📺 Setting default channel group for ${isTrialUser ? 'trial' : 'paid'} user`);
+  
+  // Find default channel group based on trial state
+  const defaultOption = Array.from(select.options).find(option => {
+    const name = option.textContent.toLowerCase();
+    if (isTrialUser) {
+      return name.includes('trial') || name.includes('default trial');
+    } else {
+      return (name.includes('default') || name.includes('basic') || name.includes('paid')) && !name.includes('trial');
+    }
+  });
+  
+  if (defaultOption) {
+    select.value = defaultOption.value;
+    console.log(`✅ Set default channel group: ${defaultOption.textContent}`);
+  } else {
+    console.log('⚠️ No default channel group found');
+  }
+},
 
   /**
    * Load default channel group based on trial/paid selection
