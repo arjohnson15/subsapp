@@ -679,90 +679,371 @@ setDefaultChannelGroup() {
     await this.createSubscription('extend');
   },
 
-  /**
-   * Create or extend subscription
-   */
-  async createSubscription(action) {
-    const packageId = document.getElementById('iptvPackageSelect').value;
-    const channelGroupId = document.getElementById('iptvChannelGroupSelect').value;
-    const username = document.getElementById('iptvUsernameField') ? document.getElementById('iptvUsernameField').value : '';
-    const password = document.getElementById('iptvPasswordField') ? document.getElementById('iptvPasswordField').value : '';
-    const notes = document.getElementById('iptvNotesField') ? document.getElementById('iptvNotesField').value : '';
-    
-    // Validation
-    if (!packageId) {
-      if (window.Utils && window.Utils.showNotification) {
-        window.Utils.showNotification('Please select a package', 'error');
-      } else if (window.showNotification) {
-        window.showNotification('Please select a package', 'error');
-      }
-      return;
-    }
-    
-    if (!channelGroupId) {
-      if (window.Utils && window.Utils.showNotification) {
-        window.Utils.showNotification('Please select a channel group', 'error');
-      } else if (window.showNotification) {
-        window.showNotification('Please select a channel group', 'error');
-      }
-      return;
-    }
-    
-    // Show loading state
-    const button = document.getElementById('iptvSubmitBtn');
-    if (!button) return;
-    
-    const originalText = button.innerHTML;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-    button.disabled = true;
+/**
+ * Enhanced create subscription with data retrieval and status update (FIXED)
+ */
+async createSubscription(action) {
+    let originalText = 'Submit'; // Declare at top level
     
     try {
-      const response = await fetch('/api/iptv/subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          user_id: this.currentUser,
-          package_id: packageId,
-          channel_group_id: channelGroupId,
-          action: action,
-          username: username,
-          password: password,
-          notes: notes
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        if (window.Utils && window.Utils.showNotification) {
-          window.Utils.showNotification(data.message, 'success');
-        } else if (window.showNotification) {
-          window.showNotification(data.message, 'success');
+        console.log(`🎯 Creating IPTV subscription with action: ${action}`);
+        
+        // Get form data
+        const packageId = document.getElementById('iptvPackageSelect').value;
+        const channelGroupId = document.getElementById('iptvChannelGroupSelect').value;
+        const username = document.getElementById('iptvUsernameField') ? document.getElementById('iptvUsernameField').value.trim() : '';
+        const password = document.getElementById('iptvPasswordField') ? document.getElementById('iptvPasswordField').value.trim() : '';
+        const notes = document.getElementById('iptvNotesField') ? document.getElementById('iptvNotesField').value.trim() : '';
+        
+        // Get user ID - FIXED: Multiple methods to find user ID
+        let userId = null;
+        
+        // Method 1: Try existing user ID field
+        const userIdField = document.getElementById('userId');
+        if (userIdField && userIdField.value) {
+            userId = userIdField.value;
+            console.log('📋 Found user ID from form field:', userId);
         }
         
-        // Reload user status
-        await this.loadUserStatus(this.currentUser);
+        // Method 2: Try URL parameters
+        if (!userId) {
+            const urlParams = new URLSearchParams(window.location.search);
+            userId = urlParams.get('id');
+            if (userId) {
+                console.log('📋 Found user ID from URL:', userId);
+            }
+        }
         
-        // Update credit balance
-        await this.loadCreditBalance();
+        // Method 3: Try current user from IPTV module
+        if (!userId && this.currentUser) {
+            userId = this.currentUser;
+            console.log('📋 Found user ID from IPTV.currentUser:', userId);
+        }
         
-      } else {
-        throw new Error(data.message);
-      }
-      
+        // Method 4: Try app state
+        if (!userId && window.AppState && window.AppState.editingUserId) {
+            userId = window.AppState.editingUserId;
+            console.log('📋 Found user ID from AppState:', userId);
+        }
+        
+        if (!userId) {
+            throw new Error('User ID not found. Please ensure you are editing a user or create a user first.');
+        }
+        
+        if (!packageId) {
+            throw new Error('Please select a package');
+        }
+        
+        if (!channelGroupId) {
+            throw new Error('Please select a channel group');
+        }
+        
+        if ((action === 'create_trial' || action === 'create_paid') && !username) {
+            throw new Error('Username is required');
+        }
+        
+        // Show loading state
+        const submitBtn = document.getElementById('iptvSubmitBtn');
+        const submitBtnText = document.getElementById('iptvSubmitBtnText');
+        
+        if (submitBtnText) {
+            originalText = submitBtnText.textContent;
+        }
+        
+        if (submitBtn) submitBtn.disabled = true;
+        if (submitBtnText) submitBtnText.textContent = 'Processing...';
+        
+        // Prepare request data
+        const requestData = {
+            user_id: parseInt(userId),
+            package_id: packageId,
+            channel_group_id: parseInt(channelGroupId),
+            action: action,
+            username: username || undefined,
+            password: password || undefined,
+            notes: notes || undefined
+        };
+        
+        console.log('📤 Sending IPTV subscription request:', requestData);
+        
+        // Make API request to enhanced endpoint
+        const response = await fetch('/api/iptv/subscription', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.message || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        if (!result.success) {
+            throw new Error(result.message || 'Unknown error occurred');
+        }
+        
+        console.log('✅ IPTV subscription created successfully:', result);
+        
+        // Update the IPTV status display with enhanced data
+        if (result.data) {
+            // Update the current IPTV status section
+            if (typeof this.updateIPTVStatus === 'function') {
+                this.updateIPTVStatus(result.data);
+            }
+            
+            // Update form fields with retrieved data
+            if (result.data.password && document.getElementById('iptvPasswordField')) {
+                document.getElementById('iptvPasswordField').value = result.data.password;
+            }
+            
+            // Show success message with details
+            let successMessage = `${action.replace('_', ' ')} successful!`;
+            
+            if (result.data.panel_data_retrieved) {
+                successMessage += `\n✅ Panel data retrieved successfully`;
+                successMessage += `\n🆔 Line ID: ${result.data.line_id}`;
+                if (result.data.password) {
+                    successMessage += `\n🔑 Password: ${result.data.password}`;
+                }
+                if (result.data.days_until_expiration !== null) {
+                    successMessage += `\n📅 Days until expiration: ${result.data.days_until_expiration}`;
+                }
+                successMessage += `\n🔗 M3U URL: Available for copy`;
+            } else {
+                successMessage += `\n⚠️ Panel data retrieval incomplete - check manually`;
+            }
+            
+            if (window.Utils && window.Utils.showNotification) {
+                window.Utils.showNotification(successMessage, 'success');
+            } else {
+                alert(successMessage);
+            }
+            
+            // Clear the form or reset to default state
+            if (typeof this.resetIPTVForm === 'function') {
+                this.resetIPTVForm();
+            }
+            
+            // Refresh any lists or displays
+            if (typeof loadUsersList === 'function') {
+                loadUsersList();
+            }
+            
+        } else {
+            // Show success without enhanced data
+            const message = result.message || `${action.replace('_', ' ')} completed successfully`;
+            if (window.Utils && window.Utils.showNotification) {
+                window.Utils.showNotification(message, 'success');
+            } else {
+                alert(message);
+            }
+        }
+        
     } catch (error) {
-      console.error(`❌ Failed to ${action} subscription:`, error);
-      if (window.Utils && window.Utils.showNotification) {
-        window.Utils.showNotification(`Failed to ${action.replace('_', ' ')} subscription: ${error.message}`, 'error');
-      } else if (window.showNotification) {
-        window.showNotification(`Failed to ${action.replace('_', ' ')} subscription: ${error.message}`, 'error');
-      }
+        console.error('❌ IPTV subscription creation failed:', error);
+        
+        let errorMessage = 'Failed to create IPTV subscription';
+        if (error.message) {
+            errorMessage += `\n${error.message}`;
+        }
+        
+        if (window.Utils && window.Utils.showNotification) {
+            window.Utils.showNotification(errorMessage, 'error');
+        } else {
+            alert(errorMessage);
+        }
     } finally {
-      // Restore button state
-      button.innerHTML = originalText;
-      button.disabled = false;
+        // Restore button state - FIXED: originalText is now in scope
+        const submitBtn = document.getElementById('iptvSubmitBtn');
+        const submitBtnText = document.getElementById('iptvSubmitBtnText');
+        
+        if (submitBtn) submitBtn.disabled = false;
+        if (submitBtnText) submitBtnText.textContent = originalText;
+    }
+},
+
+  /**
+   * Reset IPTV form to default state (NEW METHOD)
+   */
+  resetIPTVForm() {
+    // Reset package selection
+    const packageSelect = document.getElementById('iptvPackageSelect');
+    if (packageSelect) {
+        packageSelect.selectedIndex = 0;
+    }
+    
+    // Reset channel group selection
+    const channelGroupSelect = document.getElementById('iptvChannelGroupSelect');
+    if (channelGroupSelect) {
+        channelGroupSelect.selectedIndex = 0;
+    }
+    
+    // Don't clear username/password as they might be auto-generated and needed
+    // Clear notes
+    const notesField = document.getElementById('iptvNotesField');
+    if (notesField) {
+        notesField.value = '';
+    }
+    
+    // Reset action to default (create_paid)
+    const createPaidRadio = document.getElementById('iptvActionCreate');
+    const trialCheckbox = document.getElementById('isTrialUser');
+    
+    if (createPaidRadio) createPaidRadio.checked = true;
+    if (trialCheckbox) trialCheckbox.checked = false;
+    
+    // Refresh button text
+    if (this.updateSubmitButtonText) {
+        this.updateSubmitButtonText();
+    }
+  },
+  
+ /**
+   * Update IPTV status display (NEW METHOD)
+   */
+  updateIPTVStatus(data) {
+    console.log('📺 Updating IPTV status display:', data);
+    
+    // Update Line ID
+    const lineIdElement = document.getElementById('iptvLineId');
+    if (lineIdElement) {
+        lineIdElement.textContent = data.line_id || 'None';
+    }
+    
+    // Update Connections
+    const connectionsElement = document.getElementById('iptvConnections');
+    if (connectionsElement) {
+        const current = data.current_connections || 0;
+        const max = data.max_connections || 0;
+        connectionsElement.textContent = `${current}/${max}`;
+    }
+    
+    // Update Days Until Expiration
+    const daysLeftElement = document.getElementById('iptvDaysLeft');
+    if (daysLeftElement) {
+        if (data.days_until_expiration !== null && data.days_until_expiration !== undefined) {
+            const days = data.days_until_expiration;
+            daysLeftElement.textContent = days > 0 ? `${days} days` : 
+                                        days === 0 ? 'Expires today' : 'Expired';
+            daysLeftElement.style.color = days > 7 ? '#4caf50' : 
+                                        days > 0 ? '#ff9800' : '#f44336';
+        } else {
+            daysLeftElement.textContent = 'None';
+            daysLeftElement.style.color = '#fff';
+        }
+    }
+    
+    // Update Expiration Date
+    const expirationElement = document.getElementById('iptvExpiration');
+    if (expirationElement) {
+        if (data.expiration_formatted) {
+            expirationElement.textContent = data.expiration_formatted;
+        } else if (data.expiration_date) {
+            const date = new Date(data.expiration_date);
+            expirationElement.textContent = date.toLocaleDateString();
+        } else {
+            expirationElement.textContent = 'None';
+        }
+    }
+    
+    // Update M3U URL
+    const m3uSection = document.getElementById('iptvM3USection');
+    const m3uUrlElement = document.getElementById('iptvM3UUrl');
+    if (data.m3u_plus_url && m3uSection && m3uUrlElement) {
+        m3uUrlElement.value = data.m3u_plus_url;
+        m3uSection.style.display = 'block';
+    } else if (m3uSection) {
+        m3uSection.style.display = 'none';
+    }
+    
+    // Update Status Indicator
+    const statusDot = document.getElementById('iptvStatusDot');
+    const statusText = document.getElementById('iptvStatusText');
+    const trialIndicator = document.getElementById('iptvTrialIndicator');
+    
+    if (statusDot && statusText) {
+        if (data.enabled === false) {
+            statusDot.style.background = '#f44336';
+            statusText.textContent = 'Disabled';
+        } else if (data.line_id) {
+            const now = new Date();
+            const expiration = data.expiration_date ? new Date(data.expiration_date) : null;
+            
+            if (expiration && expiration < now) {
+                statusDot.style.background = '#f44336';
+                statusText.textContent = 'Expired';
+            } else {
+                statusDot.style.background = '#4caf50';
+                statusText.textContent = 'Active';
+            }
+        } else {
+            statusDot.style.background = '#f44336';
+            statusText.textContent = 'Inactive';
+        }
+    }
+    
+    // Show/hide trial indicator
+    if (trialIndicator) {
+        if (data.is_trial) {
+            trialIndicator.style.display = 'flex';
+        } else {
+            trialIndicator.style.display = 'none';
+        }
+    }
+  },
+
+  /**
+   * Load IPTV status for current user (NEW METHOD)
+   */
+  async loadCurrentUserIPTVStatus() {
+    try {
+        // Get user ID from form or URL
+        let userId = null;
+        const userIdField = document.getElementById('userId');
+        if (userIdField) {
+            userId = userIdField.value;
+        } else {
+            const urlParams = new URLSearchParams(window.location.search);
+            userId = urlParams.get('id');
+        }
+        
+        if (!userId) {
+            console.warn('⚠️ No user ID found for IPTV status loading');
+            return;
+        }
+        
+        console.log('📊 Loading IPTV status for user:', userId);
+        
+        const response = await fetch(`/api/iptv/user/${userId}`);
+        const result = await response.json();
+        
+        if (result.success && result.user) {
+            this.updateIPTVStatus(result.user);
+            
+            // Populate form fields if user has existing IPTV data
+            if (result.user.iptv_username) {
+                const usernameField = document.getElementById('iptvUsernameField');
+                if (usernameField) usernameField.value = result.user.iptv_username;
+            }
+            
+            if (result.user.iptv_password) {
+                const passwordField = document.getElementById('iptvPasswordField');
+                if (passwordField) passwordField.value = result.user.iptv_password;
+            }
+        } else {
+            console.log('📋 No existing IPTV data for user');
+            this.updateIPTVStatus({
+                line_id: null, max_connections: 0, current_connections: 0,
+                days_until_expiration: null, expiration_date: null,
+                m3u_plus_url: null, enabled: false, is_trial: false
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Failed to load user IPTV status:', error);
     }
   },
 
@@ -1328,6 +1609,8 @@ setDefaultChannelGroup() {
 // CRITICAL: Export to global scope IMMEDIATELY
 window.IPTV = IPTV;
 window.IPTVUser = IPTV;
+// Make updateIPTVStatus available globally for utils.js
+window.updateIPTVStatus = IPTV.updateIPTVStatus.bind(IPTV);
 
 // Global function for trial user checkbox changes
 window.handleTrialUserChange = function() {

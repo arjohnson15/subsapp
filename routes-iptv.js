@@ -418,7 +418,7 @@ router.get('/user/:id', [
         u.id, u.name, u.email, u.iptv_username, u.iptv_line_id,
         u.iptv_package_id, u.iptv_package_name, u.iptv_expiration,
         u.iptv_credits_used, u.iptv_channel_group_id, u.iptv_connections,
-        u.iptv_is_trial, u.implayer_code,
+        u.iptv_is_trial,
         cg.name as channel_group_name,
         cg.description as channel_group_description
       FROM users u
@@ -466,8 +466,11 @@ router.get('/user/:id', [
   }
 });
 
+// Enhanced POST /api/iptv/subscription endpoint in routes-iptv.js
+// Replace the existing subscription endpoint with this enhanced version
+
 /**
- * POST /api/iptv/subscription - Create or extend IPTV subscription
+ * POST /api/iptv/subscription - Create or extend IPTV subscription with data retrieval
  */
 router.post('/subscription', [
   body('user_id').isInt().withMessage('Invalid user ID'),
@@ -494,35 +497,35 @@ router.post('/subscription', [
     
     const user = userRows[0];
     
-    // Get package info
-    const packageInfo = await iptvService.getPackageInfo(package_id);
-    if (!packageInfo) {
-      return res.status(400).json({
+    // Get package information
+    const packageResult = await db.query('SELECT * FROM iptv_packages WHERE package_id = ?', [package_id]);
+    const packageRows = Array.isArray(packageResult) ? packageResult[0] : packageResult;
+    
+    if (!packageRows || !Array.isArray(packageRows) || packageRows.length === 0) {
+      return res.status(404).json({
         success: false,
-        message: 'Invalid package selected'
+        message: 'Package not found'
       });
     }
+    
+    const packageInfo = packageRows[0];
     
     // Get channel group bouquets
-    const channelGroupResult = await db.query(
-      'SELECT bouquet_ids FROM iptv_channel_groups WHERE id = ? AND is_active = true',
-      [channel_group_id]
-    );
-    
+    const channelGroupResult = await db.query('SELECT bouquet_ids FROM iptv_channel_groups WHERE id = ?', [channel_group_id]);
     const channelGroupRows = Array.isArray(channelGroupResult) ? channelGroupResult[0] : channelGroupResult;
     
-    if (!channelGroupRows || !Array.isArray(channelGroupRows) || channelGroupRows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid channel group selected'
-      });
+    let bouquetIds = [];
+    if (channelGroupRows && Array.isArray(channelGroupRows) && channelGroupRows.length > 0) {
+      try {
+        bouquetIds = JSON.parse(channelGroupRows[0].bouquet_ids || '[]');
+      } catch (e) {
+        console.warn('⚠️ Failed to parse bouquet IDs from channel group');
+      }
     }
     
-    const bouquetIds = JSON.parse(channelGroupRows[0].bouquet_ids);
-    
-    // Check credit balance for paid subscriptions
-    if (action !== 'create_trial') {
-      const currentBalance = await iptvService.getLocalCreditBalance();
+    // Check credits for paid subscriptions
+    if (action === 'create_paid') {
+      const currentBalance = await iptvService.getCurrentBalance();
       if (currentBalance < packageInfo.credits) {
         return res.status(400).json({
           success: false,
@@ -531,31 +534,30 @@ router.post('/subscription', [
       }
     }
     
-    let apiResponse;
-    let finalUsername = username;
-    let finalPassword = password;
+    let result;
+    let finalUsername = username || user.iptv_username;
     let isExtending = false;
     
-    // Execute the appropriate action
+    // Execute the appropriate action with enhanced data retrieval
     switch (action) {
       case 'create_trial':
-        if (!username) {
+        if (!finalUsername) {
           return res.status(400).json({
             success: false,
             message: 'Username is required for trial creation'
           });
         }
-        apiResponse = await iptvService.createTrialUser(username, password, package_id, bouquetIds);
+        result = await iptvService.createTrialUserWithData(finalUsername, password, package_id, bouquetIds);
         break;
         
       case 'create_paid':
-        if (!username) {
+        if (!finalUsername) {
           return res.status(400).json({
             success: false,
             message: 'Username is required for paid subscription creation'
           });
         }
-        apiResponse = await iptvService.createPaidUser(username, password, package_id, bouquetIds);
+        result = await iptvService.createPaidUserWithData(finalUsername, password, package_id, bouquetIds);
         break;
         
       case 'extend':
@@ -565,34 +567,28 @@ router.post('/subscription', [
             message: 'No existing IPTV subscription to extend'
           });
         }
-        apiResponse = await iptvService.extendUser(user.iptv_line_id, package_id, bouquetIds);
+        result = await iptvService.extendUserWithData(user.iptv_line_id, package_id, bouquetIds, user.iptv_username);
         finalUsername = user.iptv_username;
-        finalPassword = user.iptv_password;
         isExtending = true;
         break;
     }
     
-    // Extract response data (API response format may vary)
-    let lineId = apiResponse.id || apiResponse.line_id || user.iptv_line_id;
-    if (apiResponse.user && apiResponse.user.id) {
-      lineId = apiResponse.user.id;
-    }
+    // Extract enhanced data from result
+    const { userData, m3uPlusURL } = result;
     
-    // If password was auto-generated, extract it from response
-    if (!finalPassword && apiResponse.password) {
-      finalPassword = apiResponse.password;
-    } else if (!finalPassword && apiResponse.user && apiResponse.user.password) {
-      finalPassword = apiResponse.user.password;
-    }
+    // Use retrieved data or fallback to provided/existing data
+    const finalLineId = userData?.line_id || user.iptv_line_id;
+    const finalPassword = userData?.password || password || user.iptv_password;
+    const finalExpirationDate = userData?.expiration_date || iptvService.calculateExpirationDate(packageInfo, isExtending, user.iptv_expiration);
+    const maxConnections = userData?.max_connections || packageInfo.connections || 0;
+    const finalM3UUrl = m3uPlusURL || (finalUsername && finalPassword ? iptvService.generateM3UPlusURL(finalUsername, finalPassword) : null);
     
-    // Calculate expiration date
-    const expirationDate = iptvService.calculateExpirationDate(
-      packageInfo, 
-      isExtending, 
-      user.iptv_expiration
-    );
+    // Calculate expiration if not retrieved from panel
+    const expirationForDB = finalExpirationDate instanceof Date ? 
+      finalExpirationDate.toISOString().slice(0, 19).replace('T', ' ') : 
+      finalExpirationDate;
     
-    // Update user record in database
+    // Update user record in database with enhanced data
     const creditsUsed = action === 'create_trial' ? 0 : packageInfo.credits;
     
     await db.query(`
@@ -607,62 +603,83 @@ router.post('/subscription', [
         iptv_channel_group_id = ?,
         iptv_connections = ?,
         iptv_is_trial = ?,
-        implayer_code = ?,
+        iptv_m3u_url = ?,
         updated_at = NOW()
       WHERE id = ?
     `, [
       finalUsername,
       finalPassword,
-      lineId,
+      finalLineId,
       package_id,
       packageInfo.name,
-      expirationDate,
+      expirationForDB,
       creditsUsed,
       channel_group_id,
-      packageInfo.connections,
+      maxConnections,
       action === 'create_trial',
-      implayerCode,
+      finalM3UUrl,
       user_id
     ]);
     
-    // Log the activity
+    // Log the activity with enhanced data
     await iptvService.logActivity(
       user_id, 
-      lineId, 
+      finalLineId, 
       action, 
       package_id, 
       creditsUsed, 
       true, 
       null, 
-      apiResponse
+      result
     );
     
-    // Return success response with all details
+    console.log(`✅ IPTV subscription ${action} completed for user ${user_id}`);
+    
+    // Return enhanced response with all the data
     res.json({
       success: true,
       message: `IPTV subscription ${action.replace('_', ' ')} successful`,
-      subscription: {
+      data: {
+        user_id: user_id,
         username: finalUsername,
         password: finalPassword,
-        line_id: lineId,
+        line_id: finalLineId,
+        package_id: package_id,
         package_name: packageInfo.name,
-        connections: packageInfo.connections,
-        expiration: expirationDate,
-        expiration_formatted: expirationDate.toLocaleDateString(),
+        expiration_date: expirationForDB,
+        expiration_formatted: userData?.expiration_formatted,
+        days_until_expiration: userData?.days_until_expiration,
+        max_connections: maxConnections,
+        current_connections: userData?.current_connections || 0,
         is_trial: action === 'create_trial',
+        enabled: userData?.enabled !== false,
+        m3u_plus_url: finalM3UUrl,
         credits_used: creditsUsed,
-        stream_urls: {
-          m3u: `https://Pinkpony.lol:443/get.php?username=${finalUsername}&password=${finalPassword}&type=m3u&output=ts`,
-          m3u_plus: `https://Pinkpony.lol:443/get.php?username=${finalUsername}&password=${finalPassword}&type=m3u_plus&output=ts`
-        }
+        panel_data_retrieved: !!userData
       }
     });
-    
   } catch (error) {
-    console.error('❌ Error creating/extending IPTV subscription:', error);
+    console.error('❌ Error processing IPTV subscription:', error);
+    
+    // Log the failed activity
+    try {
+      await iptvService.logActivity(
+        req.body.user_id, 
+        null, 
+        req.body.action, 
+        req.body.package_id, 
+        0, 
+        false, 
+        error.message, 
+        null
+      );
+    } catch (logError) {
+      console.error('❌ Failed to log error activity:', logError);
+    }
+    
     res.status(500).json({
       success: false,
-      message: 'Failed to create/extend IPTV subscription',
+      message: 'Failed to process IPTV subscription',
       error: error.message
     });
   }
@@ -908,7 +925,6 @@ router.delete('/user/:id', [
         iptv_channel_group_id = NULL,
         iptv_connections = NULL,
         iptv_is_trial = FALSE,
-        implayer_code = NULL,
         updated_at = NOW()
       WHERE id = ?
     `, [id]);

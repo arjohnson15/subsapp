@@ -271,6 +271,17 @@ async function initUserFormPage() {
         // Load Plex libraries
         await loadPlexLibrariesForUserForm();
         
+        // ENHANCED: Load IPTV status for existing user
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('id');
+        
+        if (userId && window.IPTV && typeof window.IPTV.loadCurrentUserIPTVStatus === 'function') {
+            console.log('📺 Loading IPTV status for existing user...');
+            setTimeout(() => {
+                window.IPTV.loadCurrentUserIPTVStatus();
+            }, 800);
+        }
+        
         // Load IPTV credits from database
         if (window.UserFormIPTV && typeof window.UserFormIPTV.loadCreditBalance === 'function') {
             console.log('💳 Loading credits for user form...');

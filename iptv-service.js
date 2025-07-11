@@ -1304,6 +1304,266 @@ class IPTVService {
       throw new Error(`Failed to get user: ${error.message}`);
     }
   }
+  
+  /**
+   * Get all users data from panel
+   * This calls the /lines/data endpoint to retrieve all users
+   */
+  async getAllUsersFromPanel() {
+    try {
+      console.log('📊 Fetching all users data from panel...');
+      
+      await this.ensureAuthenticated();
+      
+      const data = {
+        id: 'users',
+        filter: '',
+        reseller: '1435', // Your reseller ID
+        draw: 1,
+        start: 0,
+        length: 50 // Adjust as needed
+      };
+
+      const response = await this.makeAPIRequest('/lines/data', data);
+      
+      console.log('✅ Successfully fetched users data from panel');
+      return response;
+    } catch (error) {
+      console.error('❌ Failed to fetch users data:', error);
+      throw new Error(`Failed to fetch users data: ${error.message}`);
+    }
+  }
+
+  /**
+   * Find user data by username from panel response
+   */
+  findUserByUsername(usersData, username) {
+    try {
+      if (!usersData || !usersData.data || !Array.isArray(usersData.data)) {
+        console.warn('⚠️ Invalid users data structure');
+        return null;
+      }
+
+      const user = usersData.data.find(user => user.username === username);
+      
+      if (user) {
+        console.log(`✅ Found user ${username} in panel data:`, {
+          id: user.id,
+          username: user.username,
+          password: user.password,
+          exp_date: user.exp_date,
+          user_connection: user.user_connection,
+          enabled: user.enabled
+        });
+      } else {
+        console.warn(`⚠️ User ${username} not found in panel data`);
+      }
+
+      return user;
+    } catch (error) {
+      console.error('❌ Error finding user by username:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Parse and extract user data for database storage
+   */
+  parseUserDataFromPanel(panelUser) {
+    if (!panelUser) return null;
+
+    try {
+      // Parse expiration date (from Unix timestamp)
+      let expirationDate = null;
+      if (panelUser.expire_date) {
+        expirationDate = new Date(parseInt(panelUser.expire_date) * 1000);
+      }
+
+      // Calculate days until expiration
+      let daysUntilExpiration = null;
+      if (expirationDate) {
+        const now = new Date();
+        const diffTime = expirationDate - now;
+        daysUntilExpiration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      }
+
+      const userData = {
+        line_id: panelUser.id,
+        username: panelUser.username,
+        password: panelUser.password,
+        expiration_date: expirationDate,
+        expiration_formatted: panelUser.exp_date, // Human readable format
+        days_until_expiration: daysUntilExpiration,
+        max_connections: parseInt(panelUser.user_connection) || 0,
+        current_connections: parseInt(panelUser.active_connections) || 0,
+        enabled: parseInt(panelUser.enabled) === 1,
+        is_trial: parseInt(panelUser.is_trial) === 1,
+        created_at: panelUser.created_at,
+        owner: panelUser.owner
+      };
+
+      console.log('📋 Parsed user data:', userData);
+      return userData;
+    } catch (error) {
+      console.error('❌ Error parsing user data:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Generate M3U Plus URL for user
+   */
+  generateM3UPlusURL(username, password) {
+    return `https://Pinkpony.lol:443/get.php?username=${username}&password=${password}&type=m3u_plus&output=ts`;
+  }
+
+  /**
+   * Enhanced create trial user with data retrieval
+   */
+  async createTrialUserWithData(username, password, packageId, bouquetIds = []) {
+    try {
+      console.log(`🆓 Creating trial user with data retrieval: ${username}`);
+      
+      // Create the user first
+      const createResponse = await this.createTrialUser(username, password, packageId, bouquetIds);
+      
+      // Wait a moment for the user to be created in the panel
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Fetch all users data and find our new user
+      const usersData = await this.getAllUsersFromPanel();
+      const panelUser = this.findUserByUsername(usersData, username);
+      
+      if (panelUser) {
+        const userData = this.parseUserDataFromPanel(panelUser);
+        const m3uPlusURL = this.generateM3UPlusURL(username, userData.password);
+        
+        return {
+          success: true,
+          createResponse,
+          userData,
+          m3uPlusURL
+        };
+      } else {
+        console.warn('⚠️ User created but not found in panel data - using fallback');
+        return {
+          success: true,
+          createResponse,
+          userData: {
+            line_id: null,
+            username: username,
+            password: password,
+            expiration_date: null,
+            days_until_expiration: null,
+            max_connections: 0,
+            current_connections: 0,
+            enabled: true,
+            is_trial: true
+          },
+          m3uPlusURL: password ? this.generateM3UPlusURL(username, password) : null
+        };
+      }
+    } catch (error) {
+      console.error(`❌ Failed to create trial user with data: ${username}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Enhanced create paid user with data retrieval
+   */
+  async createPaidUserWithData(username, password, packageId, bouquetIds = []) {
+    try {
+      console.log(`💰 Creating paid user with data retrieval: ${username}`);
+      
+      // Create the user first
+      const createResponse = await this.createPaidUser(username, password, packageId, bouquetIds);
+      
+      // Wait a moment for the user to be created in the panel
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Fetch all users data and find our new user
+      const usersData = await this.getAllUsersFromPanel();
+      const panelUser = this.findUserByUsername(usersData, username);
+      
+      if (panelUser) {
+        const userData = this.parseUserDataFromPanel(panelUser);
+        const m3uPlusURL = this.generateM3UPlusURL(username, userData.password);
+        
+        return {
+          success: true,
+          createResponse,
+          userData,
+          m3uPlusURL
+        };
+      } else {
+        console.warn('⚠️ User created but not found in panel data - using fallback');
+        return {
+          success: true,
+          createResponse,
+          userData: {
+            line_id: null,
+            username: username,
+            password: password,
+            expiration_date: null,
+            days_until_expiration: null,
+            max_connections: 0,
+            current_connections: 0,
+            enabled: true,
+            is_trial: false
+          },
+          m3uPlusURL: password ? this.generateM3UPlusURL(username, password) : null
+        };
+      }
+    } catch (error) {
+      console.error(`❌ Failed to create paid user with data: ${username}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Enhanced extend user with data retrieval
+   */
+  async extendUserWithData(lineId, packageId, bouquetIds = [], username) {
+    try {
+      console.log(`🔄 Extending user with data retrieval: ${lineId}`);
+      
+      // Extend the user first
+      const extendResponse = await this.extendUser(lineId, packageId, bouquetIds);
+      
+      // Wait a moment for the extension to be processed
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Fetch all users data and find our extended user
+      const usersData = await this.getAllUsersFromPanel();
+      const panelUser = username ? 
+        this.findUserByUsername(usersData, username) : 
+        usersData.data.find(user => user.id === lineId.toString());
+      
+      if (panelUser) {
+        const userData = this.parseUserDataFromPanel(panelUser);
+        const m3uPlusURL = this.generateM3UPlusURL(panelUser.username, userData.password);
+        
+        return {
+          success: true,
+          extendResponse,
+          userData,
+          m3uPlusURL
+        };
+      } else {
+        console.warn('⚠️ User extended but not found in panel data');
+        return {
+          success: true,
+          extendResponse,
+          userData: null,
+          m3uPlusURL: null
+        };
+      }
+    } catch (error) {
+      console.error(`❌ Failed to extend user with data: ${lineId}:`, error);
+      throw error;
+    }
+  }
 
   /**
    * Update local credit balance in database
@@ -1334,6 +1594,13 @@ class IPTVService {
       console.error('❌ Failed to get local credit balance:', error);
       return 0;
     }
+  }
+  
+  /**
+   * Get current balance (alias for getLocalCreditBalance)
+   */
+  async getCurrentBalance() {
+    return await this.getLocalCreditBalance();
   }
 
   /**
@@ -1519,7 +1786,7 @@ class IPTVService {
     try {
       const rows = await db.query(
         'SELECT iptv_line_id, iptv_username, iptv_password, iptv_package_id, iptv_package_name, ' +
-        'iptv_expiration, iptv_credits_used, iptv_channel_group_id, iptv_connections, iptv_is_trial, implayer_code ' +
+        'iptv_expiration, iptv_credits_used, iptv_channel_group_id, iptv_connections, iptv_is_trial ' +
         'FROM users WHERE id = ?',
         [userId]
       );
@@ -1583,7 +1850,7 @@ class IPTVService {
         'UPDATE users SET iptv_line_id = NULL, iptv_username = NULL, iptv_password = NULL, ' +
         'iptv_package_id = NULL, iptv_package_name = NULL, iptv_expiration = NULL, ' +
         'iptv_credits_used = 0, iptv_channel_group_id = NULL, iptv_connections = NULL, ' +
-        'iptv_is_trial = 0, implayer_code = NULL WHERE id = ?',
+        'iptv_is_trial = 0 WHERE id = ?',
         [userId]
       );
       

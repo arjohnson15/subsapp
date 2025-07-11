@@ -453,4 +453,32 @@ window.Utils = {
     handleError
 };
 
+// Copy M3U URL function (global for onclick handler)
+window.copyM3UUrl = function() {
+    const m3uUrlElement = document.getElementById('iptvM3UUrl');
+    if (m3uUrlElement && m3uUrlElement.value) {
+        navigator.clipboard.writeText(m3uUrlElement.value).then(() => {
+            // Show success feedback
+            const copyBtn = document.getElementById('copyM3UBtn');
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = 'Copied!';
+            copyBtn.style.background = 'linear-gradient(45deg, #4caf50, #8bc34a)';
+            
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+                copyBtn.style.background = 'linear-gradient(45deg, #4fc3f7, #29b6f6)';
+            }, 2000);
+            
+            if (window.Utils && window.Utils.showNotification) {
+                window.Utils.showNotification('M3U URL copied to clipboard!', 'success');
+            }
+        }).catch(err => {
+            console.error('Failed to copy M3U URL:', err);
+            // Fallback for older browsers
+            m3uUrlElement.select();
+            document.execCommand('copy');
+        });
+    }
+};
+
 console.log('🔧 Utils module loaded successfully');
