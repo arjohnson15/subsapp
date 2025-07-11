@@ -592,9 +592,6 @@ router.post('/subscription', [
       user.iptv_expiration
     );
     
-    // Generate iMPlayer code
-    const implayerCode = iptvService.generateiMPlayerCode(finalUsername, finalPassword);
-    
     // Update user record in database
     const creditsUsed = action === 'create_trial' ? 0 : packageInfo.credits;
     
@@ -654,7 +651,6 @@ router.post('/subscription', [
         expiration_formatted: expirationDate.toLocaleDateString(),
         is_trial: action === 'create_trial',
         credits_used: creditsUsed,
-        implayer_code: implayerCode,
         stream_urls: {
           m3u: `https://Pinkpony.lol:443/get.php?username=${finalUsername}&password=${finalPassword}&type=m3u&output=ts`,
           m3u_plus: `https://Pinkpony.lol:443/get.php?username=${finalUsername}&password=${finalPassword}&type=m3u_plus&output=ts`

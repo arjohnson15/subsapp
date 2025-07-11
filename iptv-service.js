@@ -1492,17 +1492,6 @@ class IPTVService {
   }
 
   /**
-   * Generate iMPlayer code for user
-   */
-  generateiMPlayerCode(username, password) {
-    if (!username || !password) {
-      return null;
-    }
-
-    return `https://Pinkpony.lol:443|${username}|${password}`;
-  }
-
-  /**
    * Calculate expiration date based on package
    */
   calculateExpirationDate(packageInfo, isExtending = false, currentExpiration = null) {
@@ -1543,9 +1532,6 @@ class IPTVService {
       
       if (user.iptv_username && user.iptv_password) {
         user.stream_urls = this.generateStreamURLs(user.iptv_username, user.iptv_password);
-        if (!user.implayer_code) {
-          user.implayer_code = this.generateiMPlayerCode(user.iptv_username, user.iptv_password);
-        }
       }
       
       return user;
