@@ -305,57 +305,105 @@ async function initUserFormPage() {
 }
 
 
-function toggleIptvManagementByTag(show) {
-    console.log(`🔧 Toggling IPTV management: ${show}`);
+// Replace BOTH versions of toggleIptvManagementByTag with this complete version:
+
+function toggleIptvManagementByTag(isChecked) {
+    console.log(`🔧 Toggling IPTV management: ${isChecked}`);
     
-    const section = document.getElementById('iptvSection');
-    if (!section) {
-        console.error('❌ IPTV section not found');
+    const iptvSection = document.getElementById('iptvSection');
+    if (!iptvSection) {
+        console.error(`❌ IPTV section not found`);
         return;
     }
     
-    if (show) {
-        // FIRST: Show the section
-        section.style.display = 'block';
+    if (isChecked) {
+        // Show the section first
+        iptvSection.style.display = 'block';
         
-        // SECOND: Check if IPTV module is available and initialize the section
+        // Check if IPTV module is available
         if (window.IPTV) {
-            console.log('📺 IPTV module available, setting up section...');
+            console.log('📺 IPTV module available, initializing properly...');
             
-            // Set current user if we're editing
-            if (window.AppState.editingUserId) {
-                window.IPTV.showIPTVSection(window.AppState.editingUserId);
+            // Get the user ID for proper initialization
+            let userId = null;
+            
+            // For editing existing user
+            if (window.AppState && window.AppState.editingUserId) {
+                userId = window.AppState.editingUserId;
+                console.log('👤 Using existing user ID:', userId);
+                
+                // Set current user in IPTV module (from old version)
+                window.IPTV.currentUser = window.AppState.editingUserId;
             } else {
-                // Just populate dropdowns for new user
-                setTimeout(() => {
+                // For new user - no user ID yet
+                userId = null;
+                console.log('👤 New user - no user ID yet');
+            }
+            
+            // Use the proper IPTV initialization
+            setTimeout(() => {
+                if (userId) {
+                    // Existing user - load their IPTV status
+                    IPTV.showIPTVSection(userId);
+                } else {
+                    // New user - show check existing interface
+                    IPTV.currentUser = null;
+                    IPTV.userHasExistingIPTVData = false;
+                    
+                    // Initialize the IPTV section for new user (from old version with error handling)
+                    console.log('📦 Attempting to populate IPTV dropdowns...');
+                    
                     if (typeof window.IPTV.populatePackageSelect === 'function') {
-                        window.IPTV.populatePackageSelect();
+                        const packageSuccess = window.IPTV.populatePackageSelect();
+                        console.log(`📦 Package dropdown population: ${packageSuccess ? 'SUCCESS' : 'FAILED'}`);
+                    } else {
+                        console.error('❌ populatePackageSelect function not found');
                     }
+                    
                     if (typeof window.IPTV.populateChannelGroupSelect === 'function') {
-                        window.IPTV.populateChannelGroupSelect();
+                        const channelSuccess = window.IPTV.populateChannelGroupSelect();
+                        console.log(`📺 Channel group dropdown population: ${channelSuccess ? 'SUCCESS' : 'FAILED'}`);
+                    } else {
+                        console.error('❌ populateChannelGroupSelect function not found');
                     }
+                    
+                    // Update credit display
                     if (typeof window.IPTV.updateCreditDisplay === 'function') {
                         window.IPTV.updateCreditDisplay();
                     }
+                    
                     // Initialize form state
                     if (typeof window.IPTV.handleActionChange === 'function') {
                         window.IPTV.handleActionChange();
                     }
-                }, 200);
-            }
+                    
+                    // KEY: Show the check existing interface
+                    if (typeof window.IPTV.updateStatusInterface === 'function') {
+                        window.IPTV.updateStatusInterface();
+                    } else {
+                        console.error('❌ updateStatusInterface function not found');
+                    }
+                    
+                    console.log('✅ IPTV dropdowns population complete');
+                }
+            }, 200);
         } else {
             console.warn('⚠️ IPTV module not available when showing IPTV section');
         }
     } else {
-        section.style.display = 'none';
+        // Hide the section
+        iptvSection.style.display = 'none';
         
-        // Clear IPTV current user
+        // Properly hide using IPTV module
         if (window.IPTV && typeof window.IPTV.hideIPTVSection === 'function') {
             window.IPTV.hideIPTVSection();
+        } else if (window.IPTV) {
+            // Fallback cleanup
+            window.IPTV.currentUser = null;
         }
     }
     
-    console.log(`✅ IPTV section ${show ? 'shown' : 'hidden'}`);
+    console.log(`✅ IPTV section ${isChecked ? 'shown' : 'hidden'}`);
 }
 
 // Setup user form event listeners
@@ -641,71 +689,6 @@ if (data && (data.regular || data.fourk)) {
     }
 }
 
-
-// Toggle IPTV management section visibility
-function toggleIptvManagementByTag(isChecked) {
-    console.log(`🔧 Toggling IPTV management: ${isChecked}`);
-    
-    const iptvGroup = document.getElementById('iptvSection');
-    if (!iptvGroup) {
-        console.error(`❌ IPTV section not found`);
-        return;
-    }
-    
-    if (isChecked) {
-        // FIRST: Show the section
-        iptvGroup.style.display = 'block';
-        
-        // SECOND: Check if IPTV module is available and populate dropdowns
-        if (window.IPTV) {
-            console.log('📺 IPTV module available, populating dropdowns...');
-            
-            // Set current user if we're editing
-            if (window.AppState.editingUserId) {
-                window.IPTV.currentUser = window.AppState.editingUserId;
-            }
-            
-            // THIRD: Populate dropdowns now that section is visible (with delay for DOM)
-            setTimeout(() => {
-                console.log('📦 Attempting to populate IPTV dropdowns...');
-                
-                // Call populate functions directly (they already have the data)
-                if (typeof window.IPTV.populatePackageSelect === 'function') {
-                    const packageSuccess = window.IPTV.populatePackageSelect();
-                    console.log(`📦 Package dropdown population: ${packageSuccess ? 'SUCCESS' : 'FAILED'}`);
-                } else {
-                    console.error('❌ populatePackageSelect function not found');
-                }
-                
-                if (typeof window.IPTV.populateChannelGroupSelect === 'function') {
-                    const channelSuccess = window.IPTV.populateChannelGroupSelect();
-                    console.log(`📺 Channel group dropdown population: ${channelSuccess ? 'SUCCESS' : 'FAILED'}`);
-                } else {
-                    console.error('❌ populateChannelGroupSelect function not found');
-                }
-                
-                // Update credit display
-                if (typeof window.IPTV.updateCreditDisplay === 'function') {
-                    window.IPTV.updateCreditDisplay();
-                }
-                
-                console.log('✅ IPTV dropdowns population complete');
-            }, 200); // Increased delay to ensure DOM is ready
-            
-        } else {
-            console.warn('⚠️ IPTV module not available when showing IPTV section');
-        }
-    } else {
-        iptvGroup.style.display = 'none';
-        
-        // Clear IPTV current user
-        if (window.IPTV) {
-            window.IPTV.currentUser = null;
-        }
-    }
-    
-    console.log(`✅ IPTV section ${isChecked ? 'shown' : 'hidden'}`);
-}
 
 // Test Plex connection quietly
 async function testPlexConnectionQuiet(serverGroup) {
