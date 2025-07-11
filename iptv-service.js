@@ -1272,25 +1272,95 @@ class IPTVService {
   /**
    * Get all users from IPTV panel
    */
-  async getAllPanelUsers() {
-    try {
-      const response = await this.makeAPIRequest('/lines/data');
+async getAllPanelUsers() {
+  try {
+    console.log('🔍 Fetching all panel users from /lines/data with DataTables params...');
+    
+    // Ensure fresh authentication (from both existing methods)
+    await this.ensureAuthenticated();
+    
+    // DataTables parameters required by the /lines/data endpoint (NEW - fixes the search issue)
+    const data = {
+      draw: 1,           // Request counter
+      start: 0,          // Starting record number (0 for first page)  
+      length: 1000,      // Number of records to return (high number to get all)
+      search: '',        // Search string (empty = no filter)
+      reseller: '1435'   // Your reseller ID
+    };
+
+    console.log('📤 Sending DataTables request with params:', data);
+    
+    // Use makeAPIRequest with POST method and DataTables parameters
+    const response = await this.makeAPIRequest('/lines/data', data, 'POST');
+    
+    console.log('📥 Raw /lines/data response structure:', {
+      hasData: !!response.data,
+      isDataArray: Array.isArray(response.data),
+      dataLength: response.data ? response.data.length : 0,
+      recordsTotal: response.recordsTotal,
+      recordsFiltered: response.recordsFiltered,
+      responseType: typeof response
+    });
+    
+    // Handle DataTables response format (response.data contains the actual user array)
+    if (response && response.data && Array.isArray(response.data)) {
+      console.log(`✅ Retrieved ${response.data.length} users from panel via DataTables format`);
       
-      if (response && response.data && Array.isArray(response.data)) {
-        return response.data;
+      // Log sample user data for debugging
+      if (response.data.length > 0) {
+        console.log('👤 Sample user data:', {
+          id: response.data[0].id,
+          username: response.data[0].username,
+          expire_date: response.data[0].expire_date,
+          enabled: response.data[0].enabled,
+          user_connection: response.data[0].user_connection
+        });
       }
       
-      if (response && Array.isArray(response)) {
-        return response;
-      }
-      
-      console.warn('⚠️ Unexpected users response format:', response);
-      return [];
-    } catch (error) {
-      console.error('❌ Failed to get panel users:', error);
-      throw new Error(`Failed to get panel users: ${error.message}`);
+      return response.data;
     }
+    
+    // Fallback: Handle direct array response (from existing method 1)
+    if (response && Array.isArray(response)) {
+      console.log(`✅ Retrieved ${response.length} users from panel via direct array format`);
+      return response;
+    }
+    
+    // If response has data property but it's not an array (from existing method 2)
+    if (response && response.data) {
+      const users = Array.isArray(response.data) ? response.data : [];
+      console.log(`✅ Retrieved ${users.length} users from panel via response.data format`);
+      return users;
+    }
+    
+    // No data found
+    console.warn('⚠️ Unexpected users response format or no data found:', {
+      responseType: typeof response,
+      hasData: !!response?.data,
+      isResponseArray: Array.isArray(response),
+      responseKeys: response ? Object.keys(response) : []
+    });
+    
+    return [];
+    
+  } catch (error) {
+    console.error('❌ Failed to get panel users:', error.message);
+    
+    // Enhanced error logging (from existing methods)
+    if (error.response) {
+      console.error('❌ Response status:', error.response.status);
+      console.error('❌ Response data:', error.response.data);
+      console.error('❌ Response headers:', error.response.headers);
+    }
+    
+    // Check for specific authentication errors
+    if (error.response && (error.response.status === 419 || error.response.status === 403)) {
+      console.log('🔄 Authentication error detected, might need fresh login');
+    }
+    
+    throw new Error(`Failed to get panel users: ${error.message}`);
   }
+}
 
   /**
    * Get specific user from IPTV panel
@@ -1304,32 +1374,6 @@ class IPTVService {
       throw new Error(`Failed to get user: ${error.message}`);
     }
   }
-  
-/**
- * Get all panel users using /lines/data endpoint
- */
-async getAllPanelUsers() {
-  try {
-    console.log('🔍 Fetching all panel users from /lines/data...');
-    
-    await this.ensureAuthenticated();
-    
-    const response = await this.makeAuthenticatedRequest('GET', '/lines/data');
-    
-    if (response && response.data) {
-      const users = Array.isArray(response.data) ? response.data : [];
-      console.log(`✅ Retrieved ${users.length} users from panel`);
-      return users;
-    }
-    
-    console.warn('⚠️ No user data returned from panel');
-    return [];
-    
-  } catch (error) {
-    console.error('❌ Failed to get panel users:', error);
-    throw error;
-  }
-}
   
   /**
    * Get all users data from panel
