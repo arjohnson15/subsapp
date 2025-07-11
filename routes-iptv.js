@@ -466,9 +466,6 @@ router.get('/user/:id', [
   }
 });
 
-// Enhanced POST /api/iptv/subscription endpoint in routes-iptv.js
-// Replace the existing subscription endpoint with this enhanced version
-
 /**
  * POST /api/iptv/subscription - Create or extend IPTV subscription with data retrieval
  */
@@ -480,65 +477,116 @@ router.post('/subscription', [
   handleValidationErrors
 ], async (req, res) => {
   try {
-    const { user_id, package_id, channel_group_id, action, username, password } = req.body;
+    const { user_id, package_id, channel_group_id, action, username, password, notes } = req.body;
+    
+    console.log('🔄 Processing IPTV subscription request:', { user_id, package_id, channel_group_id, action, username });
     
     await iptvService.initialize();
     
-    // Get user data
+    // Get user data - FIXED QUERY RESULT HANDLING
     const userResult = await db.query('SELECT * FROM users WHERE id = ?', [user_id]);
-    const userRows = Array.isArray(userResult) ? userResult[0] : userResult;
+    console.log('📊 Raw user query result:', userResult);
+    console.log('📊 User result type:', typeof userResult);
+    console.log('📊 User result is array:', Array.isArray(userResult));
     
-    if (!userRows || !Array.isArray(userRows) || userRows.length === 0) {
+    // Handle different possible result structures from mysql2
+    let user = null;
+    if (Array.isArray(userResult) && userResult.length > 0) {
+      user = userResult[0];
+    } else if (userResult && Array.isArray(userResult[0]) && userResult[0].length > 0) {
+      user = userResult[0][0];
+    } else if (userResult && userResult.id) {
+      // Direct object result
+      user = userResult;
+    }
+    
+    if (!user) {
+      console.error('❌ User not found for ID:', user_id);
+      console.error('❌ Raw result was:', userResult);
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
     
-    const user = userRows[0];
+    console.log('✅ Found user:', { id: user.id, name: user.name, email: user.email });
     
-    // Get package information
+    // Get package information - FIXED QUERY RESULT HANDLING
     const packageResult = await db.query('SELECT * FROM iptv_packages WHERE package_id = ?', [package_id]);
-    const packageRows = Array.isArray(packageResult) ? packageResult[0] : packageResult;
+    console.log('📊 Raw package query result:', packageResult);
     
-    if (!packageRows || !Array.isArray(packageRows) || packageRows.length === 0) {
+    let packageInfo = null;
+    if (Array.isArray(packageResult) && packageResult.length > 0) {
+      packageInfo = packageResult[0];
+    } else if (packageResult && Array.isArray(packageResult[0]) && packageResult[0].length > 0) {
+      packageInfo = packageResult[0][0];
+    } else if (packageResult && packageResult.package_id) {
+      packageInfo = packageResult;
+    }
+    
+    if (!packageInfo) {
+      console.error('❌ Package not found for ID:', package_id);
+      console.error('❌ Raw package result was:', packageResult);
       return res.status(404).json({
         success: false,
         message: 'Package not found'
       });
     }
     
-    const packageInfo = packageRows[0];
+    console.log('✅ Found package:', { id: packageInfo.package_id, name: packageInfo.package_name, type: packageInfo.package_type });
     
-    // Get channel group bouquets
+    // Get channel group bouquets - FIXED QUERY RESULT HANDLING
     const channelGroupResult = await db.query('SELECT bouquet_ids FROM iptv_channel_groups WHERE id = ?', [channel_group_id]);
-    const channelGroupRows = Array.isArray(channelGroupResult) ? channelGroupResult[0] : channelGroupResult;
+    console.log('📊 Raw channel group query result:', channelGroupResult);
     
+    let channelGroup = null;
+    if (Array.isArray(channelGroupResult) && channelGroupResult.length > 0) {
+      channelGroup = channelGroupResult[0];
+    } else if (channelGroupResult && Array.isArray(channelGroupResult[0]) && channelGroupResult[0].length > 0) {
+      channelGroup = channelGroupResult[0][0];
+    } else if (channelGroupResult && channelGroupResult.bouquet_ids) {
+      channelGroup = channelGroupResult;
+    }
+    
+    if (!channelGroup || !channelGroup.bouquet_ids) {
+      console.error('❌ Channel group not found for ID:', channel_group_id);
+      console.error('❌ Raw channel group result was:', channelGroupResult);
+      return res.status(404).json({
+        success: false,
+        message: 'Channel group not found'
+      });
+    }
+    
+    console.log('✅ Found channel group with bouquets:', channelGroup.bouquet_ids);
+    
+    // Parse bouquet IDs (stored as JSON array)
     let bouquetIds = [];
-    if (channelGroupRows && Array.isArray(channelGroupRows) && channelGroupRows.length > 0) {
-      try {
-        bouquetIds = JSON.parse(channelGroupRows[0].bouquet_ids || '[]');
-      } catch (e) {
-        console.warn('⚠️ Failed to parse bouquet IDs from channel group');
-      }
+    try {
+      bouquetIds = JSON.parse(channelGroup.bouquet_ids);
+    } catch (error) {
+      console.error('❌ Error parsing bouquet IDs:', error);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid channel group configuration'
+      });
     }
     
     // Check credits for paid subscriptions
     if (action === 'create_paid') {
-      const currentBalance = await iptvService.getCurrentBalance();
-      if (currentBalance < packageInfo.credits) {
+      const currentBalance = await iptvService.getLocalCreditBalance();
+      if (currentBalance < (packageInfo.credits || 0)) {
         return res.status(400).json({
           success: false,
-          message: `Insufficient credits. Required: ${packageInfo.credits}, Available: ${currentBalance}`
+          message: `Insufficient credits. Required: ${packageInfo.credits || 0}, Available: ${currentBalance}`
         });
       }
     }
     
+    // Call IPTV service to create subscription
     let result;
     let finalUsername = username || user.iptv_username;
-    let isExtending = false;
+    let finalPassword = password || user.iptv_password;
     
-    // Execute the appropriate action with enhanced data retrieval
     switch (action) {
       case 'create_trial':
         if (!finalUsername) {
@@ -547,7 +595,7 @@ router.post('/subscription', [
             message: 'Username is required for trial creation'
           });
         }
-        result = await iptvService.createTrialUserWithData(finalUsername, password, package_id, bouquetIds);
+        result = await iptvService.createTrialUserWithData(finalUsername, finalPassword, package_id, bouquetIds);
         break;
         
       case 'create_paid':
@@ -557,7 +605,7 @@ router.post('/subscription', [
             message: 'Username is required for paid subscription creation'
           });
         }
-        result = await iptvService.createPaidUserWithData(finalUsername, password, package_id, bouquetIds);
+        result = await iptvService.createPaidUserWithData(finalUsername, finalPassword, package_id, bouquetIds);
         break;
         
       case 'extend':
@@ -569,28 +617,39 @@ router.post('/subscription', [
         }
         result = await iptvService.extendUserWithData(user.iptv_line_id, package_id, bouquetIds, user.iptv_username);
         finalUsername = user.iptv_username;
-        isExtending = true;
         break;
     }
     
-    // Extract enhanced data from result
+    if (!result || !result.success) {
+      console.error('❌ IPTV service failed:', result?.message || 'Unknown error');
+      return res.status(400).json({
+        success: false,
+        message: result?.message || 'IPTV service failed'
+      });
+    }
+    
+    console.log('✅ IPTV service success:', result);
+    
+    // Extract data from result
     const { userData, m3uPlusURL } = result;
     
-    // Use retrieved data or fallback to provided/existing data
-    const finalLineId = userData?.line_id || user.iptv_line_id;
-    const finalPassword = userData?.password || password || user.iptv_password;
-    const finalExpirationDate = userData?.expiration_date || iptvService.calculateExpirationDate(packageInfo, isExtending, user.iptv_expiration);
+    // Use retrieved data or calculate fallbacks
+    const finalLineId = userData?.line_id || result.line_id;
+    const finalExpirationDate = userData?.expiration_date || result.expiration_date || 
+      iptvService.calculateExpirationDate(packageInfo, action === 'extend', user.iptv_expiration);
     const maxConnections = userData?.max_connections || packageInfo.connections || 0;
-    const finalM3UUrl = m3uPlusURL || (finalUsername && finalPassword ? iptvService.generateM3UPlusURL(finalUsername, finalPassword) : null);
+    const finalM3UUrl = m3uPlusURL || (finalUsername && finalPassword ? 
+      iptvService.generateM3UPlusURL(finalUsername, finalPassword) : null);
     
-    // Calculate expiration if not retrieved from panel
+    // Convert expiration date for database storage
     const expirationForDB = finalExpirationDate instanceof Date ? 
       finalExpirationDate.toISOString().slice(0, 19).replace('T', ' ') : 
       finalExpirationDate;
     
-    // Update user record in database with enhanced data
-    const creditsUsed = action === 'create_trial' ? 0 : packageInfo.credits;
+    // Calculate credits used
+    const creditsUsed = action === 'create_trial' ? 0 : (packageInfo.credits || 0);
     
+    // Update user record in database
     await db.query(`
       UPDATE users SET 
         iptv_username = ?,
@@ -604,6 +663,7 @@ router.post('/subscription', [
         iptv_connections = ?,
         iptv_is_trial = ?,
         iptv_m3u_url = ?,
+        iptv_notes = ?,
         updated_at = NOW()
       WHERE id = ?
     `, [
@@ -611,17 +671,18 @@ router.post('/subscription', [
       finalPassword,
       finalLineId,
       package_id,
-      packageInfo.name,
+      packageInfo.package_name || packageInfo.name,
       expirationForDB,
       creditsUsed,
       channel_group_id,
       maxConnections,
       action === 'create_trial',
       finalM3UUrl,
+      notes || null,
       user_id
     ]);
     
-    // Log the activity with enhanced data
+    // Log the activity
     await iptvService.logActivity(
       user_id, 
       finalLineId, 
@@ -629,13 +690,18 @@ router.post('/subscription', [
       package_id, 
       creditsUsed, 
       true, 
-      null, 
+      notes || null, 
       result
     );
     
+    // Sync credit balance after successful creation
+    if (action === 'create_paid') {
+      await iptvService.syncCreditBalance();
+    }
+    
     console.log(`✅ IPTV subscription ${action} completed for user ${user_id}`);
     
-    // Return enhanced response with all the data
+    // Return successful response
     res.json({
       success: true,
       message: `IPTV subscription ${action.replace('_', ' ')} successful`,
@@ -645,7 +711,7 @@ router.post('/subscription', [
         password: finalPassword,
         line_id: finalLineId,
         package_id: package_id,
-        package_name: packageInfo.name,
+        package_name: packageInfo.package_name || packageInfo.name,
         expiration_date: expirationForDB,
         expiration_formatted: userData?.expiration_formatted,
         days_until_expiration: userData?.days_until_expiration,
@@ -655,7 +721,8 @@ router.post('/subscription', [
         enabled: userData?.enabled !== false,
         m3u_plus_url: finalM3UUrl,
         credits_used: creditsUsed,
-        panel_data_retrieved: !!userData
+        panel_data_retrieved: !!userData,
+        notes: notes
       }
     });
   } catch (error) {
