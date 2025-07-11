@@ -314,25 +314,34 @@ async processIndividualSchedule(schedule) {
     if (shouldRun && targetUsers.length > 0) {
       console.log(`📤 Running schedule: ${schedule.name} for ${targetUsers.length} users`);
       
-      // Send emails to all target users
-      let sentCount = 0;
-      for (const user of targetUsers) {
-        try {
-          const personalizedBody = await this.replacePlaceholders(schedule.body, user);
-          const personalizedSubject = await this.replacePlaceholders(schedule.subject, user);
-          
-          const result = await this.sendEmail(user.email, personalizedSubject, personalizedBody, {
-            userId: user.id,
-            templateName: schedule.template_name
-          });
+// Send emails to all target users
+let sentCount = 0;
+for (const user of targetUsers) {
+  try {
+    const personalizedBody = await this.replacePlaceholders(schedule.body, user);
+    const personalizedSubject = await this.replacePlaceholders(schedule.subject, user);
+    
+    // 🔧 FIXED: Add owner BCC logic for scheduled renewal emails
+    const emailOptions = {
+      userId: user.id,
+      templateName: schedule.template_name
+    };
 
-          if (result.success) {
-            sentCount++;
-          }
-        } catch (error) {
-          console.error(`   ❌ Error sending to ${user.name}:`, error);
-        }
-      }
+    // Check if this user should BCC their owner on renewal emails
+    if (user.bcc_owner_renewal && user.owner_email) {
+      emailOptions.bcc = [user.owner_email];
+      console.log(`   → Adding owner BCC: ${user.owner_email} for user ${user.name}`);
+    }
+    
+    const result = await this.sendEmail(user.email, personalizedSubject, personalizedBody, emailOptions);
+
+    if (result.success) {
+      sentCount++;
+    }
+  } catch (error) {
+    console.error(`   ❌ Error sending to ${user.name}:`, error);
+  }
+}
 
       // Update schedule statistics
       await db.query(`
