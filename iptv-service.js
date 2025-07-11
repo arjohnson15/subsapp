@@ -362,12 +362,65 @@ class IPTVService {
       throw new Error(`Failed to get packages: ${error.message}`);
     }
   }
-
-  /**
-   * Parse package options from HTML - FIXED WITH ACTUAL HTML STRUCTURE
+  
+/**
+   * Get trial packages from IPTV panel
    */
-  parsePackageOptions(htmlContent) {
-    console.log('🔍 Parsing package options from HTML...');
+  async getTrialPackagesFromPanel() {
+    try {
+      console.log('🆓 Getting trial packages from IPTV panel...');
+      
+      // Ensure fresh authentication
+      await this.ensureAuthenticated();
+      
+      // Add delay after authentication
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // TRIAL ENDPOINT: /lines/create/1/line
+      const trialCreateUrl = `${this.baseURL}/lines/create/1/line`;
+      console.log('🔍 Fetching trial packages from:', trialCreateUrl);
+      
+      const response = await axios({
+        method: 'GET',
+        url: trialCreateUrl,
+        timeout: 15000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Cookie': this.sessionCookies,
+          'Referer': this.baseURL + '/dashboard',
+          'Connection': 'keep-alive'
+        }
+      });
+      
+      console.log('📄 Trial package form response status:', response.status);
+      console.log('📄 Trial package form response length:', response.data.length);
+      
+      // Check for authentication failure
+      if (response.data === 'no access.' || response.data.includes('no access') || response.data.length < 100) {
+        console.log('❌ Got "no access" response - authentication failed');
+        throw new Error('Authentication failed: Got "no access" response from panel');
+      }
+      
+      // Parse trial packages from the HTML
+      const trialPackages = this.parsePackageOptions(response.data, true);
+      console.log(`✅ Found ${trialPackages.length} trial packages`);
+      
+      return trialPackages;
+      
+    } catch (error) {
+      console.error('❌ Failed to get trial packages:', error.message);
+      throw new Error(`Failed to get trial packages: ${error.message}`);
+    }
+  }
+
+/**
+   * Parse package options from HTML - ENHANCED FOR TRIAL/PAID DETECTION
+   */
+  parsePackageOptions(htmlContent, isTrial = false) {
+    console.log(`🔍 Parsing ${isTrial ? 'trial' : 'paid'} package options from HTML...`);
     console.log('🔍 HTML content length:', htmlContent.length);
     
     const packages = [];
@@ -396,7 +449,11 @@ class IPTVService {
       if (id && !description.toLowerCase().includes('select') && !description.toLowerCase().includes('please')) {
         const cleanDescription = description.trim();
         
-        console.log(`🔍 Found package: ID=${id}, Credits=${credits}, Duration=${duration} ${durationUnit}, Connections=${connections}`);
+        // For trial packages, set credits to 0 and mark as trial type
+        const packageType = isTrial ? 'trial' : this.determinePackageType(id, cleanDescription);
+        const finalCredits = isTrial ? 0 : parseInt(credits);
+        
+        console.log(`🔍 Found ${isTrial ? 'trial' : 'paid'} package: ID=${id}, Credits=${finalCredits}, Duration=${duration} ${durationUnit}, Connections=${connections}`);
         console.log(`🔍 Description: ${cleanDescription}`);
         
         packages.push({
@@ -405,12 +462,12 @@ class IPTVService {
           connections: parseInt(connections),
           duration_months: this.convertDurationToMonths(parseInt(duration), durationUnit),
           duration_unit: durationUnit,
-          credits: parseInt(credits),
+          credits: finalCredits,
           description: cleanDescription,
-          package_type: this.determinePackageType(id, cleanDescription)
+          package_type: packageType
         });
         
-        console.log(`✅ Extracted package: ID=${id}, Credits=${credits}, Duration=${duration} ${durationUnit}, Connections=${connections}`);
+        console.log(`✅ Extracted ${isTrial ? 'trial' : 'paid'} package: ID=${id}, Credits=${finalCredits}, Duration=${duration} ${durationUnit}, Connections=${connections}`);
       }
     }
     
@@ -428,18 +485,22 @@ class IPTVService {
         if (id && !description.toLowerCase().includes('select') && !description.toLowerCase().includes('please')) {
           const cleanDescription = description.trim();
           
+          // For trial packages, set credits to 0 and mark as trial type
+          const packageType = isTrial ? 'trial' : this.determinePackageType(id, cleanDescription);
+          const finalCredits = isTrial ? 0 : parseInt(credits);
+          
           packages.push({
             id: id,
             name: this.extractPackageName(cleanDescription),
             connections: parseInt(connections),
             duration_months: this.convertDurationToMonths(parseInt(duration), durationUnit),
             duration_unit: durationUnit,
-            credits: parseInt(credits),
+            credits: finalCredits,
             description: cleanDescription,
-            package_type: this.determinePackageType(id, cleanDescription)
+            package_type: packageType
           });
           
-          console.log(`✅ Flexible match - Package: ID=${id}, Credits=${credits}, Duration=${duration} ${durationUnit}, Connections=${connections}`);
+          console.log(`✅ Flexible match - ${isTrial ? 'trial' : 'paid'} Package: ID=${id}, Credits=${finalCredits}, Duration=${duration} ${durationUnit}, Connections=${connections}`);
         }
       }
     }
@@ -470,18 +531,22 @@ class IPTVService {
             const durationUnit = durationInMatch[1];
             const connections = parseInt(connectionsMatch[1]);
             
+            // For trial packages, set credits to 0 and mark as trial type
+            const packageType = isTrial ? 'trial' : this.determinePackageType(id, description.trim());
+            const finalCredits = isTrial ? 0 : credits;
+            
             packages.push({
               id: id,
               name: this.extractPackageName(description.trim()),
               connections: connections,
               duration_months: this.convertDurationToMonths(duration, durationUnit),
               duration_unit: durationUnit,
-              credits: credits,
+              credits: finalCredits,
               description: description.trim(),
-              package_type: this.determinePackageType(id, description.trim())
+              package_type: packageType
             });
             
-            console.log(`✅ Basic parsed package: ID=${id}, Credits=${credits}, Duration=${duration} ${durationUnit}, Connections=${connections}`);
+            console.log(`✅ Basic parsed ${isTrial ? 'trial' : 'paid'} package: ID=${id}, Credits=${finalCredits}, Duration=${duration} ${durationUnit}, Connections=${connections}`);
           }
         }
       }
@@ -493,10 +558,11 @@ class IPTVService {
       console.log(selectContent.substring(0, 1000));
     }
     
-    console.log(`✅ Successfully parsed ${packages.length} packages from panel`);
+    console.log(`✅ Successfully parsed ${packages.length} ${isTrial ? 'trial' : 'paid'} packages from panel`);
     return packages;
   }
-
+  
+  
   /**
    * Get bouquets from IPTV panel - FIXED CSRF AND SESSION HANDLING
    */
@@ -824,16 +890,23 @@ class IPTVService {
     }
   }
 
-  /**
-   * Sync packages from panel to database
+/**
+   * Sync packages from panel to database - ENHANCED FOR TRIAL + PAID
    */
   async syncPackagesFromPanel() {
     try {
-      console.log('📦 Syncing packages (subscription plans) from panel...');
+      console.log('📦 Syncing packages (both trial and paid) from panel...');
       
-      const packages = await this.getPackagesFromPanel();
+      // Get both trial and paid packages
+      const [trialPackages, paidPackages] = await Promise.all([
+        this.getTrialPackagesFromPanel(),
+        this.getPackagesFromPanel()
+      ]);
       
-      if (packages.length === 0) {
+      // Combine all packages
+      const allPackages = [...trialPackages, ...paidPackages];
+      
+      if (allPackages.length === 0) {
         console.log('⚠️ No packages found to sync');
         return 0;
       }
@@ -842,7 +915,7 @@ class IPTVService {
       await db.query('DELETE FROM iptv_packages');
       
       // Insert new packages
-      for (const pkg of packages) {
+      for (const pkg of allPackages) {
         await db.query(`
           INSERT INTO iptv_packages (package_id, name, connections, duration_months, credits, package_type, synced_at)
           VALUES (?, ?, ?, ?, ?, ?, NOW())
@@ -856,10 +929,16 @@ class IPTVService {
         ]);
       }
       
-      await this.updateSetting('iptv_last_sync', new Date().toISOString());
-      console.log(`✅ Synced ${packages.length} packages from panel`);
+      // Update sync timestamps in settings
+      const now = new Date().toISOString();
+      await this.updateSetting('iptv_last_sync', now);
+      await this.updateSetting('iptv_packages_last_sync', now);
+      await this.updateSetting('iptv_packages_count', allPackages.length);
+      await this.updateSetting('iptv_trial_packages_count', trialPackages.length);
       
-      return packages.length;
+      console.log(`✅ Synced ${allPackages.length} total packages (${trialPackages.length} trial, ${paidPackages.length} paid) from panel`);
+      
+      return allPackages.length;
     } catch (error) {
       console.error('❌ Failed to sync packages:', error);
       throw error;

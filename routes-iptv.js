@@ -22,7 +22,7 @@ const handleValidationErrors = (req, res, next) => {
 iptvService.initialize().catch(console.error);
 
 /**
- * GET /api/iptv/packages - Get available IPTV packages
+ * GET /api/iptv/packages - Get available IPTV packages (enhanced with breakdown)
  */
 router.get('/packages', async (req, res) => {
   try {
@@ -35,26 +35,36 @@ router.get('/packages', async (req, res) => {
         success: true,
         packages: {
           trial: [],
+          basic: [],
           full: [],
-          live_tv: [],
-          basic: []
+          live_tv: []
         },
-        total: 0
+        total: 0,
+        breakdown: { trial: 0, basic: 0, full: 0, live_tv: 0 }
       });
     }
     
     // Group packages by type for easier frontend handling
     const groupedPackages = {
       trial: packages.filter(p => p.package_type === 'trial'),
+      basic: packages.filter(p => p.package_type === 'basic'),
       full: packages.filter(p => p.package_type === 'full'),
-      live_tv: packages.filter(p => p.package_type === 'live_tv'),
-      basic: packages.filter(p => p.package_type === 'basic')
+      live_tv: packages.filter(p => p.package_type === 'live_tv')
+    };
+    
+    // Create breakdown object
+    const breakdown = {
+      trial: groupedPackages.trial.length,
+      basic: groupedPackages.basic.length,
+      full: groupedPackages.full.length,
+      live_tv: groupedPackages.live_tv.length
     };
     
     res.json({
       success: true,
       packages: groupedPackages,
-      total: packages.length
+      total: packages.length,
+      breakdown: breakdown
     });
   } catch (error) {
     console.error('❌ Error getting packages:', error);
@@ -67,17 +77,29 @@ router.get('/packages', async (req, res) => {
 });
 
 /**
- * POST /api/iptv/sync-packages - Force sync packages from panel
+ * POST /api/iptv/sync-packages - Force sync packages from panel (enhanced for trial + paid)
  */
 router.post('/sync-packages', async (req, res) => {
   try {
+    console.log('🔄 Starting package sync (trial + paid)...');
+    
     await iptvService.initialize();
     const count = await iptvService.syncPackagesFromPanel();
+    
+    // Get breakdown after sync
+    const packages = await iptvService.getAvailablePackages();
+    const breakdown = {
+      trial: packages.filter(p => p.package_type === 'trial').length,
+      basic: packages.filter(p => p.package_type === 'basic').length,
+      full: packages.filter(p => p.package_type === 'full').length,
+      live_tv: packages.filter(p => p.package_type === 'live_tv').length
+    };
     
     res.json({
       success: true,
       message: `Successfully synced ${count} packages from panel`,
-      count: count
+      count: count,
+      breakdown: breakdown
     });
   } catch (error) {
     console.error('❌ Error syncing packages:', error);
@@ -904,6 +926,83 @@ router.delete('/user/:id', [
     res.status(500).json({
       success: false,
       message: 'Failed to remove IPTV subscription',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/iptv/packages/trial - Get only trial packages
+ */
+router.get('/packages/trial', async (req, res) => {
+  try {
+    const allPackages = await iptvService.getAvailablePackages();
+    const trialPackages = allPackages.filter(p => p.package_type === 'trial');
+    
+    res.json({
+      success: true,
+      packages: trialPackages,
+      total: trialPackages.length
+    });
+  } catch (error) {
+    console.error('❌ Error getting trial packages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get trial packages',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/iptv/packages/paid - Get only paid packages
+ */
+router.get('/packages/paid', async (req, res) => {
+  try {
+    const allPackages = await iptvService.getAvailablePackages();
+    const paidPackages = allPackages.filter(p => p.package_type !== 'trial');
+    
+    res.json({
+      success: true,
+      packages: paidPackages,
+      total: paidPackages.length
+    });
+  } catch (error) {
+    console.error('❌ Error getting paid packages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get paid packages',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/iptv/packages/stats - Get package statistics
+ */
+router.get('/packages/stats', async (req, res) => {
+  try {
+    const packages = await iptvService.getAvailablePackages();
+    
+    const stats = {
+      total: packages.length,
+      by_type: {
+        trial: packages.filter(p => p.package_type === 'trial').length,
+        basic: packages.filter(p => p.package_type === 'basic').length,
+        full: packages.filter(p => p.package_type === 'full').length,
+        live_tv: packages.filter(p => p.package_type === 'live_tv').length
+      }
+    };
+    
+    res.json({
+      success: true,
+      stats: stats
+    });
+  } catch (error) {
+    console.error('❌ Error getting package stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get package statistics',
       error: error.message
     });
   }

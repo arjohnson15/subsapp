@@ -2132,44 +2132,78 @@ window.SettingsIPTV = {
         }
     },
 
-    async syncPackagesFromPanel() {
-        try {
-            Utils.showNotification('Syncing packages from panel...', 'info');
+async syncPackagesFromPanel() {
+    try {
+        Utils.showNotification('Syncing packages (trial + paid) from panel...', 'info');
+        
+        const response = await fetch('/api/iptv/sync-packages', { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            const count = data.count || 0;
+            const breakdown = data.breakdown || {};
             
-            const response = await fetch('/api/iptv/sync-packages', { method: 'POST' });
-            const data = await response.json();
-            
-            if (data.success) {
-                const count = data.count || 0;
-                
-                // Update the display immediately
-                const countElement = document.getElementById('totalPackagesCount');
-                if (countElement) {
-                    countElement.textContent = count;
-                }
-                
-                // Update last sync time
-                const syncTime = new Date().toLocaleString();
-                const syncElement = document.getElementById('lastPackageSync');
-                if (syncElement) {
-                    syncElement.textContent = syncTime;
-                }
-                
-                // SAVE TO DATABASE - packages count and sync time
-                await API.Settings.update({
-                    'iptv_packages_count': count,
-                    'iptv_packages_last_sync': new Date().toISOString()
-                });
-                
-                Utils.showNotification(`Synced ${count} packages`, 'success');
-            } else {
-                throw new Error(data.message);
+            // Update the display immediately
+            const countElement = document.getElementById('totalPackagesCount');
+            if (countElement) {
+                countElement.textContent = count;
             }
-        } catch (error) {
-            console.error('Failed to sync packages:', error);
-            Utils.showNotification('Failed to sync packages', 'error');
+            
+            // Update last sync time
+            const syncTime = new Date().toLocaleString();
+            const syncElement = document.getElementById('lastPackageSync');
+            if (syncElement) {
+                syncElement.textContent = syncTime;
+            }
+            
+            // Update package breakdown display
+            this.updatePackageBreakdownDisplay(breakdown, countElement);
+            
+            // SAVE TO DATABASE - packages count and sync time
+            await API.Settings.update({
+                'iptv_packages_count': count,
+                'iptv_packages_last_sync': new Date().toISOString(),
+                'iptv_trial_packages_count': breakdown.trial || 0
+            });
+            
+            Utils.showNotification(`Successfully synced ${count} packages (${breakdown.trial || 0} trial, ${(breakdown.basic || 0) + (breakdown.full || 0) + (breakdown.live_tv || 0)} paid) from panel`, 'success');
+        } else {
+            Utils.showNotification(`Failed to sync packages: ${data.message}`, 'error');
         }
-    },
+    } catch (error) {
+        console.error('❌ Package sync failed:', error);
+        Utils.showNotification('Package sync failed', 'error');
+    }
+},
+
+/**
+ * Update package breakdown display
+ */
+updatePackageBreakdownDisplay(breakdown, totalElement) {
+    if (!totalElement) return;
+    
+    // Create or update breakdown tooltip/display
+    const packageSection = totalElement.closest('div[style*="text-align: center"]');
+    if (packageSection) {
+        let breakdownElement = packageSection.querySelector('.package-breakdown');
+        if (!breakdownElement) {
+            breakdownElement = document.createElement('div');
+            breakdownElement.className = 'package-breakdown';
+            breakdownElement.style.cssText = `
+                color: #64b5f6; 
+                font-size: 0.75rem; 
+                margin-top: 5px;
+                text-align: center;
+            `;
+            totalElement.parentElement.appendChild(breakdownElement);
+        }
+        
+        breakdownElement.innerHTML = `
+            Trial: ${breakdown.trial || 0} | Basic: ${breakdown.basic || 0} | 
+            Full: ${breakdown.full || 0} | Live TV: ${breakdown.live_tv || 0}
+        `;
+    }
+},
 
     async syncBouquetsFromPanel() {
         try {

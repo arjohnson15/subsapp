@@ -165,20 +165,29 @@
                 </div>
             </div>
 
-            <!-- Action Selection -->
-            <div class="form-section">
-                <h6 style="color: #4fc3f7; margin-bottom: 15px;">Action</h6>
-                <div style="display: flex; gap: 20px; margin-bottom: 20px;">
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input type="radio" name="iptvAction" value="extend" id="iptvActionExtend" style="margin-right: 8px;" onchange="IPTV.handleActionChange()">
-                        <span style="color: #fff;">Extend Current Subscription</span>
-                    </label>
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input type="radio" name="iptvAction" value="create" id="iptvActionCreate" style="margin-right: 8px;" onchange="IPTV.handleActionChange()" checked>
-                        <span style="color: #fff;">Create New Subscription</span>
-                    </label>
-                </div>
-            </div>
+<!-- Action Selection -->
+<div class="form-section">
+    <h6 style="color: #4fc3f7; margin-bottom: 15px;">Action</h6>
+    <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+        <label style="display: flex; align-items: center; cursor: pointer;">
+            <input type="radio" name="iptvAction" value="extend" id="iptvActionExtend" style="margin-right: 8px;" onchange="IPTV.handleActionChange()">
+            <span style="color: #fff;">Extend Current Subscription</span>
+        </label>
+        <label style="display: flex; align-items: center; cursor: pointer;">
+            <input type="radio" name="iptvAction" value="create" id="iptvActionCreate" style="margin-right: 8px;" onchange="IPTV.handleActionChange()" checked>
+            <span style="color: #fff;">Create New Subscription</span>
+        </label>
+    </div>
+    
+    <!-- Trial User Checkbox - Only shows when "Create New" is selected -->
+    <div id="trialCheckboxGroup" style="margin-bottom: 15px;">
+        <label style="display: flex; align-items: center; cursor: pointer;">
+            <input type="checkbox" id="isTrialUser" onchange="handleTrialUserChange()" style="margin-right: 8px; transform: scale(1.2);">
+            <span style="color: #ff9800; font-weight: 500;">Create Trial User</span>
+        </label>
+        <small style="color: #ff9800; font-size: 0.85rem;">Trial users get 12-24 hour access at no credit cost. Checking this will load trial packages.</small>
+    </div>
+</div>
 
             <!-- Credit Balance Display -->
             <div class="form-section">
@@ -187,7 +196,7 @@
                         <span style="color: #4caf50; font-weight: 500;">Available Credits: </span>
                         <span id="currentCreditBalance" style="color: #fff; font-size: 1.2rem; font-weight: bold;">Loading...</span>
                     </div>
-                    <button type="button" class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a); padding: 6px 12px; font-size: 0.8rem;" onclick="UserFormIPTV.syncCredits()">Sync Credits</button>
+                    <button type="button" class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a); padding: 6px 12px; font-size: 0.8rem;" onclick="IPTV.syncCredits()">Sync Credits</button>
                 </div>
             </div>
 
@@ -250,14 +259,14 @@
                 </div>
             </div>
 
-            <!-- Action Buttons -->
-            <div class="form-section">
-                <div style="display: flex; gap: 15px; justify-content: center;">
-                    <button type="button" id="createTrialBtn" class="btn" style="background: linear-gradient(45deg, #ff9800, #ff5722); padding: 10px 20px;" onclick="IPTV.createTrialSubscription()">Create Trial Subscription</button>
-                    <button type="button" id="createPaidBtn" class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a); padding: 10px 20px;" onclick="IPTV.createPaidSubscription()">Create Paid Subscription</button>
-                    <button type="button" id="extendBtn" class="btn" style="background: linear-gradient(45deg, #2196f3, #03a9f4); padding: 10px 20px; display: none;" onclick="IPTV.extendSubscription()">Extend Subscription</button>
-                </div>
-            </div>
+<!-- Action Buttons -->
+<div class="form-section">
+    <div style="display: flex; gap: 15px; justify-content: center;">
+        <button type="button" id="iptvSubmitBtn" class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a); padding: 10px 20px;" onclick="IPTV.executeAction()">
+            <span id="iptvSubmitBtnText">Create Subscription</span>
+        </button>
+    </div>
+</div>
         </div>
 
         <div class="form-group">
