@@ -278,52 +278,72 @@ const IPTV = {
     }
   },
 
-  /**
-   * Populate package selection dropdown (FIXED - with better error handling and debugging)
-   */
-  populatePackageSelect() {
-    const select = document.getElementById('iptvPackageSelect');
-    if (!select) {
-      console.warn('📦 Package select element not found - IPTV section may not be visible yet');
-      return false;
+/**
+ * Populate package selection dropdown (FIXED - excludes trial packages by default)
+ */
+populatePackageSelect(showTrialPackages = false) {
+  const select = document.getElementById('iptvPackageSelect');
+  if (!select) {
+    console.warn('📦 Package select element not found - IPTV section may not be visible yet');
+    return false;
+  }
+  
+  console.log('📦 Populating package dropdown, showTrialPackages:', showTrialPackages);
+  
+  select.innerHTML = '<option value="">Select Package...</option>';
+  
+  // Check if we have package data
+  if (!this.packages || Object.keys(this.packages).length === 0) {
+    console.warn('📦 No package data available to populate');
+    select.innerHTML = '<option value="">No packages available</option>';
+    return false;
+  }
+  
+  // FIXED: Filter package types based on trial flag
+  const packageTypesToShow = showTrialPackages ? 
+    ['trial', 'basic', 'full', 'live_tv'] :  // Show trial + paid when trial selected
+    ['basic', 'full', 'live_tv'];            // Show only paid by default
+  
+  // Add package groups in order
+  packageTypesToShow.forEach(type => {
+    if (this.packages[type] && this.packages[type].length > 0) {
+      const groupLabel = type.replace('_', ' ').toUpperCase();
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = groupLabel;
+      
+      this.packages[type].forEach(pkg => {
+        const option = document.createElement('option');
+        option.value = pkg.package_id;
+        option.dataset.type = type;
+        option.textContent = `${pkg.name} (${pkg.connections} conn, ${pkg.duration_months}mo, ${pkg.credits} credits)`;
+        optgroup.appendChild(option);
+      });
+      
+      select.appendChild(optgroup);
     }
-    
-    console.log('📦 Populating package dropdown with data:', this.packages);
-    
-    select.innerHTML = '<option value="">Select Package...</option>';
-    
-    // Check if we have package data
-    if (!this.packages || Object.keys(this.packages).length === 0) {
-      console.warn('📦 No package data available to populate');
-      select.innerHTML = '<option value="">No packages available</option>';
-      return false;
-    }
-    
-    // Add package groups
-    Object.keys(this.packages).forEach(type => {
-      if (this.packages[type] && this.packages[type].length > 0) {
-        const groupLabel = type.replace('_', ' ').toUpperCase();
-        const optgroup = document.createElement('optgroup');
-        optgroup.label = groupLabel;
-        
-        console.log(`📦 Adding ${groupLabel} group with ${this.packages[type].length} packages`);
-        
-        this.packages[type].forEach(pkg => {
-          const option = document.createElement('option');
-          option.value = pkg.package_id;
-          option.dataset.type = type;
-          option.dataset.credits = pkg.credits;
-          option.textContent = `${pkg.name} (${pkg.connections} conn, ${pkg.duration_months}mo, ${pkg.credits} credits)`;
-          optgroup.appendChild(option);
-        });
-        
-        select.appendChild(optgroup);
-      }
-    });
-    
-    console.log('✅ Package dropdown populated successfully');
-    return true;
-  },
+  });
+  
+  return true;
+},
+
+/**
+ * Handle trial checkbox change
+ */
+handleTrialCheckboxChange(event) {
+  const isTrialUser = event.target.checked;
+  console.log('🔄 Trial checkbox changed:', isTrialUser);
+  
+  // Repopulate packages with new filter
+  this.populatePackageSelect(isTrialUser);
+  
+  // Clear any selected package when switching
+  const select = document.getElementById('iptvPackageSelect');
+  if (select) select.value = '';
+  
+  // Hide package summary
+  const summary = document.getElementById('iptvPackageSummary');
+  if (summary) summary.style.display = 'none';
+},
 
   /**
    * Populate channel group selection dropdown (FIXED - with better error handling and debugging)
