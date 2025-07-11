@@ -1,4 +1,4 @@
-# JohnsonFlix Manager
+# Subscription Manager 
 
 A comprehensive Docker-based subscription management system for Plex and IPTV services with automated email reminders and real-time integrations.
 
