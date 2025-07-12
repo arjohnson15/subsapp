@@ -1038,12 +1038,17 @@ router.get('/sync-user/:id', [
       });
     }
     
-    // Update local database with panel data
-const expirationDate = panelUser.expire_date 
-  ? new Date(parseInt(panelUser.expire_date) * 1000) // FIXED: Use panel timestamp as-is
-  : null;
+// Update local database with panel data - FIXED: No date conversion
+let expirationForDB = null;
+if (panelUser.expire_date) {
+  const panelTimestamp = new Date(parseInt(panelUser.expire_date) * 1000);
+  const year = panelTimestamp.getUTCFullYear();
+  const month = String(panelTimestamp.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(panelTimestamp.getUTCDate()).padStart(2, '0');
+  expirationForDB = `${year}-${month}-${day}`;
+}
 
-console.log(`📅 Storing panel expiration without timezone conversion: ${panelUser.expire_date} → ${expirationDate ? expirationDate.toISOString() : 'null'}`);
+console.log(`📅 Storing panel expiration (no conversion): ${panelUser.expire_date} → ${expirationForDB}`);
 
 await db.query(`
   UPDATE users SET 
@@ -1053,7 +1058,7 @@ await db.query(`
     updated_at = NOW()
   WHERE id = ?
 `, [
-  expirationDate,
+  expirationForDB,
   panelUser.user_connection || panelUser.connections,
   panelUser.is_trial || 0,
   id

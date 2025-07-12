@@ -1211,37 +1211,39 @@ async loadCurrentUserIPTVStatus() {
                 console.warn('⚠️ No password value found to populate');
             }
 
-            // Update IPTV Expiration field in subscription section - NEW AUTOMATION
-            if (result.user.iptv_expiration) {
-                const iptvExpirationFields = [
-                    'iptvExpiration',        // Basic subscription field
-                    'iptv_expiration'        // Alternative field name
-                ];
-                
-                // Convert database datetime to input date format (YYYY-MM-DD)
-                let dateValue = null;
-                try {
-                    const expDate = new Date(result.user.iptv_expiration);
-                    if (!isNaN(expDate.getTime())) {
-                        dateValue = expDate.toISOString().split('T')[0]; // Get YYYY-MM-DD format
-                        console.log(`📅 Converted IPTV expiration: ${result.user.iptv_expiration} → ${dateValue}`);
-                    }
-                } catch (dateError) {
-                    console.warn('⚠️ Error converting IPTV expiration date:', dateError);
-                }
-                
-                if (dateValue) {
-                    for (const fieldId of iptvExpirationFields) {
-                        const field = document.getElementById(fieldId);
-                        if (field) {
-                            field.value = dateValue;
-                            console.log(`✅ Set IPTV expiration field ${fieldId}: ${dateValue}`);
-                        }
-                    }
-                }
-            } else {
-                console.log('📅 No IPTV expiration date found to populate');
+// Update IPTV Expiration field in subscription section - FIXED: NO CONVERSION  
+if (result.user.iptv_expiration) {
+    const iptvExpirationFields = [
+        'iptvExpiration',        // Basic subscription field
+        'iptv_expiration'        // Alternative field name
+    ];
+    
+    // FIXED: Use date as-is from database, no timezone conversion
+    let dateValue = result.user.iptv_expiration;
+    
+    // Only extract date part if it's a full datetime string
+    if (typeof dateValue === 'string') {
+        if (dateValue.includes('T')) {
+            dateValue = dateValue.split('T')[0];
+        } else if (dateValue.includes(' ')) {
+            dateValue = dateValue.split(' ')[0];  
+        }
+    }
+    
+    console.log(`📅 Using IPTV expiration as-is (no conversion): ${result.user.iptv_expiration} → ${dateValue}`);
+    
+    if (dateValue) {
+        for (const fieldId of iptvExpirationFields) {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.value = dateValue;
+                console.log(`✅ Set IPTV expiration field ${fieldId}: ${dateValue}`);
             }
+        }
+    }
+} else {
+    console.log('📅 No IPTV expiration date found to populate');
+}
             
             // Update interface state
             this.userHasExistingIPTVData = !!(result.user.iptv_username || result.user.iptv_line_id);
