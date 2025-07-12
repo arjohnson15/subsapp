@@ -1336,27 +1336,36 @@ async saveBasicUserInfo() {
             body: JSON.stringify(basicUserData)
         });
         
-        if (response.success) {
-            Utils.showNotification('Basic user info saved! You can now add services below.', 'success');
-            
-            // Hide the save basic info section
-            document.getElementById('saveBasicInfoSection').style.display = 'none';
-            
-            // Update form to edit mode
-            const userId = response.user?.id || response.id || response.userId;
-if (userId) {
-    this.updateFormToEditMode(userId);
+console.log('🔍 Full response:', response);
+console.log('🔍 response.success:', response.success);
+console.log('🔍 response.success type:', typeof response.success);
+console.log('🔍 response.message:', response.message);
+
+// Check for success based on the actual response format
+if (response.id && response.message === 'User created successfully') {
+    Utils.showNotification('Basic user info saved! You can now add services below.', 'success');
+    
+    // Hide the save basic info section
+    document.getElementById('saveBasicInfoSection').style.display = 'none';
+    
+    // Get user ID directly from response (we know it's there now)
+    const userId = response.id;
+    console.log(`✅ Got user ID from response: ${userId}`);
+    
+    if (userId) {
+        this.updateFormToEditMode(userId);
+        
+        // Update page title
+        document.querySelector('h2').textContent = 'Edit User';
+    } else {
+        console.warn('⚠️ Could not determine user ID, but user was created successfully');
+        Utils.showNotification('User created but could not switch to edit mode. Please refresh the page.', 'warning');
+    }
+    
 } else {
-    console.error('❌ No user ID found in response:', response);
-    throw new Error('User created but no ID returned');
+    console.error('❌ Response indicates failure:', response);
+    throw new Error(response.message || 'Failed to save user');
 }
-            
-            // Update page title
-            document.querySelector('h2').textContent = 'Edit User';
-            
-        } else {
-            throw new Error(response.message || 'Failed to save user');
-        }
         
     } catch (error) {
         console.error('Error saving basic user info:', error);
