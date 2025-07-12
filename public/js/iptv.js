@@ -1154,6 +1154,38 @@ async loadCurrentUserIPTVStatus() {
             } else {
                 console.warn('⚠️ No password value found to populate');
             }
+
+            // Update IPTV Expiration field in subscription section - NEW AUTOMATION
+            if (result.user.iptv_expiration) {
+                const iptvExpirationFields = [
+                    'iptvExpiration',        // Basic subscription field
+                    'iptv_expiration'        // Alternative field name
+                ];
+                
+                // Convert database datetime to input date format (YYYY-MM-DD)
+                let dateValue = null;
+                try {
+                    const expDate = new Date(result.user.iptv_expiration);
+                    if (!isNaN(expDate.getTime())) {
+                        dateValue = expDate.toISOString().split('T')[0]; // Get YYYY-MM-DD format
+                        console.log(`📅 Converted IPTV expiration: ${result.user.iptv_expiration} → ${dateValue}`);
+                    }
+                } catch (dateError) {
+                    console.warn('⚠️ Error converting IPTV expiration date:', dateError);
+                }
+                
+                if (dateValue) {
+                    for (const fieldId of iptvExpirationFields) {
+                        const field = document.getElementById(fieldId);
+                        if (field) {
+                            field.value = dateValue;
+                            console.log(`✅ Set IPTV expiration field ${fieldId}: ${dateValue}`);
+                        }
+                    }
+                }
+            } else {
+                console.log('📅 No IPTV expiration date found to populate');
+            }
             
             // Update interface state
             this.userHasExistingIPTVData = !!(result.user.iptv_username || result.user.iptv_line_id);
