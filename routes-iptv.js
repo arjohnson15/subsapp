@@ -898,22 +898,6 @@ router.post('/match-existing-user', [
 });
 
 /**
- * POST /api/iptv/match-existing-user - Match existing IPTV panel user to local user
- */
-router.post('/match-existing-user', [
-  // ... existing route code ...
-  } catch (error) {
-    console.error('❌ Error matching existing IPTV user:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to match existing IPTV user',
-      error: error.message
-    });
-  }
-});
-
-// ADD THE NEW ROUTE HERE:
-/**
  * POST /api/iptv/link-existing-user - Link existing IPTV account to user and save to database
  */
 router.post('/link-existing-user', [
@@ -921,14 +905,59 @@ router.post('/link-existing-user', [
   body('iptv_data').isObject().withMessage('IPTV data is required'),
   handleValidationErrors
 ], async (req, res) => {
-  // ... new route code ...
+  try {
+    const { user_id, iptv_data } = req.body;
+    
+    console.log(`🔗 Linking existing IPTV account to user ${user_id}:`, iptv_data);
+    
+    // Update the user with IPTV information
+    const updateResult = await db.query(`
+      UPDATE users SET 
+        iptv_username = ?,
+        iptv_password = ?,
+        iptv_line_id = ?,
+        iptv_expiration = ?,
+        iptv_connections = ?,
+        iptv_is_trial = ?,
+        iptv_m3u_url = ?,
+        updated_at = NOW()
+      WHERE id = ?
+    `, [
+      iptv_data.username,
+      iptv_data.password,
+      iptv_data.line_id,
+      iptv_data.expiration_date,
+      iptv_data.connections,
+      iptv_data.is_trial ? 1 : 0,
+      iptv_data.m3u_plus_url,
+      user_id
+    ]);
+    
+    console.log('📊 Update result:', updateResult);
+    
+    // Get the updated user data
+    const userResult = await db.query('SELECT * FROM users WHERE id = ?', [user_id]);
+    const user = Array.isArray(userResult) && userResult.length > 0 ? userResult[0] : null;
+    
+    if (!user) {
+      throw new Error('Failed to retrieve updated user data');
+    }
+    
+    res.json({
+      success: true,
+      message: 'IPTV account linked successfully',
+      user: user
+    });
+    
+  } catch (error) {
+    console.error('❌ Error linking existing IPTV account:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to link existing IPTV account',
+      error: error.message
+    });
+  }
 });
-
-/**
- * GET /api/iptv/sync-user/:id - Sync single user from panel
- */
-router.get('/sync-user/:id', [
-  // ... next existing route continues ...
 
 /**
  * GET /api/iptv/sync-user/:id - Sync single user from panel
