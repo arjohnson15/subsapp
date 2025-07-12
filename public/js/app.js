@@ -305,8 +305,6 @@ async function initUserFormPage() {
 }
 
 
-// Replace BOTH versions of toggleIptvManagementByTag with this complete version:
-
 function toggleIptvManagementByTag(isChecked) {
     console.log(`🔧 Toggling IPTV management: ${isChecked}`);
     
@@ -383,19 +381,18 @@ function toggleIptvManagementByTag(isChecked) {
                     } else {
                         console.error('❌ updateStatusInterface function not found');
                     }
-					
-					// CRITICAL: Initialize the always-visible check button
-					setTimeout(() => {
-						if (window.initializeIPTVCheck) {
-							console.log('🔧 Initializing IPTV check button...');
-							window.initializeIPTVCheck();
-						} else {
-							console.error('❌ initializeIPTVCheck function not found');
-						}
-					}, 100);
-                    
-                    console.log('✅ IPTV dropdowns population complete');
                 }
+                
+                // CRITICAL: Initialize the check button for ALL users (moved outside conditional)
+                setTimeout(() => {
+                    if (window.initializeIPTVCheck) {
+                        console.log('🔧 Initializing IPTV check button for all users...');
+                        window.initializeIPTVCheck();
+                    } else {
+                        console.error('❌ initializeIPTVCheck function not found');
+                    }
+                }, 200);
+                
             }, 200);
         } else {
             console.warn('⚠️ IPTV module not available when showing IPTV section');
