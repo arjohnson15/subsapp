@@ -849,12 +849,12 @@ router.post('/match-existing-user', [
       // Use the panel's exp_date (human readable format) directly
       expirationFormatted = matchingUser.exp_date || 'Unknown';
       
-      // For database storage, convert timestamp but use UTC to avoid timezone shift
-      const panelTimestamp = new Date(matchingUser.expire_date * 1000);
-      const year = panelTimestamp.getUTCFullYear();
-      const month = String(panelTimestamp.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(panelTimestamp.getUTCDate()).padStart(2, '0');
-      expirationForDB = `${year}-${month}-${day} 00:00:00`;
+// For database storage, convert timestamp but use UTC to avoid timezone shift
+const panelTimestamp = new Date(matchingUser.expire_date * 1000);
+const year = panelTimestamp.getUTCFullYear();
+const month = String(panelTimestamp.getUTCMonth() + 1).padStart(2, '0');
+const day = String(panelTimestamp.getUTCDate()).padStart(2, '0');
+expirationForDB = `${year}-${month}-${day}`;
       
       console.log(`📅 Panel expiration (no timezone shift): ${matchingUser.expire_date} → ${expirationForDB} (formatted: ${expirationFormatted})`);
     }
