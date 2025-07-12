@@ -466,6 +466,7 @@ router.get('/user/:id', [
 
 /**
  * POST /api/iptv/subscription - Create or extend IPTV subscription with data retrieval
+ * FIXED VERSION - Only changed the data extraction and response structure
  */
 router.post('/subscription', [
   body('user_id').isInt().withMessage('Invalid user ID'),
@@ -644,16 +645,19 @@ router.post('/subscription', [
     
     console.log('✅ IPTV service success:', result);
     
-    // Extract data from result
+    // FIXED: Extract data correctly from service result
     const { userData, m3uPlusURL } = result;
+    
+    // FIXED: Use the actual password from userData (this is the key fix!)
+    const actualPassword = userData?.password || finalPassword;
     
     // Use retrieved data or calculate fallbacks
     const finalLineId = userData?.line_id || result.line_id;
     const finalExpirationDate = userData?.expiration_date || result.expiration_date || 
       iptvService.calculateExpirationDate(packageInfo, action === 'extend', user.iptv_expiration);
     const maxConnections = userData?.max_connections || packageInfo.connections || 0;
-    const finalM3UUrl = m3uPlusURL || (finalUsername && finalPassword ? 
-      iptvService.generateM3UPlusURL(finalUsername, finalPassword) : null);
+    const finalM3UUrl = m3uPlusURL || (finalUsername && actualPassword ? 
+      iptvService.generateM3UPlusURL(finalUsername, actualPassword) : null);
     
     // Convert expiration date for database storage
     const expirationForDB = finalExpirationDate instanceof Date ? 
@@ -663,7 +667,7 @@ router.post('/subscription', [
     // Calculate credits used
     const creditsUsed = action === 'create_trial' ? 0 : (packageInfo.credits || 0);
     
-    // Update user record in database
+    // FIXED: Update database with the correct password
     await db.query(`
       UPDATE users SET 
         iptv_username = ?,
@@ -682,7 +686,7 @@ router.post('/subscription', [
       WHERE id = ?
     `, [
       finalUsername,
-      finalPassword,
+      actualPassword, // FIXED: Use the actual password from panel
       finalLineId,
       package_id,
       packageInfo.package_name || packageInfo.name,
@@ -715,28 +719,44 @@ router.post('/subscription', [
     
     console.log(`✅ IPTV subscription ${action} completed for user ${user_id}`);
     
-    // Return successful response
+    // FIXED: Return response with correct password data
     res.json({
       success: true,
       message: `IPTV subscription ${action.replace('_', ' ')} successful`,
       data: {
         user_id: user_id,
+        
+        // CRITICAL FIX: Return the actual password from panel
         username: finalUsername,
-        password: finalPassword,
+        password: actualPassword, // This will now be the real password
+        iptv_username: finalUsername, // Alternative field name
+        iptv_password: actualPassword, // Alternative field name
+        
         line_id: finalLineId,
+        iptv_line_id: finalLineId, // Alternative field name
         package_id: package_id,
         package_name: packageInfo.package_name || packageInfo.name,
         expiration_date: expirationForDB,
+        iptv_expiration: expirationForDB, // Alternative field name
         expiration_formatted: userData?.expiration_formatted,
         days_until_expiration: userData?.days_until_expiration,
         max_connections: maxConnections,
+        iptv_connections: maxConnections, // Alternative field name
         current_connections: userData?.current_connections || 0,
+        active_connections: userData?.current_connections || 0, // Alternative field name
         is_trial: action === 'create_trial',
+        iptv_is_trial: action === 'create_trial', // Alternative field name
         enabled: userData?.enabled !== false,
         m3u_plus_url: finalM3UUrl,
+        iptv_m3u_url: finalM3UUrl, // Alternative field name
+        m3u_url: finalM3UUrl, // Alternative field name
         credits_used: creditsUsed,
-        panel_data_retrieved: !!userData,
-        notes: notes
+        panel_data_retrieved: !!userData, // Flag for frontend
+        notes: notes,
+        
+        // Additional metadata
+        created_at: userData?.created_at,
+        owner: userData?.owner
       }
     });
   } catch (error) {

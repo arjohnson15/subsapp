@@ -1058,6 +1058,29 @@ async saveUser(event) {
     console.log('🎯 Form submission triggered - starting save process');
     
     try {
+        // Check if this is a new user without basic info saved
+        const isNewUser = !window.AppState?.editingUserId && !window.currentEditingUserId;
+        
+        if (isNewUser) {
+            // For completely new users, encourage using basic save first
+            const hasIPTVTag = document.getElementById('tag-iptv')?.checked;
+            const hasPlexTags = document.getElementById('tag-plex1')?.checked || document.getElementById('tag-plex2')?.checked;
+            
+            if (hasIPTVTag || hasPlexTags) {
+                const useBasicSave = confirm(
+                    'For new users with IPTV or Plex services, we recommend saving basic info first.\n\n' +
+                    'Click OK to save basic info first, or Cancel to save everything at once.'
+                );
+                
+                if (useBasicSave) {
+                    // Call the basic save function instead
+                    await this.saveBasicUserInfo();
+                    return;
+                }
+            }
+        }
+        
+        // Continue with existing saveUser logic...
         console.log('💾 Starting optimized user save with smart change detection...');
         
         // Collect form data properly
@@ -1278,6 +1301,98 @@ async saveUser(event) {
     } catch (error) {
         console.error('Error saving user:', error);
         Utils.handleError(error, 'Saving user');
+    }
+},
+
+/**
+ * Save basic user info only (for new users)
+ */
+async saveBasicUserInfo() {
+    const button = document.getElementById('saveBasicInfoBtn');
+    const originalText = button.innerHTML;
+    
+    // Validate required fields
+    const name = document.getElementById('userName').value.trim();
+    const email = document.getElementById('userEmail').value.trim();
+    
+    if (!name || !email) {
+        Utils.showNotification('Name and Email are required', 'error');
+        return;
+    }
+    
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    button.disabled = true;
+    
+    try {
+        const basicUserData = {
+            name: name,
+            email: email,
+            plex_email: document.getElementById('plexEmail').value.trim(),
+            owner_id: document.getElementById('userOwner').value || null
+        };
+        
+        const response = await API.call('/users', {
+            method: 'POST',
+            body: JSON.stringify(basicUserData)
+        });
+        
+        if (response.success) {
+            Utils.showNotification('Basic user info saved! You can now add services below.', 'success');
+            
+            // Hide the save basic info section
+            document.getElementById('saveBasicInfoSection').style.display = 'none';
+            
+            // Update form to edit mode
+            const userId = response.user?.id || response.id || response.userId;
+if (userId) {
+    this.updateFormToEditMode(userId);
+} else {
+    console.error('❌ No user ID found in response:', response);
+    throw new Error('User created but no ID returned');
+}
+            
+            // Update page title
+            document.querySelector('h2').textContent = 'Edit User';
+            
+        } else {
+            throw new Error(response.message || 'Failed to save user');
+        }
+        
+    } catch (error) {
+        console.error('Error saving basic user info:', error);
+        Utils.showNotification('Failed to save: ' + error.message, 'error');
+    } finally {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+},
+
+/**
+ * Update form to edit mode after saving basic info
+ */
+updateFormToEditMode(userId) {
+    // Store the user ID globally so other functions can use it
+    window.currentEditingUserId = userId;
+    window.AppState.editingUserId = userId;
+    
+    // Update the form action or any hidden fields if needed
+    const form = document.getElementById('userFormData');
+    if (form) {
+        form.setAttribute('data-user-id', userId);
+    }
+    
+    console.log(`✅ Form updated to edit mode with user ID: ${userId}`);
+},
+
+/**
+ * Show/hide the basic save button based on whether this is a new user
+ */
+toggleBasicSaveButton() {
+    const isNewUser = !window.AppState?.editingUserId && !window.currentEditingUserId;
+    const section = document.getElementById('saveBasicInfoSection');
+    
+    if (section) {
+        section.style.display = isNewUser ? 'block' : 'none';
     }
 },
 
@@ -2221,6 +2336,11 @@ window.showUserForm = function() {
             }
         });
         
+        // Show/hide basic save button based on user type (NEW USER = show button)
+        if (window.Users && window.Users.toggleBasicSaveButton) {
+            window.Users.toggleBasicSaveButton();
+        }
+        
         console.log('✅ Clean form initialized for new user');
     }, 700);
 };
@@ -2567,6 +2687,45 @@ window.Users.saveUser = window.Users.saveUser.bind(window.Users);
 // Make the saveUser function globally available
 window.saveUser = function(event) {
     return window.Users.saveUser(event);
+};
+
+console.log('👥 Users module loaded successfully');
+
+// Make saveBasicUserInfo globally available
+window.saveBasicUserInfo = function() {
+    return window.Users.saveBasicUserInfo();
+};
+
+// Make toggleBasicSaveButton globally available  
+window.toggleBasicSaveButton = function() {
+    return window.Users.toggleBasicSaveButton();
+};
+
+// Manual initialization for always-visible IPTV check
+window.initializeIPTVCheck = function() {
+    const usernameInput = document.getElementById('existingIptvUsername');
+    const checkBtn = document.getElementById('checkAccessBtn');
+    
+    if (usernameInput && checkBtn) {
+        console.log('🔧 Initializing IPTV check button...');
+        
+        // Enable/disable button based on input
+        usernameInput.addEventListener('input', function() {
+            const username = this.value.trim();
+            checkBtn.disabled = username.length === 0;
+        });
+        
+        // Add click handler
+        checkBtn.addEventListener('click', function() {
+            if (window.IPTV && window.IPTV.checkExistingAccess) {
+                window.IPTV.checkExistingAccess();
+            } else {
+                console.error('❌ IPTV.checkExistingAccess not found');
+            }
+        });
+        
+        console.log('✅ IPTV check button initialized');
+    }
 };
 
 console.log('👥 Users module loaded successfully');

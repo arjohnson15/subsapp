@@ -383,6 +383,16 @@ function toggleIptvManagementByTag(isChecked) {
                     } else {
                         console.error('❌ updateStatusInterface function not found');
                     }
+					
+					// CRITICAL: Initialize the always-visible check button
+					setTimeout(() => {
+						if (window.initializeIPTVCheck) {
+							console.log('🔧 Initializing IPTV check button...');
+							window.initializeIPTVCheck();
+						} else {
+							console.error('❌ initializeIPTVCheck function not found');
+						}
+					}, 100);
                     
                     console.log('✅ IPTV dropdowns population complete');
                 }
