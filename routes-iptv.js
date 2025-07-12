@@ -1029,9 +1029,9 @@ router.get('/sync-user/:id', [
     }
     
     // Update local database with panel data
-    const expirationDate = panelUser.expire_date 
-      ? new Date(panelUser.expire_date * 1000) // Convert Unix timestamp
-      : null;
+const expirationDate = panelUser.expire_date 
+  ? new Date((panelUser.expire_date * 1000) - (1 * 60 * 60 * 1000)) // Convert Unix timestamp and subtract 1 hour (Eastern to Central)
+  : null;
     
     await db.query(`
       UPDATE users SET 

@@ -1452,9 +1452,9 @@ async getAllPanelUsers() {
     try {
       // Parse expiration date (from Unix timestamp)
       let expirationDate = null;
-      if (panelUser.expire_date) {
-        expirationDate = new Date(parseInt(panelUser.expire_date) * 1000);
-      }
+if (panelUser.expire_date) {
+  expirationDate = new Date((parseInt(panelUser.expire_date) * 1000) - (1 * 60 * 60 * 1000)); // Subtract 1 hour (Eastern to Central)
+}
 
       // Calculate days until expiration
       let daysUntilExpiration = null;
