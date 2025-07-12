@@ -1580,48 +1580,30 @@ window.syncIptvExpirationFromPanel = function() {
     syncBtn.disabled = true;
     syncBtn.innerHTML = '⏳ Syncing...';
     
-    // Use the IPTV-specific API that has the correct expiration data
+    // Use the IPTV-specific API that gets the stored (should be converted) date
     fetch(`/api/iptv/user/${userId}`)
         .then(response => response.json())
         .then(data => {
             console.log('📺 IPTV API response:', data);
             
             if (data.success && data.user && data.user.iptv_expiration) {
-                // Convert database datetime to input date format (YYYY-MM-DD)
                 const expDate = new Date(data.user.iptv_expiration);
                 if (!isNaN(expDate.getTime())) {
                     const dateValue = expDate.toISOString().split('T')[0];
                     
-                    // Update the form field
-                    const expirationField = document.getElementById('iptvExpiration');
+                    // Target the correct date input field
+                    const expirationField = document.querySelector('input[name="iptv_expiration"]') || document.querySelector('input[type="date"][id*="iptv"]');
+                    
                     if (expirationField) {
                         expirationField.value = dateValue;
+                        expirationField.dispatchEvent(new Event('change', { bubbles: true }));
+                        
                         Utils.showNotification(`IPTV expiration synced: ${dateValue}`, 'success');
                         console.log(`✅ Synced IPTV expiration: ${data.user.iptv_expiration} → ${dateValue}`);
                     }
-                } else {
-                    Utils.showNotification('Invalid date format in panel data', 'error');
-                }
-            } else if (data.success && data.user && data.user.expiration_formatted) {
-                // Fallback: try to parse the formatted date
-                try {
-                    const [month, day, year] = data.user.expiration_formatted.split('/');
-                    const expDate = new Date(year, month - 1, day); // month is 0-indexed
-                    const dateValue = expDate.toISOString().split('T')[0];
-                    
-                    const expirationField = document.getElementById('iptvExpiration');
-                    if (expirationField) {
-                        expirationField.value = dateValue;
-                        Utils.showNotification(`IPTV expiration synced: ${dateValue}`, 'success');
-                        console.log(`✅ Synced from formatted date: ${data.user.expiration_formatted} → ${dateValue}`);
-                    }
-                } catch (parseError) {
-                    console.error('❌ Error parsing formatted date:', parseError);
-                    Utils.showNotification('Error parsing expiration date', 'error');
                 }
             } else {
                 Utils.showNotification('No IPTV expiration date found in panel data', 'warning');
-                console.log('⚠️ No iptv_expiration found in IPTV API response:', data);
             }
         })
         .catch(error => {
@@ -1629,7 +1611,6 @@ window.syncIptvExpirationFromPanel = function() {
             Utils.showNotification('Error syncing from panel data: ' + error.message, 'error');
         })
         .finally(() => {
-            // Re-enable button
             syncBtn.disabled = false;
             syncBtn.innerHTML = originalText;
         });
