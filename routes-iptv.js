@@ -426,17 +426,15 @@ router.get('/user/:id', [
       WHERE u.id = ?
     `, [id]);
     
-    // Handle different return formats from mysql2
-    const rows = Array.isArray(result) ? result[0] : result;
-    
-    if (!rows || !Array.isArray(rows) || rows.length === 0) {
+    // Handle mysql2 result format - db.query() returns direct results array
+    if (!result || !Array.isArray(result) || result.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
     
-    const user = rows[0];
+    const user = result[0];
     
     // Calculate status
     let status = 'inactive';
@@ -898,6 +896,39 @@ router.post('/match-existing-user', [
     });
   }
 });
+
+/**
+ * POST /api/iptv/match-existing-user - Match existing IPTV panel user to local user
+ */
+router.post('/match-existing-user', [
+  // ... existing route code ...
+  } catch (error) {
+    console.error('❌ Error matching existing IPTV user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to match existing IPTV user',
+      error: error.message
+    });
+  }
+});
+
+// ADD THE NEW ROUTE HERE:
+/**
+ * POST /api/iptv/link-existing-user - Link existing IPTV account to user and save to database
+ */
+router.post('/link-existing-user', [
+  body('user_id').isInt().withMessage('Invalid user ID'),
+  body('iptv_data').isObject().withMessage('IPTV data is required'),
+  handleValidationErrors
+], async (req, res) => {
+  // ... new route code ...
+});
+
+/**
+ * GET /api/iptv/sync-user/:id - Sync single user from panel
+ */
+router.get('/sync-user/:id', [
+  // ... next existing route continues ...
 
 /**
  * GET /api/iptv/sync-user/:id - Sync single user from panel

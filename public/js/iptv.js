@@ -908,19 +908,19 @@ async createSubscription(action) {
   updateIPTVStatus(data) {
     console.log('📺 Updating IPTV status display:', data);
     
-    // Update Line ID
-    const lineIdElement = document.getElementById('iptvLineId');
-    if (lineIdElement) {
-        lineIdElement.textContent = data.line_id || 'None';
-    }
-    
-    // Update Connections
-    const connectionsElement = document.getElementById('iptvConnections');
-    if (connectionsElement) {
-        const current = data.current_connections || 0;
-        const max = data.max_connections || 0;
-        connectionsElement.textContent = `${current}/${max}`;
-    }
+// Update Line ID
+const lineIdElement = document.getElementById('iptvLineId');
+if (lineIdElement) {
+    lineIdElement.textContent = data.iptv_line_id || 'None';
+}
+
+// Update Connections
+const connectionsElement = document.getElementById('iptvConnections');
+if (connectionsElement) {
+    const current = data.current_connections || 0;
+    const max = data.iptv_connections || 0;
+    connectionsElement.textContent = `${current}/${max}`;
+}
     
     // Update Days Until Expiration
     const daysLeftElement = document.getElementById('iptvDaysLeft');
@@ -1024,16 +1024,16 @@ async createSubscription(action) {
         if (result.success && result.user) {
             this.updateIPTVStatus(result.user);
             
-            // Populate form fields if user has existing IPTV data
-            if (result.user.iptv_username) {
-                const usernameField = document.getElementById('iptvUsernameField');
-                if (usernameField) usernameField.value = result.user.iptv_username;
-            }
-            
-            if (result.user.iptv_password) {
-                const passwordField = document.getElementById('iptvPasswordField');
-                if (passwordField) passwordField.value = result.user.iptv_password;
-            }
+// FIXED:
+if (result.user.iptv_username) {
+    const usernameField = document.getElementById('iptvUsername');
+    if (usernameField) usernameField.value = result.user.iptv_username;
+}
+
+if (result.user.iptv_password) {
+    const passwordField = document.getElementById('iptvPassword');
+    if (passwordField) passwordField.value = result.user.iptv_password;
+}
         } else {
             console.log('📋 No existing IPTV data for user');
             this.updateIPTVStatus({
@@ -1497,72 +1497,84 @@ showAccessCheckSuccess(iptvData) {
     }
   },
 
-/**
- * Handle successful account linking (called by button) - IMPROVED VERSION
- */
 linkExistingAccount() {
   try {
     console.log('🔗 Linking existing IPTV account...');
     
-    // Update the interface state
-    this.userHasExistingIPTVData = true;
+    if (!this.foundIPTVData) {
+      console.error('❌ No IPTV data found to link');
+      return;
+    }
     
-    // Clear the found data
+    // Get current user ID
+    const userId = this.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ No user ID found');
+      return;
+    }
+    
+    // Show loading state
+    const linkBtn = document.querySelector('.link-account-btn');
+    if (linkBtn) {
+      linkBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Linking Account...';
+      linkBtn.disabled = true;
+    }
+    
+    // Save to database
+    this.saveLinkedAccount(userId, this.foundIPTVData);
+    
+  } catch (error) {
+    console.error('❌ Error in linkExistingAccount:', error);
+  }
+},
+
+async saveLinkedAccount(userId, iptvData) {
+  try {
+    console.log('💾 Saving linked IPTV account to database...');
+    
+    const response = await fetch('/api/iptv/link-existing-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        user_id: parseInt(userId),
+        iptv_data: iptvData
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to save linked account');
+    }
+    
+    console.log('✅ Account linked and saved successfully');
+    
+    // Update interface
+    this.userHasExistingIPTVData = true;
     this.foundIPTVData = null;
     
-    // Hide the check interface and show the normal status display
+    // Hide check interface, show status display
     const checkInterface = document.getElementById('checkExistingInterface');
     const statusDisplay = document.getElementById('iptvStatusDisplay');
     
     if (checkInterface) checkInterface.style.display = 'none';
     if (statusDisplay) statusDisplay.style.display = 'block';
     
-    // Show success message
+    // Refresh status
+    setTimeout(() => {
+      this.loadCurrentUserIPTVStatus();
+    }, 1000);
+    
     if (window.Utils && window.Utils.showNotification) {
-      window.Utils.showNotification('IPTV account linked successfully! Refreshing user data...', 'success');
+      window.Utils.showNotification('IPTV account linked successfully!', 'success');
     }
-    
-    // Refresh the user's IPTV status to show updated data
-    if (this.currentUser) {
-      // Small delay to let the database update process
-      setTimeout(async () => {
-        try {
-          console.log('🔄 Refreshing user IPTV status after linking...');
-          await this.loadUserStatus(this.currentUser);
-          
-          // If loadUserStatus still gets 404, show manual status based on foundIPTVData
-          if (!this.userHasExistingIPTVData && this.foundIPTVData) {
-            console.log('📋 Using stored IPTV data to populate status display...');
-            this.displayUserStatus({
-              iptv_line_id: this.foundIPTVData.line_id,
-              iptv_username: this.foundIPTVData.username,
-              iptv_package_name: 'Linked Account',
-              expiration_formatted: this.foundIPTVData.expiration_formatted,
-              iptv_connections: this.foundIPTVData.connections,
-              iptv_credits_used: 0
-            });
-            this.userHasExistingIPTVData = true;
-          }
-          
-          console.log('✅ User IPTV status refresh completed');
-        } catch (refreshError) {
-          console.log('ℹ️ User status refresh got 404 (expected for newly linked accounts)');
-          
-          // 404 is expected - the match-existing-user API updated the user record
-          // but there might not be an IPTV status endpoint record yet
-          if (window.Utils && window.Utils.showNotification) {
-            window.Utils.showNotification('✅ Account linked! Username and password updated in user profile.', 'success');
-          }
-        }
-      }, 1000);
-    }
-    
-    console.log('✅ IPTV account linking completed');
     
   } catch (error) {
-    console.error('❌ Error during account linking:', error);
+    console.error('❌ Error saving linked account:', error);
     if (window.Utils && window.Utils.showNotification) {
-      window.Utils.showNotification('Error linking account', 'error');
+      window.Utils.showNotification('Failed to save linked account: ' + error.message, 'error');
     }
   }
 },
