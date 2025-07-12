@@ -1166,14 +1166,18 @@ class IPTVService {
     }
   }
 
-  /**
+
+/**
    * Create trial user (24 hours)
    */
-  async createTrialUser(username, password, packageId, bouquetIds = []) {
+  async createTrialUser(username, password, packageId, bouquetIds = [], notes = '') {
     try {
       console.log(`🆓 Creating trial user: ${username}`);
       
       const bouquetString = Array.isArray(bouquetIds) ? bouquetIds.join(',') : bouquetIds;
+      
+      // Use notes if provided, otherwise use default message
+      const description = notes ? `${notes} - created via API` : 'Trial user created via API';
       
       const data = {
         line_type: 'line',
@@ -1184,7 +1188,7 @@ class IPTVService {
         package: packageId,
         current_bouquets: bouquetString,
         q: '',
-        description: `Trial user created via JohnsonFlix Manager`
+        description: description
       };
 
       const response = await this.makeAPIRequest('/lines/create/1', data);
@@ -1203,7 +1207,7 @@ class IPTVService {
   /**
    * Create paid user
    */
-  async createPaidUser(username, password, packageId, bouquetIds = []) {
+  async createPaidUser(username, password, packageId, bouquetIds = [], notes = '') {
     try {
       console.log(`💰 Creating paid user: ${username}`);
       
@@ -1211,6 +1215,9 @@ class IPTVService {
       const credits = packageInfo ? packageInfo.credits : 0;
       
       const bouquetString = Array.isArray(bouquetIds) ? bouquetIds.join(',') : bouquetIds;
+      
+      // Use notes if provided, otherwise use default message
+      const description = notes ? `${notes} - created via API` : 'Created via API';
       
       const data = {
         line_type: 'line',
@@ -1221,7 +1228,7 @@ class IPTVService {
         package: packageId,
         current_bouquets: bouquetString,
         q: '',
-        description: `Paid user created via JohnsonFlix Manager`
+        description: description
       };
 
       const response = await this.makeAPIRequest('/lines/create/0', data);
@@ -1490,12 +1497,12 @@ async getAllPanelUsers() {
   /**
    * Enhanced create trial user with data retrieval
    */
-  async createTrialUserWithData(username, password, packageId, bouquetIds = []) {
+  async createTrialUserWithData(username, password, packageId, bouquetIds = [], notes = '') {
     try {
       console.log(`🆓 Creating trial user with data retrieval: ${username}`);
       
-      // Create the user first
-      const createResponse = await this.createTrialUser(username, password, packageId, bouquetIds);
+      // Create the user first - now passing notes parameter
+      const createResponse = await this.createTrialUser(username, password, packageId, bouquetIds, notes);
       
       // Wait a moment for the user to be created in the panel
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -1542,12 +1549,12 @@ async getAllPanelUsers() {
   /**
    * Enhanced create paid user with data retrieval
    */
-  async createPaidUserWithData(username, password, packageId, bouquetIds = []) {
+  async createPaidUserWithData(username, password, packageId, bouquetIds = [], notes = '') {
     try {
       console.log(`💰 Creating paid user with data retrieval: ${username}`);
       
-      // Create the user first
-      const createResponse = await this.createPaidUser(username, password, packageId, bouquetIds);
+      // Create the user first - now passing notes parameter
+      const createResponse = await this.createPaidUser(username, password, packageId, bouquetIds, notes);
       
       // Wait a moment for the user to be created in the panel
       await new Promise(resolve => setTimeout(resolve, 2000));
