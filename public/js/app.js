@@ -1150,42 +1150,53 @@ window.calculateNewPlexExpiration = function() {
 };
 
 window.calculateNewIptvExpiration = function() {
-    console.log('?? Calculating new IPTV expiration...');
+    console.log('📅 Calculating new IPTV expiration...');
     
     const subscription = document.getElementById('iptvSubscription')?.value;
-    const expirationField = document.getElementById('iptvExpiration');
+    // FIX: Target the actual date input field, not the display span
+    const expirationField = document.querySelector('input[name="iptv_expiration"]') || document.querySelector('input[type="date"][id*="iptv"]');
+    
+    console.log('🔍 Debug info:');
+    console.log('- Subscription value:', subscription);
+    console.log('- Expiration field found:', !!expirationField);
+    console.log('- Expiration field type:', expirationField?.type);
+    console.log('- Expiration field ID:', expirationField?.id);
     
     if (!expirationField) {
-        console.warn('?? IPTV expiration field not found');
+        console.warn('⚠️ IPTV date input field not found');
         return;
     }
     
-    console.log('?? Selected subscription:', subscription);
-    
     if (subscription === 'remove') {
-        // Remove subscription - clear the date field
         expirationField.value = '';
-        console.log('? Set IPTV to REMOVE - cleared expiration date');
+        console.log('🗑️ Set IPTV to REMOVE - cleared expiration date');
         return;
     }
     
     if (!subscription || subscription === '') {
-        // Keep current or no subscription selected - don't change the date
-        console.log('? Keep current IPTV subscription - no date change');
+        console.log('ℹ️ Keep current IPTV subscription - no date change');
         return;
     }
     
     // Find the subscription type from loaded data
     const selectedSub = window.AppState.subscriptionTypes?.find(sub => sub.id == subscription);
-    if (selectedSub) {
+    if (selectedSub && selectedSub.duration_months) {
         const today = new Date();
         const expiration = new Date();
         expiration.setMonth(today.getMonth() + selectedSub.duration_months);
-        expirationField.value = expiration.toISOString().split('T')[0];
-        console.log(`? Set IPTV expiration to: ${expirationField.value} (${selectedSub.duration_months} months from today)`);
+        const dateString = expiration.toISOString().split('T')[0];
+        
+        expirationField.value = dateString;
+        
+        // Trigger change event to ensure UI updates
+        expirationField.dispatchEvent(new Event('change', { bubbles: true }));
+        
+        console.log(`✅ Set IPTV expiration to: ${dateString} (${selectedSub.duration_months} months from today)`);
+        console.log('🔍 Field value after setting:', expirationField.value);
+        
     } else {
-        console.warn('?? Subscription type not found for ID:', subscription);
-        expirationField.value = '';
+        console.warn('⚠️ Subscription type not found for ID:', subscription);
+        console.log('Available subscription types:', window.AppState?.subscriptionTypes);
     }
 };
 
@@ -1550,6 +1561,126 @@ window.forceLoadLibraries = async function() {
         Utils.showNotification('Failed to reload libraries: ' + error.message, 'error');
     }
 };
+
+
+// sync function for iptv date
+window.syncIptvExpirationFromPanel = function() {
+    console.log('🔄 Syncing IPTV expiration from panel data...');
+    
+    const userId = getFormUserId();
+    if (!userId) {
+        Utils.showNotification('No user ID found - save user first', 'error');
+        return;
+    }
+    
+    const syncBtn = document.getElementById('syncIptvDateBtn');
+    const originalText = syncBtn.innerHTML;
+    
+    // Disable button and show loading
+    syncBtn.disabled = true;
+    syncBtn.innerHTML = '⏳ Syncing...';
+    
+    // Use the IPTV-specific API that has the correct expiration data
+    fetch(`/api/iptv/user/${userId}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('📺 IPTV API response:', data);
+            
+            if (data.success && data.user && data.user.iptv_expiration) {
+                // Convert database datetime to input date format (YYYY-MM-DD)
+                const expDate = new Date(data.user.iptv_expiration);
+                if (!isNaN(expDate.getTime())) {
+                    const dateValue = expDate.toISOString().split('T')[0];
+                    
+                    // Update the form field
+                    const expirationField = document.getElementById('iptvExpiration');
+                    if (expirationField) {
+                        expirationField.value = dateValue;
+                        Utils.showNotification(`IPTV expiration synced: ${dateValue}`, 'success');
+                        console.log(`✅ Synced IPTV expiration: ${data.user.iptv_expiration} → ${dateValue}`);
+                    }
+                } else {
+                    Utils.showNotification('Invalid date format in panel data', 'error');
+                }
+            } else if (data.success && data.user && data.user.expiration_formatted) {
+                // Fallback: try to parse the formatted date
+                try {
+                    const [month, day, year] = data.user.expiration_formatted.split('/');
+                    const expDate = new Date(year, month - 1, day); // month is 0-indexed
+                    const dateValue = expDate.toISOString().split('T')[0];
+                    
+                    const expirationField = document.getElementById('iptvExpiration');
+                    if (expirationField) {
+                        expirationField.value = dateValue;
+                        Utils.showNotification(`IPTV expiration synced: ${dateValue}`, 'success');
+                        console.log(`✅ Synced from formatted date: ${data.user.expiration_formatted} → ${dateValue}`);
+                    }
+                } catch (parseError) {
+                    console.error('❌ Error parsing formatted date:', parseError);
+                    Utils.showNotification('Error parsing expiration date', 'error');
+                }
+            } else {
+                Utils.showNotification('No IPTV expiration date found in panel data', 'warning');
+                console.log('⚠️ No iptv_expiration found in IPTV API response:', data);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Error syncing IPTV expiration:', error);
+            Utils.showNotification('Error syncing from panel data: ' + error.message, 'error');
+        })
+        .finally(() => {
+            // Re-enable button
+            syncBtn.disabled = false;
+            syncBtn.innerHTML = originalText;
+        });
+};
+
+function getFormUserId() {
+    let userId = null;
+    
+    // Method 1: Check URL parameters (for editing existing users)
+    const urlParams = new URLSearchParams(window.location.search);
+    userId = urlParams.get('edit'); // The edit user URL uses 'edit' parameter
+    if (userId) {
+        console.log('📋 Found user ID from URL edit parameter:', userId);
+        return userId;
+    }
+    
+    // Method 2: Check AppState for editing user ID
+    if (window.AppState && window.AppState.editingUserId) {
+        userId = window.AppState.editingUserId;
+        console.log('📋 Found user ID from AppState.editingUserId:', userId);
+        return userId;
+    }
+    
+    // Method 3: Check various possible user ID fields
+    const possibleUserIdFields = ['userId', 'user_id', 'editUserId'];
+    for (const fieldId of possibleUserIdFields) {
+        const field = document.getElementById(fieldId);
+        if (field && field.value) {
+            userId = field.value;
+            console.log(`📋 Found user ID from field ${fieldId}:`, userId);
+            return userId;
+        }
+    }
+    
+    // Method 4: Check current editing user ID
+    if (window.currentEditingUserId) {
+        userId = window.currentEditingUserId;
+        console.log('📋 Found user ID from currentEditingUserId:', userId);
+        return userId;
+    }
+    
+    // Method 5: Check IPTV module current user
+    if (window.IPTV && window.IPTV.currentUser) {
+        userId = window.IPTV.currentUser;
+        console.log('📋 Found user ID from IPTV.currentUser:', userId);
+        return userId;
+    }
+    
+    console.warn('⚠️ No user ID found using any method');
+    return null;
+}
 
 // Update existing modal functions to use new manager
 function closeModal(modalId) {

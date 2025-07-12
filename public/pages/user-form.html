@@ -357,11 +357,17 @@
                         <option value="">No IPTV Subscription</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label for="iptvExpiration">IPTV Expiration:</label>
-                    <input type="date" id="iptvExpiration" name="iptv_expiration">
-                    <small style="color: #4fc3f7;">Manual override - leave blank for auto-calculation</small>
-                </div>
+<div class="form-group">
+    <label for="iptvExpiration">IPTV Expiration:</label>
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <input type="date" id="iptvExpiration" name="iptv_expiration" style="flex: 1;">
+        <button type="button" id="syncIptvDateBtn" onclick="syncIptvExpirationFromPanel()" 
+                style="background: #00bcd4; color: white; border: none; padding: 8px 12px; border-radius: 4px; font-size: 12px; white-space: nowrap;">
+            Sync with Panel
+        </button>
+    </div>
+    <small style="color: #4fc3f7;">Auto-calculates from subscription or sync from IPTV panel</small>
+</div>
             </div>
         </div>
 
