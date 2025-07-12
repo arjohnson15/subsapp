@@ -726,86 +726,122 @@ function clearAllLibrariesForGroup(serverGroup) {
     document.querySelectorAll(`input[name="${serverGroup}_fourk"]`).forEach(cb => cb.checked = false);
 }
 
-// Load and populate user for editing with enhanced library pre-selection
 async function loadAndPopulateUser(userId) {
     try {
-        console.log(`🔧 Loading user data for ID: ${userId}`);
+        console.log('📋 Loading and populating user data for ID:', userId);
         
-        // Fetch user data from API
         const response = await fetch(`/api/users/${userId}`);
-        const user = await response.json();
-        
-        if (!user) {
-            throw new Error('User not found');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
-        // Store user data in global state for pre-selection
-        window.AppState.currentUserData = user;
-        
-        console.log(`📋 Loaded user data:`, user);
+        const userData = await response.json();
+        console.log('✅ User data loaded:', userData);
         
         // Populate basic form fields
-        document.getElementById('userName').value = user.name || '';
-        document.getElementById('userEmail').value = user.email || '';
-        document.getElementById('plexEmail').value = user.plex_email || '';
-        document.getElementById('userOwner').value = user.owner_id || '';
-        document.getElementById('iptvUsername').value = user.iptv_username || '';
-        document.getElementById('iptvPassword').value = user.iptv_password || '';
-        document.getElementById('implayerCode').value = user.implayer_code || '';
-        document.getElementById('deviceCount').value = user.device_count || 1;
+        const fields = {
+            'name': userData.name,
+            'email': userData.email,
+            'owner_id': userData.owner_id,
+            'plex_email': userData.plex_email,
+            'iptv_username': userData.iptv_username,    // Basic IPTV username field
+            'iptv_password': userData.iptv_password,    // Basic IPTV password field
+            'implayer_code': userData.implayer_code,
+            'device_count': userData.device_count || 1,
+            'bcc_owner_renewal': userData.bcc_owner_renewal,
+            'exclude_bulk_emails': userData.exclude_bulk_emails,
+            'exclude_automated_emails': userData.exclude_automated_emails
+        };
         
-        // Set expiration dates
-        if (user.plex_expiration) {
-            const plexDate = new Date(user.plex_expiration);
-            if (!isNaN(plexDate.getTime())) {
-                document.getElementById('plexExpiration').value = plexDate.toISOString().split('T')[0];
-            }
-        }
-        
-        if (user.iptv_expiration) {
-            const iptvDate = new Date(user.iptv_expiration);
-            if (!isNaN(iptvDate.getTime())) {
-                document.getElementById('iptvExpiration').value = iptvDate.toISOString().split('T')[0];
-            }
-        }
-        
-        // Set checkboxes
-        document.getElementById('bccOwnerRenewal').checked = user.bcc_owner_renewal === 1;
-        
-// Tags and library sections
-document.querySelectorAll('input[name="tags"]').forEach(cb => cb.checked = false);
-if (user.tags && Array.isArray(user.tags)) {
-    user.tags.forEach(tag => {
-        const checkbox = document.querySelector(`input[name="tags"][value="${tag}"]`);
-        if (checkbox) {
-            checkbox.checked = true;
-            
-            // Show library sections for Plex tags and pre-select libraries
-            if (tag === 'Plex 1') {
-                togglePlexLibrariesByTag('plex1', true);
-            }
-            if (tag === 'Plex 2') {
-                togglePlexLibrariesByTag('plex2', true);
-            }
-            // ADD THIS NEW SECTION:
-            if (tag === 'IPTV') {
-                toggleIptvManagementByTag(true);
-                // Load current IPTV status for this user
-                if (window.IPTV && typeof window.IPTV.loadUserStatus === 'function') {
-                    setTimeout(() => {
-                        window.IPTV.loadUserStatus(user.id);
-                    }, 500); // Small delay to ensure UI is ready
+        // Populate form fields
+        Object.entries(fields).forEach(([fieldName, value]) => {
+            const element = document.getElementById(fieldName);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    element.checked = Boolean(value);
+                } else {
+                    element.value = value || '';
                 }
+                console.log(`✅ Set field ${fieldName}: ${value}`);
+            }
+        });
+        
+        // Handle tags (special case)
+        if (userData.tags) {
+            try {
+                const tags = typeof userData.tags === 'string' ? JSON.parse(userData.tags) : userData.tags;
+                console.log('📋 Processing tags:', tags);
+                
+                // Update tag checkboxes
+                document.querySelectorAll('input[name="tags"]').forEach(checkbox => {
+                    checkbox.checked = tags.includes(checkbox.value);
+                    
+                    // If IPTV tag is checked, show IPTV section and load status
+                    if (checkbox.value === 'IPTV' && checkbox.checked) {
+                        console.log('📺 IPTV tag detected, initializing IPTV section...');
+                        if (window.IPTV && typeof window.IPTV.showIPTVSection === 'function') {
+                            window.IPTV.showIPTVSection(userId);
+                        }
+                        
+                        // Load IPTV status with a slight delay to ensure UI is ready
+                        setTimeout(() => {
+                            if (window.IPTV && typeof window.IPTV.loadCurrentUserIPTVStatus === 'function') {
+                                window.IPTV.loadCurrentUserIPTVStatus();
+                            }
+                        }, 500);
+                    }
+                });
+            } catch (tagError) {
+                console.error('❌ Error processing tags:', tagError);
             }
         }
-    });
-}
         
-        console.log(`✅ Form population completed for ${user.name}`);
+        // Handle Plex libraries (special case)
+        if (userData.plex_libraries) {
+            try {
+                const libraries = typeof userData.plex_libraries === 'string' 
+                    ? JSON.parse(userData.plex_libraries) 
+                    : userData.plex_libraries;
+                
+                console.log('📺 Processing Plex libraries:', libraries);
+                
+                // Set Plex library checkboxes based on user data
+                Object.entries(libraries).forEach(([serverKey, serverLibraries]) => {
+                    if (serverLibraries && typeof serverLibraries === 'object') {
+                        Object.entries(serverLibraries).forEach(([libraryKey, hasAccess]) => {
+                            const checkboxId = `${serverKey}_${libraryKey}`;
+                            const checkbox = document.getElementById(checkboxId);
+                            if (checkbox) {
+                                checkbox.checked = Boolean(hasAccess);
+                                console.log(`✅ Set library ${checkboxId}: ${hasAccess}`);
+                            }
+                        });
+                    }
+                });
+            } catch (libraryError) {
+                console.error('❌ Error processing Plex libraries:', libraryError);
+            }
+        }
+        
+        // Set the user ID in the form
+        const userIdField = document.getElementById('userId');
+        if (userIdField) {
+            userIdField.value = userId;
+        }
+        
+        // Update page title
+        const titleElement = document.querySelector('h2');
+        if (titleElement) {
+            titleElement.textContent = `Edit User: ${userData.name}`;
+        }
+        
+        console.log('✅ User form populated successfully');
         
     } catch (error) {
         console.error('❌ Error loading user data:', error);
-        Utils.handleError(error, 'Loading user data');
+        if (window.Utils && window.Utils.showNotification) {
+            window.Utils.showNotification(`Failed to load user: ${error.message}`, 'error');
+        }
     }
 }
 

@@ -403,7 +403,7 @@ router.delete('/channel-groups/:id', [
 });
 
 /**
- * GET /api/iptv/user/:id - Get user's IPTV status
+ * GET /api/iptv/user/:id - Get user's IPTV status - FIXED VERSION
  */
 router.get('/user/:id', [
   param('id').isInt().withMessage('Invalid user ID'),
@@ -412,13 +412,13 @@ router.get('/user/:id', [
   try {
     const { id } = req.params;
     
-    // Get user's IPTV data from database
+    // Get user's IPTV data from database - FIXED: Added missing fields
     const result = await db.query(`
       SELECT 
-        u.id, u.name, u.email, u.iptv_username, u.iptv_line_id,
+        u.id, u.name, u.email, u.iptv_username, u.iptv_password, u.iptv_line_id,
         u.iptv_package_id, u.iptv_package_name, u.iptv_expiration,
         u.iptv_credits_used, u.iptv_channel_group_id, u.iptv_connections,
-        u.iptv_is_trial,
+        u.iptv_is_trial, u.iptv_m3u_url,
         cg.name as channel_group_name,
         cg.description as channel_group_description
       FROM users u
@@ -910,6 +910,9 @@ router.post('/link-existing-user', [
     
     console.log(`🔗 Linking existing IPTV account to user ${user_id}:`, iptv_data);
     
+    // Extract password from panel_data if it exists, otherwise try direct property
+    const password = iptv_data.panel_data?.password || iptv_data.password || null;
+    
     // Update the user with IPTV information
     const updateResult = await db.query(`
       UPDATE users SET 
@@ -923,13 +926,13 @@ router.post('/link-existing-user', [
         updated_at = NOW()
       WHERE id = ?
     `, [
-      iptv_data.username,
-      iptv_data.password,
-      iptv_data.line_id,
-      iptv_data.expiration_date,
-      iptv_data.connections,
+      iptv_data.username || null,
+      password,
+      iptv_data.line_id || null,
+      iptv_data.expiration || null,  // Fixed: was expiration_date
+      iptv_data.connections || null,
       iptv_data.is_trial ? 1 : 0,
-      iptv_data.m3u_plus_url,
+      iptv_data.m3u_url || null,     // Fixed: was m3u_plus_url
       user_id
     ]);
     
