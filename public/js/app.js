@@ -322,47 +322,38 @@ function toggleIptvManagementByTag(isChecked) {
         if (window.IPTV) {
             console.log('📺 IPTV module available, initializing properly...');
             
-            // Get the user ID for proper initialization
-            let userId = null;
-            
-            // For editing existing user
-            if (window.AppState && window.AppState.editingUserId) {
-                userId = window.AppState.editingUserId;
-                console.log('👤 Using existing user ID:', userId);
-                
-                // Set current user in IPTV module (from old version)
-                window.IPTV.currentUser = window.AppState.editingUserId;
-            } else {
-                // For new user - no user ID yet
-                userId = null;
-                console.log('👤 New user - no user ID yet');
-            }
-            
-            // Use the proper IPTV initialization
             setTimeout(() => {
-                if (userId) {
-                    // Existing user - load their IPTV status
-                    IPTV.showIPTVSection(userId);
+                if (window.AppState?.editingUserId) {
+                    console.log('🔧 Editing mode detected - setting up IPTV for existing user...');
+                    
+                    // Set the current user for IPTV module
+                    if (window.AppState.currentUserData && window.IPTV) {
+                        window.IPTV.currentUser = window.AppState.currentUserData;
+                        console.log('👤 Set current user for IPTV:', window.IPTV.currentUser.name);
+                    }
+                    
+                    // Initialize IPTV interface with existing user
+                    if (typeof window.IPTV.showIPTVSection === 'function') {
+                        window.IPTV.showIPTVSection(window.AppState.currentUserData);
+                    }
+                    
+                    // Load user IPTV status first (this will call updateStatusInterface internally)
+                    if (window.IPTV && typeof window.IPTV.loadCurrentUserIPTVStatus === 'function') {
+                        window.IPTV.loadCurrentUserIPTVStatus();
+                    }
+                    
                 } else {
-                    // New user - show check existing interface
-                    IPTV.currentUser = null;
-                    IPTV.userHasExistingIPTVData = false;
+                    console.log('🆕 New user mode - setting up fresh IPTV interface...');
                     
-                    // Initialize the IPTV section for new user (from old version with error handling)
-                    console.log('📦 Attempting to populate IPTV dropdowns...');
-                    
+                    // For new users, just populate dropdowns and show check interface
                     if (typeof window.IPTV.populatePackageSelect === 'function') {
                         const packageSuccess = window.IPTV.populatePackageSelect();
                         console.log(`📦 Package dropdown population: ${packageSuccess ? 'SUCCESS' : 'FAILED'}`);
-                    } else {
-                        console.error('❌ populatePackageSelect function not found');
                     }
                     
                     if (typeof window.IPTV.populateChannelGroupSelect === 'function') {
                         const channelSuccess = window.IPTV.populateChannelGroupSelect();
                         console.log(`📺 Channel group dropdown population: ${channelSuccess ? 'SUCCESS' : 'FAILED'}`);
-                    } else {
-                        console.error('❌ populateChannelGroupSelect function not found');
                     }
                     
                     // Update credit display
@@ -375,23 +366,22 @@ function toggleIptvManagementByTag(isChecked) {
                         window.IPTV.handleActionChange();
                     }
                     
-                    // KEY: Show the check existing interface
+                    // Show the check existing interface for new users
                     if (typeof window.IPTV.updateStatusInterface === 'function') {
                         window.IPTV.updateStatusInterface();
-                    } else {
-                        console.error('❌ updateStatusInterface function not found');
                     }
                 }
                 
-                // CRITICAL: Initialize the check button for ALL users (moved outside conditional)
+                // CRITICAL: ALWAYS initialize the always-visible check button 
+                // This must happen AFTER all IPTV module initialization
                 setTimeout(() => {
                     if (window.initializeIPTVCheck) {
-                        console.log('🔧 Initializing IPTV check button for all users...');
+                        console.log('🔧 Initializing always-visible IPTV check button...');
                         window.initializeIPTVCheck();
                     } else {
                         console.error('❌ initializeIPTVCheck function not found');
                     }
-                }, 200);
+                }, 300); // Slightly longer delay to ensure IPTV module is fully set up
                 
             }, 200);
         } else {

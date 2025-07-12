@@ -2403,6 +2403,8 @@ document.getElementById('excludeAutomatedEmails').checked = user.exclude_automat
     }
     
     const plexTags = []; // Track Plex tags for invite status check
+    let hasIPTVTag = false; // Track IPTV tag for initialization
+    
     if (user.tags && Array.isArray(user.tags)) {
         user.tags.forEach(tag => {
             const checkbox = document.querySelector(`input[name="tags"][value="${tag}"]`);
@@ -2418,8 +2420,40 @@ document.getElementById('excludeAutomatedEmails').checked = user.exclude_automat
                     plexTags.push('plex2');
                     window.showPlexLibrariesAndPreSelect('plex2', user);
                 }
+                
+                // CRITICAL: Track IPTV tag but don't trigger the change event
+                if (tag === 'IPTV') {
+                    hasIPTVTag = true;
+                    // Show IPTV section without triggering change event
+                    const iptvSection = document.getElementById('iptvSection');
+                    if (iptvSection) {
+                        iptvSection.style.display = 'block';
+                    }
+                }
             }
         });
+    }
+    
+    // CRITICAL: If user has IPTV tag, initialize IPTV functionality
+    if (hasIPTVTag) {
+        console.log('📺 User has IPTV tag - initializing IPTV functionality...');
+        
+        // Initialize IPTV module for this user
+        if (window.IPTV && typeof window.IPTV.showIPTVSection === 'function') {
+            setTimeout(() => {
+                window.IPTV.showIPTVSection(window.AppState.editingUserId);
+            }, 300);
+        }
+        
+        // CRITICAL: Initialize the always-visible IPTV check button
+        setTimeout(() => {
+            if (window.initializeIPTVCheck) {
+                console.log('🔧 Initializing IPTV check button for editing user...');
+                window.initializeIPTVCheck();
+            } else {
+                console.error('❌ initializeIPTVCheck function not found during form population');
+            }
+        }, 500);
     }
     
     // If user has Plex tags, check invite status and show appropriate indicators
@@ -2710,30 +2744,59 @@ window.toggleBasicSaveButton = function() {
     return window.Users.toggleBasicSaveButton();
 };
 
-// Manual initialization for always-visible IPTV check
+// Enhanced IPTV check button initialization with proper cleanup
 window.initializeIPTVCheck = function() {
     const usernameInput = document.getElementById('existingIptvUsername');
     const checkBtn = document.getElementById('checkAccessBtn');
     
     if (usernameInput && checkBtn) {
-        console.log('🔧 Initializing IPTV check button...');
+        console.log('🔧 Initializing IPTV check button (always-visible version)...');
         
-        // Enable/disable button based on input
-        usernameInput.addEventListener('input', function() {
+        // CRITICAL: Remove any existing event listeners first to prevent duplicates
+        if (usernameInput._iptvInputHandler) {
+            usernameInput.removeEventListener('input', usernameInput._iptvInputHandler);
+            delete usernameInput._iptvInputHandler;
+        }
+        if (checkBtn._iptvClickHandler) {
+            checkBtn.removeEventListener('click', checkBtn._iptvClickHandler);
+            delete checkBtn._iptvClickHandler;
+        }
+        
+        // Create new handler functions and store references for cleanup
+        const inputHandler = function() {
             const username = this.value.trim();
             checkBtn.disabled = username.length === 0;
-        });
+        };
         
-        // Add click handler
-        checkBtn.addEventListener('click', function() {
+        const clickHandler = function() {
             if (window.IPTV && window.IPTV.checkExistingAccess) {
                 window.IPTV.checkExistingAccess();
             } else {
                 console.error('❌ IPTV.checkExistingAccess not found');
+                if (window.Utils && window.Utils.showNotification) {
+                    window.Utils.showNotification('IPTV module not properly loaded. Please refresh the page.', 'error');
+                }
             }
-        });
+        };
         
-        console.log('✅ IPTV check button initialized');
+        // Store references for future cleanup
+        usernameInput._iptvInputHandler = inputHandler;
+        checkBtn._iptvClickHandler = clickHandler;
+        
+        // Add the event listeners
+        usernameInput.addEventListener('input', inputHandler);
+        checkBtn.addEventListener('click', clickHandler);
+        
+        // Set initial button state
+        const initialUsername = usernameInput.value.trim();
+        checkBtn.disabled = initialUsername.length === 0;
+        
+        console.log('✅ IPTV check button initialized successfully (always-visible version)');
+    } else {
+        console.warn('⚠️ IPTV check button elements not found:', {
+            usernameInput: !!usernameInput,
+            checkBtn: !!checkBtn
+        });
     }
 };
 

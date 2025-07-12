@@ -1451,33 +1451,34 @@ async getAllPanelUsers() {
 
     try {
       // Parse expiration date (from Unix timestamp)
-      let expirationDate = null;
+let expirationDate = null;
 if (panelUser.expire_date) {
-  expirationDate = new Date((parseInt(panelUser.expire_date) * 1000) - (1 * 60 * 60 * 1000)); // Subtract 1 hour (Eastern to Central)
+  expirationDate = new Date(parseInt(panelUser.expire_date) * 1000);
+  console.log(`📅 Panel expiration (no timezone conversion): ${panelUser.expire_date} → ${expirationDate.toISOString()}`);
 }
 
       // Calculate days until expiration
-      let daysUntilExpiration = null;
-      if (expirationDate) {
-        const now = new Date();
-        const diffTime = expirationDate - now;
-        daysUntilExpiration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      }
+let daysUntilExpiration = null;
+if (expirationDate) {
+  const now = new Date();
+  const diffTime = expirationDate - now;
+  daysUntilExpiration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
 
-      const userData = {
-        line_id: panelUser.id,
-        username: panelUser.username,
-        password: panelUser.password,
-        expiration_date: expirationDate,
-        expiration_formatted: panelUser.exp_date, // Human readable format
-        days_until_expiration: daysUntilExpiration,
-        max_connections: parseInt(panelUser.user_connection) || 0,
-        current_connections: parseInt(panelUser.active_connections) || 0,
-        enabled: parseInt(panelUser.enabled) === 1,
-        is_trial: parseInt(panelUser.is_trial) === 1,
-        created_at: panelUser.created_at,
-        owner: panelUser.owner
-      };
+const userData = {
+  line_id: panelUser.id,
+  username: panelUser.username,
+  password: panelUser.password,
+  expiration_date: expirationDate,
+  expiration_formatted: panelUser.exp_date, // Human readable format from panel
+  days_until_expiration: daysUntilExpiration,
+  max_connections: parseInt(panelUser.user_connection) || 0,
+  current_connections: parseInt(panelUser.active_connections) || 0,
+  enabled: parseInt(panelUser.enabled) === 1,
+  is_trial: parseInt(panelUser.is_trial) === 1,
+  created_at: panelUser.created_at,
+  owner: panelUser.owner
+};
 
       console.log('📋 Parsed user data:', userData);
       return userData;

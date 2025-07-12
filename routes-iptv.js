@@ -841,13 +841,23 @@ router.post('/match-existing-user', [
     
     console.log('✅ Found matching IPTV user:', matchingUser);
     
-    // Extract and format the data
-    const expirationDate = matchingUser.expire_date 
-      ? new Date(matchingUser.expire_date * 1000) // Convert Unix timestamp
-      : null;
+    // FIXED: Extract and format the data without timezone conversion
+    let expirationForDB = null;
+    let expirationFormatted = 'None';
     
-    const expirationForDB = expirationDate ? 
-      expirationDate.toISOString().slice(0, 19).replace('T', ' ') : null;
+    if (matchingUser.expire_date) {
+      // Use the panel's exp_date (human readable format) directly
+      expirationFormatted = matchingUser.exp_date || 'Unknown';
+      
+      // For database storage, convert timestamp but use UTC to avoid timezone shift
+      const panelTimestamp = new Date(matchingUser.expire_date * 1000);
+      const year = panelTimestamp.getUTCFullYear();
+      const month = String(panelTimestamp.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(panelTimestamp.getUTCDate()).padStart(2, '0');
+      expirationForDB = `${year}-${month}-${day} 00:00:00`;
+      
+      console.log(`📅 Panel expiration (no timezone shift): ${matchingUser.expire_date} → ${expirationForDB} (formatted: ${expirationFormatted})`);
+    }
     
     // Generate M3U URL
     const m3uUrl = iptvService.generateM3UPlusURL(matchingUser.username, matchingUser.password);
@@ -897,7 +907,7 @@ router.post('/match-existing-user', [
         username: matchingUser.username,
         line_id: matchingUser.id,
         expiration: expirationForDB,
-        expiration_formatted: expirationDate ? expirationDate.toLocaleDateString() : 'None',
+        expiration_formatted: expirationFormatted, // FIXED: Use panel's formatted date directly
         connections: matchingUser.user_connection || matchingUser.connections || 0,
         active_connections: matchingUser.active_connections || 0,
         is_trial: Boolean(matchingUser.is_trial),
@@ -1030,22 +1040,24 @@ router.get('/sync-user/:id', [
     
     // Update local database with panel data
 const expirationDate = panelUser.expire_date 
-  ? new Date((panelUser.expire_date * 1000) - (1 * 60 * 60 * 1000)) // Convert Unix timestamp and subtract 1 hour (Eastern to Central)
+  ? new Date(parseInt(panelUser.expire_date) * 1000) // FIXED: Use panel timestamp as-is
   : null;
-    
-    await db.query(`
-      UPDATE users SET 
-        iptv_expiration = ?,
-        iptv_connections = ?,
-        iptv_is_trial = ?,
-        updated_at = NOW()
-      WHERE id = ?
-    `, [
-      expirationDate,
-      panelUser.user_connection || panelUser.connections,
-      panelUser.is_trial || 0,
-      id
-    ]);
+
+console.log(`📅 Storing panel expiration without timezone conversion: ${panelUser.expire_date} → ${expirationDate ? expirationDate.toISOString() : 'null'}`);
+
+await db.query(`
+  UPDATE users SET 
+    iptv_expiration = ?,
+    iptv_connections = ?,
+    iptv_is_trial = ?,
+    updated_at = NOW()
+  WHERE id = ?
+`, [
+  expirationDate,
+  panelUser.user_connection || panelUser.connections,
+  panelUser.is_trial || 0,
+  id
+]);
     
     // Log the sync
     await iptvService.logActivity(id, user.iptv_line_id, 'sync', null, 0, true, null, panelUser);
