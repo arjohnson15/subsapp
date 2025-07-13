@@ -216,6 +216,16 @@
                 </button>
             </div>
         </div>
+		
+		<!-- Delete Button Row (Bottom Right) -->
+<div style="display: flex; justify-content: flex-end; margin-top: 15px; padding-top: 10px; border-top: 1px solid #333;">
+  <button type="button" 
+          id="iptvDeleteBtn" 
+          onclick="IPTV.deleteSubscription()"
+          style="background: linear-gradient(45deg, #f44336, #d32f2f); color: #fff; border: none; padding: 10px 15px; border-radius: 4px; font-weight: bold; cursor: pointer;">
+    <i class="fas fa-trash"></i> Delete Subscription
+  </button>
+</div>
         
         <!-- Status Indicators -->
         <div style="margin-top: 15px; display: flex; gap: 15px; flex-wrap: wrap;">
