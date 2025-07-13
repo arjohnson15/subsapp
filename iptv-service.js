@@ -1275,6 +1275,46 @@ class IPTVService {
       throw new Error(`Failed to extend user: ${error.message}`);
     }
   }
+  
+/**
+ * Delete user subscription from IPTV panel
+ */
+async deleteUserSubscription(lineId) {
+  try {
+    console.log(`🗑️ Deleting IPTV subscription for line ID: ${lineId}`);
+    
+    if (!lineId) {
+      throw new Error('Line ID is required for deletion');
+    }
+    
+    // Ensure we have valid authentication
+    await this.ensureAuthenticated();
+    
+    // The delete endpoint uses a simple POST with no body
+    // Panel expects: POST /lines/delete/{lineId}
+    const response = await this.makeAPIRequest(`/lines/delete/${lineId}`, {}, 'POST');
+    
+    console.log(`✅ User ${lineId} deleted successfully from panel`);
+    
+    // Log the deletion activity
+    await this.logActivity(null, lineId, 'delete', null, 0, true, null, response);
+    
+    return {
+      success: true,
+      message: `Subscription ${lineId} deleted successfully`,
+      lineId: lineId,
+      response: response
+    };
+    
+  } catch (error) {
+    console.error(`❌ Failed to delete user ${lineId} from panel:`, error);
+    
+    // Log the failed deletion
+    await this.logActivity(null, lineId, 'delete', null, 0, false, error.message, null);
+    
+    throw new Error(`Failed to delete subscription: ${error.message}`);
+  }
+}
 
   /**
    * Get all users from IPTV panel

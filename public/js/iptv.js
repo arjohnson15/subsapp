@@ -4,6 +4,8 @@ const IPTV = {
   channelGroups: [],
   currentUser: null,
   creditBalance: 0,
+  currentLineId: null,          // Add this line
+  currentUserData: null,
 
   /**
    * Initialize IPTV module
@@ -243,17 +245,22 @@ async loadUserStatus(userId) {
   /**
    * Display user's current IPTV status in the Current Status section
    */
-  displayUserStatus(user) {
+displayUserStatus(user) {
   // Store user data for filtering
   this.currentUserData = user;
-    const statusElements = {
-      'currentLineId': user.iptv_line_id || 'None',
-      'currentIptvUsername': user.iptv_username || 'None',
-      'currentPackage': user.iptv_package_name || 'None',
-      'currentExpiration': user.expiration_formatted || 'None',
-      'currentConnections': user.iptv_connections ? `${user.active_connections || 0}/${user.iptv_connections}` : '0/0',
-      'currentCreditsUsed': user.iptv_credits_used || '0'
-    };
+  
+  // CRITICAL: Store the line ID for delete functionality
+  this.currentLineId = user.iptv_line_id;
+  console.log('📋 Stored line ID for deletion:', this.currentLineId);
+  
+  const statusElements = {
+    'currentLineId': user.iptv_line_id || 'None',
+    'currentIptvUsername': user.iptv_username || 'None',
+    'currentPackage': user.iptv_package_name || 'None',
+    'currentExpiration': user.expiration_formatted || 'None',
+    'currentConnections': user.iptv_connections ? `${user.active_connections || 0}/${user.iptv_connections}` : '0/0',
+    'currentCreditsUsed': user.iptv_credits_used || '0'
+  };
     
     Object.keys(statusElements).forEach(elementId => {
       const element = document.getElementById(elementId);
@@ -1437,6 +1444,135 @@ if (result.user.iptv_expiration) {
       // Restore button state
       button.innerHTML = originalText;
       button.disabled = false;
+    }
+  },
+  
+  /**
+   * Delete IPTV subscription from panel and database
+   */
+  async deleteSubscription() {
+    try {
+      // Get current user ID and line ID
+      const userId = this.currentUser;
+      if (!userId) {
+        throw new Error('No user selected. Please ensure you are editing a user.');
+      }
+      
+// Get line ID from stored user data
+      let lineId = this.currentLineId;
+
+      // Fallback: try to get from current user data  
+      if (!lineId && this.currentUserData && this.currentUserData.iptv_line_id) {
+        lineId = this.currentUserData.iptv_line_id;
+      }
+
+      // Final fallback: try DOM element
+      if (!lineId) {
+        const lineIdElement = document.getElementById('currentLineId');
+        lineId = lineIdElement ? lineIdElement.textContent.trim() : null;
+      }
+
+      console.log('🗑️ Using line ID for deletion:', lineId);
+
+      if (!lineId || lineId === 'None' || lineId === '') {
+        throw new Error('No active IPTV subscription found to delete.');
+      }
+      
+      console.log(`🗑️ Attempting to delete subscription for user ${userId}, line ${lineId}`);
+      
+      // Show confirmation dialog
+      const confirmMessage = `⚠️ WARNING: This will permanently delete the IPTV subscription!\n\n` +
+                            `Line ID: ${lineId}\n` +
+                            `This action cannot be undone.\n\n` +
+                            `Are you sure you want to proceed?`;
+      
+      if (!confirm(confirmMessage)) {
+        console.log('❌ User cancelled deletion');
+        return;
+      }
+      
+      // Show loading state
+      const deleteBtn = document.getElementById('iptvDeleteBtn');
+      if (deleteBtn) {
+        deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+        deleteBtn.disabled = true;
+      }
+      
+      console.log(`📤 Sending delete request for line ${lineId}`);
+      
+      // Make delete request to the panel + database endpoint
+      const response = await fetch(`/api/iptv/subscription/${lineId}?userId=${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      if (result.success) {
+        console.log('✅ Subscription deleted successfully:', result);
+        
+        // Show success message
+        const successMessage = `✅ Subscription deleted successfully!\n\n` +
+                              `Line ${lineId} has been removed from the panel` +
+                              (result.databaseCleared ? ' and database.' : '.');
+        
+        if (window.Utils && window.Utils.showNotification) {
+          window.Utils.showNotification(successMessage, 'success');
+        } else {
+          alert(successMessage);
+        }
+        
+        // Clear the IPTV status display and reset to check interface
+        this.userHasExistingIPTVData = false;
+        this.updateStatusInterface();
+        
+        // Clear status display
+        const statusDisplay = document.getElementById('iptvStatusDisplay');
+        const checkInterface = document.getElementById('checkExistingInterface');
+        
+        if (statusDisplay) statusDisplay.style.display = 'none';
+        if (checkInterface) checkInterface.style.display = 'block';
+        
+        // Reset form state
+        this.resetIPTVForm();
+        
+        console.log('🔄 Status interface updated after deletion');
+        
+      } else {
+        throw new Error(result.message || 'Delete request failed');
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to delete IPTV subscription:', error);
+      
+      let errorMessage = '❌ Failed to delete IPTV subscription\n\n';
+      if (error.message.includes('No active IPTV subscription')) {
+        errorMessage += 'No active subscription found to delete.';
+      } else if (error.message.includes('No user selected')) {
+        errorMessage += 'Please ensure you are editing a user first.';
+      } else {
+        errorMessage += error.message;
+      }
+      
+      if (window.Utils && window.Utils.showNotification) {
+        window.Utils.showNotification(errorMessage, 'error');
+      } else {
+        alert(errorMessage);
+      }
+      
+    } finally {
+      // Restore button state
+      const deleteBtn = document.getElementById('iptvDeleteBtn');
+      if (deleteBtn) {
+        deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete Subscription';
+        deleteBtn.disabled = false;
+      }
     }
   },
 

@@ -1329,6 +1329,88 @@ router.delete('/user/:id', [
 });
 
 /**
+ * DELETE /api/iptv/subscription/:lineId - Delete subscription from panel AND database
+ * This performs a complete deletion from both panel and local database
+ */
+router.delete('/subscription/:lineId', [
+  param('lineId').notEmpty().withMessage('Line ID is required'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { lineId } = req.params;
+    const { userId } = req.query; // Optional user ID for database cleanup
+    
+    console.log(`🗑️ Processing complete IPTV subscription deletion for line: ${lineId}`);
+    
+    await iptvService.initialize();
+    
+    // Step 1: Delete from panel first
+    const panelResult = await iptvService.deleteUserSubscription(lineId);
+    
+    // Step 2: Clear from database if user ID provided
+    if (userId) {
+      console.log(`🧹 Clearing IPTV data from database for user: ${userId}`);
+      
+      await db.query(`
+        UPDATE users SET 
+          iptv_username = NULL,
+          iptv_password = NULL,
+          iptv_line_id = NULL,
+          iptv_package_id = NULL,
+          iptv_package_name = NULL,
+          iptv_expiration = NULL,
+          iptv_channel_group_id = NULL,
+          iptv_connections = NULL,
+          iptv_is_trial = FALSE,
+          implayer_code = NULL,
+          device_count = 1,
+          updated_at = NOW()
+        WHERE id = ?
+      `, [userId]);
+      
+      console.log(`✅ Database cleared for user ${userId}`);
+    }
+    
+    // Step 3: Log the complete deletion
+    await db.query(`
+      INSERT INTO iptv_activity_log (user_id, line_id, action, success, api_response, created_at)
+      VALUES (?, ?, 'delete', TRUE, ?, NOW())
+    `, [userId || null, lineId, JSON.stringify(panelResult)]);
+    
+    res.json({
+      success: true,
+      message: `Subscription ${lineId} deleted successfully from panel${userId ? ' and database' : ''}`,
+      lineId: lineId,
+      panelDeleted: true,
+      databaseCleared: !!userId,
+      details: panelResult
+    });
+    
+  } catch (error) {
+    console.error('❌ Error deleting IPTV subscription:', error);
+    
+    // Log the error
+    if (req.params.lineId && req.query.userId) {
+      try {
+        await db.query(`
+          INSERT INTO iptv_activity_log (user_id, line_id, action, success, error_message, created_at)
+          VALUES (?, ?, 'delete', FALSE, ?, NOW())
+        `, [req.query.userId, req.params.lineId, error.message]);
+      } catch (logError) {
+        console.error('Failed to log deletion error:', logError);
+      }
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete IPTV subscription',
+      error: error.message,
+      lineId: req.params.lineId
+    });
+  }
+});
+
+/**
  * GET /api/iptv/packages/trial - Get only trial packages
  */
 router.get('/packages/trial', async (req, res) => {
