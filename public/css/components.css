@@ -2255,3 +2255,73 @@ table tbody td:last-child .btn-small:nth-child(4) {
   margin-top: 15px;
   width: 100%;
 }
+
+/* IPTV Action Selection Styles */
+.radio-option:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  transform: translateY(-1px);
+}
+
+.radio-option input[type="radio"]:checked + span {
+  color: #4caf50 !important;
+  font-weight: bold;
+}
+
+.radio-option:has(input[type="radio"]:checked) {
+  background: rgba(76, 175, 80, 0.2) !important;
+  border-color: #4caf50 !important;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+.radio-option input[type="radio"] {
+  accent-color: #4caf50;
+}
+
+.checkbox-option:hover {
+  background: rgba(255, 193, 7, 0.15) !important;
+  border-color: rgba(255, 193, 7, 0.4) !important;
+}
+
+.checkbox-option input[type="checkbox"]:checked + span {
+  color: #ffc107 !important;
+  font-weight: bold;
+}
+
+.checkbox-option:has(input[type="checkbox"]:checked) {
+  background: rgba(255, 193, 7, 0.25) !important;
+  border-color: #ffc107 !important;
+  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.3);
+}
+
+.checkbox-option input[type="checkbox"] {
+  accent-color: #ffc107;
+  transform: scale(1.1);
+}
+
+/* Package Select Enhancement for Extension */
+#iptvPackageSelect optgroup {
+  background: rgba(0, 0, 0, 0.9);
+  color: #4fc3f7;
+  font-weight: bold;
+  font-style: normal;
+  padding: 8px;
+}
+
+#iptvPackageSelect option[disabled] {
+  background: rgba(79, 195, 247, 0.1);
+  color: #4fc3f7;
+  font-style: italic;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .radio-option {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+  
+  .form-section[style*="display: flex"] {
+    flex-direction: column !important;
+  }
+}

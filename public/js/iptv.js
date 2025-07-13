@@ -244,7 +244,8 @@ async loadUserStatus(userId) {
    * Display user's current IPTV status in the Current Status section
    */
   displayUserStatus(user) {
-    // Update status display elements
+  // Store user data for filtering
+  this.currentUserData = user;
     const statusElements = {
       'currentLineId': user.iptv_line_id || 'None',
       'currentIptvUsername': user.iptv_username || 'None',
@@ -542,7 +543,7 @@ setDefaultChannelGroup() {
       }
       
       // Load paid packages only (no trial extensions)
-      this.loadPackagesForForm(false);
+      this.loadPackagesForExtension();
     } else {
       // Show trial checkbox for create new
       if (trialGroup) trialGroup.style.display = 'block';
@@ -553,6 +554,90 @@ setDefaultChannelGroup() {
       // Load packages based on trial checkbox
       const isTrialChecked = document.getElementById('isTrialUser') && document.getElementById('isTrialUser').checked;
       this.loadPackagesForForm(isTrialChecked);
+    }
+  },
+  
+/**
+   * Load packages filtered for extension (same connections only) - NEW FUNCTION
+   */
+  loadPackagesForExtension() {
+    console.log('🔄 Loading packages for extension...');
+    
+    // Get current user data from the stored status
+    const currentUser = this.currentUserData;
+    
+    if (!currentUser || !currentUser.iptv_connections) {
+      console.warn('⚠️ No current user or connection info for filtering');
+      // Show warning message
+      const select = document.getElementById('iptvPackageSelect');
+      if (select) {
+        select.innerHTML = '<option value="">⚠️ User has no existing IPTV subscription to extend</option>';
+      }
+      return;
+    }
+    
+    const currentConnections = parseInt(currentUser.iptv_connections);
+    console.log(`🔍 Filtering packages for ${currentConnections} connections`);
+    
+    const select = document.getElementById('iptvPackageSelect');
+    if (!select) {
+      console.warn('📦 Package select element not found');
+      return;
+    }
+    
+    select.innerHTML = '<option value="">Select Extension Package...</option>';
+    
+    // Check if we have package data
+    if (!this.packages || Object.keys(this.packages).length === 0) {
+      console.warn('📦 No package data available');
+      select.innerHTML = '<option value="">No packages available</option>';
+      return;
+    }
+    
+    let matchingPackagesFound = 0;
+    
+    // Only show paid packages (exclude trial) with matching connections
+    ['basic', 'full', 'live_tv'].forEach(type => {
+      if (this.packages[type] && this.packages[type].length > 0) {
+        // Filter packages with matching connections
+        const matchingPackages = this.packages[type].filter(pkg => 
+          parseInt(pkg.connections) === currentConnections
+        );
+        
+        if (matchingPackages.length > 0) {
+          const group = document.createElement('optgroup');
+          group.label = `${type === 'live_tv' ? 'Live TV Only' : 
+                        type === 'full' ? 'Full Service' : 'Basic Packages'} (${currentConnections} connections)`;
+          
+          matchingPackages.forEach(pkg => {
+            const option = document.createElement('option');
+            option.value = pkg.package_id;
+            option.textContent = `${pkg.name} (${pkg.connections} conn, ${pkg.duration_months}m, ${pkg.credits} credits)`;
+            option.dataset.credits = pkg.credits;
+            option.dataset.type = pkg.package_type;
+            option.dataset.connections = pkg.connections;
+            group.appendChild(option);
+            matchingPackagesFound++;
+          });
+          
+          select.appendChild(group);
+        }
+      }
+    });
+    
+    if (matchingPackagesFound === 0) {
+      select.innerHTML = `<option value="">❌ No packages available for ${currentConnections} connections</option>`;
+      console.warn(`⚠️ No packages found with ${currentConnections} connections`);
+    } else {
+      console.log(`✅ Found ${matchingPackagesFound} packages with ${currentConnections} connections`);
+      
+      // Add helpful message
+      const infoOption = document.createElement('option');
+      infoOption.disabled = true;
+      infoOption.textContent = `ℹ️ Showing only packages with ${currentConnections} connections (same as current)`;
+      infoOption.style.fontStyle = 'italic';
+      infoOption.style.color = '#4fc3f7';
+      select.insertBefore(infoOption, select.children[1]);
     }
   },
 

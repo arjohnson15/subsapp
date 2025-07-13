@@ -533,6 +533,46 @@ router.post('/subscription', [
     }
     
     console.log('✅ Found package:', { id: packageInfo.package_id, name: packageInfo.package_name, type: packageInfo.package_type });
+	
+// **CRITICAL VALIDATION**: For extend action, validate connection count matches
+if (action === 'extend') {
+  if (!user.iptv_line_id) {
+    return res.status(400).json({
+      success: false,
+      message: 'No existing IPTV subscription to extend. User must have an active IPTV line to extend.'
+    });
+  }
+  
+  // Validate connection count matches current user's package
+  if (user.iptv_connections && parseInt(packageInfo.connections) !== parseInt(user.iptv_connections)) {
+    return res.status(400).json({
+      success: false,
+      message: `Connection mismatch: User currently has ${user.iptv_connections} connections, but selected package has ${packageInfo.connections} connections. For extensions, you must use a package with the same number of connections.`,
+      details: {
+        current_connections: parseInt(user.iptv_connections),
+        selected_connections: parseInt(packageInfo.connections),
+        user_line_id: user.iptv_line_id,
+        user_package: user.iptv_package_name
+      }
+    });
+  }
+  
+  // Additional validation: ensure user has username
+  if (!user.iptv_username) {
+    return res.status(400).json({
+      success: false,
+      message: 'User has a line ID but no username. Cannot extend subscription without existing username.'
+    });
+  }
+  
+  console.log(`✅ Extension validation passed:`, {
+    line_id: user.iptv_line_id,
+    username: user.iptv_username,
+    current_connections: user.iptv_connections,
+    package_connections: packageInfo.connections,
+    package_name: packageInfo.name
+  });
+}
     
 // Get channel group bouquets - ENHANCED DEBUGGING
     const channelGroupResult = await db.query('SELECT bouquet_ids FROM iptv_channel_groups WHERE id = ?', [channel_group_id]);

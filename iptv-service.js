@@ -1450,11 +1450,18 @@ async getAllPanelUsers() {
     if (!panelUser) return null;
 
     try {
-      // Parse expiration date (from Unix timestamp)
+      // Parse expiration date
 let expirationDate = null;
-if (panelUser.expire_date) {
-  expirationDate = new Date(parseInt(panelUser.expire_date) * 1000);
-  console.log(`📅 Panel expiration (no timezone conversion): ${panelUser.expire_date} → ${expirationDate.toISOString()}`);
+if (panelUser.exp_date && panelUser.exp_date.includes('-')) {
+  // Panel format: "13-07-2025 20:10" (DD-MM-YYYY HH:mm)
+  const datePart = panelUser.exp_date.split(' ')[0]; // Get "13-07-2025"
+  const [day, month, year] = datePart.split('-'); // Split DD-MM-YYYY
+  
+  // Create date in YYYY-MM-DD format for consistent parsing
+  const isoDateString = `${year}-${month}-${day}`;
+  expirationDate = new Date(isoDateString + 'T00:00:00'); // Local timezone
+  
+  console.log(`📅 Panel expiration (using formatted date): ${panelUser.exp_date} → ${expirationDate.toISOString().split('T')[0]}`);
 }
 
       // Calculate days until expiration
