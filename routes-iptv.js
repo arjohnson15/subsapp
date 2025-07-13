@@ -841,23 +841,51 @@ router.post('/match-existing-user', [
     
     console.log('✅ Found matching IPTV user:', matchingUser);
     
-    // FIXED: Extract and format the data without timezone conversion
+    // FIXED: Extract and format the data using local timezone to match panel display
     let expirationForDB = null;
     let expirationFormatted = 'None';
     
-    if (matchingUser.expire_date) {
-      // Use the panel's exp_date (human readable format) directly
-      expirationFormatted = matchingUser.exp_date || 'Unknown';
-      
-// For database storage, convert timestamp but use UTC to avoid timezone shift
-const panelTimestamp = new Date(matchingUser.expire_date * 1000);
-const year = panelTimestamp.getUTCFullYear();
-const month = String(panelTimestamp.getUTCMonth() + 1).padStart(2, '0');
-const day = String(panelTimestamp.getUTCDate()).padStart(2, '0');
-expirationForDB = `${year}-${month}-${day}`;
-      
-      console.log(`📅 Panel expiration (no timezone shift): ${matchingUser.expire_date} → ${expirationForDB} (formatted: ${expirationFormatted})`);
-    }
+if (matchingUser.expire_date) {
+  // Use the panel's exp_date (human readable format) directly
+  expirationFormatted = matchingUser.exp_date || 'Unknown';
+  
+  // DEBUGGING - Add these lines right before the date conversion
+  console.log('🔍 DEBUG: About to convert timestamp:', matchingUser.expire_date);
+  const panelTimestamp = new Date(matchingUser.expire_date * 1000);
+  console.log('🔍 DEBUG: Date object created:', panelTimestamp);
+  console.log('🔍 DEBUG: Date ISO string:', panelTimestamp.toISOString());
+  console.log('🔍 DEBUG: getFullYear():', panelTimestamp.getFullYear());
+  console.log('🔍 DEBUG: getMonth():', panelTimestamp.getMonth());
+  console.log('🔍 DEBUG: getDate():', panelTimestamp.getDate());
+  console.log('🔍 DEBUG: getUTCFullYear():', panelTimestamp.getUTCFullYear());
+  console.log('🔍 DEBUG: getUTCMonth():', panelTimestamp.getUTCMonth());
+  console.log('🔍 DEBUG: getUTCDate():', panelTimestamp.getUTCDate());
+
+  const year = panelTimestamp.getFullYear();
+  const month = String(panelTimestamp.getMonth() + 1).padStart(2, '0');
+  const day = String(panelTimestamp.getDate()).padStart(2, '0');
+  expirationForDB = `${year}-${month}-${day}`;
+
+  console.log('🔍 DEBUG: Final result:', expirationForDB);
+  
+  console.log(`📅 Panel expiration (using local timezone): ${matchingUser.expire_date} → ${expirationForDB} (formatted: ${expirationFormatted})`);
+}
+
+// WITH THIS SIMPLE VERSION:
+if (matchingUser.expire_date) {
+  // Use the panel's exp_date (human readable format) directly
+  expirationFormatted = matchingUser.exp_date || 'Unknown';
+  
+  // SIMPLE: Just use the panel's formatted date directly
+  if (matchingUser.exp_date && matchingUser.exp_date.includes('-')) {
+    // Panel format: "12-07-2025 19:25" (DD-MM-YYYY HH:mm)
+    const datePart = matchingUser.exp_date.split(' ')[0]; // Get "12-07-2025"
+    const [day, month, year] = datePart.split('-'); // Split DD-MM-YYYY
+    expirationForDB = `${year}-${month}-${day}`; // Convert to YYYY-MM-DD for database
+    
+    console.log(`📅 Panel expiration (using panel date as-is): ${matchingUser.exp_date} → ${expirationForDB}`);
+  }
+}
     
     // Generate M3U URL
     const m3uUrl = iptvService.generateM3UPlusURL(matchingUser.username, matchingUser.password);
@@ -1038,17 +1066,20 @@ router.get('/sync-user/:id', [
       });
     }
     
-// Update local database with panel data - FIXED: No date conversion
+	
+    // Update local database with panel data - FIXED: Use local timezone
 let expirationForDB = null;
 if (panelUser.expire_date) {
-  const panelTimestamp = new Date(parseInt(panelUser.expire_date) * 1000);
-  const year = panelTimestamp.getUTCFullYear();
-  const month = String(panelTimestamp.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(panelTimestamp.getUTCDate()).padStart(2, '0');
-  expirationForDB = `${year}-${month}-${day}`;
+  // SIMPLE: Use the panel's formatted date directly instead of timestamp conversion
+  if (panelUser.exp_date && panelUser.exp_date.includes('-')) {
+    // Panel format: "12-07-2025 19:25" (DD-MM-YYYY HH:mm)
+    const datePart = panelUser.exp_date.split(' ')[0]; // Get "12-07-2025"
+    const [day, month, year] = datePart.split('-'); // Split DD-MM-YYYY
+    expirationForDB = `${year}-${month}-${day}`; // Convert to YYYY-MM-DD for database
+    
+    console.log(`📅 Storing panel expiration (using panel date as-is): ${panelUser.exp_date} → ${expirationForDB}`);
+  }
 }
-
-console.log(`📅 Storing panel expiration (no conversion): ${panelUser.expire_date} → ${expirationForDB}`);
 
 await db.query(`
   UPDATE users SET 

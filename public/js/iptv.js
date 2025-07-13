@@ -950,16 +950,30 @@ updateIPTVStatus(data) {
         }
     }
     
-    // Update Expiration Date
-    const expirationElement = document.getElementById('iptvExpiration');
-    if (expirationElement) {
-        if (data.iptv_expiration) {
-            const date = new Date(data.iptv_expiration);
-            expirationElement.textContent = date.toLocaleDateString();
-        } else {
-            expirationElement.textContent = 'None';
+const expirationElement = document.getElementById('iptvExpiration');
+if (expirationElement) {
+    if (data.iptv_expiration) {
+        // FIXED: Parse date as local timezone to avoid UTC shift
+        let dateString = data.iptv_expiration;
+        
+        // Extract just the date part if it's a datetime string
+        if (dateString.includes('T')) {
+            dateString = dateString.split('T')[0];
+        } else if (dateString.includes(' ')) {
+            dateString = dateString.split(' ')[0];
         }
+        
+        // Parse as local date to avoid timezone shift
+        const [year, month, day] = dateString.split('-');
+        const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        
+        expirationElement.textContent = date.toLocaleDateString();
+        
+        console.log(`📅 Frontend display: ${data.iptv_expiration} → ${dateString} → ${date.toLocaleDateString()}`);
+    } else {
+        expirationElement.textContent = 'None';
     }
+}
     
 // Update M3U URL - Enhanced with multiple field checks and better data source detection
 const m3uUrl = data.iptv_m3u_url || data.m3u_url || data.m3u_plus_url;
@@ -1805,6 +1819,8 @@ linkExistingAccount() {
   }
 },
 
+// COMPLETE FIX: Replace the saveLinkedAccount function in public/js/iptv.js
+
 async saveLinkedAccount(userId, iptvData) {
   try {
     console.log('💾 Saving linked IPTV account to database...');
@@ -1828,7 +1844,7 @@ async saveLinkedAccount(userId, iptvData) {
     
     console.log('✅ Account linked and saved successfully');
     
-    // Update interface
+    // Update interface state
     this.userHasExistingIPTVData = true;
     this.foundIPTVData = null;
     
@@ -1839,7 +1855,11 @@ async saveLinkedAccount(userId, iptvData) {
     if (checkInterface) checkInterface.style.display = 'none';
     if (statusDisplay) statusDisplay.style.display = 'block';
     
-    // Show success notification - with better error handling
+    // CRITICAL FIX: Reload user status to populate the Current IPTV Status section
+    console.log('🔄 Reloading user IPTV status after linking...');
+    await this.loadUserStatus(userId);
+    
+    // Show success notification
     try {
       if (window.Utils && typeof window.Utils.showNotification === 'function') {
         window.Utils.showNotification('IPTV account linked successfully!', 'success');
@@ -1848,45 +1868,37 @@ async saveLinkedAccount(userId, iptvData) {
       } else {
         console.log('✅ IPTV account linked successfully!');
       }
-    } catch (notificationError) {
-      console.warn('⚠️ Could not show notification:', notificationError);
-      // Don't fail the whole operation for notification issues
+    } catch (notifError) {
+      console.warn('⚠️ Could not show notification:', notifError);
     }
-    
-    // Refresh status with better error handling
-    setTimeout(() => {
-      try {
-        this.loadCurrentUserIPTVStatus();
-      } catch (statusError) {
-        console.warn('⚠️ Could not refresh IPTV status:', statusError);
-      }
-    }, 1000);
     
   } catch (error) {
     console.error('❌ Error saving linked account:', error);
     
-    // Reset interface state
-    this.userHasExistingIPTVData = false;
+    // Reset interface on error
+    this.foundIPTVData = iptvData; // Restore data for retry
     
-    // Show error notification with better error handling
+    // Show error notification
     try {
       if (window.Utils && typeof window.Utils.showNotification === 'function') {
-        window.Utils.showNotification(`Failed to save linked account: ${error.message}`, 'error');
+        window.Utils.showNotification(`Failed to link account: ${error.message}`, 'error');
       } else if (window.showNotification && typeof window.showNotification === 'function') {
-        window.showNotification(`Failed to save linked account: ${error.message}`, 'error');
+        window.showNotification(`Failed to link account: ${error.message}`, 'error');
       } else {
-        console.error('❌ Failed to save linked account:', error.message);
-        alert(`Failed to save linked account: ${error.message}`);
+        console.error('❌ Failed to link account:', error.message);
       }
-    } catch (notificationError) {
-      console.warn('⚠️ Could not show error notification:', notificationError);
-      // Fallback to alert
-      alert(`Failed to save linked account: ${error.message}`);
+    } catch (notifError) {
+      console.warn('⚠️ Could not show error notification:', notifError);
     }
     
-    throw error; // Re-throw so calling code knows it failed
+    // Reset button state
+    const linkBtn = document.querySelector('.link-account-btn');
+    if (linkBtn) {
+      linkBtn.innerHTML = '<i class="fas fa-link"></i> Account Successfully Linked';
+      linkBtn.disabled = false;
+    }
   }
-},
+}
 
   /**
    * Show channel group creation form (Fixed for settings page)
