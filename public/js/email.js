@@ -725,50 +725,66 @@ function toggleDynamicFields() {
     }
 }
 
-// Fixed toggle preview size function
+// Fixed toggle function with working click-outside
 function togglePreviewSize() {
     const container = document.getElementById('emailPreviewContainer');
     const preview = document.getElementById('emailPreview');
     
+    if (!container || !preview) {
+        console.error('Email preview elements not found');
+        return;
+    }
+    
     if (container.classList.contains('large-view')) {
         // Close large view
+        console.log('Closing modal');
         container.classList.remove('large-view');
         document.body.style.overflow = 'auto';
         
-        // Remove click handlers
-        container.onclick = null;
-        
-        // Remove ESC key listener
+        // Remove event handlers
+        container.removeEventListener('click', window.modalClickHandler);
         if (window.previewEscHandler) {
             document.removeEventListener('keydown', window.previewEscHandler);
             window.previewEscHandler = null;
         }
+        window.modalClickHandler = null;
     } else {
         // Open large view
+        console.log('Opening modal');
         container.classList.add('large-view');
         document.body.style.overflow = 'hidden';
         
-        // FORCE SCROLL TO TOP
+        // Force scroll to top after opening
         setTimeout(() => {
-            if (preview) {
-                preview.scrollTop = 0;
-            }
-        }, 50);
+            preview.scrollTop = 0;
+        }, 100);
         
-        // ESC to close
+        // ESC key handler
         window.previewEscHandler = function(e) {
             if (e.key === 'Escape') {
+                e.preventDefault();
                 togglePreviewSize();
             }
         };
         document.addEventListener('keydown', window.previewEscHandler);
         
-        // Click outside to close
-        container.onclick = function(e) {
+        // Click outside handler - FIXED
+        window.modalClickHandler = function(e) {
+            // Only close if clicking directly on the container background
             if (e.target === container) {
+                console.log('Clicked outside - closing modal');
+                e.preventDefault();
                 togglePreviewSize();
             }
         };
+        
+        // Add the click handler
+        container.addEventListener('click', window.modalClickHandler);
+        
+        // Prevent preview content clicks from bubbling up
+        preview.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
     }
 }
 

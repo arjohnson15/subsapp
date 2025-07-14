@@ -729,7 +729,7 @@ textarea:focus {
 }
 
 /* ==========================================
-   ENHANCED EMAIL MANAGER STYLES
+   ENHANCED EMAIL MANAGER STYLES - FIXED
    ========================================== */
 
 /* Dynamic Fields Collapsible */
@@ -799,35 +799,6 @@ textarea:focus {
     max-width: 100%;
 }
 
-/* Large view modal */
-.email-preview-container.large-view {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 9999;
-    background: rgba(0, 0, 0, 0.9);
-    border-radius: 0;
-    padding: 40px;
-    box-sizing: border-box;
-    overflow: hidden;
-}
-
-/* Content container in large view */
-.email-preview-container.large-view #emailPreview {
-    background: white;
-    color: black;
-    border-radius: 8px;
-    padding: 30px;
-    width: 100%;
-    height: 100%;
-    overflow-y: auto;
-    box-sizing: border-box;
-    margin: 0;
-    scroll-behavior: smooth;
-}
-
 /* Normal preview (unchanged) */
 .email-preview-container:not(.large-view) #emailPreview {
     padding: 30px;
@@ -845,6 +816,18 @@ textarea:focus {
     text-align: center;
     padding: 40px;
     margin: 0;
+}
+
+/* Responsive adjustments for large view */
+@media (max-width: 768px) {
+    .email-preview-container.large-view {
+        padding: 10px !important;
+    }
+    
+    .email-preview-container.large-view #emailPreview {
+        padding: 20px !important;
+        max-height: 95vh !important;
+    }
 }
 
 /* Enhanced Field Tags */
@@ -886,4 +869,56 @@ textarea:focus {
     color: #4fc3f7;
     margin-bottom: 20px;
     font-size: 18px;
+}
+
+/* ==========================================
+   EMAIL MODAL FIX - FINAL WORKING VERSION
+   ========================================== */
+
+#emailPreviewContainer.large-view {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 99999 !important;
+    background: rgba(0, 0, 0, 0.9) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 20px !important;
+    box-sizing: border-box !important;
+    border-radius: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+}
+
+#emailPreviewContainer.large-view #emailPreview {
+    width: 80vw !important;
+    height: 80vh !important;
+    max-width: 1000px !important;
+    max-height: none !important;
+    background: white !important;
+    color: black !important;
+    border-radius: 12px !important;
+    padding: 30px !important;
+    overflow-y: auto !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    position: relative !important;
+    transform: none !important;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    #emailPreviewContainer.large-view {
+        padding: 10px !important;
+    }
+    
+    #emailPreviewContainer.large-view #emailPreview {
+        width: 95vw !important;
+        height: 85vh !important;
+        padding: 20px !important;
+    }
 }
