@@ -34,48 +34,45 @@
         <input type="text" id="emailSubject" placeholder="Email subject line">
     </div>
 
-    <!-- Dynamic Fields -->
-    <div class="dynamic-fields">
-        <h4>Dynamic Fields - Click to Insert</h4>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 5px;">
-            <!-- Basic User Info -->
-            <span class="field-tag" onclick="Email.insertField('{{name}}')">{{name}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{email}}')">{{email}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{username}}')">{{username}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{owner_name}}')">{{owner_name}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{owner_email}}')">{{owner_email}}</span>
-            
-            <!-- Plex Info -->
-            <span class="field-tag" onclick="Email.insertField('{{plex_email}}')">{{plex_email}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{plex_expiration}}')">{{plex_expiration}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{plex_subscription_type}}')">{{plex_subscription_type}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{plex_days_until_expiration}}')">{{plex_days_until_expiration}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{plex_renewal_price}}')">{{plex_renewal_price}}</span>
-            
-            <!-- IPTV Info -->
-            <span class="field-tag" onclick="Email.insertField('{{iptv_username}}')">{{iptv_username}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{iptv_password}}')">{{iptv_password}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{iptv_expiration}}')">{{iptv_expiration}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{iptv_subscription_type}}')">{{iptv_subscription_type}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{iptv_days_until_expiration}}')">{{iptv_days_until_expiration}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{iptv_renewal_price}}')">{{iptv_renewal_price}}</span>
-            
-            <!-- Device Info -->
-            <span class="field-tag" onclick="Email.insertField('{{implayer_code}}')">{{implayer_code}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{device_count}}')">{{device_count}}</span>
-            
-            <!-- Payment Links -->
-            <span class="field-tag" onclick="Email.insertField('{{paypal_link}}')">{{paypal_link}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{venmo_link}}')">{{venmo_link}}</span>
-            <span class="field-tag" onclick="Email.insertField('{{cashapp_link}}')">{{cashapp_link}}</span>
+    <!-- Dynamic Fields - Now Collapsible -->
+    <div class="dynamic-fields-container" style="margin-bottom: 30px;">
+        <div class="collapsible-header" onclick="toggleDynamicFields()">
+            <h4>Dynamic Fields - Click to Insert</h4>
+            <span id="dynamicFieldsToggle">+</span>
         </div>
-    </div>
-
-    <!-- Full-Width Preview (moved above email body) -->
-    <div style="margin: 30px 0;">
-        <h4 style="color: #4fc3f7; margin-bottom: 15px;">Email Preview:</h4>
-        <div id="emailPreview" class="template-preview" style="background: white; color: black; padding: 20px; border-radius: 8px; min-height: 300px; border: 1px solid #ddd; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            <p style="color: #666; text-align: center; padding: 40px;">Start typing in the email body below to see the preview...</p>
+        <div id="dynamicFieldsContent" class="dynamic-fields" style="display: none;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 5px;">
+                <!-- Basic User Info -->
+                <span class="field-tag" onclick="Email.insertField('{{name}}')">{{name}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{email}}')">{{email}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{username}}')">{{username}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{owner_name}}')">{{owner_name}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{owner_email}}')">{{owner_email}}</span>
+                
+                <!-- Plex Info -->
+                <span class="field-tag" onclick="Email.insertField('{{plex_email}}')">{{plex_email}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{plex_expiration}}')">{{plex_expiration}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{plex_subscription_type}}')">{{plex_subscription_type}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{plex_days_until_expiration}}')">{{plex_days_until_expiration}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{plex_renewal_price}}')">{{plex_renewal_price}}</span>
+                
+                <!-- IPTV Info -->
+                <span class="field-tag" onclick="Email.insertField('{{iptv_username}}')">{{iptv_username}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{iptv_password}}')">{{iptv_password}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{iptv_expiration}}')">{{iptv_expiration}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{iptv_subscription_type}}')">{{iptv_subscription_type}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{iptv_days_until_expiration}}')">{{iptv_days_until_expiration}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{iptv_renewal_price}}')">{{iptv_renewal_price}}</span>
+                
+                <!-- Device Info -->
+                <span class="field-tag" onclick="Email.insertField('{{implayer_code}}')">{{implayer_code}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{device_count}}')">{{device_count}}</span>
+                
+                <!-- Payment Links -->
+                <span class="field-tag" onclick="Email.insertField('{{paypal_link}}')">{{paypal_link}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{venmo_link}}')">{{venmo_link}}</span>
+                <span class="field-tag" onclick="Email.insertField('{{cashapp_link}}')">{{cashapp_link}}</span>
+            </div>
         </div>
     </div>
 
@@ -85,6 +82,22 @@
         <textarea id="emailBody" rows="12" placeholder="Enter your email content here...
 
 You can use dynamic fields like {{name}}, {{email}}, etc. that will be replaced with actual user data."></textarea>
+    </div>
+
+    <!-- IMPROVED Email Preview Section -->
+    <div class="email-preview-section" style="margin: 30px 0;">
+        <div class="preview-header">
+            <h4 style="color: #4fc3f7; margin: 0;">Email Preview:</h4>
+            <button class="btn btn-small" onclick="togglePreviewSize()">Toggle Size</button>
+        </div>
+        
+        <div id="emailPreviewContainer" class="email-preview-container">
+            <div id="emailPreview" class="template-preview-large">
+                <p class="preview-placeholder">
+                    Start typing in the email body above to see the preview...
+                </p>
+            </div>
+        </div>
     </div>
 
     <!-- Template Management Buttons -->
@@ -106,30 +119,34 @@ You can use dynamic fields like {{name}}, {{email}}, etc. that will be replaced 
         </button>
     </div>
 
-    <!-- Bulk Email Section -->
-    <div style="margin-top: 40px; padding: 20px; background: rgba(255, 255, 255, 0.05); border-radius: 8px;">
-        <h4 style="color: #4fc3f7; margin-bottom: 20px;">Bulk Email (Send to Multiple Users)</h4>
+    <!-- Enhanced Bulk Email Section -->
+    <div class="bulk-email-section">
+        <h4>📧 Bulk Email (Send to Multiple Users)</h4>
         
         <div class="form-group">
-            <label>Select User Groups:</label>
-            <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px;">
-                <label style="display: flex; align-items: center; gap: 5px;">
+            <label class="bulk-email-label">Select User Groups by Tags:</label>
+            <div class="bulk-email-tags">
+                <label class="checkbox-label">
                     <input type="checkbox" name="bulkEmailTags" value="Plex 1">
                     <span>Plex 1 Users</span>
                 </label>
-                <label style="display: flex; align-items: center; gap: 5px;">
+                <label class="checkbox-label">
                     <input type="checkbox" name="bulkEmailTags" value="Plex 2">
                     <span>Plex 2 Users</span>
                 </label>
-                <label style="display: flex; align-items: center; gap: 5px;">
+                <label class="checkbox-label">
                     <input type="checkbox" name="bulkEmailTags" value="IPTV">
                     <span>IPTV Users</span>
                 </label>
             </div>
         </div>
         
-        <button class="btn btn-info" type="button" onclick="Email.sendBulkEmail()">
-            Send Bulk Email
+        <div class="bulk-email-info">
+            <p><strong>How it works:</strong> Bulk email will send to any user who has at least one of the selected tags. Users with <code>exclude_bulk_emails</code> enabled will be skipped automatically.</p>
+        </div>
+        
+        <button class="btn btn-info bulk-email-btn" type="button" onclick="Email.sendBulkEmail()">
+            📤 Send Bulk Email
         </button>
     </div>
 </div>

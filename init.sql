@@ -53,6 +53,7 @@ CREATE TABLE users (
   iptv_connections INT NULL COMMENT 'Max allowed connections for this user',
   iptv_m3u_url TEXT NULL COMMENT 'Generated M3U Plus playlist URL',
   iptv_is_trial BOOLEAN DEFAULT FALSE COMMENT 'Whether current subscription is trial',
+  iptv_notes TEXT NULL COMMENT 'Notes about user IPTV subscription',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE SET NULL
@@ -400,12 +401,13 @@ CREATE TABLE iptv_bouquets (
   INDEX idx_is_active (is_active)
 );
 
+
 -- IPTV User Activity Log
 CREATE TABLE iptv_activity_log (
   id INT PRIMARY KEY AUTO_INCREMENT,
   user_id INT,
   line_id VARCHAR(20),
-  action ENUM('create_trial', 'create_paid', 'extend', 'sync', 'error') NOT NULL,
+  action ENUM('create_trial', 'create_paid', 'extend', 'sync', 'error', 'delete') NOT NULL,
   package_id VARCHAR(10),
   credits_used INT DEFAULT 0,
   success BOOLEAN DEFAULT TRUE,

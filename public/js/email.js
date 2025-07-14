@@ -711,6 +711,46 @@ clearForm() {
     }
 };
 
+// Toggle dynamic fields visibility
+function toggleDynamicFields() {
+    const content = document.getElementById('dynamicFieldsContent');
+    const toggle = document.getElementById('dynamicFieldsToggle');
+    
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        toggle.textContent = '−';
+    } else {
+        content.style.display = 'none';
+        toggle.textContent = '+';
+    }
+}
+
+// Toggle preview size between normal and large view
+function togglePreviewSize() {
+    const container = document.getElementById('emailPreviewContainer');
+    const isLarge = container.classList.contains('large-view');
+    
+    if (isLarge) {
+        container.classList.remove('large-view');
+        document.body.style.overflow = 'auto';
+    } else {
+        container.classList.add('large-view');
+        document.body.style.overflow = 'hidden';
+        
+        // Click outside to close
+        container.onclick = function(e) {
+            if (e.target === container) {
+                container.classList.remove('large-view');
+                document.body.style.overflow = 'auto';
+            }
+        };
+    }
+}
+
+// Make functions globally available
+window.toggleDynamicFields = toggleDynamicFields;
+window.togglePreviewSize = togglePreviewSize;
+
 // Global function exports for onclick handlers
 window.loadTemplate = window.Email.loadTemplate.bind(window.Email);
 window.insertField = window.Email.insertField.bind(window.Email);

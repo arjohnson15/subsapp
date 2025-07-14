@@ -727,3 +727,170 @@ textarea:focus {
     outline: none;
     box-shadow: 0 0 0 2px rgba(79, 195, 247, 0.2);
 }
+
+/* ==========================================
+   ENHANCED EMAIL MANAGER STYLES
+   ========================================== */
+
+/* Dynamic Fields Collapsible */
+.dynamic-fields-container {
+    margin-bottom: 30px;
+}
+
+.collapsible-header {
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid rgba(79, 195, 247, 0.3);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.collapsible-header:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(79, 195, 247, 0.5);
+}
+
+.collapsible-header h4 {
+    color: #4fc3f7;
+    margin: 0;
+    font-size: 16px;
+}
+
+.collapsible-header #dynamicFieldsToggle {
+    color: #4fc3f7;
+    font-size: 18px;
+    font-weight: bold;
+    transition: transform 0.3s ease;
+}
+
+.dynamic-fields {
+    margin-top: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 20px;
+    border: 1px solid rgba(79, 195, 247, 0.2);
+}
+
+/* Enhanced Email Preview */
+.email-preview-section {
+    margin: 30px 0;
+}
+
+.preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.email-preview-container {
+    background: white;
+    color: black;
+    border-radius: 12px;
+    border: 2px solid rgba(79, 195, 247, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    max-width: 100%;
+}
+
+/* FIXED: Toggle Size - Full Screen Preview */
+.email-preview-container.large-view {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    width: calc(100vw - 20px);
+    height: calc(100vh - 20px);
+    z-index: 9999;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.8);
+    overflow: hidden;
+}
+
+.template-preview-large {
+    padding: 30px;
+    min-height: 400px;
+    max-height: 70vh;
+    overflow-y: auto;
+    font-size: 14px;
+    line-height: 1.6;
+    font-family: Arial, sans-serif;
+}
+
+.email-preview-container.large-view .template-preview-large {
+    height: calc(100vh - 80px);
+    max-height: none;
+    padding: 40px;
+    overflow-y: auto;
+}
+
+/* Add close button for large view */
+.email-preview-container.large-view::after {
+    content: '✕ Close';
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    background: #f44336;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    z-index: 10000;
+    font-weight: bold;
+}
+
+.preview-placeholder {
+    color: #666;
+    text-align: center;
+    padding: 40px;
+    margin: 0;
+}
+
+/* Enhanced Field Tags */
+.field-tag {
+    display: inline-block;
+    background: linear-gradient(45deg, #8e24aa, #3f51b5);
+    padding: 6px 12px;
+    border-radius: 6px;
+    margin: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s ease;
+    color: white;
+    border: none;
+    font-weight: 500;
+}
+
+.field-tag:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(142, 36, 170, 0.3);
+}
+
+/* Enhanced Bulk Email Section */
+.bulk-email-section {
+    margin-top: 40px;
+    padding: 25px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(79, 195, 247, 0.3);
+    transition: all 0.3s ease;
+}
+
+.bulk-email-section:hover {
+    border-color: rgba(79, 195, 247, 0.5);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.bulk-email-section h4 {
+    color: #4fc3f7;
+    margin-bottom: 20px;
+    font-size: 18px;
+}
