@@ -9,6 +9,10 @@ RUN apk add --no-cache \
     musl-dev \
     python3-dev
 
+# Create Python virtual environment in /opt (outside of /app)
+RUN python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir plexapi
+
 # Set working directory
 WORKDIR /app
 
@@ -20,10 +24,6 @@ RUN npm install --production
 
 # Copy application code
 COPY . .
-
-# Create Python virtual environment and install plexapi
-RUN python3 -m venv /app/venv && \
-    /app/venv/bin/pip install --no-cache-dir plexapi
 
 # Create uploads directory
 RUN mkdir -p uploads
@@ -42,5 +42,5 @@ RUN adduser -S johnsonflix -u 1001
 RUN chown -R johnsonflix:nodejs /app
 USER johnsonflix
 
-# Start application with Python virtual environment activated
-CMD ["sh", "-c", ". /app/venv/bin/activate && npm start"]
+# Start application with Python virtual environment activated from /opt
+CMD ["sh", "-c", ". /opt/venv/bin/activate && npm start"]
