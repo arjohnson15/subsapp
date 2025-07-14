@@ -725,71 +725,124 @@ function toggleDynamicFields() {
     }
 }
 
-// Fixed toggle function with working click-outside
+// FINAL WORKING VERSION - Replace togglePreviewSize function
 function togglePreviewSize() {
-    const container = document.getElementById('emailPreviewContainer');
-    const preview = document.getElementById('emailPreview');
+    console.log('🎯 Final toggle called');
     
-    if (!container || !preview) {
-        console.error('Email preview elements not found');
+    // Remove any existing modal
+    const existing = document.getElementById('EMAIL_MODAL_FINAL');
+    if (existing) {
+        existing.remove();
+        document.body.style.overflow = '';
+        
+        // Remove ESC handler
+        if (window.emailModalEscHandler) {
+            document.removeEventListener('keydown', window.emailModalEscHandler);
+            window.emailModalEscHandler = null;
+        }
+        
+        console.log('✅ Modal closed');
         return;
     }
     
-    if (container.classList.contains('large-view')) {
-        // Close large view
-        console.log('Closing modal');
-        container.classList.remove('large-view');
-        document.body.style.overflow = 'auto';
-        
-        // Remove event handlers
-        container.removeEventListener('click', window.modalClickHandler);
-        if (window.previewEscHandler) {
-            document.removeEventListener('keydown', window.previewEscHandler);
-            window.previewEscHandler = null;
-        }
-        window.modalClickHandler = null;
-    } else {
-        // Open large view
-        console.log('Opening modal');
-        container.classList.add('large-view');
-        document.body.style.overflow = 'hidden';
-        
-        // Force scroll to top after opening
-        setTimeout(() => {
-            preview.scrollTop = 0;
-        }, 100);
-        
-        // ESC key handler
-        window.previewEscHandler = function(e) {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                togglePreviewSize();
-            }
-        };
-        document.addEventListener('keydown', window.previewEscHandler);
-        
-        // Click outside handler - FIXED
-        window.modalClickHandler = function(e) {
-            // Only close if clicking directly on the container background
-            if (e.target === container) {
-                console.log('Clicked outside - closing modal');
-                e.preventDefault();
-                togglePreviewSize();
-            }
-        };
-        
-        // Add the click handler
-        container.addEventListener('click', window.modalClickHandler);
-        
-        // Prevent preview content clicks from bubbling up
-        preview.addEventListener('click', function(e) {
-            e.stopPropagation();
-        });
+    // Get the email content
+    const preview = document.getElementById('emailPreview');
+    if (!preview) {
+        console.error('❌ Email preview not found');
+        return;
     }
+    
+    const content = preview.innerHTML;
+    
+    // Create modal
+    const modal = document.createElement('div');
+    modal.id = 'EMAIL_MODAL_FINAL';
+    
+    // Create content container with proper formatting
+    const contentDiv = document.createElement('div');
+    contentDiv.innerHTML = content;
+    
+    // Style the content container
+    Object.assign(contentDiv.style, {
+        width: '80vw',
+        maxWidth: '1000px',
+        height: '80vh',
+        background: 'white',
+        color: 'black',
+        borderRadius: '12px',
+        padding: '30px',
+        overflowY: 'auto',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+        boxSizing: 'border-box',
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '14px',
+        lineHeight: '1.6',
+        margin: '0'
+    });
+    
+    // Add proper spacing to email content elements
+    const elements = contentDiv.querySelectorAll('h1, h2, h3, h4, h5, h6, p, div');
+    elements.forEach(el => {
+        if (el.tagName.toLowerCase().startsWith('h')) {
+            el.style.marginTop = '20px';
+            el.style.marginBottom = '10px';
+        } else {
+            el.style.marginBottom = '15px';
+        }
+    });
+    
+    // Style the modal backdrop
+    Object.assign(modal.style, {
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        width: '100vw',
+        height: '100vh',
+        background: 'rgba(0, 0, 0, 0.9)',
+        zIndex: '999999',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+        boxSizing: 'border-box'
+    });
+    
+    // Add content to modal
+    modal.appendChild(contentDiv);
+    
+    // Click outside to close
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            togglePreviewSize();
+        }
+    };
+    
+    // Prevent content clicks from closing modal
+    contentDiv.onclick = (e) => {
+        e.stopPropagation();
+    };
+    
+    // ESC key to close
+    window.emailModalEscHandler = (e) => {
+        if (e.key === 'Escape') {
+            togglePreviewSize();
+        }
+    };
+    document.addEventListener('keydown', window.emailModalEscHandler);
+    
+    // Add to page
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+    
+    // Scroll content to top
+    setTimeout(() => {
+        contentDiv.scrollTop = 0;
+    }, 50);
+    
+    console.log('✅ Modal opened successfully');
 }
 
-// Make functions globally available
-window.toggleDynamicFields = toggleDynamicFields;
+// Make sure it's globally available
 window.togglePreviewSize = togglePreviewSize;
 
 // Global function exports for onclick handlers
