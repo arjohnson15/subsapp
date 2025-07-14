@@ -725,23 +725,48 @@ function toggleDynamicFields() {
     }
 }
 
-// Toggle preview size between normal and large view
+// Fixed toggle preview size function
 function togglePreviewSize() {
     const container = document.getElementById('emailPreviewContainer');
-    const isLarge = container.classList.contains('large-view');
+    const preview = document.getElementById('emailPreview');
     
-    if (isLarge) {
+    if (container.classList.contains('large-view')) {
+        // Close large view
         container.classList.remove('large-view');
         document.body.style.overflow = 'auto';
+        
+        // Remove click handlers
+        container.onclick = null;
+        
+        // Remove ESC key listener
+        if (window.previewEscHandler) {
+            document.removeEventListener('keydown', window.previewEscHandler);
+            window.previewEscHandler = null;
+        }
     } else {
+        // Open large view
         container.classList.add('large-view');
         document.body.style.overflow = 'hidden';
+        
+        // FORCE SCROLL TO TOP
+        setTimeout(() => {
+            if (preview) {
+                preview.scrollTop = 0;
+            }
+        }, 50);
+        
+        // ESC to close
+        window.previewEscHandler = function(e) {
+            if (e.key === 'Escape') {
+                togglePreviewSize();
+            }
+        };
+        document.addEventListener('keydown', window.previewEscHandler);
         
         // Click outside to close
         container.onclick = function(e) {
             if (e.target === container) {
-                container.classList.remove('large-view');
-                document.body.style.overflow = 'auto';
+                togglePreviewSize();
             }
         };
     }

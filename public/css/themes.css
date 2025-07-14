@@ -787,6 +787,7 @@ textarea:focus {
     margin-bottom: 15px;
 }
 
+/* Fixed Email Preview Styles */
 .email-preview-container {
     background: white;
     color: black;
@@ -798,23 +799,37 @@ textarea:focus {
     max-width: 100%;
 }
 
-/* FIXED: Toggle Size - Full Screen Preview */
+/* Large view modal */
 .email-preview-container.large-view {
     position: fixed;
-    top: 10px;
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
-    width: calc(100vw - 20px);
-    height: calc(100vh - 20px);
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
     z-index: 9999;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.9);
+    border-radius: 0;
+    padding: 40px;
+    box-sizing: border-box;
     overflow: hidden;
 }
 
-.template-preview-large {
+/* Content container in large view */
+.email-preview-container.large-view #emailPreview {
+    background: white;
+    color: black;
+    border-radius: 8px;
+    padding: 30px;
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    margin: 0;
+    scroll-behavior: smooth;
+}
+
+/* Normal preview (unchanged) */
+.email-preview-container:not(.large-view) #emailPreview {
     padding: 30px;
     min-height: 400px;
     max-height: 70vh;
@@ -824,29 +839,7 @@ textarea:focus {
     font-family: Arial, sans-serif;
 }
 
-.email-preview-container.large-view .template-preview-large {
-    height: calc(100vh - 80px);
-    max-height: none;
-    padding: 40px;
-    overflow-y: auto;
-}
-
-/* Add close button for large view */
-.email-preview-container.large-view::after {
-    content: '✕ Close';
-    position: absolute;
-    top: 15px;
-    right: 20px;
-    background: #f44336;
-    color: white;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    z-index: 10000;
-    font-weight: bold;
-}
-
+/* Preview placeholder */
 .preview-placeholder {
     color: #666;
     text-align: center;
