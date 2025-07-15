@@ -53,7 +53,7 @@ class EmailService {
     }
   }
 
-  async sendEmail(to, subject, htmlBody, options = {}) {
+async sendEmail(to, subject, htmlBody, options = {}) {
     try {
       if (!this.transporter) {
         console.error('❌ Email transporter not initialized');
@@ -64,9 +64,25 @@ class EmailService {
         from: options.from || process.env.SMTP_USER,
         to: to,
         subject: subject,
-        html: htmlBody,
-        bcc: options.bcc || []
+        html: htmlBody
       };
+
+      // FIXED: Add CC support
+      if (options.cc && options.cc.length > 0) {
+        mailOptions.cc = Array.isArray(options.cc) ? options.cc : [options.cc];
+      }
+
+      // FIXED: Add BCC support  
+      if (options.bcc && options.bcc.length > 0) {
+        mailOptions.bcc = Array.isArray(options.bcc) ? options.bcc : [options.bcc];
+      }
+
+      console.log('📧 Sending email with options:', {
+        to: mailOptions.to,
+        cc: mailOptions.cc || 'none',
+        bcc: mailOptions.bcc || 'none',
+        subject: mailOptions.subject
+      });
 
       const result = await this.transporter.sendMail(mailOptions);
       
