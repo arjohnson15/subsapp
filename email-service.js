@@ -327,37 +327,83 @@ async processIndividualSchedule(schedule) {
       }
     }
 
-    if (shouldRun && targetUsers.length > 0) {
+if (shouldRun && targetUsers.length > 0) {
       console.log(`📤 Running schedule: ${schedule.name} for ${targetUsers.length} users`);
       
-// Send emails to all target users
-let sentCount = 0;
-for (const user of targetUsers) {
-  try {
-    const personalizedBody = await this.replacePlaceholders(schedule.body, user);
-    const personalizedSubject = await this.replacePlaceholders(schedule.subject, user);
-    
-    // 🔧 FIXED: Add owner BCC logic for scheduled renewal emails
-    const emailOptions = {
-      userId: user.id,
-      templateName: schedule.template_name
-    };
+      if (schedule.schedule_type === 'specific_date') {
+        // FIXED: For specific date emails, send ONE email with all users as BCC (NO OWNER BCC)
+        try {
+          // Get sender email from settings
+          const emailSettings = await this.getEmailSettings();
+          const senderEmail = emailSettings.smtp_user;
+          
+          if (!senderEmail) {
+            console.error('❌ No sender email configured in settings');
+            return;
+          }
+          
+          // Use first user's data for template personalization
+          const templateUser = targetUsers[0];
+          const personalizedBody = await this.replacePlaceholders(schedule.body, templateUser);
+          const personalizedSubject = await this.replacePlaceholders(schedule.subject, templateUser);
+          
+          // Collect ONLY user emails for BCC (NO OWNER EMAILS)
+          const allUserEmails = targetUsers.map(user => user.email);
+          
+          console.log(`   → Sending single specific date email with ${allUserEmails.length} users in BCC`);
+          console.log(`   → NO owner BCCs for scheduled emails`);
+          
+          const emailOptions = {
+            templateName: schedule.template_name,
+            bcc: allUserEmails
+          };
+          
+          // Send ONE email TO the sender, with all users in BCC
+          const result = await this.sendEmail(senderEmail, personalizedSubject, personalizedBody, emailOptions);
+          
+          if (result.success) {
+            console.log(`✅ Specific date email sent to ${allUserEmails.length} users via BCC`);
+            
+            // Log email for each user
+            for (const user of targetUsers) {
+              await this.logEmail(user.id, user.email, personalizedSubject, schedule.template_name, 'sent');
+            }
+          }
+          
+        } catch (error) {
+          console.error(`❌ Error sending specific date email:`, error);
+        }
+        
+      } else if (schedule.schedule_type === 'expiration_reminder') {
+        // For expiration reminders, send individual emails with owner BCC if enabled
+        let sentCount = 0;
+        for (const user of targetUsers) {
+          try {
+            const personalizedBody = await this.replacePlaceholders(schedule.body, user);
+            const personalizedSubject = await this.replacePlaceholders(schedule.subject, user);
+            
+            const emailOptions = {
+              userId: user.id,
+              templateName: schedule.template_name
+            };
 
-    // Check if this user should BCC their owner on renewal emails
-    if (user.bcc_owner_renewal && user.owner_email) {
-      emailOptions.bcc = [user.owner_email];
-      console.log(`   → Adding owner BCC: ${user.owner_email} for user ${user.name}`);
-    }
-    
-    const result = await this.sendEmail(user.email, personalizedSubject, personalizedBody, emailOptions);
+            // ONLY add owner BCC for renewal emails if user has it enabled
+            if (user.bcc_owner_renewal && user.owner_email) {
+              emailOptions.bcc = [user.owner_email];
+              console.log(`   → Adding owner BCC: ${user.owner_email} for user ${user.name}`);
+            }
+            
+            const result = await this.sendEmail(user.email, personalizedSubject, personalizedBody, emailOptions);
 
-    if (result.success) {
-      sentCount++;
-    }
-  } catch (error) {
-    console.error(`   ❌ Error sending to ${user.name}:`, error);
-  }
-}
+            if (result.success) {
+              sentCount++;
+            }
+          } catch (error) {
+            console.error(`   ❌ Error sending to ${user.name}:`, error);
+          }
+        }
+        console.log(`✅ Expiration reminder emails: ${sentCount}/${targetUsers.length} sent individually`);
+      }
 
       // Update schedule statistics
       await db.query(`
