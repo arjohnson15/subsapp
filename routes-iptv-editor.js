@@ -4,7 +4,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('./database-config');
-const iptvEditorService = require('./services/iptv-editor-service');
+const iptvEditorService = require('./iptv-editor-service');
 
 // Middleware to check if IPTV Editor is enabled
 async function checkIPTVEditorEnabled(req, res, next) {

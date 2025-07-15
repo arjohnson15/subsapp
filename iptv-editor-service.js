@@ -3,7 +3,7 @@
 // Handles all interactions with editor.iptveditor.com API
 
 const axios = require('axios');
-const db = require('../database-config');
+const db = require('./database-config');
 const FormData = require('form-data');
 
 class IPTVEditorService {
