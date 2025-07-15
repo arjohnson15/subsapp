@@ -6,9 +6,9 @@ class PythonPlexService {
   constructor() {
     this.pythonScript = path.join(__dirname, 'plex_service.py');
     // Use Python from virtual environment in Docker, fallback to system python3
-    this.pythonExecutable = process.env.NODE_ENV === 'production' 
-      ? '/app/venv/bin/python' 
-      : 'python3';
+this.pythonExecutable = process.env.NODE_ENV === 'production' 
+  ? '/opt/venv/bin/python' 
+  : 'python3';
   }
 
   /**
