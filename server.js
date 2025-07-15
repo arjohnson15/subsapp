@@ -20,6 +20,8 @@ const multer = require('multer');
 const plexService = require('./plex-service');
 const emailService = require('./email-service');
 const iptvRoutes = require('./routes-iptv');
+const iptvEditorRoutes = require('./routes-iptv-editor'); // NEW
+const iptvEditorService = require('./services/iptv-editor-service'); // NEW
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -68,6 +70,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/owners', ownerRoutes);
 app.use('/api/email-schedules', emailScheduleRoutes);
 app.use('/api/iptv', iptvRoutes);
+app.use('/api/iptv-editor', iptvEditorRoutes); // NEW - IPTV Editor routes
 
 // Serve main application
 app.get('/', (req, res) => {
@@ -116,9 +119,84 @@ cron.schedule('0 * * * *', async () => {
   }
 });
 
+// NEW - IPTV Editor Daily Sync (runs at 3 AM daily)
+cron.schedule('0 3 * * *', async () => {
+  try {
+    console.log('🎬 Starting IPTV Editor daily sync...');
+    
+    // Check if IPTV Editor is enabled
+    const syncEnabled = await iptvEditorService.getSetting('sync_enabled');
+    if (!syncEnabled) {
+      console.log('⚠️ IPTV Editor sync is disabled - skipping');
+      return;
+    }
+    
+    // Initialize service
+    const initialized = await iptvEditorService.initialize();
+    if (!initialized) {
+      console.log('❌ IPTV Editor service not properly configured - skipping sync');
+      return;
+    }
+    
+    // Sync playlists
+    console.log('📺 Syncing IPTV Editor playlists...');
+    await iptvEditorService.updatePlaylists();
+    
+    // Sync all enabled users
+    console.log('👥 Syncing IPTV Editor users...');
+    const enabledUsers = await db.query(`
+      SELECT u.id, u.name 
+      FROM users u 
+      WHERE u.iptv_editor_enabled = TRUE AND u.include_in_iptv_editor = TRUE
+    `);
+    
+    let syncedCount = 0;
+    let errorCount = 0;
+    
+    for (const user of enabledUsers) {
+      try {
+        const iptvUser = await iptvEditorService.getIPTVEditorUser(user.id);
+        if (iptvUser) {
+          await iptvEditorService.syncUser(user.id);
+          syncedCount++;
+        }
+      } catch (error) {
+        console.error(`Failed to sync IPTV Editor user ${user.id} (${user.name}):`, error.message);
+        errorCount++;
+      }
+    }
+    
+    console.log(`✅ IPTV Editor sync completed: ${syncedCount} users synced, ${errorCount} errors`);
+    
+  } catch (error) {
+    console.error('❌ IPTV Editor daily sync failed:', error);
+    
+    // Log specific error details for debugging
+    if (error.message) {
+      console.error('Error message:', error.message);
+    }
+    if (error.response) {
+      console.error('API response status:', error.response.status);
+    }
+  }
+});
+
 // Initialize IPTV service on startup
 iptvService.initialize().catch(console.error);
 
+// NEW - Initialize IPTV Editor service on startup
+(async () => {
+  try {
+    const initialized = await iptvEditorService.initialize();
+    if (initialized) {
+      console.log('✅ IPTV Editor service initialized successfully');
+    } else {
+      console.log('⚠️ IPTV Editor service not configured (bearer token missing)');
+    }
+  } catch (error) {
+    console.error('❌ Failed to initialize IPTV Editor service:', error.message);
+  }
+})();
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -1,4 +1,4 @@
--- JohnsonFlix Database Schema - FINAL CORRECTED VERSION
+-- JohnsonFlix Database Schema - FINAL CORRECTED VERSION WITH IPTV EDITOR
 -- Fresh database setup with proper single subscription constraints
 -- FREE subscriptions use NULL subscription_type_id (no FREE subscription types in database)
 CREATE DATABASE IF NOT EXISTS subsapp_db;
@@ -54,6 +54,8 @@ CREATE TABLE users (
   iptv_m3u_url TEXT NULL COMMENT 'Generated M3U Plus playlist URL',
   iptv_is_trial BOOLEAN DEFAULT FALSE COMMENT 'Whether current subscription is trial',
   iptv_notes TEXT NULL COMMENT 'Notes about user IPTV subscription',
+  include_in_iptv_editor BOOLEAN DEFAULT TRUE COMMENT 'Include user in IPTV Editor sync',
+  iptv_editor_enabled BOOLEAN DEFAULT FALSE COMMENT 'User has IPTV Editor account',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE SET NULL
@@ -122,7 +124,6 @@ CREATE TABLE email_logs (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
-
 -- Email schedules table
 CREATE TABLE email_schedules (
   id INT PRIMARY KEY AUTO_INCREMENT,
@@ -138,10 +139,123 @@ CREATE TABLE email_schedules (
   active BOOLEAN DEFAULT TRUE,
   next_run DATETIME NULL,
   last_run DATETIME NULL,
-  run_count INT DEFAULT 0,  -- ADD THIS LINE
+  run_count INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (email_template_id) REFERENCES email_templates(id) ON DELETE CASCADE
+);
+
+-- NEW IPTV TABLES
+-- IPTV Packages (synced from panel)
+CREATE TABLE iptv_packages (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  package_id VARCHAR(10) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  connections INT NOT NULL,
+  duration_months INT NOT NULL,
+  credits INT NOT NULL,
+  package_type ENUM('trial', 'basic', 'full', 'live_tv') NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_package (package_id),
+  INDEX idx_package_type (package_type),
+  INDEX idx_is_active (is_active)
+);
+
+-- Custom Channel Groups
+CREATE TABLE iptv_channel_groups (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(100) NOT NULL,
+  description TEXT,
+  bouquet_ids JSON NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_is_active (is_active)
+);
+
+-- Bouquet Master List
+CREATE TABLE iptv_bouquets (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  bouquet_id VARCHAR(10) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  category VARCHAR(50),
+  is_active BOOLEAN DEFAULT true,
+  synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_bouquet (bouquet_id),
+  INDEX idx_category (category),
+  INDEX idx_is_active (is_active)
+);
+
+-- IPTV User Activity Log
+CREATE TABLE iptv_activity_log (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT,
+  line_id VARCHAR(20),
+  action ENUM('create_trial', 'create_paid', 'extend', 'sync', 'error', 'delete') NOT NULL,
+  package_id VARCHAR(10),
+  credits_used INT DEFAULT 0,
+  success BOOLEAN DEFAULT TRUE,
+  error_message TEXT,
+  api_response JSON,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_user_id (user_id),
+  INDEX idx_line_id (line_id),
+  INDEX idx_action (action),
+  INDEX idx_created_at (created_at)
+);
+
+-- ========================================
+-- IPTV EDITOR INTEGRATION TABLES
+-- ========================================
+
+-- IPTV Editor settings table
+CREATE TABLE iptv_editor_settings (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  setting_key VARCHAR(100) NOT NULL UNIQUE,
+  setting_value TEXT,
+  setting_type ENUM('string', 'json', 'boolean', 'integer') DEFAULT 'string',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- IPTV Editor user management table
+CREATE TABLE iptv_editor_users (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  iptv_editor_id INT,
+  iptv_editor_username VARCHAR(100),
+  iptv_editor_password VARCHAR(100),
+  m3u_code VARCHAR(50),
+  epg_code VARCHAR(50),
+  expiry_date TIMESTAMP,
+  max_connections INT DEFAULT 1,
+  sync_status ENUM('pending', 'synced', 'error') DEFAULT 'pending',
+  last_sync_time TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_user_id (user_id),
+  UNIQUE KEY unique_iptv_username (iptv_editor_username)
+);
+
+-- IPTV Editor sync operation logging table
+CREATE TABLE iptv_sync_logs (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  sync_type ENUM('user_create', 'user_sync', 'user_delete', 'playlist_sync', 'scheduled_sync') NOT NULL,
+  user_id INT NULL,
+  status ENUM('success', 'error', 'pending') DEFAULT 'pending',
+  request_data JSON,
+  response_data JSON,
+  error_message TEXT,
+  duration_ms INT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Insert default owners
@@ -222,10 +336,23 @@ INSERT INTO settings (setting_key, setting_value, setting_type) VALUES
 ('iptv_bouquets_last_sync', '', 'string'),
 ('iptv_credits_last_sync', '', 'string');
 
+-- Insert default IPTV Editor settings
+INSERT INTO iptv_editor_settings (setting_key, setting_value, setting_type) VALUES
+('bearer_token', '', 'string'),
+('base_url', 'https://editor.iptveditor.com', 'string'),
+('default_playlist_id', '', 'string'),
+('default_playlist_name', '', 'string'),
+('sync_schedule_hours', '24', 'integer'),
+('sync_enabled', 'false', 'boolean'),
+('last_sync_time', '', 'string'),
+('default_channels_categories', '[]', 'json'),
+('default_vods_categories', '[73]', 'json'),
+('default_series_categories', '[]', 'json');
+
 -- Insert sample users
-INSERT INTO users (name, email, owner_id, plex_email, iptv_username, iptv_password, implayer_code, device_count, bcc_owner_renewal, tags) VALUES
-('test 1', 'andrew+plextest3@cloudjohnson.com', 1, 'andrew+plextest3@cloudjohnson.com', 'andrew_iptv', 'iptv456', 'ABC123', 2, true, '["Plex 1", "Plex 2", "IPTV"]'),
-('test 2', 'andrew+plextest4@cloudjohnson.com', 1, 'andrew+plextest4@cloudjohnson.com', '', '', '', 1, false, '["Plex 1"]');
+INSERT INTO users (name, email, owner_id, plex_email, iptv_username, iptv_password, implayer_code, device_count, bcc_owner_renewal, tags, include_in_iptv_editor, iptv_editor_enabled) VALUES
+('test 1', 'andrew+plextest3@cloudjohnson.com', 1, 'andrew+plextest3@cloudjohnson.com', 'andrew_iptv', 'iptv456', 'ABC123', 2, true, '["Plex 1", "Plex 2", "IPTV"]', true, false),
+('test 2', 'andrew+plextest4@cloudjohnson.com', 1, 'andrew+plextest4@cloudjohnson.com', '', '', '', 1, false, '["Plex 1"]', true, false);
 
 -- Insert sample subscriptions - FREE subscriptions use NULL subscription_type_id
 INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status) VALUES
@@ -355,72 +482,6 @@ CREATE INDEX idx_subscriptions_user_status ON subscriptions(user_id, status);
 CREATE INDEX idx_subscriptions_type_status ON subscription_types(type, active);
 CREATE INDEX idx_subscriptions_expiration ON subscriptions(expiration_date, status);
 
--- NEW IPTV TABLES
--- IPTV Packages (synced from panel)
-CREATE TABLE iptv_packages (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  package_id VARCHAR(10) NOT NULL,
-  name VARCHAR(100) NOT NULL,
-  connections INT NOT NULL,
-  duration_months INT NOT NULL,
-  credits INT NOT NULL,
-  package_type ENUM('trial', 'basic', 'full', 'live_tv') NOT NULL,
-  is_active BOOLEAN DEFAULT true,
-  synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY unique_package (package_id),
-  INDEX idx_package_type (package_type),
-  INDEX idx_is_active (is_active)
-);
-
--- Custom Channel Groups
-CREATE TABLE iptv_channel_groups (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  name VARCHAR(100) NOT NULL,
-  description TEXT,
-  bouquet_ids JSON NOT NULL,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_is_active (is_active)
-);
-
--- Bouquet Master List
-CREATE TABLE iptv_bouquets (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  bouquet_id VARCHAR(10) NOT NULL,
-  name VARCHAR(100) NOT NULL,
-  category VARCHAR(50),
-  is_active BOOLEAN DEFAULT true,
-  synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY unique_bouquet (bouquet_id),
-  INDEX idx_category (category),
-  INDEX idx_is_active (is_active)
-);
-
-
--- IPTV User Activity Log
-CREATE TABLE iptv_activity_log (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  user_id INT,
-  line_id VARCHAR(20),
-  action ENUM('create_trial', 'create_paid', 'extend', 'sync', 'error', 'delete') NOT NULL,
-  package_id VARCHAR(10),
-  credits_used INT DEFAULT 0,
-  success BOOLEAN DEFAULT TRUE,
-  error_message TEXT,
-  api_response JSON,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-  INDEX idx_user_id (user_id),
-  INDEX idx_line_id (line_id),
-  INDEX idx_action (action),
-  INDEX idx_created_at (created_at)
-);
-
 -- Insert sample IPTV data
 INSERT INTO iptv_packages (package_id, name, connections, duration_months, credits, package_type) VALUES
 ('150', '2 Connections - 1 Month', 2, 1, 1, 'full'),
@@ -436,3 +497,11 @@ INSERT INTO iptv_channel_groups (name, description, bouquet_ids) VALUES
  JSON_ARRAY('130', '134', '137', '144', '145', '146', '147')),
 ('Family Friendly', 'USA, CAN, UK, SPORTS, 24/7 (No Adult Content)', 
  JSON_ARRAY('130', '134', '137', '144', '145', '146'));
+
+-- Add indexes for IPTV Editor tables for better performance
+CREATE INDEX idx_iptv_editor_users_user_id ON iptv_editor_users(user_id);
+CREATE INDEX idx_iptv_editor_users_sync_status ON iptv_editor_users(sync_status);
+CREATE INDEX idx_iptv_sync_logs_user_id ON iptv_sync_logs(user_id);
+CREATE INDEX idx_iptv_sync_logs_sync_type ON iptv_sync_logs(sync_type);
+CREATE INDEX idx_iptv_sync_logs_status ON iptv_sync_logs(status);
+CREATE INDEX idx_iptv_editor_settings_key ON iptv_editor_settings(setting_key);
