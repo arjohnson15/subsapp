@@ -21,7 +21,7 @@ const plexService = require('./plex-service');
 const emailService = require('./email-service');
 const iptvRoutes = require('./routes-iptv');
 const iptvEditorRoutes = require('./routes-iptv-editor'); // NEW
-const iptvEditorService = require('./services/iptv-editor-service'); // NEW
+const iptvEditorService = require('./iptv-editor-service'); // NEW
 
 const app = express();
 const PORT = process.env.PORT || 3000;
