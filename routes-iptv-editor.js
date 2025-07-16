@@ -214,6 +214,10 @@ router.post('/sync-playlists', checkIPTVEditorEnabled, async (req, res) => {
         
         const result = await iptvEditorService.getPlaylists(); // CORRECT - just get playlists
         
+        console.log('🔍 Raw result from getPlaylists:', JSON.stringify(result, null, 2));
+        console.log('🔍 Result has playlist property:', !!result.playlist);
+        console.log('🔍 Playlist array length:', result.playlist ? result.playlist.length : 'N/A');
+        
         res.json({ 
             success: true, 
             message: 'Playlists synced successfully',

@@ -2188,7 +2188,7 @@ async syncIPTVEditorPlaylists() {
         syncButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
         
         // First test connection
-        const connectionOk = await this.testIPTVEditorConnection();
+        const connectionOk = await Settings.testIPTVEditorConnection();
         if (!connectionOk) {
             throw new Error('Connection test failed - cannot sync playlists');
         }
@@ -2202,8 +2202,12 @@ const response = await fetch('/api/iptv-editor/sync-playlists', {
 });
         
         const result = await response.json();
-        
-        if (result.success && result.data && result.data.playlist) {
+        console.log('🔍 Frontend received result:', result);
+console.log('🔍 result.success:', result.success);
+console.log('🔍 result.data:', result.data);
+console.log('🔍 result.data.playlist:', result.data ? result.data.playlist : 'N/A');
+
+if (result.success && result.data && result.data.playlist) {
             // Clear existing options
             playlistSelect.innerHTML = '<option value="">Select a playlist...</option>';
             
