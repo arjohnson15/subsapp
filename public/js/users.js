@@ -2744,6 +2744,213 @@ window.toggleBasicSaveButton = function() {
     return window.Users.toggleBasicSaveButton();
 };
 
+// IPTV Editor Check Functions - Add these to your users.js file
+
+async function checkIPTVEditorAccess() {
+    const usernameInput = document.getElementById('existingIptvEditorUsername');
+    const checkBtn = document.getElementById('checkEditorAccessBtn');
+    const resultsDiv = document.getElementById('editorAccessCheckResults');
+    
+    const username = usernameInput.value.trim();
+    
+    if (!username) {
+        Utils.showNotification('Please enter a username to check', 'error');
+        return;
+    }
+    
+    // Update button state
+    const originalText = checkBtn.innerHTML;
+    checkBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
+    checkBtn.disabled = true;
+    
+    try {
+        const response = await fetch(`/api/iptv-editor/user/${username}/check`);
+        const data = await response.json();
+        
+        resultsDiv.style.display = 'block';
+        
+        if (data.success && data.exists && data.user) {
+            // User found - show sync results
+            showIPTVEditorSyncResults(data.user, username);
+        } else {
+            // User not found - show create option
+            showIPTVEditorCreateOption(username);
+        }
+        
+    } catch (error) {
+        console.error('Error checking IPTV Editor access:', error);
+        resultsDiv.style.display = 'block';
+        resultsDiv.innerHTML = `
+            <div style="background: rgba(244, 67, 54, 0.1); border: 1px solid #f44336; border-radius: 4px; padding: 12px;">
+                <div style="color: #f44336; font-weight: bold; margin-bottom: 5px;">
+                    <i class="fas fa-exclamation-triangle"></i> Check Failed
+                </div>
+                <div style="color: #fff; font-size: 0.9rem;">
+                    Unable to check IPTV Editor access. Please verify the username and try again.
+                </div>
+            </div>
+        `;
+    } finally {
+        // Restore button
+        checkBtn.innerHTML = originalText;
+        checkBtn.disabled = false;
+    }
+}
+
+function showIPTVEditorSyncResults(user, username) {
+    const resultsDiv = document.getElementById('editorAccessCheckResults');
+    
+    // Update the IPTV username field if it's empty
+    const iptvUsernameField = document.getElementById('iptvUsername');
+    if (iptvUsernameField && !iptvUsernameField.value) {
+        iptvUsernameField.value = username;
+    }
+    
+    const expiryDate = user.expiry ? new Date(user.expiry).toLocaleDateString() : 'Unknown';
+    const lastUpdate = user.updatedAt ? new Date(user.updatedAt * 1000).toLocaleDateString() : 'Unknown';
+    
+    resultsDiv.innerHTML = `
+        <div style="background: rgba(76, 175, 80, 0.1); border: 1px solid #4caf50; border-radius: 4px; padding: 15px;">
+            <div style="color: #4caf50; font-weight: bold; margin-bottom: 10px;">
+                <i class="fas fa-check-circle"></i> IPTV Editor Account Found
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 15px;">
+                <div>
+                    <span style="color: #4caf50; font-size: 0.9rem;">Username:</span><br>
+                    <span style="color: #fff; font-weight: bold;">${user.username}</span>
+                </div>
+                <div>
+                    <span style="color: #4caf50; font-size: 0.9rem;">Max Connections:</span><br>
+                    <span style="color: #fff; font-weight: bold;">${user.max_connections || 1}</span>
+                </div>
+                <div>
+                    <span style="color: #4caf50; font-size: 0.9rem;">Expiry:</span><br>
+                    <span style="color: #fff; font-weight: bold;">${expiryDate}</span>
+                </div>
+                <div>
+                    <span style="color: #4caf50; font-size: 0.9rem;">Status:</span><br>
+                    <span style="color: #fff; font-weight: bold;">${user.enabled ? 'Active' : 'Inactive'}</span>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button type="button" 
+                        onclick="syncIPTVEditorUser('${username}')"
+                        style="background: linear-gradient(45deg, #4caf50, #8bc34a); color: #fff; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold;">
+                    <i class="fas fa-sync"></i> Sync Data
+                </button>
+                <span style="color: #ccc; font-size: 0.85rem;">Last updated: ${lastUpdate}</span>
+            </div>
+        </div>
+    `;
+}
+
+function showIPTVEditorCreateOption(username) {
+    const resultsDiv = document.getElementById('editorAccessCheckResults');
+    
+    resultsDiv.innerHTML = `
+        <div style="background: rgba(255, 193, 7, 0.1); border: 1px solid #ffc107; border-radius: 4px; padding: 15px;">
+            <div style="color: #ffc107; font-weight: bold; margin-bottom: 10px;">
+                <i class="fas fa-user-plus"></i> No IPTV Editor Account Found
+            </div>
+            
+            <div style="color: #fff; margin-bottom: 15px; font-size: 0.9rem;">
+                Username "<strong>${username}</strong>" was not found in IPTV Editor. 
+                You can create an account when you save this user or create it manually now.
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button type="button" 
+                        onclick="createIPTVEditorAccountNow('${username}')"
+                        style="background: linear-gradient(45deg, #8e24aa, #ab47bc); color: #fff; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold;">
+                    <i class="fas fa-plus"></i> Create Account Now
+                </button>
+                <span style="color: #ccc; font-size: 0.85rem; line-height: 2;">Or save user to auto-create</span>
+            </div>
+        </div>
+    `;
+}
+
+async function syncIPTVEditorUser(username) {
+    try {
+        Utils.showNotification('Syncing IPTV Editor account...', 'info');
+        
+        const response = await fetch(`/api/iptv-editor/user/${username}/sync`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            Utils.showNotification('IPTV Editor account synced successfully', 'success');
+            // Refresh the check to show updated data
+            setTimeout(() => checkIPTVEditorAccess(), 1000);
+        } else {
+            Utils.showNotification(`Sync failed: ${data.message}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error syncing IPTV Editor user:', error);
+        Utils.showNotification('Failed to sync IPTV Editor account', 'error');
+    }
+}
+
+async function createIPTVEditorAccountNow(username) {
+    const userName = document.getElementById('userName').value;
+    const userEmail = document.getElementById('userEmail').value;
+    
+    if (!userName || !userEmail) {
+        Utils.showNotification('Please save basic user info first', 'error');
+        return;
+    }
+    
+    try {
+        Utils.showNotification('Creating IPTV Editor account...', 'info');
+        
+        const response = await fetch('/api/iptv-editor/user/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                username: username,
+                name: userName,
+                email: userEmail,
+                expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() // 1 year
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            Utils.showNotification('IPTV Editor account created successfully', 'success');
+            // Refresh the check to show the new account
+            setTimeout(() => checkIPTVEditorAccess(), 1000);
+        } else {
+            Utils.showNotification(`Failed to create account: ${data.message}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error creating IPTV Editor account:', error);
+        Utils.showNotification('Failed to create IPTV Editor account', 'error');
+    }
+}
+
+// Auto-populate from IPTV username field when it changes
+document.addEventListener('DOMContentLoaded', function() {
+    const iptvUsernameField = document.getElementById('iptvUsername');
+    const iptvEditorUsernameField = document.getElementById('existingIptvEditorUsername');
+    
+    if (iptvUsernameField && iptvEditorUsernameField) {
+        iptvUsernameField.addEventListener('input', function() {
+            if (this.value && !iptvEditorUsernameField.value) {
+                iptvEditorUsernameField.value = this.value;
+            }
+        });
+    }
+});
+
 // Enhanced IPTV check button initialization with proper cleanup
 window.initializeIPTVCheck = function() {
     const usernameInput = document.getElementById('existingIptvUsername');

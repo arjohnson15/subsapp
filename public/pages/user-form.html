@@ -172,6 +172,32 @@
     </div>
 </div>
 
+<!-- IPTV EDITOR ACCESS CHECK -->
+<div class="iptv-access-check-simple" style="background: rgba(142, 36, 170, 0.1); border: 1px solid #8e24aa; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
+    <h6 style="color: #8e24aa; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-search"></i>
+        Check IPTV Editor Access
+    </h6>
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <input type="text" 
+               id="existingIptvEditorUsername" 
+               placeholder="Enter IPTV username to check in Editor"
+               style="flex: 1; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #8e24aa; border-radius: 4px;"
+               maxlength="50">
+        <button type="button" 
+                id="checkEditorAccessBtn" 
+                class="btn"
+                style="background: linear-gradient(45deg, #8e24aa, #ab47bc); color: #fff; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold;"
+                onclick="checkIPTVEditorAccess()">
+            <i class="fas fa-search"></i> Check
+        </button>
+    </div>
+    <!-- Results area -->
+    <div id="editorAccessCheckResults" class="access-results" style="display: none; margin-top: 15px;">
+        <!-- Results will be populated here -->
+    </div>
+</div>
+
 <!-- Current IPTV Status Display -->
 <div class="iptv-status-container">
   <div id="iptvStatusDisplay" class="current-status-display">
@@ -350,134 +376,6 @@
         </button>
     </div>
 </div>
-        </div>
-
-<!-- IPTV Editor Section -->
-        <div class="form-section iptv-editor-section" style="display: none;" id="iptvEditorSection">
-            <h4>IPTV Editor Account</h4>
-            
-            <!-- IPTV Editor Enable Toggle -->
-            <div class="iptv-editor-form-group">
-                <label class="iptv-editor-toggle">
-                    <input type="checkbox" 
-                           id="iptv_editor_enabled" 
-                           name="iptv_editor_enabled"
-                           onchange="toggleIPTVEditorSection()">
-                    <span>Enable IPTV Editor Account</span>
-                </label>
-                <small class="iptv-editor-help">Create and manage IPTV Editor account for this user</small>
-            </div>
-
-            <!-- IPTV Editor Details (hidden by default) -->
-            <div id="iptv-editor-details" style="display: none; margin-top: 20px;">
-                
-                <!-- Current Account Status -->
-                <div id="iptv-editor-status-display" class="iptv-editor-status-display" style="display: none;">
-                    <h5 style="color: #8e24aa; margin-bottom: 10px;">Current IPTV Editor Account</h5>
-                    <div class="iptv-editor-status-grid">
-                        <div class="iptv-editor-status-item">
-                            <span>Username:</span>
-                            <span id="current-iptv-username"></span>
-                        </div>
-                        <div class="iptv-editor-status-item">
-                            <span>Max Connections:</span>
-                            <span id="current-iptv-connections"></span>
-                        </div>
-                        <div class="iptv-editor-status-item">
-                            <span>Expiry Date:</span>
-                            <span id="current-iptv-expiry"></span>
-                        </div>
-                        <div class="iptv-editor-status-item">
-                            <span>Sync Status:</span>
-                            <span id="current-iptv-sync-status"></span>
-                        </div>
-                    </div>
-                    <div class="iptv-editor-actions">
-                        <button type="button" 
-                                class="iptv-editor-btn iptv-editor-btn-sync"
-                                onclick="syncIPTVEditorUser()">
-                            Sync Account
-                        </button>
-                        <button type="button" 
-                                class="iptv-editor-btn iptv-editor-btn-delete"
-                                onclick="deleteIPTVEditorUser()">
-                            Delete Account
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Create New Account Form -->
-                <div id="iptv-editor-create-form">
-                    <h5 style="color: #8e24aa; margin-bottom: 15px;">Create New IPTV Editor Account</h5>
-                    
-                    <div class="form-grid">
-                        <div class="iptv-editor-form-group">
-                            <label for="iptv_editor_username">Username <span class="iptv-editor-required">*</span></label>
-                            <div class="iptv-editor-input-group">
-                                <input type="text" 
-                                       id="iptv_editor_username" 
-                                       name="iptv_editor_username"
-                                       placeholder="Enter IPTV username">
-                                <button type="button" 
-                                        class="iptv-editor-btn-generate"
-                                        onclick="generateIPTVUsername()">
-                                    Generate
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="iptv-editor-form-group">
-                            <label for="iptv_editor_password">Password <span class="iptv-editor-required">*</span></label>
-                            <div class="iptv-editor-input-group">
-                                <input type="text" 
-                                       id="iptv_editor_password" 
-                                       name="iptv_editor_password"
-                                       placeholder="Enter password">
-                                <button type="button" 
-                                        class="iptv-editor-btn-generate"
-                                        onclick="generateIPTVPassword()">
-                                    Generate
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-grid">
-                        <div class="iptv-editor-form-group">
-                            <label for="iptv_editor_max_connections">Max Connections</label>
-                            <input type="number" 
-                                   id="iptv_editor_max_connections" 
-                                   name="iptv_editor_max_connections"
-                                   min="1" 
-                                   max="10" 
-                                   value="1"
-                                   placeholder="1">
-                        </div>
-                        
-                        <div class="iptv-editor-form-group">
-                            <label for="iptv_editor_expiry_date">Expiry Date</label>
-                            <input type="datetime-local" 
-                                   id="iptv_editor_expiry_date" 
-                                   name="iptv_editor_expiry_date">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Settings -->
-                <div style="margin-top: 20px;">
-                    <h5 style="color: #8e24aa; margin-bottom: 15px;">IPTV Editor Settings</h5>
-                    <div class="iptv-editor-form-group">
-                        <label class="iptv-editor-toggle">
-                            <input type="checkbox" 
-                                   id="include_in_iptv_editor" 
-                                   name="include_in_iptv_editor"
-                                   checked>
-                            <span>Include in IPTV Editor sync</span>
-                        </label>
-                        <small class="iptv-editor-help">Whether this user should be included in automatic sync operations</small>
-                    </div>
-                </div>
-            </div>
         </div>
 
 
