@@ -1011,50 +1011,50 @@ console.log('✅ Settings initialization complete');
         }
     },
 
-    async saveAllSettings() {
-        try {
-            // First upload any pending files
-            await this.uploadPendingFiles();
+async saveAllSettings() {
+    try {
+        // First upload any pending files
+        await this.uploadPendingFiles();
             
-            const settingsData = {
-                // Branding settings (text only - files already uploaded above)
-                app_title: document.getElementById('appTitle')?.value?.trim() || '',
-                app_subtitle: document.getElementById('appSubtitle')?.value?.trim() || '',
-                
-                // Email settings
-                smtp_host: document.getElementById('smtpHost')?.value || 'smtp.gmail.com',
-                smtp_port: parseInt(document.getElementById('smtpPort')?.value) || 587,
-                smtp_user: document.getElementById('smtpUser')?.value || '',
-                smtp_pass: document.getElementById('smtpPass')?.value || '',
-                
-                // Payment settings
-                paypal_link: document.getElementById('paypalLink')?.value || '',
-                venmo_link: document.getElementById('venmoLink')?.value || '',
-                cashapp_link: document.getElementById('cashappLink')?.value || '',
-                
-                // IPTV Panel Configuration
-                iptv_panel_base_url: document.getElementById('iptvPanelBaseUrl')?.value || '',
-                iptv_panel_login_url: document.getElementById('iptvPanelLoginUrl')?.value || '',
-                iptv_panel_username: document.getElementById('iptvPanelUsername')?.value || '',
-                iptv_panel_password: document.getElementById('iptvPanelPassword')?.value || '',
-                iptv_package_id_for_bouquets: document.getElementById('iptvPackageIdForBouquets')?.value || ''
-            };
+        const settingsData = {
+            // Branding settings (text only - files already uploaded above)
+            app_title: document.getElementById('appTitle')?.value?.trim() || '',
+            app_subtitle: document.getElementById('appSubtitle')?.value?.trim() || '',
             
-            // Save text settings (only if there are any changes)
-            if (Object.values(settingsData).some(value => value !== '')) {
-                await API.Settings.update(settingsData);
-            }
+            // Email settings
+            smtp_host: document.getElementById('smtpHost')?.value || 'smtp.gmail.com',
+            smtp_port: parseInt(document.getElementById('smtpPort')?.value) || 587,
+            smtp_user: document.getElementById('smtpUser')?.value || '',
+            smtp_pass: document.getElementById('smtpPass')?.value || '',
             
-            Utils.showNotification('Settings saved successfully!', 'success');
+            // Payment settings
+            paypal_link: document.getElementById('paypalLink')?.value || '',
+            venmo_link: document.getElementById('venmoLink')?.value || '',
+            cashapp_link: document.getElementById('cashappLink')?.value || '',
             
-            // Apply branding immediately
-            const allSettings = await API.Settings.getAll();
-            this.applyBranding(allSettings);
-            
-        } catch (error) {
-            Utils.handleError(error, 'Saving settings');
+            // IPTV Panel Configuration
+            iptv_panel_base_url: document.getElementById('iptvPanelBaseUrl')?.value || '',
+            iptv_panel_login_url: document.getElementById('iptvPanelLoginUrl')?.value || '',
+            iptv_panel_username: document.getElementById('iptvPanelUsername')?.value || '',
+            iptv_panel_password: document.getElementById('iptvPanelPassword')?.value || '',
+            iptv_package_id_for_bouquets: document.getElementById('iptvPackageIdForBouquets')?.value || ''
+        };
+        
+        // Save text settings (only if there are any changes)
+        if (Object.values(settingsData).some(value => value !== '')) {
+            await API.Settings.update(settingsData);
         }
-    },
+        
+        Utils.showNotification('Settings saved successfully!', 'success');
+        
+        // Apply branding immediately
+        const allSettings = await API.Settings.getAll();
+        this.applyBranding(allSettings);
+        
+    } catch (error) {
+        Utils.handleError(error, 'Saving settings');
+    }
+},
 
     // NEW: Upload pending files
     async uploadPendingFiles() {
