@@ -129,15 +129,16 @@ class IPTVEditorService {
     // HTTP REQUEST HELPERS
     // =============================================================================
     
-    getHeaders() {
-        return {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.bearerToken}`,
-            'Origin': 'https://cloud.iptveditor.com',
-            'Accept': 'application/json, text/plain, */*',
-            'User-Agent': 'JohnsonFlix-Manager/1.0'
-        };
-    }
+getHeaders() {
+    return {
+        'Cache-Control': 'no-cache',
+        'Content-Type': 'application/json',
+        'User-Agent': 'curl/7.58.0',
+        'Accept': '*/*',
+        'Origin': 'https://cloud.iptveditor.com',
+        'Authorization': `Bearer ${this.bearerToken}`
+    };
+}
     
     async makeRequest(endpoint, data = {}, method = 'POST') {
         // Ensure service is initialized
@@ -153,6 +154,13 @@ class IPTVEditorService {
         
         try {
             console.log(`📡 Making ${method} request to ${endpoint}...`);
+			
+			console.log('🔍 Full URL:', url);
+console.log('🔍 Headers being sent:', this.getHeaders());
+console.log('🔍 Bearer token length:', this.bearerToken ? this.bearerToken.length : 'NULL');
+console.log('🔍 Bearer token starts with:', this.bearerToken ? this.bearerToken.substring(0, 20) : 'NULL');
+console.log('🔍 Request body:', JSON.stringify(data));
+
             
             const config = {
                 method,
@@ -162,9 +170,9 @@ class IPTVEditorService {
                 validateStatus: (status) => status < 500 // Don't throw on 4xx errors
             };
             
-            if (method === 'POST' && Object.keys(data).length > 0) {
-                config.data = data;
-            }
+if (method === 'POST') {
+    config.data = Object.keys(data).length > 0 ? data : '';
+}
             
             const response = await axios(config);
             const duration = Date.now() - startTime;
@@ -188,24 +196,38 @@ class IPTVEditorService {
             console.log(`✅ Request to ${endpoint} completed successfully (${duration}ms)`);
             return response.data;
             
-        } catch (error) {
-            const duration = Date.now() - startTime;
-            const errorMessage = error.response?.data?.message || error.message;
-            
-            // Log failed request
-            await this.logSync(
-                this.getLogTypeFromEndpoint(endpoint),
-                data.user_id || null,
-                'error',
-                data,
-                error.response?.data || null,
-                errorMessage,
-                duration
-            );
-            
-            console.error(`❌ Request to ${endpoint} failed (${duration}ms):`, errorMessage);
-            throw new Error(`IPTV Editor API Error: ${errorMessage}`);
-        }
+} catch (error) {
+    const duration = Date.now() - startTime;
+    const errorMessage = error.response?.data?.message || error.message;
+    
+    // Enhanced error logging
+    console.error(`❌ Request to ${endpoint} failed (${duration}ms):`, errorMessage);
+    
+    if (error.response) {
+        console.error(`   Status: ${error.response.status}`);
+        console.error(`   Status Text: ${error.response.statusText}`);
+        console.error(`   Response Headers:`, JSON.stringify(error.response.headers, null, 2));
+        console.error(`   Response Data:`, JSON.stringify(error.response.data, null, 2));
+    } else if (error.request) {
+        console.error(`   No response received`);
+        console.error(`   Request details:`, error.request);
+    } else {
+        console.error(`   Error setting up request:`, error.message);
+    }
+    
+    // Log failed request
+    await this.logSync(
+        this.getLogTypeFromEndpoint(endpoint),
+        data.user_id || null,
+        'error',
+        data,
+        error.response?.data || null,
+        errorMessage,
+        duration
+    );
+    
+    throw new Error(`IPTV Editor API Error: ${errorMessage}`);
+}
     }
     
     getLogTypeFromEndpoint(endpoint) {
