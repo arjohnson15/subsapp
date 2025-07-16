@@ -275,154 +275,48 @@
     </div>
 </div>
 
-<!-- IPTV Editor Integration Section - ADD TO EXISTING settings.html -->
 <div class="settings-section">
     <h3>IPTV Editor Integration</h3>
     
-    <!-- Status Display -->
-    <div class="integration-status">
-        <div class="status-item">
-            <span>Connection:</span>
-            <span id="iptvEditorConnectionStatus" class="status-missing">NOT TESTED</span>
-        </div>
-        <div class="status-item">
-            <span>Bearer Token:</span>
-            <span id="iptvEditorTokenStatus" class="status-missing">MISSING</span>
-        </div>
-        <div class="status-item">
-            <span>Default Playlist:</span>
-            <span id="iptvEditorPlaylistStatus" class="status-missing">NOT SELECTED</span>
-        </div>
-        <div class="status-item">
-            <span>API Endpoint:</span>
-            <span class="status-configured">https://editor.iptveditor.com/api</span>
-        </div>
-    </div>
-    
-    <!-- Configuration Form -->
+    <!-- Bearer Token Input -->
     <div class="form-group">
         <label for="iptvBearerToken">Bearer Token *</label>
         <input type="password" id="iptvBearerToken" placeholder="Enter your IPTV Editor bearer token">
         <small style="color: #4fc3f7;">Required for API authentication (get from IPTV Editor login - expires monthly)</small>
     </div>
     
+    <!-- Test Connection Button -->
+    <div class="form-group">
+        <button type="button" onclick="testIPTVEditorConnection()" class="btn btn-test">
+            <i class="fas fa-wifi"></i> Test Connection
+        </button>
+        <span id="iptvConnectionStatus" class="status-indicator"></span>
+    </div>
+    
+    <!-- Sync Playlists Button -->
+    <div class="form-group">
+        <button type="button" onclick="syncIPTVEditorPlaylists()" class="btn btn-secondary">
+            <i class="fas fa-sync"></i> Sync Playlists
+        </button>
+        <small style="color: #4fc3f7;">Load available playlists from IPTV Editor</small>
+    </div>
+    
+    <!-- Default Playlist Selection -->
     <div class="form-group">
         <label for="iptvPlaylistSelect">Default Playlist</label>
-        <div class="input-with-button">
-            <select id="iptvPlaylistSelect">
-                <option value="">Select a playlist...</option>
-            </select>
-            <button type="button" onclick="syncIPTVEditorPlaylists()" class="btn btn-secondary">Load Playlists</button>
-        </div>
+        <select id="iptvPlaylistSelect">
+            <option value="">Select a playlist...</option>
+        </select>
         <small style="color: #4fc3f7;">This playlist will be used for all new user accounts</small>
     </div>
     
+    <!-- Enable Automatic Sync -->
     <div class="form-group">
         <label>
             <input type="checkbox" id="iptvEditorSyncEnabled" style="margin-right: 8px;">
             Enable Automatic Sync
         </label>
         <small style="color: #4fc3f7;">Automatically sync user accounts with IPTV Editor</small>
-    </div>
-    
-    <!-- Action Buttons -->
-    <div class="form-actions">
-        <button type="button" onclick="testIPTVEditorConnection()" class="btn btn-test">
-            <i class="fas fa-wifi"></i> Test Connection
-        </button>
-        <button type="button" onclick="saveIPTVEditorSettings()" class="btn">
-            <i class="fas fa-save"></i> Save IPTV Editor Settings
-        </button>
-        <button type="button" onclick="loadIPTVEditorLogs()" class="btn btn-secondary">
-            <i class="fas fa-list"></i> View Sync Logs
-        </button>
-    </div>
-    
-    <!-- User Management Section -->
-    <div style="margin-top: 30px;">
-        <h4 style="color: #4fc3f7; margin-bottom: 15px;">IPTV Editor User Management</h4>
-        <p style="color: #4fc3f7; margin-bottom: 20px; font-size: 0.9rem;">
-            Manage users who have IPTV Editor accounts and sync their data.
-        </p>
-        
-        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
-            <button type="button" onclick="manualIPTVEditorSync()" class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a);">
-                <i class="fas fa-sync"></i> Manual Sync All
-            </button>
-            <button type="button" onclick="createIPTVEditorUser()" class="btn" style="background: linear-gradient(45deg, #2196f3, #03a9f4);">
-                <i class="fas fa-user-plus"></i> Create User
-            </button>
-            <button type="button" onclick="bulkCreateIPTVEditorUsers()" class="btn" style="background: linear-gradient(45deg, #ff9800, #ffc107);">
-                <i class="fas fa-users"></i> Bulk Create
-            </button>
-        </div>
-        
-        <!-- Users Table -->
-        <div class="table-container">
-            <table id="iptv-editor-users-table" class="data-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>IPTV Username</th>
-                        <th>Max Connections</th>
-                        <th>Expiry Date</th>
-                        <th>Sync Status</th>
-                        <th>Last Sync</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr><td colspan="8" style="text-align: center;">Loading IPTV Editor users...</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
-    <!-- Sync Logs Section -->
-    <div id="iptvEditorLogsSection" style="margin-top: 30px; display: none;">
-        <h4 style="color: #4fc3f7; margin-bottom: 15px;">Recent Sync Logs</h4>
-        
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <div style="display: flex; gap: 10px;">
-                <select id="logTypeFilter" style="padding: 8px; background: rgba(0,0,0,0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px;">
-                    <option value="">All Types</option>
-                    <option value="user_create">User Create</option>
-                    <option value="user_delete">User Delete</option>
-                    <option value="user_sync">User Sync</option>
-                    <option value="playlist_sync">Playlist Sync</option>
-                </select>
-                <select id="logStatusFilter" style="padding: 8px; background: rgba(0,0,0,0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px;">
-                    <option value="">All Status</option>
-                    <option value="success">Success</option>
-                    <option value="error">Error</option>
-                </select>
-                <button type="button" onclick="loadIPTVEditorLogs()" class="btn btn-sm">
-                    <i class="fas fa-filter"></i> Filter
-                </button>
-            </div>
-            <button type="button" onclick="clearOldIPTVEditorLogs()" class="btn btn-sm" style="background: #f44336;">
-                <i class="fas fa-trash"></i> Clear Old Logs
-            </button>
-        </div>
-        
-        <div class="table-container">
-            <table id="iptv-editor-logs-table" class="data-table">
-                <thead>
-                    <tr>
-                        <th>Time</th>
-                        <th>Type</th>
-                        <th>User</th>
-                        <th>Status</th>
-                        <th>Duration</th>
-                        <th>Details</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr><td colspan="6" style="text-align: center;">Loading sync logs...</td></tr>
-                </tbody>
-            </table>
-        </div>
     </div>
 </div>
 
