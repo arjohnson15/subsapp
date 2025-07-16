@@ -547,32 +547,34 @@ async getPlaylists() {
         }
     }
     
-    async testConnection() {
-        try {
-            console.log('🔧 Testing IPTV Editor connection...');
-            
-            // Test by fetching playlists (lightweight operation)
-            const playlists = await this.getPlaylists();
-            
-            if (playlists && Array.isArray(playlists)) {
-                console.log(`✅ Connection test successful - found ${playlists.length} playlists`);
-                return { 
-                    success: true, 
-                    message: 'Connection successful',
-                    playlistCount: playlists.length
-                };
-            } else {
-                throw new Error('Invalid response format');
-            }
-            
-        } catch (error) {
-            console.error('❌ Connection test failed:', error);
+
+async testConnection() {
+    try {
+        console.log('🔧 Testing IPTV Editor connection...');
+        
+        // Test by fetching playlists (lightweight operation)
+        const response = await this.getPlaylists();
+        
+        // Check if response has the expected structure
+        if (response && response.playlist && Array.isArray(response.playlist)) {
+            console.log(`✅ Connection test successful - found ${response.playlist.length} playlists`);
             return { 
-                success: false, 
-                message: error.message || 'Connection failed'
+                success: true, 
+                message: 'Connection successful',
+                playlistCount: response.playlist.length
             };
+        } else {
+            throw new Error('Invalid response format - expected playlist array');
         }
+        
+    } catch (error) {
+        console.error('❌ Connection test failed:', error);
+        return { 
+            success: false, 
+            message: error.message || 'Connection failed'
+        };
     }
+}
     
     // =============================================================================
     // BATCH OPERATIONS
