@@ -17,113 +17,214 @@ class IPTVEditorService {
     // INITIALIZATION & SETTINGS
     // =============================================================================
     
-    async initialize() {
-        try {
-            console.log('🎬 Initializing IPTV Editor service...');
-            
-            this.bearerToken = await this.getSetting('bearer_token');
-            this.defaultPlaylistId = await this.getSetting('default_playlist_id');
-            
-            if (!this.bearerToken) {
-                console.warn('⚠️ IPTV Editor bearer token not configured');
-                return false;
-            }
-            
-            this.initialized = true;
-            console.log('✅ IPTV Editor service initialized successfully');
-            return true;
-            
-        } catch (error) {
-            console.error('❌ Failed to initialize IPTV Editor service:', error);
-            return false;
+async initialize() {
+    try {
+        const settings = await this.getAllSettings();
+        
+        // Update service configuration
+        if (settings.bearer_token) {
+            this.bearerToken = settings.bearer_token;
         }
+        if (settings.base_url) {
+            this.baseUrl = settings.base_url;
+        }
+        if (settings.default_playlist_id) {
+            this.defaultPlaylistId = settings.default_playlist_id;
+        }
+        
+        console.log('✅ IPTV Editor service initialized with database settings');
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Failed to initialize IPTV Editor service:', error);
+        throw error;
     }
+}
     
     // Get setting from database
-    async getSetting(key) {
-        try {
-            const result = await db.query(
-                'SELECT setting_value, setting_type FROM iptv_editor_settings WHERE setting_key = ?',
-                [key]
-            );
-            
-            if (result.length === 0) return null;
-            
-            const { setting_value, setting_type } = result[0];
-            
-            switch (setting_type) {
-                case 'json':
-                    return JSON.parse(setting_value || '{}');
-                case 'boolean':
-                    return setting_value === 'true';
-                case 'integer':
-                    return parseInt(setting_value) || 0;
-                default:
-                    return setting_value;
-            }
-            
-        } catch (error) {
-            console.error(`❌ Error getting setting ${key}:`, error);
+async getSetting(key) {
+    try {
+        const rows = await db.query(
+            'SELECT setting_value, setting_type FROM iptv_editor_settings WHERE setting_key = ?',
+            [key]
+        );
+        
+        if (rows.length === 0) {
             return null;
         }
+        
+        const row = rows[0];
+        let value = row.setting_value;
+        
+        // Convert value based on type
+        switch (row.setting_type) {
+            case 'boolean':
+                value = value === 'true' || value === true;
+                break;
+            case 'integer':
+                value = parseInt(value) || 0;
+                break;
+            case 'json':
+                try {
+                    value = JSON.parse(value);
+                } catch (e) {
+                    value = {};
+                }
+                break;
+            default:
+                // string - keep as is
+                break;
+        }
+        
+        return value;
+    } catch (error) {
+        console.error(`❌ Failed to get setting ${key}:`, error);
+        throw error;
     }
+}
     
     // Set setting in database
-    async setSetting(key, value, type = 'string') {
-        try {
-            const setting_value = type === 'json' ? JSON.stringify(value) : String(value);
-            
-            await db.query(
-                `INSERT INTO iptv_editor_settings (setting_key, setting_value, setting_type) 
-                 VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE 
-                 setting_value = VALUES(setting_value), 
-                 setting_type = VALUES(setting_type)`,
-                [key, setting_value, type]
-            );
-            
-            console.log(`✅ Setting ${key} updated successfully`);
-            return true;
-            
-        } catch (error) {
-            console.error(`❌ Error setting ${key}:`, error);
-            return false;
+async setSetting(key, value, type = 'string') {
+    try {
+        let processedValue = value;
+        
+        // Convert value to string for storage
+        if (type === 'json') {
+            processedValue = JSON.stringify(value);
+        } else if (type === 'boolean') {
+            processedValue = value ? 'true' : 'false';
+        } else {
+            processedValue = String(value);
         }
+        
+        await db.query(`
+            INSERT INTO iptv_editor_settings (setting_key, setting_value, setting_type) 
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE 
+            setting_value = VALUES(setting_value),
+            setting_type = VALUES(setting_type),
+            updated_at = CURRENT_TIMESTAMP
+        `, [key, processedValue, type]);
+        
+        console.log(`✅ Setting ${key} updated successfully`);
+        return true;
+        
+    } catch (error) {
+        console.error(`❌ Failed to set setting ${key}:`, error);
+        throw error;
     }
+}
     
     // Get all settings for frontend
-    async getAllSettings() {
-        try {
-            const results = await db.query(
-                'SELECT setting_key, setting_value, setting_type FROM iptv_editor_settings ORDER BY setting_key'
-            );
+async getAllSettings() {
+    try {
+        const rows = await db.query('SELECT setting_key, setting_value, setting_type FROM iptv_editor_settings');
+        
+        const settings = {};
+        for (const row of rows) {
+            let value = row.setting_value;
             
-            const settings = {};
+            // Convert value based on type
+            switch (row.setting_type) {
+                case 'boolean':
+                    value = value === 'true' || value === true;
+                    break;
+                case 'integer':
+                    value = parseInt(value) || 0;
+                    break;
+                case 'json':
+                    try {
+                        value = JSON.parse(value);
+                    } catch (e) {
+                        value = {};
+                    }
+                    break;
+                default:
+                    // string - keep as is
+                    break;
+            }
             
-            results.forEach(row => {
-                const { setting_key, setting_value, setting_type } = row;
-                
-                switch (setting_type) {
-                    case 'json':
-                        settings[setting_key] = JSON.parse(setting_value || '{}');
-                        break;
-                    case 'boolean':
-                        settings[setting_key] = setting_value === 'true';
-                        break;
-                    case 'integer':
-                        settings[setting_key] = parseInt(setting_value) || 0;
-                        break;
-                    default:
-                        settings[setting_key] = setting_value || '';
-                }
-            });
-            
-            return settings;
-            
-        } catch (error) {
-            console.error('❌ Error getting all settings:', error);
-            return {};
+            settings[row.setting_key] = value;
         }
+        
+        return settings;
+    } catch (error) {
+        console.error('❌ Failed to get all settings:', error);
+        throw error;
     }
+}
+
+async getStoredPlaylists() {
+    try {
+        const playlists = await db.query(`
+            SELECT playlist_id, name, customer_count, channel_count, 
+                   movie_count, series_count, expiry_date, is_active, last_synced
+            FROM iptv_editor_playlists 
+            WHERE is_active = TRUE
+            ORDER BY name
+        `);
+        
+        return playlists;
+    } catch (error) {
+        console.error('❌ Failed to get stored playlists:', error);
+        throw error;
+    }
+}
+
+async storePlaylist(playlist) {
+    try {
+        await db.query(`
+            INSERT INTO iptv_editor_playlists (
+                playlist_id, name, username, password, m3u_code, epg_code, 
+                expiry_date, max_connections, customer_count, channel_count, 
+                movie_count, series_count, last_synced
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
+            username = VALUES(username),
+            password = VALUES(password),
+            m3u_code = VALUES(m3u_code),
+            epg_code = VALUES(epg_code),
+            expiry_date = VALUES(expiry_date),
+            max_connections = VALUES(max_connections),
+            customer_count = VALUES(customer_count),
+            channel_count = VALUES(channel_count),
+            movie_count = VALUES(movie_count),
+            series_count = VALUES(series_count),
+            last_synced = NOW(),
+            updated_at = CURRENT_TIMESTAMP
+        `, [
+            playlist.id,
+            playlist.name,
+            playlist.username || null,
+            playlist.password || null,
+            playlist.m3u || null,
+            playlist.epg || null,
+            playlist.expiry ? new Date(playlist.expiry) : null,
+            playlist.max_connections || 1,
+            playlist.customerCount || 0,
+            playlist.channel || 0,
+            playlist.movie || 0,
+            playlist.series || 0
+        ]);
+        
+        return true;
+    } catch (error) {
+        console.error('❌ Failed to store playlist:', error);
+        throw error;
+    }
+}
+
+async clearStoredPlaylists() {
+    try {
+        await db.query('DELETE FROM iptv_editor_playlists');
+        console.log('✅ Cleared all stored playlists');
+        return true;
+    } catch (error) {
+        console.error('❌ Failed to clear stored playlists:', error);
+        throw error;
+    }
+}
     
     // =============================================================================
     // HTTP REQUEST HELPERS

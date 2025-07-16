@@ -42,15 +42,15 @@ async function checkIPTVEditorEnabled(req, res, next) {
 // Settings Routes
 router.get('/settings', async (req, res) => {
     try {
-        console.log('📋 Loading IPTV Editor settings...');
+        console.log('⚙️ Loading IPTV Editor settings...');
         
         const settings = await iptvEditorService.getAllSettings();
         
-res.json({ 
-    success: true, 
-    settings: settings,  // Changed from 'data' to 'settings'
-    message: 'Settings loaded successfully'
-});
+        res.json({ 
+            success: true, 
+            settings: settings,
+            message: 'Settings loaded successfully'
+        });
         
     } catch (error) {
         console.error('❌ Error getting IPTV Editor settings:', error);
@@ -187,9 +187,15 @@ router.get('/channels', checkIPTVEditorEnabled, async (req, res) => {
 
 router.get('/playlists', checkIPTVEditorEnabled, async (req, res) => {
     try {
-        console.log('📺 Loading IPTV Editor playlists...');
+        console.log('📺 Loading stored IPTV Editor playlists...');
         
-        const playlists = await iptvEditorService.getPlaylists();
+        const playlists = await db.query(`
+            SELECT playlist_id, name, customer_count, channel_count, 
+                   movie_count, series_count, expiry_date, is_active, last_synced
+            FROM iptv_editor_playlists 
+            WHERE is_active = TRUE
+            ORDER BY name
+        `);
         
         res.json({ 
             success: true, 
@@ -198,7 +204,7 @@ router.get('/playlists', checkIPTVEditorEnabled, async (req, res) => {
         });
         
     } catch (error) {
-        console.error('❌ Error getting playlists:', error);
+        console.error('❌ Error getting stored playlists:', error);
         res.status(500).json({ 
             success: false, 
             message: 'Failed to get playlists',
@@ -212,16 +218,50 @@ router.post('/sync-playlists', checkIPTVEditorEnabled, async (req, res) => {
     try {
         console.log('🔄 Syncing IPTV Editor playlists...');
         
-        const result = await iptvEditorService.getPlaylists(); // CORRECT - just get playlists
+        const result = await iptvEditorService.getPlaylists();
         
         console.log('🔍 Raw result from getPlaylists:', JSON.stringify(result, null, 2));
         console.log('🔍 Result has playlist property:', !!result.playlist);
         console.log('🔍 Playlist array length:', result.playlist ? result.playlist.length : 'N/A');
         
+        if (!result.playlist || !Array.isArray(result.playlist)) {
+            throw new Error('Invalid playlist data received from IPTV Editor API');
+        }
+        
+        // Clear existing playlists and insert new ones
+        await db.query('DELETE FROM iptv_editor_playlists');
+        
+        // Insert each playlist into database
+        for (const playlist of result.playlist) {
+            await db.query(`
+                INSERT INTO iptv_editor_playlists (
+                    playlist_id, name, username, password, m3u_code, epg_code, 
+                    expiry_date, max_connections, customer_count, channel_count, 
+                    movie_count, series_count, last_synced
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            `, [
+                playlist.id,
+                playlist.name,
+                playlist.username || null,
+                playlist.password || null,
+                playlist.m3u || null,
+                playlist.epg || null,
+                playlist.expiry ? new Date(playlist.expiry) : null,
+                playlist.max_connections || 1,
+                playlist.customerCount || 0,
+                playlist.channel || 0,
+                playlist.movie || 0,
+                playlist.series || 0
+            ]);
+        }
+        
+        console.log(`✅ Stored ${result.playlist.length} playlists in database`);
+        
         res.json({ 
             success: true, 
             message: 'Playlists synced successfully',
-            data: result 
+            count: result.playlist.length,
+            playlists: result.playlist
         });
         
     } catch (error) {
