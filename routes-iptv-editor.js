@@ -46,11 +46,11 @@ router.get('/settings', async (req, res) => {
         
         const settings = await iptvEditorService.getAllSettings();
         
-        res.json({ 
-            success: true, 
-            data: settings,
-            message: 'Settings loaded successfully'
-        });
+res.json({ 
+    success: true, 
+    settings: settings,  // Changed from 'data' to 'settings'
+    message: 'Settings loaded successfully'
+});
         
     } catch (error) {
         console.error('❌ Error getting IPTV Editor settings:', error);
@@ -102,7 +102,7 @@ router.post('/settings', [
         res.json({ 
             success: true, 
             message: 'Settings updated successfully',
-            data: updatedSettings
+            settings: updatedSettings
         });
         
     } catch (error) {

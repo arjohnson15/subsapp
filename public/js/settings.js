@@ -2194,12 +2194,12 @@ async syncIPTVEditorPlaylists() {
         }
         
         // Sync playlists
-        const response = await fetch('/api/iptv-editor/sync-playlists', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
+const response = await fetch('/api/iptv-editor/playlists', {
+    method: 'GET',
+    headers: {
+        'Content-Type': 'application/json'
+    }
+});
         
         const result = await response.json();
         

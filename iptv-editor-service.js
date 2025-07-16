@@ -370,20 +370,20 @@ class IPTVEditorService {
     }
     
     // 5. Get Playlists
-    async getPlaylists() {
-        try {
-            console.log('📺 Fetching IPTV Editor playlists...');
-            
-            const response = await this.makeRequest('/api/playlist/list', {});
-            
-            console.log(`✅ Fetched ${response?.playlists?.length || 0} playlists`);
-            return response?.playlists || [];
-            
-        } catch (error) {
-            console.error('❌ Failed to get playlists:', error);
-            throw error;
-        }
+async getPlaylists() {
+    try {
+        console.log('📺 Fetching IPTV Editor playlists...');
+        
+        const response = await this.makeRequest('/api/playlist/list', {});
+        
+        console.log(`✅ Fetched playlists from IPTV Editor`);
+        return response;  // Return the response directly
+        
+    } catch (error) {
+        console.error('❌ Failed to get playlists:', error);
+        throw error;
     }
+}
     
     // 6. Get Categories
     async getCategories() {
