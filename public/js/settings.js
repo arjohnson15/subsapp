@@ -82,7 +82,10 @@ async init() {
             console.warn('IPTV statistics initialization failed:', error);
         }
         
-        console.log('✅ Settings initialization complete');
+console.log('✅ Settings initialization complete');
+        
+        // ADD THIS: Initialize IPTV Editor if elements exist
+        await this.initializeIPTVEditor();
         
     } catch (error) {
         console.error('❌ Settings initialization failed:', error);
@@ -2600,30 +2603,35 @@ window.testPlexConnection = Settings.testPlexConnection.bind(Settings);
 
 console.log('✅ Settings.js loaded cleanly with fixed initialization and sorting');
 
-// =============================================================================
-// IPTV EDITOR GLOBAL FUNCTIONS - SIMPLIFIED VERSION
-// =============================================================================
+// Export IPTV Editor functions for HTML onclick handlers
+window.testIPTVEditorConnection = function() {
+    return Settings.testIPTVEditorConnection();
+};
 
-// Global functions called from HTML buttons
-function saveIPTVEditorSettings() {
-    Settings.saveIPTVEditorSettings();
-}
+window.syncIPTVEditorPlaylists = function() {
+    return Settings.syncIPTVEditorPlaylists();
+};
 
-function testIPTVEditorConnection() {
-    Settings.testIPTVEditorConnection();
-}
+window.saveIPTVEditorSettings = function() {
+    return Settings.saveIPTVEditorSettings();
+};
 
-function syncIPTVEditorPlaylists() {
-    Settings.syncIPTVEditorPlaylists();
-}
+window.manualIPTVEditorSync = function() {
+    return Settings.manualIPTVEditorSync();
+};
 
-// Initialize IPTV Editor settings when settings page loads
-document.addEventListener('DOMContentLoaded', function() {
-    if (document.getElementById('iptvBearerToken')) {
-        Settings.loadIPTVEditorSettings();
-    }
-});
+window.loadIPTVEditorLogs = function() {
+    return Settings.loadIPTVEditorLogs();
+};
 
-console.log('✅ IPTV Editor settings functions loaded');
+window.clearOldIPTVEditorLogs = function() {
+    return Settings.clearOldIPTVEditorLogs();
+};
 
-console.log('✅ IPTV Editor settings functions loaded');
+window.createIPTVEditorUser = function() {
+    Utils.showNotification('User creation modal not implemented yet', 'info');
+};
+
+window.bulkCreateIPTVEditorUsers = function() {
+    Utils.showNotification('Bulk user creation not implemented yet', 'info');
+};
