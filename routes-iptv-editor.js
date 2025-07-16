@@ -3,8 +3,22 @@
 
 const express = require('express');
 const router = express.Router();
+const { body, validationResult } = require('express-validator');
 const db = require('./database-config');
 const iptvEditorService = require('./iptv-editor-service');
+
+// Validation middleware
+const handleValidationErrors = (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            success: false,
+            message: 'Validation failed',
+            errors: errors.array()
+        });
+    }
+    next();
+};
 
 // Middleware to check if IPTV Editor is enabled
 async function checkIPTVEditorEnabled(req, res, next) {
@@ -23,36 +37,54 @@ async function checkIPTVEditorEnabled(req, res, next) {
             message: 'Failed to check IPTV Editor status' 
         });
     }
-}
+};
 
 // Settings Routes
 router.get('/settings', async (req, res) => {
     try {
+        console.log('📋 Loading IPTV Editor settings...');
+        
         const settings = await iptvEditorService.getAllSettings();
-        res.json({ success: true, data: settings });
+        
+        res.json({ 
+            success: true, 
+            data: settings,
+            message: 'Settings loaded successfully'
+        });
+        
     } catch (error) {
-        console.error('Error getting IPTV Editor settings:', error);
+        console.error('❌ Error getting IPTV Editor settings:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to get settings' 
+            message: 'Failed to get settings',
+            error: error.message
         });
     }
 });
 
-router.post('/settings', async (req, res) => {
+router.post('/settings', [
+    body('bearer_token').optional().isString().notEmpty().withMessage('Bearer token must be a non-empty string'),
+    body('default_playlist_id').optional().isString().withMessage('Playlist ID must be a string'),
+    body('default_playlist_name').optional().isString().withMessage('Playlist name must be a string'),
+    body('sync_enabled').optional().isBoolean().withMessage('Sync enabled must be a boolean'),
+    body('sync_schedule_hours').optional().isInt({ min: 1, max: 168 }).withMessage('Sync schedule must be between 1 and 168 hours'),
+    handleValidationErrors
+], async (req, res) => {
     try {
-        const { settings } = req.body;
+        console.log('💾 Updating IPTV Editor settings...');
         
-        if (!settings || typeof settings !== 'object') {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Invalid settings data' 
+        const updates = req.body;
+        
+        // Validate at least one field is provided
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No settings provided for update'
             });
         }
         
         // Update each setting
-        for (const [key, value] of Object.entries(settings)) {
-            // Determine type based on value
+        for (const [key, value] of Object.entries(updates)) {
             let type = 'string';
             if (typeof value === 'boolean') type = 'boolean';
             else if (typeof value === 'number') type = 'integer';
@@ -64,15 +96,21 @@ router.post('/settings', async (req, res) => {
         // Re-initialize service with new settings
         await iptvEditorService.initialize();
         
+        // Return updated settings
+        const updatedSettings = await iptvEditorService.getAllSettings();
+        
         res.json({ 
             success: true, 
-            message: 'Settings updated successfully' 
+            message: 'Settings updated successfully',
+            data: updatedSettings
         });
+        
     } catch (error) {
-        console.error('Error updating IPTV Editor settings:', error);
+        console.error('❌ Error updating IPTV Editor settings:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to update settings' 
+            message: 'Failed to update settings',
+            error: error.message
         });
     }
 });
@@ -80,13 +118,24 @@ router.post('/settings', async (req, res) => {
 // Test connection
 router.post('/test-connection', async (req, res) => {
     try {
+        console.log('🔧 Testing IPTV Editor connection...');
+        
         const result = await iptvEditorService.testConnection();
+        
+        if (result.success) {
+            console.log('✅ Connection test successful');
+        } else {
+            console.log('❌ Connection test failed:', result.message);
+        }
+        
         res.json(result);
+        
     } catch (error) {
-        console.error('Error testing IPTV Editor connection:', error);
+        console.error('❌ Error testing IPTV Editor connection:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Connection test failed' 
+            message: 'Connection test failed',
+            error: error.message
         });
     }
 });
@@ -94,39 +143,66 @@ router.post('/test-connection', async (req, res) => {
 // Data Routes (require enabled service)
 router.get('/categories', checkIPTVEditorEnabled, async (req, res) => {
     try {
+        console.log('📺 Loading IPTV Editor categories...');
+        
         const categories = await iptvEditorService.getCategories();
-        res.json({ success: true, data: categories });
+        
+        res.json({ 
+            success: true, 
+            data: categories,
+            message: 'Categories loaded successfully'
+        });
+        
     } catch (error) {
-        console.error('Error getting categories:', error);
+        console.error('❌ Error getting categories:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to get categories' 
+            message: 'Failed to get categories',
+            error: error.message
         });
     }
 });
 
 router.get('/channels', checkIPTVEditorEnabled, async (req, res) => {
     try {
+        console.log('📺 Loading IPTV Editor channels...');
+        
         const channels = await iptvEditorService.getChannels();
-        res.json({ success: true, data: channels });
+        
+        res.json({ 
+            success: true, 
+            data: channels,
+            message: 'Channels loaded successfully'
+        });
+        
     } catch (error) {
-        console.error('Error getting channels:', error);
+        console.error('❌ Error getting channels:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to get channels' 
+            message: 'Failed to get channels',
+            error: error.message
         });
     }
 });
 
 router.get('/playlists', checkIPTVEditorEnabled, async (req, res) => {
     try {
+        console.log('📺 Loading IPTV Editor playlists...');
+        
         const playlists = await iptvEditorService.getPlaylists();
-        res.json({ success: true, data: playlists });
+        
+        res.json({ 
+            success: true, 
+            data: playlists,
+            message: 'Playlists loaded successfully'
+        });
+        
     } catch (error) {
-        console.error('Error getting playlists:', error);
+        console.error('❌ Error getting playlists:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to get playlists' 
+            message: 'Failed to get playlists',
+            error: error.message
         });
     }
 });
@@ -134,17 +210,22 @@ router.get('/playlists', checkIPTVEditorEnabled, async (req, res) => {
 // Playlist sync
 router.post('/sync-playlists', checkIPTVEditorEnabled, async (req, res) => {
     try {
+        console.log('🔄 Syncing IPTV Editor playlists...');
+        
         const result = await iptvEditorService.updatePlaylists();
+        
         res.json({ 
             success: true, 
             message: 'Playlists synced successfully',
             data: result 
         });
+        
     } catch (error) {
-        console.error('Error syncing playlists:', error);
+        console.error('❌ Error syncing playlists:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to sync playlists' 
+            message: 'Failed to sync playlists',
+            error: error.message
         });
     }
 });
@@ -152,6 +233,8 @@ router.post('/sync-playlists', checkIPTVEditorEnabled, async (req, res) => {
 // User Management Routes
 router.get('/users', checkIPTVEditorEnabled, async (req, res) => {
     try {
+        console.log('👥 Loading IPTV Editor users...');
+        
         // Get users from IPTV Editor API
         const apiUsers = await iptvEditorService.getAllUsers();
         
@@ -172,34 +255,39 @@ router.get('/users', checkIPTVEditorEnabled, async (req, res) => {
             data: {
                 api_users: apiUsers,
                 local_users: localUsers
-            }
+            },
+            message: 'Users loaded successfully'
         });
+        
     } catch (error) {
-        console.error('Error getting IPTV Editor users:', error);
+        console.error('❌ Error getting IPTV Editor users:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to get users' 
+            message: 'Failed to get users',
+            error: error.message
         });
     }
 });
 
-router.post('/users', checkIPTVEditorEnabled, async (req, res) => {
+router.post('/users', [
+    body('user_id').isInt({ min: 1 }).withMessage('User ID must be a positive integer'),
+    body('username').isString().notEmpty().withMessage('Username is required'),
+    body('password').isString().notEmpty().withMessage('Password is required'),
+    body('max_connections').optional().isInt({ min: 1, max: 10 }).withMessage('Max connections must be between 1 and 10'),
+    body('expiry_date').optional().isISO8601().withMessage('Expiry date must be valid ISO date'),
+    handleValidationErrors
+], checkIPTVEditorEnabled, async (req, res) => {
     try {
+        console.log('👤 Creating IPTV Editor user...');
+        
         const { user_id, username, password, max_connections, expiry_date } = req.body;
         
-        if (!user_id || !username || !password) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Missing required fields: user_id, username, password' 
-            });
-        }
-        
         // Check if user exists
-        const userExists = await db.query('SELECT id FROM users WHERE id = ?', [user_id]);
+        const userExists = await db.query('SELECT id, name FROM users WHERE id = ?', [user_id]);
         if (userExists.length === 0) {
             return res.status(404).json({ 
                 success: false, 
-                message: 'User not found' 
+                message: 'User not found in system' 
             });
         }
         
@@ -217,7 +305,7 @@ router.post('/users', checkIPTVEditorEnabled, async (req, res) => {
             username,
             password,
             max_connections: max_connections || 1,
-            expiry_date: expiry_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+            expiry_date: expiry_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days default
         };
         
         const result = await iptvEditorService.createUser(userData);
@@ -230,11 +318,13 @@ router.post('/users', checkIPTVEditorEnabled, async (req, res) => {
             message: 'User created successfully',
             data: result 
         });
+        
     } catch (error) {
-        console.error('Error creating IPTV Editor user:', error);
+        console.error('❌ Error creating IPTV Editor user:', error);
         res.status(500).json({ 
             success: false, 
-            message: error.message || 'Failed to create user' 
+            message: 'Failed to create user',
+            error: error.message
         });
     }
 });
@@ -243,12 +333,14 @@ router.delete('/users/:id', checkIPTVEditorEnabled, async (req, res) => {
     try {
         const userId = parseInt(req.params.id);
         
-        if (!userId) {
+        if (!userId || isNaN(userId)) {
             return res.status(400).json({ 
                 success: false, 
                 message: 'Invalid user ID' 
             });
         }
+        
+        console.log(`🗑️ Deleting IPTV Editor user ${userId}...`);
         
         const result = await iptvEditorService.deleteUser(userId);
         
@@ -260,25 +352,30 @@ router.delete('/users/:id', checkIPTVEditorEnabled, async (req, res) => {
             message: 'User deleted successfully',
             data: result 
         });
+        
     } catch (error) {
-        console.error('Error deleting IPTV Editor user:', error);
+        console.error('❌ Error deleting IPTV Editor user:', error);
         res.status(500).json({ 
             success: false, 
-            message: error.message || 'Failed to delete user' 
+            message: 'Failed to delete user',
+            error: error.message
         });
     }
 });
+
 
 router.post('/users/:id/sync', checkIPTVEditorEnabled, async (req, res) => {
     try {
         const userId = parseInt(req.params.id);
         
-        if (!userId) {
+        if (!userId || isNaN(userId)) {
             return res.status(400).json({ 
                 success: false, 
                 message: 'Invalid user ID' 
             });
         }
+        
+        console.log(`🔄 Syncing IPTV Editor user ${userId}...`);
         
         const result = await iptvEditorService.syncUser(userId);
         
@@ -287,11 +384,13 @@ router.post('/users/:id/sync', checkIPTVEditorEnabled, async (req, res) => {
             message: 'User synced successfully',
             data: result 
         });
+        
     } catch (error) {
-        console.error('Error syncing IPTV Editor user:', error);
+        console.error('❌ Error syncing IPTV Editor user:', error);
         res.status(500).json({ 
             success: false, 
-            message: error.message || 'Failed to sync user' 
+            message: 'Failed to sync user',
+            error: error.message
         });
     }
 });
@@ -300,12 +399,14 @@ router.get('/users/:id/status', checkIPTVEditorEnabled, async (req, res) => {
     try {
         const userId = parseInt(req.params.id);
         
-        if (!userId) {
+        if (!userId || isNaN(userId)) {
             return res.status(400).json({ 
                 success: false, 
                 message: 'Invalid user ID' 
             });
         }
+        
+        console.log(`📊 Getting IPTV Editor user ${userId} status...`);
         
         const iptvUser = await iptvEditorService.getIPTVEditorUser(userId);
         
@@ -320,18 +421,23 @@ router.get('/users/:id/status', checkIPTVEditorEnabled, async (req, res) => {
             success: true, 
             data: iptvUser 
         });
+        
     } catch (error) {
-        console.error('Error getting IPTV Editor user status:', error);
+        console.error('❌ Error getting IPTV Editor user status:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to get user status' 
+            message: 'Failed to get user status',
+            error: error.message
         });
     }
 });
 
+
 // Manual sync all users
 router.post('/manual-sync', checkIPTVEditorEnabled, async (req, res) => {
     try {
+        console.log('🔄 Starting manual sync for all IPTV Editor users...');
+        
         const enabledUsers = await db.query(`
             SELECT u.id, u.name 
             FROM users u 
@@ -372,11 +478,13 @@ router.post('/manual-sync', checkIPTVEditorEnabled, async (req, res) => {
             message: `Sync completed for ${results.length} users`,
             data: results 
         });
+        
     } catch (error) {
-        console.error('Error in manual sync:', error);
+        console.error('❌ Error in manual sync:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to perform manual sync' 
+            message: 'Failed to perform manual sync',
+            error: error.message
         });
     }
 });
@@ -384,6 +492,8 @@ router.post('/manual-sync', checkIPTVEditorEnabled, async (req, res) => {
 // Sync logs
 router.get('/sync-logs', async (req, res) => {
     try {
+        console.log('📋 Loading IPTV Editor sync logs...');
+        
         const { limit = 50, offset = 0, sync_type, status } = req.query;
         
         let query = `
@@ -420,7 +530,9 @@ router.get('/sync-logs', async (req, res) => {
         
         if (conditions.length > 0) {
             countQuery += ' WHERE ' + conditions.join(' AND ');
-            conditions.forEach(() => countParams.push(params.shift()));
+            // Re-add the filter parameters for count query
+            if (sync_type) countParams.push(sync_type);
+            if (status) countParams.push(status);
         }
         
         const countResult = await db.query(countQuery, countParams);
@@ -436,21 +548,30 @@ router.get('/sync-logs', async (req, res) => {
                     offset: parseInt(offset),
                     has_more: (parseInt(offset) + parseInt(limit)) < total
                 }
-            }
+            },
+            message: 'Logs loaded successfully'
         });
+        
     } catch (error) {
-        console.error('Error getting sync logs:', error);
+        console.error('❌ Error getting sync logs:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to get sync logs' 
+            message: 'Failed to get sync logs',
+            error: error.message
         });
     }
 });
 
+
 // Clear old logs
-router.delete('/sync-logs', async (req, res) => {
+router.delete('/sync-logs', [
+    body('days_old').optional().isInt({ min: 1, max: 365 }).withMessage('Days old must be between 1 and 365'),
+    handleValidationErrors
+], async (req, res) => {
     try {
         const { days_old = 30 } = req.body;
+        
+        console.log(`🗑️ Clearing IPTV Editor logs older than ${days_old} days...`);
         
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - parseInt(days_old));
@@ -465,26 +586,30 @@ router.delete('/sync-logs', async (req, res) => {
             message: `Deleted ${result.affectedRows} old log entries`,
             deleted_count: result.affectedRows 
         });
+        
     } catch (error) {
-        console.error('Error clearing sync logs:', error);
+        console.error('❌ Error clearing sync logs:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to clear sync logs' 
+            message: 'Failed to clear sync logs',
+            error: error.message
         });
     }
 });
 
 // Bulk operations
-router.post('/bulk-create-users', checkIPTVEditorEnabled, async (req, res) => {
+router.post('/bulk-create-users', [
+    body('user_ids').isArray({ min: 1 }).withMessage('User IDs must be a non-empty array'),
+    body('user_ids.*').isInt({ min: 1 }).withMessage('Each user ID must be a positive integer'),
+    body('default_password').optional().isString().withMessage('Default password must be a string'),
+    body('max_connections').optional().isInt({ min: 1, max: 10 }).withMessage('Max connections must be between 1 and 10'),
+    body('expiry_months').optional().isInt({ min: 1, max: 12 }).withMessage('Expiry months must be between 1 and 12'),
+    handleValidationErrors
+], checkIPTVEditorEnabled, async (req, res) => {
     try {
-        const { user_ids, default_password, max_connections, expiry_months } = req.body;
+        console.log('👥 Starting bulk create IPTV Editor users...');
         
-        if (!user_ids || !Array.isArray(user_ids)) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'user_ids must be an array' 
-            });
-        }
+        const { user_ids, default_password, max_connections, expiry_months } = req.body;
         
         const results = [];
         const expiry_date = new Date();
@@ -495,14 +620,24 @@ router.post('/bulk-create-users', checkIPTVEditorEnabled, async (req, res) => {
                 // Get user info
                 const userInfo = await db.query('SELECT name, email FROM users WHERE id = ?', [user_id]);
                 if (userInfo.length === 0) {
-                    results.push({ user_id, status: 'error', error: 'User not found' });
+                    results.push({ 
+                        user_id, 
+                        name: 'Unknown', 
+                        status: 'error', 
+                        error: 'User not found' 
+                    });
                     continue;
                 }
                 
                 // Check if already has account
                 const existingAccount = await iptvEditorService.getIPTVEditorUser(user_id);
                 if (existingAccount) {
-                    results.push({ user_id, status: 'exists', error: 'Already has IPTV Editor account' });
+                    results.push({ 
+                        user_id, 
+                        name: userInfo[0].name, 
+                        status: 'exists', 
+                        error: 'Already has IPTV Editor account' 
+                    });
                     continue;
                 }
                 
@@ -522,13 +657,16 @@ router.post('/bulk-create-users', checkIPTVEditorEnabled, async (req, res) => {
                 
                 results.push({ 
                     user_id, 
+                    name: userInfo[0].name,
                     status: 'created',
                     username,
                     password
                 });
+                
             } catch (error) {
                 results.push({ 
                     user_id, 
+                    name: 'Unknown',
                     status: 'error', 
                     error: error.message 
                 });
@@ -540,13 +678,26 @@ router.post('/bulk-create-users', checkIPTVEditorEnabled, async (req, res) => {
             message: `Bulk operation completed for ${user_ids.length} users`,
             data: results 
         });
+        
     } catch (error) {
-        console.error('Error in bulk create users:', error);
+        console.error('❌ Error in bulk create users:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to perform bulk create operation' 
+            message: 'Failed to perform bulk create operation',
+            error: error.message
         });
     }
+});
+
+// Global error handler for this router
+router.use((error, req, res, next) => {
+    console.error('❌ IPTV Editor API Error:', error);
+    
+    res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+    });
 });
 
 module.exports = router;

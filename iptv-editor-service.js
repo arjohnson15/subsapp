@@ -1,10 +1,9 @@
-// services/iptv-editor-service.js
-// IPTV Editor API Service for JohnsonFlix Manager
+// iptv-editor-service.js
+// CORRECTED IPTV Editor API Service for JohnsonFlix Manager
 // Handles all interactions with editor.iptveditor.com API
 
 const axios = require('axios');
 const db = require('./database-config');
-const FormData = require('form-data');
 
 class IPTVEditorService {
     constructor() {
@@ -14,25 +13,33 @@ class IPTVEditorService {
         this.initialized = false;
     }
     
+    // =============================================================================
+    // INITIALIZATION & SETTINGS
+    // =============================================================================
+    
     async initialize() {
         try {
+            console.log('🎬 Initializing IPTV Editor service...');
+            
             this.bearerToken = await this.getSetting('bearer_token');
             this.defaultPlaylistId = await this.getSetting('default_playlist_id');
             
             if (!this.bearerToken) {
-                console.warn('IPTV Editor bearer token not configured');
+                console.warn('⚠️ IPTV Editor bearer token not configured');
                 return false;
             }
             
             this.initialized = true;
+            console.log('✅ IPTV Editor service initialized successfully');
             return true;
+            
         } catch (error) {
-            console.error('Failed to initialize IPTV Editor service:', error);
+            console.error('❌ Failed to initialize IPTV Editor service:', error);
             return false;
         }
     }
     
-    // Settings Management
+    // Get setting from database
     async getSetting(key) {
         try {
             const result = await db.query(
@@ -43,6 +50,7 @@ class IPTVEditorService {
             if (result.length === 0) return null;
             
             const { setting_value, setting_type } = result[0];
+            
             switch (setting_type) {
                 case 'json':
                     return JSON.parse(setting_value || '{}');
@@ -53,12 +61,14 @@ class IPTVEditorService {
                 default:
                     return setting_value;
             }
+            
         } catch (error) {
-            console.error(`Error getting setting ${key}:`, error);
+            console.error(`❌ Error getting setting ${key}:`, error);
             return null;
         }
     }
     
+    // Set setting in database
     async setSetting(key, value, type = 'string') {
         try {
             const setting_value = type === 'json' ? JSON.stringify(value) : String(value);
@@ -70,38 +80,86 @@ class IPTVEditorService {
                  setting_type = VALUES(setting_type)`,
                 [key, setting_value, type]
             );
+            
+            console.log(`✅ Setting ${key} updated successfully`);
             return true;
+            
         } catch (error) {
-            console.error(`Error setting ${key}:`, error);
+            console.error(`❌ Error setting ${key}:`, error);
             return false;
         }
     }
     
-    // HTTP Request Helpers
+    // Get all settings for frontend
+    async getAllSettings() {
+        try {
+            const results = await db.query(
+                'SELECT setting_key, setting_value, setting_type FROM iptv_editor_settings ORDER BY setting_key'
+            );
+            
+            const settings = {};
+            
+            results.forEach(row => {
+                const { setting_key, setting_value, setting_type } = row;
+                
+                switch (setting_type) {
+                    case 'json':
+                        settings[setting_key] = JSON.parse(setting_value || '{}');
+                        break;
+                    case 'boolean':
+                        settings[setting_key] = setting_value === 'true';
+                        break;
+                    case 'integer':
+                        settings[setting_key] = parseInt(setting_value) || 0;
+                        break;
+                    default:
+                        settings[setting_key] = setting_value || '';
+                }
+            });
+            
+            return settings;
+            
+        } catch (error) {
+            console.error('❌ Error getting all settings:', error);
+            return {};
+        }
+    }
+    
+    // =============================================================================
+    // HTTP REQUEST HELPERS
+    // =============================================================================
+    
     getHeaders() {
         return {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${this.bearerToken}`,
             'Origin': 'https://cloud.iptveditor.com',
-            'Accept': 'application/json, text/plain, */*'
+            'Accept': 'application/json, text/plain, */*',
+            'User-Agent': 'JohnsonFlix-Manager/1.0'
         };
     }
     
     async makeRequest(endpoint, data = {}, method = 'POST') {
+        // Ensure service is initialized
         if (!this.initialized) {
             const init = await this.initialize();
-            if (!init) throw new Error('IPTV Editor service not properly configured');
+            if (!init) {
+                throw new Error('IPTV Editor service not properly configured');
+            }
         }
         
         const startTime = Date.now();
         const url = `${this.baseURL}${endpoint}`;
         
         try {
+            console.log(`📡 Making ${method} request to ${endpoint}...`);
+            
             const config = {
                 method,
                 url,
                 headers: this.getHeaders(),
-                timeout: 30000
+                timeout: 30000,
+                validateStatus: (status) => status < 500 // Don't throw on 4xx errors
             };
             
             if (method === 'POST' && Object.keys(data).length > 0) {
@@ -110,6 +168,11 @@ class IPTVEditorService {
             
             const response = await axios(config);
             const duration = Date.now() - startTime;
+            
+            // Check if response indicates success
+            if (response.status >= 400) {
+                throw new Error(`HTTP ${response.status}: ${response.data?.message || 'Request failed'}`);
+            }
             
             // Log successful request
             await this.logSync(
@@ -122,7 +185,9 @@ class IPTVEditorService {
                 duration
             );
             
+            console.log(`✅ Request to ${endpoint} completed successfully (${duration}ms)`);
             return response.data;
+            
         } catch (error) {
             const duration = Date.now() - startTime;
             const errorMessage = error.response?.data?.message || error.message;
@@ -138,6 +203,7 @@ class IPTVEditorService {
                 duration
             );
             
+            console.error(`❌ Request to ${endpoint} failed (${duration}ms):`, errorMessage);
             throw new Error(`IPTV Editor API Error: ${errorMessage}`);
         }
     }
@@ -147,125 +213,233 @@ class IPTVEditorService {
         if (endpoint.includes('remove')) return 'user_delete';
         if (endpoint.includes('force-sync')) return 'user_sync';
         if (endpoint.includes('playlist')) return 'playlist_sync';
-        return 'scheduled_sync';
+        if (endpoint.includes('auto-updater')) return 'playlist_sync';
+        return 'api_error';
     }
     
-    // Logging
+    // =============================================================================
+    // LOGGING SYSTEM
+    // =============================================================================
+    
     async logSync(syncType, userId, status, requestData, responseData, errorMessage = null, durationMs = 0) {
         try {
             await db.query(
                 `INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, error_message, duration_ms)
                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [syncType, userId, status, JSON.stringify(requestData), JSON.stringify(responseData), errorMessage, durationMs]
+                [
+                    syncType, 
+                    userId, 
+                    status, 
+                    JSON.stringify(requestData), 
+                    JSON.stringify(responseData), 
+                    errorMessage, 
+                    durationMs
+                ]
             );
         } catch (error) {
-            console.error('Failed to log sync:', error);
+            console.error('❌ Failed to log sync:', error);
         }
     }
     
-    // API Methods
+    // =============================================================================
+    // CORE API METHODS
+    // =============================================================================
     
     // 1. Create New User
     async createUser(userData) {
-        const data = {
-            playlist_id: this.defaultPlaylistId,
-            username: userData.username,
-            password: userData.password,
-            max_connections: userData.max_connections || 1,
-            expiry_date: userData.expiry_date,
-            user_id: userData.user_id
-        };
-        
-        const response = await this.makeRequest('/api/reseller/new-customer', data);
-        
-        // Store in database
-        if (response && response.success) {
-            await this.createIPTVEditorUser(userData.user_id, {
-                iptv_editor_id: response.user_id,
-                iptv_editor_username: userData.username,
-                iptv_editor_password: userData.password,
-                m3u_code: response.m3u_code,
-                epg_code: response.epg_code,
-                expiry_date: userData.expiry_date,
+        try {
+            console.log(`👤 Creating IPTV Editor user for ${userData.username}...`);
+            
+            const data = {
+                playlist_id: this.defaultPlaylistId,
+                username: userData.username,
+                password: userData.password,
                 max_connections: userData.max_connections || 1,
-                sync_status: 'synced'
-            });
+                expiry_date: userData.expiry_date,
+                user_id: userData.user_id
+            };
+            
+            const response = await this.makeRequest('/api/reseller/new-customer', data);
+            
+            // Store in database if successful
+            if (response && response.success) {
+                await this.createIPTVEditorUser(userData.user_id, {
+                    iptv_editor_id: response.user_id,
+                    iptv_editor_username: userData.username,
+                    iptv_editor_password: userData.password,
+                    m3u_code: response.m3u_code,
+                    epg_code: response.epg_code,
+                    expiry_date: userData.expiry_date,
+                    max_connections: userData.max_connections || 1,
+                    sync_status: 'synced'
+                });
+                
+                console.log(`✅ User ${userData.username} created successfully`);
+            }
+            
+            return response;
+            
+        } catch (error) {
+            console.error(`❌ Failed to create user ${userData.username}:`, error);
+            throw error;
         }
-        
-        return response;
     }
     
     // 2. Delete User
     async deleteUser(userId) {
-        const iptvUser = await this.getIPTVEditorUser(userId);
-        if (!iptvUser) {
-            throw new Error('User not found in IPTV Editor');
+        try {
+            console.log(`🗑️ Deleting IPTV Editor user ${userId}...`);
+            
+            const iptvUser = await this.getIPTVEditorUser(userId);
+            if (!iptvUser) {
+                throw new Error('User not found in IPTV Editor');
+            }
+            
+            const data = {
+                user_id: iptvUser.iptv_editor_id
+            };
+            
+            const response = await this.makeRequest('/api/reseller/remove', data);
+            
+            // Remove from database if successful
+            if (response && response.success) {
+                await db.query('DELETE FROM iptv_editor_users WHERE user_id = ?', [userId]);
+                console.log(`✅ User ${userId} deleted successfully`);
+            }
+            
+            return response;
+            
+        } catch (error) {
+            console.error(`❌ Failed to delete user ${userId}:`, error);
+            throw error;
         }
-        
-        const data = {
-            user_id: iptvUser.iptv_editor_id
-        };
-        
-        const response = await this.makeRequest('/api/reseller/remove', data);
-        
-        // Remove from database
-        if (response && response.success) {
-            await db.query('DELETE FROM iptv_editor_users WHERE user_id = ?', [userId]);
-        }
-        
-        return response;
     }
     
     // 3. Get All Users
     async getAllUsers() {
-        return await this.makeRequest('/api/reseller/get-data', {});
+        try {
+            console.log('👥 Fetching all IPTV Editor users...');
+            
+            const response = await this.makeRequest('/api/reseller/get-data', {});
+            
+            console.log(`✅ Fetched ${response?.users?.length || 0} users from IPTV Editor`);
+            return response;
+            
+        } catch (error) {
+            console.error('❌ Failed to get all users:', error);
+            throw error;
+        }
     }
     
     // 4. Sync User
     async syncUser(userId) {
-        const iptvUser = await this.getIPTVEditorUser(userId);
-        if (!iptvUser) {
-            throw new Error('User not found in IPTV Editor');
+        try {
+            console.log(`🔄 Syncing IPTV Editor user ${userId}...`);
+            
+            const iptvUser = await this.getIPTVEditorUser(userId);
+            if (!iptvUser) {
+                throw new Error('User not found in IPTV Editor');
+            }
+            
+            const data = {
+                user_id: iptvUser.iptv_editor_id
+            };
+            
+            const response = await this.makeRequest('/api/reseller/force-sync', data);
+            
+            // Update sync status
+            await db.query(
+                'UPDATE iptv_editor_users SET sync_status = ?, last_sync_time = NOW() WHERE user_id = ?',
+                ['synced', userId]
+            );
+            
+            console.log(`✅ User ${userId} synced successfully`);
+            return response;
+            
+        } catch (error) {
+            console.error(`❌ Failed to sync user ${userId}:`, error);
+            
+            // Update sync status to error
+            await db.query(
+                'UPDATE iptv_editor_users SET sync_status = ?, last_sync_time = NOW() WHERE user_id = ?',
+                ['error', userId]
+            );
+            
+            throw error;
         }
-        
-        const data = {
-            user_id: iptvUser.iptv_editor_id
-        };
-        
-        const response = await this.makeRequest('/api/reseller/force-sync', data);
-        
-        // Update sync status
-        await db.query(
-            'UPDATE iptv_editor_users SET sync_status = ?, last_sync_time = NOW() WHERE user_id = ?',
-            ['synced', userId]
-        );
-        
-        return response;
     }
     
     // 5. Get Playlists
     async getPlaylists() {
-        return await this.makeRequest('/api/playlist/list', {});
+        try {
+            console.log('📺 Fetching IPTV Editor playlists...');
+            
+            const response = await this.makeRequest('/api/playlist/list', {});
+            
+            console.log(`✅ Fetched ${response?.playlists?.length || 0} playlists`);
+            return response?.playlists || [];
+            
+        } catch (error) {
+            console.error('❌ Failed to get playlists:', error);
+            throw error;
+        }
     }
     
     // 6. Get Categories
     async getCategories() {
-        return await this.makeRequest('/api/category/channel/get-data', {});
+        try {
+            console.log('📂 Fetching IPTV Editor categories...');
+            
+            const response = await this.makeRequest('/api/category/channel/get-data', {});
+            
+            console.log(`✅ Fetched ${response?.categories?.length || 0} categories`);
+            return response?.categories || [];
+            
+        } catch (error) {
+            console.error('❌ Failed to get categories:', error);
+            throw error;
+        }
     }
     
     // 7. Get Channels
     async getChannels() {
-        return await this.makeRequest('/api/stream/channel/get-data', {});
+        try {
+            console.log('📺 Fetching IPTV Editor channels...');
+            
+            const response = await this.makeRequest('/api/stream/channel/get-data', {});
+            
+            console.log(`✅ Fetched ${response?.channels?.length || 0} channels`);
+            return response?.channels || [];
+            
+        } catch (error) {
+            console.error('❌ Failed to get channels:', error);
+            throw error;
+        }
     }
     
     // 8. Update Playlists
     async updatePlaylists() {
-        const response = await this.makeRequest('/api/auto-updater/run-auto-updater', {});
-        await this.setSetting('last_sync_time', new Date().toISOString(), 'string');
-        return response;
+        try {
+            console.log('🔄 Updating IPTV Editor playlists...');
+            
+            const response = await this.makeRequest('/api/auto-updater/run-auto-updater', {});
+            
+            // Update last sync time
+            await this.setSetting('last_sync_time', new Date().toISOString(), 'string');
+            
+            console.log('✅ Playlists updated successfully');
+            return response;
+            
+        } catch (error) {
+            console.error('❌ Failed to update playlists:', error);
+            throw error;
+        }
     }
     
-    // Database Helper Methods
+    // =============================================================================
+    // DATABASE HELPER METHODS
+    // =============================================================================
+    
     async createIPTVEditorUser(userId, data) {
         try {
             await db.query(
@@ -285,9 +459,12 @@ class IPTVEditorService {
                     data.sync_status
                 ]
             );
+            
+            console.log(`✅ IPTV Editor user record created for user ${userId}`);
             return true;
+            
         } catch (error) {
-            console.error('Error creating IPTV Editor user:', error);
+            console.error(`❌ Error creating IPTV Editor user record for ${userId}:`, error);
             return false;
         }
     }
@@ -298,9 +475,11 @@ class IPTVEditorService {
                 'SELECT * FROM iptv_editor_users WHERE user_id = ?',
                 [userId]
             );
+            
             return result.length > 0 ? result[0] : null;
+            
         } catch (error) {
-            console.error('Error getting IPTV Editor user:', error);
+            console.error(`❌ Error getting IPTV Editor user ${userId}:`, error);
             return null;
         }
     }
@@ -325,14 +504,20 @@ class IPTVEditorService {
                 `UPDATE iptv_editor_users SET ${updates.join(', ')}, updated_at = NOW() WHERE user_id = ?`,
                 values
             );
+            
+            console.log(`✅ IPTV Editor user ${userId} updated successfully`);
             return true;
+            
         } catch (error) {
-            console.error('Error updating IPTV Editor user:', error);
+            console.error(`❌ Error updating IPTV Editor user ${userId}:`, error);
             return false;
         }
     }
     
-    // Utility Methods
+    // =============================================================================
+    // UTILITY METHODS
+    // =============================================================================
+    
     generateIPTVUsername(name) {
         const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
         const random = Math.floor(Math.random() * 1000);
@@ -340,52 +525,161 @@ class IPTVEditorService {
     }
     
     generateIPTVPassword() {
-        return Math.random().toString(36).substring(2, 10);
+        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let password = '';
+        for (let i = 0; i < 8; i++) {
+            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return password;
     }
     
-    // Status and Health Check
+    // =============================================================================
+    // STATUS AND HEALTH CHECK
+    // =============================================================================
+    
     async isServiceEnabled() {
-        return await this.getSetting('sync_enabled');
+        try {
+            const enabled = await this.getSetting('sync_enabled');
+            return enabled === true;
+        } catch (error) {
+            console.error('❌ Error checking if service is enabled:', error);
+            return false;
+        }
     }
     
     async testConnection() {
         try {
-            await this.getPlaylists();
-            return { success: true, message: 'Connection successful' };
+            console.log('🔧 Testing IPTV Editor connection...');
+            
+            // Test by fetching playlists (lightweight operation)
+            const playlists = await this.getPlaylists();
+            
+            if (playlists && Array.isArray(playlists)) {
+                console.log(`✅ Connection test successful - found ${playlists.length} playlists`);
+                return { 
+                    success: true, 
+                    message: 'Connection successful',
+                    playlistCount: playlists.length
+                };
+            } else {
+                throw new Error('Invalid response format');
+            }
+            
         } catch (error) {
-            return { success: false, message: error.message };
+            console.error('❌ Connection test failed:', error);
+            return { 
+                success: false, 
+                message: error.message || 'Connection failed'
+            };
         }
     }
     
-    // Get all settings for frontend
-    async getAllSettings() {
+    // =============================================================================
+    // BATCH OPERATIONS
+    // =============================================================================
+    
+    async batchSyncUsers(userIds) {
         try {
-            const results = await db.query('SELECT * FROM iptv_editor_settings ORDER BY setting_key');
-            const settings = {};
+            console.log(`🔄 Starting batch sync for ${userIds.length} users...`);
             
-            results.forEach(row => {
-                const { setting_key, setting_value, setting_type } = row;
-                switch (setting_type) {
-                    case 'json':
-                        settings[setting_key] = JSON.parse(setting_value || '{}');
-                        break;
-                    case 'boolean':
-                        settings[setting_key] = setting_value === 'true';
-                        break;
-                    case 'integer':
-                        settings[setting_key] = parseInt(setting_value) || 0;
-                        break;
-                    default:
-                        settings[setting_key] = setting_value;
+            const results = [];
+            
+            for (const userId of userIds) {
+                try {
+                    await this.syncUser(userId);
+                    results.push({ userId, status: 'success' });
+                } catch (error) {
+                    results.push({ userId, status: 'error', error: error.message });
                 }
+            }
+            
+            const successCount = results.filter(r => r.status === 'success').length;
+            const errorCount = results.filter(r => r.status === 'error').length;
+            
+            console.log(`✅ Batch sync completed: ${successCount} success, ${errorCount} errors`);
+            
+            return {
+                success: true,
+                results,
+                summary: {
+                    total: userIds.length,
+                    success: successCount,
+                    errors: errorCount
+                }
+            };
+            
+        } catch (error) {
+            console.error('❌ Batch sync failed:', error);
+            throw error;
+        }
+    }
+    
+    // =============================================================================
+    // MAINTENANCE METHODS
+    // =============================================================================
+    
+    async cleanupOldLogs(daysOld = 30) {
+        try {
+            console.log(`🧹 Cleaning up logs older than ${daysOld} days...`);
+            
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+            
+            const result = await db.query(
+                'DELETE FROM iptv_sync_logs WHERE created_at < ?',
+                [cutoffDate]
+            );
+            
+            console.log(`✅ Cleaned up ${result.affectedRows} old log entries`);
+            return result.affectedRows;
+            
+        } catch (error) {
+            console.error('❌ Error cleaning up logs:', error);
+            throw error;
+        }
+    }
+    
+    async getServiceStats() {
+        try {
+            const stats = {};
+            
+            // Get total users
+            const totalUsers = await db.query('SELECT COUNT(*) as count FROM iptv_editor_users');
+            stats.totalUsers = totalUsers[0].count;
+            
+            // Get users by status
+            const statusCounts = await db.query(`
+                SELECT sync_status, COUNT(*) as count 
+                FROM iptv_editor_users 
+                GROUP BY sync_status
+            `);
+            
+            stats.usersByStatus = {};
+            statusCounts.forEach(row => {
+                stats.usersByStatus[row.sync_status] = row.count;
             });
             
-            return settings;
+            // Get recent sync activity
+            const recentActivity = await db.query(`
+                SELECT sync_type, status, COUNT(*) as count
+                FROM iptv_sync_logs 
+                WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                GROUP BY sync_type, status
+            `);
+            
+            stats.recentActivity = recentActivity;
+            
+            // Get last sync time
+            stats.lastSyncTime = await this.getSetting('last_sync_time');
+            
+            return stats;
+            
         } catch (error) {
-            console.error('Error getting all settings:', error);
-            return {};
+            console.error('❌ Error getting service stats:', error);
+            throw error;
         }
     }
 }
 
+// Export singleton instance
 module.exports = new IPTVEditorService();
