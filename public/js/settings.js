@@ -2176,6 +2176,8 @@ async syncIPTVEditorPlaylists() {
     }
 },
 
+
+
 // Load IPTV Editor Settings
 async loadIPTVEditorSettings() {
     console.log('🎬 Loading IPTV Editor settings...');
@@ -2348,6 +2350,43 @@ async testIPTVEditorConnection() {
         if (testButton) {
             testButton.disabled = false;
             testButton.innerHTML = '<i class="fas fa-wifi"></i> Test Connection';
+        }
+    }
+},
+
+// Sync IPTV Editor categories
+async function syncIPTVEditorCategories() {
+    try {
+        const syncBtn = document.getElementById('syncCategoriesBtn');
+        if (syncBtn) {
+            const originalText = syncBtn.innerHTML;
+            syncBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+            syncBtn.disabled = true;
+        }
+        
+        const response = await fetch('/api/iptv-editor/sync-categories', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            Utils.showNotification(
+                `Categories synced: ${result.data.channels_synced} channels, ${result.data.vods_synced} VODs, ${result.data.series_synced} series`, 
+                'success'
+            );
+        } else {
+            Utils.showNotification('Failed to sync categories: ' + result.message, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error syncing categories:', error);
+        Utils.showNotification('Failed to sync categories', 'error');
+    } finally {
+        const syncBtn = document.getElementById('syncCategoriesBtn');
+        if (syncBtn) {
+            syncBtn.innerHTML = '<i class="fas fa-sync"></i> Sync Categories';
+            syncBtn.disabled = false;
         }
     }
 }
@@ -2703,6 +2742,8 @@ window.testIPTVEditorConnection = function() {
 window.syncIPTVEditorPlaylists = function() {
     return Settings.syncIPTVEditorPlaylists();
 };
+
+window.syncIPTVEditorCategories = syncIPTVEditorCategories;
 
 // Automatically load IPTV Editor settings on page load if we're on the settings tab
 document.addEventListener('DOMContentLoaded', function() {

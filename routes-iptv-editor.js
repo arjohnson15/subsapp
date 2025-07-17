@@ -764,6 +764,380 @@ router.post('/bulk-create-users', [
     }
 });
 
+// Check if user exists in IPTV Editor by username
+router.post('/check-user', async (req, res) => {
+    try {
+        const { username } = req.body;
+        
+        if (!username) {
+            return res.status(400).json({
+                success: false,
+                message: 'Username is required'
+            });
+        }
+        
+        console.log('🔍 Checking IPTV Editor for username:', username);
+        
+        // Get settings for API call
+        const settings = await iptvEditorService.getAllSettings();
+        
+        if (!settings.bearer_token || !settings.default_playlist_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'IPTV Editor is not properly configured'
+            });
+        }
+        
+        // Get all users from IPTV Editor API  
+        const apiUsers = await iptvEditorService.getAllUsers();
+        
+        // Look for user by username
+        const user = apiUsers.find(item => 
+            item.username && item.username.toLowerCase() === username.toLowerCase()
+        );
+        
+        if (user) {
+            console.log('✅ Found user in IPTV Editor:', user.username);
+            return res.json({
+                success: true,
+                exists: true,
+                user: user,
+                message: 'User found in IPTV Editor'
+            });
+        } else {
+            console.log('❌ User not found in IPTV Editor');
+            return res.json({
+                success: true,
+                exists: false,
+                user: null,
+                message: 'User not found in IPTV Editor'
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Error checking IPTV Editor user:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to check IPTV Editor user: ' + error.message
+        });
+    }
+});
+
+// Link existing IPTV Editor user to local user  
+router.post('/link-user', [
+    body('user_id').isInt({ min: 1 }).withMessage('User ID must be a positive integer'),
+    body('iptv_editor_user_id').notEmpty().withMessage('IPTV Editor user ID is required'),
+    body('iptv_editor_username').isString().notEmpty().withMessage('IPTV Editor username is required'),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        const { user_id, iptv_editor_user_id, iptv_editor_username } = req.body;
+        
+        console.log('🔗 Linking IPTV Editor user to local user:', { user_id, iptv_editor_username });
+        
+        // Update user record with IPTV Editor information
+        await db.execute(`
+            UPDATE users 
+            SET iptv_editor_user_id = ?, 
+                iptv_editor_username = ?,
+                iptv_editor_enabled = true,
+                updated_at = NOW()
+            WHERE id = ?
+        `, [iptv_editor_user_id, iptv_editor_username, user_id]);
+        
+        res.json({
+            success: true,
+            message: 'IPTV Editor user linked successfully'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error linking IPTV Editor user:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to link IPTV Editor user: ' + error.message
+        });
+    }
+});
+
+// Create new IPTV Editor user
+// Create new IPTV Editor user (corrected structure)
+router.post('/create-user', [
+    body('user_id').isInt({ min: 1 }).withMessage('User ID must be a positive integer'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('iptv_username').isString().notEmpty().withMessage('IPTV username is required'),
+    body('iptv_password').isString().notEmpty().withMessage('IPTV password is required'),
+    body('max_connections').optional().isInt({ min: 1, max: 10 }).withMessage('Max connections must be between 1 and 10'),
+    body('expiry_days').optional().isInt({ min: 1 }).withMessage('Expiry days must be positive'),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        const { user_id, email, iptv_username, iptv_password, max_connections = 2, expiry_days = 30 } = req.body;
+        
+        console.log('👤 Creating new IPTV Editor user for:', { email, iptv_username });
+        
+        // Get settings
+        const settings = await iptvEditorService.getAllSettings();
+        
+        if (!settings.default_playlist_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Default playlist not configured'
+            });
+        }
+        
+        // Get all active channel categories
+        const categoriesResult = await db.execute(`
+            SELECT category_id FROM iptv_editor_categories 
+            WHERE type = 'channels' AND is_active = true
+        `);
+        
+        const channelCategories = categoriesResult[0].map(cat => cat.category_id);
+        
+        if (channelCategories.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No channel categories found. Please sync categories first.'
+            });
+        }
+        
+        // Get VOD categories (default to [73] if none found)
+        const vodCategoriesResult = await db.execute(`
+            SELECT category_id FROM iptv_editor_categories 
+            WHERE type = 'vods' AND is_active = true
+        `);
+        
+        const vodCategories = vodCategoriesResult[0].length > 0 ? 
+            vodCategoriesResult[0].map(cat => cat.category_id) : [73];
+        
+        // Calculate expiry date
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + expiry_days);
+        
+        // Create the proper request structure
+        const requestData = {
+            playlist: settings.default_playlist_id,
+            items: {
+                name: email, // Use email as name
+                note: `Created for user ID ${user_id}`,
+                username: iptv_username, // IPTV panel username
+                password: iptv_password, // IPTV panel password
+                message: null,
+                channels_categories: channelCategories,
+                vods_categories: vodCategories,
+                series_categories: [],
+                patterns: [{
+                    url: "https://pinkpony.lol",
+                    param1: iptv_username, // Same IPTV username
+                    param2: iptv_password, // Same IPTV password
+                    type: "xtream"
+                }],
+                language: "en",
+                expiry: expiryDate.toISOString()
+            }
+        };
+        
+        console.log('📤 Creating IPTV Editor user with structure:', {
+            playlist: requestData.playlist,
+            name: requestData.items.name,
+            username: requestData.items.username,
+            channelCount: channelCategories.length,
+            expiry: requestData.items.expiry
+        });
+        
+        // Make API call to IPTV Editor
+        const response = await fetch('https://editor.iptveditor.com/api/reseller/new-customer', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${settings.bearer_token}`,
+                'Origin': 'https://cloud.iptveditor.com'
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.customer) {
+            // Update local user record
+            await db.execute(`
+                UPDATE users 
+                SET iptv_editor_user_id = ?, 
+                    iptv_editor_username = ?,
+                    iptv_editor_enabled = true,
+                    updated_at = NOW()
+                WHERE id = ?
+            `, [result.customer.id, iptv_username, user_id]);
+            
+            console.log('✅ IPTV Editor user created successfully:', result.customer.id);
+            
+            res.json({
+                success: true,
+                message: 'IPTV Editor user created successfully',
+                data: {
+                    iptv_editor_user_id: result.customer.id,
+                    username: iptv_username,
+                    m3u_url: result.customer.m3u ? `https://editor.iptveditor.com/m3u/${result.customer.m3u}` : null,
+                    epg_url: result.customer.epg ? `https://editor.iptveditor.com/epg/${result.customer.epg}` : null,
+                    max_connections: result.customer.max_connections,
+                    expiry: result.customer.expiry
+                }
+            });
+        } else {
+            throw new Error(result.message || 'Failed to create user in IPTV Editor');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error creating IPTV Editor user:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to create IPTV Editor user: ' + error.message
+        });
+    }
+});
+
+// Sync categories from IPTV Editor
+// Sync categories from IPTV Editor
+router.post('/sync-categories', async (req, res) => {
+    try {
+        console.log('🔄 Syncing IPTV Editor categories...');
+        
+        // Get settings
+        const settings = await iptvEditorService.getAllSettings();
+        
+        if (!settings.bearer_token || !settings.default_playlist_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'IPTV Editor is not properly configured'
+            });
+        }
+        
+        // Make API call to get categories
+        const response = await fetch('https://editor.iptveditor.com/api/reseller/get-all-categories', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${settings.bearer_token}`,
+                'Origin': 'https://cloud.iptveditor.com'
+            },
+            body: JSON.stringify({
+                playlist: settings.default_playlist_id
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+        }
+        
+        const categories = await response.json();
+        
+        console.log('📺 Received categories:', {
+            channels: categories.channels?.length || 0,
+            vods: categories.vods?.length || 0,
+            series: categories.series?.length || 0
+        });
+        
+        // Sync channel categories
+        if (categories.channels && categories.channels.length > 0) {
+            // Clear existing channel categories
+            await db.execute('DELETE FROM iptv_editor_categories WHERE type = ?', ['channels']);
+            
+            // Insert new channel categories
+            for (const category of categories.channels) {
+                await db.execute(`
+                    INSERT INTO iptv_editor_categories (category_id, name, type, is_active)
+                    VALUES (?, ?, 'channels', true)
+                `, [category.value, category.text]);
+            }
+            
+            console.log(`✅ Synced ${categories.channels.length} channel categories`);
+        }
+        
+        // Sync VOD categories
+        if (categories.vods && categories.vods.length > 0) {
+            // Clear existing VOD categories
+            await db.execute('DELETE FROM iptv_editor_categories WHERE type = ?', ['vods']);
+            
+            // Insert new VOD categories
+            for (const category of categories.vods) {
+                await db.execute(`
+                    INSERT INTO iptv_editor_categories (category_id, name, type, is_active)
+                    VALUES (?, ?, 'vods', true)
+                `, [category.value, category.text]);
+            }
+            
+            console.log(`✅ Synced ${categories.vods.length} VOD categories`);
+        }
+        
+        // Sync series categories
+        if (categories.series && categories.series.length > 0) {
+            // Clear existing series categories
+            await db.execute('DELETE FROM iptv_editor_categories WHERE type = ?', ['series']);
+            
+            // Insert new series categories
+            for (const category of categories.series) {
+                await db.execute(`
+                    INSERT INTO iptv_editor_categories (category_id, name, type, is_active)
+                    VALUES (?, ?, 'series', true)
+                `, [category.value, category.text]);
+            }
+            
+            console.log(`✅ Synced ${categories.series.length} series categories`);
+        }
+        
+        res.json({ 
+            success: true, 
+            message: 'Categories synced successfully',
+            data: {
+                channels_synced: categories.channels?.length || 0,
+                vods_synced: categories.vods?.length || 0,
+                series_synced: categories.series?.length || 0
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Error syncing categories:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to sync categories',
+            error: error.message
+        });
+    }
+});
+
+// Get stored categories
+router.get('/categories', async (req, res) => {
+    try {
+        console.log('📺 Loading stored IPTV Editor categories...');
+        
+        const categories = await db.execute(`
+            SELECT category_id, name, type, is_active 
+            FROM iptv_editor_categories 
+            WHERE is_active = true 
+            ORDER BY type, name
+        `);
+        
+        const result = {
+            channels: categories[0].filter(cat => cat.type === 'channels'),
+            vods: categories[0].filter(cat => cat.type === 'vods'),
+            series: categories[0].filter(cat => cat.type === 'series')
+        };
+        
+        res.json({ 
+            success: true, 
+            data: result,
+            message: 'Categories loaded successfully'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error getting stored categories:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to get stored categories',
+            error: error.message
+        });
+    }
+});
+
 // Global error handler for this router
 router.use((error, req, res, next) => {
     console.error('❌ IPTV Editor API Error:', error);

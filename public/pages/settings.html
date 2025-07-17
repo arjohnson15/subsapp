@@ -293,13 +293,16 @@
         <span id="iptvConnectionStatus" class="status-indicator"></span>
     </div>
     
-    <!-- Sync Playlists Button -->
-    <div class="form-group">
-        <button type="button" onclick="syncIPTVEditorPlaylists()" class="btn btn-secondary">
-            <i class="fas fa-sync"></i> Sync Playlists
-        </button>
-        <small style="color: #4fc3f7;">Load available playlists from IPTV Editor</small>
-    </div>
+<!-- Sync Playlists Button -->
+   <div class="form-group">
+       <button type="button" onclick="syncIPTVEditorPlaylists()" class="btn btn-secondary" style="margin-right: 10px;">
+           <i class="fas fa-sync"></i> Sync Playlists
+       </button>
+       <button type="button" id="syncCategoriesBtn" onclick="syncIPTVEditorCategories()" class="btn btn-secondary">
+           <i class="fas fa-sync"></i> Sync Categories
+       </button>
+       <small style="color: #4fc3f7; display: block; margin-top: 5px;">Load available playlists and categories from IPTV Editor</small>
+   </div>
     
     <!-- Default Playlist Selection -->
     <div class="form-group">
