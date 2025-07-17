@@ -2811,6 +2811,9 @@ async function checkIPTVEditorAccess() {
 }
 
 function showIPTVEditorSyncResults(user, username) {
+    // FIXED: Store the user data globally so sync can access it
+    currentIPTVEditorData = user;
+    
     const resultsDiv = document.getElementById('editorAccessCheckResults');
     
     // Update the IPTV username field if it's empty
@@ -2827,30 +2830,34 @@ function showIPTVEditorSyncResults(user, username) {
                 <i class="fas fa-check-circle"></i> IPTV Editor Account Found
             </div>
             
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                 <div>
-                    <div style="color: #4fc3f7; font-size: 0.9rem;">Username:</div>
-                    <div style="color: #fff; font-weight: bold;">${user.username}</div>
+                    <label style="color: #4fc3f7; font-size: 0.9rem;">Username:</label><br>
+                    <strong style="color: #fff;">${user.username}</strong>
                 </div>
                 <div>
-                    <div style="color: #4fc3f7; font-size: 0.9rem;">Max Connections:</div>
-                    <div style="color: #fff; font-weight: bold;">${user.max_connections}</div>
+                    <label style="color: #4fc3f7; font-size: 0.9rem;">Max Connections:</label><br>
+                    <strong style="color: #fff;">${user.max_connections}</strong>
                 </div>
                 <div>
-                    <div style="color: #4fc3f7; font-size: 0.9rem;">Expiry:</div>
-                    <div style="color: #fff; font-weight: bold;">${expiryDate}</div>
-                </div>
-                <div>
-                    <div style="color: #4fc3f7; font-size: 0.9rem;">Last updated:</div>
-                    <div style="color: #fff; font-weight: bold;">${user.last_updated}</div>
+                    <label style="color: #4fc3f7; font-size: 0.9rem;">Expiry:</label><br>
+                    <strong style="color: #fff;">${expiryDate}</strong>
                 </div>
             </div>
             
-            <button type="button" 
-                    onclick="syncIPTVEditorUser('${username}')"
-                    style="background: linear-gradient(45deg, #2196f3, #03a9f4); color: #fff; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold;">
-                <i class="fas fa-sync"></i> Sync Data
-            </button>
+            <div style="margin-bottom: 10px;">
+                <label style="color: #4fc3f7; font-size: 0.9rem;">Last updated:</label><br>
+                <strong style="color: #fff;">undefined</strong>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button type="button" 
+                        onclick="syncIPTVEditorUser('${username}')"
+                        style="background: linear-gradient(45deg, #4fc3f7, #29b6f6); color: #000; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold;">
+                    <i class="fas fa-sync"></i> Sync Data
+                </button>
+                <span style="color: #ccc; font-size: 0.85rem; line-height: 2;">User data matches - click to sync</span>
+            </div>
         </div>
     `;
 }
