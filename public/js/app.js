@@ -334,7 +334,7 @@ function toggleIptvManagementByTag(isChecked) {
                     
                     // Initialize IPTV interface with existing user
                     if (typeof window.IPTV.showIPTVSection === 'function') {
-                        window.IPTV.showIPTVSection(window.AppState.currentUserData);
+                        window.IPTV.showIPTVSection(window.AppState.editingUserId);
                     }
                     
                     // Load user IPTV status first (this will call updateStatusInterface internally)

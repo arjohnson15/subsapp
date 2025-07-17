@@ -129,49 +129,72 @@ cron.schedule('0 * * * *', async () => {
   }
 });
 
-// IPTV Editor Daily Playlist Sync (runs at 3 AM daily) - PLAYLISTS ONLY
+// IPTV Editor Daily Sync (runs at 3 AM daily) - PLAYLISTS AND CATEGORIES
 cron.schedule('0 3 * * *', async () => {
-  try {
-    console.log('🎬 Starting IPTV Editor daily playlist sync...');
-    
-    // Initialize service (no need to check sync_enabled setting anymore)
-    const initialized = await iptvEditorService.initialize();
-    if (!initialized) {
-      console.log('❌ IPTV Editor service not properly configured - skipping sync');
-      return;
-    }
-    
-    // Check if bearer token is configured
-    const bearerToken = await iptvEditorService.getSetting('bearer_token');
-    if (!bearerToken) {
-      console.log('⚠️ IPTV Editor bearer token not configured - skipping playlist sync');
-      return;
-    }
-    
-    // Sync playlists ONLY (no user syncing)
-    console.log('📺 Syncing IPTV Editor playlists...');
-    const playlistResult = await iptvEditorService.updatePlaylists();
-    
-    if (playlistResult.success) {
-      console.log(`✅ Playlist sync completed: ${playlistResult.counts.inserted} new, ${playlistResult.counts.updated} updated, ${playlistResult.counts.deactivated} deactivated`);
-    } else {
-      console.log('⚠️ Playlist sync completed with issues');
-    }
-    
-    console.log('✅ IPTV Editor daily playlist sync completed successfully');
-    
-  } catch (error) {
-    console.error('❌ IPTV Editor daily playlist sync failed:', error);
-    
-    // Log specific error details for debugging
-    if (error.message) {
-      console.error('Error message:', error.message);
-    }
-    if (error.response) {
-      console.error('API response status:', error.response.status);
-    }
-  }
+ try {
+   console.log('🎬 Starting IPTV Editor daily sync (playlists and categories)...');
+   
+   // Initialize service (no need to check sync_enabled setting anymore)
+   const initialized = await iptvEditorService.initialize();
+   if (!initialized) {
+     console.log('❌ IPTV Editor service not properly configured - skipping sync');
+     return;
+   }
+   
+   // Check if bearer token is configured
+   const bearerToken = await iptvEditorService.getSetting('bearer_token');
+   if (!bearerToken) {
+     console.log('⚠️ IPTV Editor bearer token not configured - skipping sync');
+     return;
+   }
+   
+   // Sync playlists
+   console.log('📺 Syncing IPTV Editor playlists...');
+   const playlistResult = await iptvEditorService.updatePlaylists();
+   
+   if (playlistResult.success) {
+     console.log(`✅ Playlist sync completed: ${playlistResult.counts.inserted} new, ${playlistResult.counts.updated} updated, ${playlistResult.counts.deactivated} deactivated`);
+   } else {
+     console.log('⚠️ Playlist sync completed with issues');
+   }
+   
+   // Sync categories (needed for user creation)
+   console.log('📂 Syncing IPTV Editor categories...');
+   try {
+     const categoriesResponse = await fetch('http://localhost:' + PORT + '/api/iptv-editor/sync-categories', {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/json'
+       }
+     });
+     
+     const categoriesResult = await categoriesResponse.json();
+     
+     if (categoriesResult.success) {
+       console.log(`✅ Categories sync completed: ${categoriesResult.data.channels_synced} channels, ${categoriesResult.data.vods_synced} VODs, ${categoriesResult.data.series_synced} series`);
+     } else {
+       console.log('⚠️ Categories sync failed:', categoriesResult.message);
+     }
+   } catch (categoryError) {
+     console.error('❌ Categories sync error:', categoryError.message);
+   }
+   
+   console.log('✅ IPTV Editor daily sync (playlists and categories) completed successfully');
+   
+ } catch (error) {
+   console.error('❌ IPTV Editor daily sync failed:', error);
+   
+   // Log specific error details for debugging
+   if (error.message) {
+     console.error('Error message:', error.message);
+   }
+   if (error.response) {
+     console.error('API response status:', error.response.status);
+   }
+ }
 });
+
+
 
 // Initialize IPTV service on startup
 iptvService.initialize().catch(console.error);
