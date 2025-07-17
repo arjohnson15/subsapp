@@ -3120,7 +3120,7 @@ function hideIPTVEditorStatus() {
 
 // Enhanced sync function for IPTV Editor user
 async function syncIPTVEditorUser() {
-    if (!currentEditingUserId || !currentIPTVEditorData) {
+    if (!window.currentEditingUserId || !currentIPTVEditorData) {
         Utils.showNotification('No IPTV Editor user to sync', 'error');
         return;
     }
@@ -3136,7 +3136,7 @@ async function syncIPTVEditorUser() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                user_id: currentEditingUserId
+                user_id: window.currentEditingUserId
             })
         });
         
@@ -3145,7 +3145,7 @@ async function syncIPTVEditorUser() {
         if (data.success) {
             Utils.showNotification('IPTV Editor user synced successfully', 'success');
             // Reload the status to show updated info
-            await loadIPTVEditorStatus(currentEditingUserId);
+            await loadIPTVEditorStatus(window.currentEditingUserId);
         } else {
             Utils.showNotification('Sync failed: ' + data.message, 'error');
         }
