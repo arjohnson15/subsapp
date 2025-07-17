@@ -2743,7 +2743,9 @@ window.syncIPTVEditorPlaylists = function() {
     return Settings.syncIPTVEditorPlaylists();
 };
 
-window.syncIPTVEditorCategories = syncIPTVEditorCategories;
+window.syncIPTVEditorCategories = function() {
+    return Settings.syncIPTVEditorCategories();
+};
 
 // Automatically load IPTV Editor settings on page load if we're on the settings tab
 document.addEventListener('DOMContentLoaded', function() {
