@@ -2764,17 +2764,27 @@ async function checkIPTVEditorAccess() {
     checkBtn.disabled = true;
     
     try {
-        const response = await fetch(`/api/iptv-editor/user/${username}/check`);
+        // FIXED: Use the existing /users endpoint
+        const response = await fetch(`/api/iptv-editor/users`);
         const data = await response.json();
         
-        resultsDiv.style.display = 'block';
-        
-        if (data.success && data.exists && data.user) {
-            // User found - show sync results
-            showIPTVEditorSyncResults(data.user, username);
+        if (data.success && data.data && data.data.api_users) {
+            // Search for the username in the API users
+            const matchingUser = data.data.api_users.find(user => 
+                user.username && user.username.toLowerCase() === username.toLowerCase()
+            );
+            
+            resultsDiv.style.display = 'block';
+            
+            if (matchingUser) {
+                // User found - show sync results
+                showIPTVEditorSyncResults(matchingUser, username);
+            } else {
+                // User not found - show create option
+                showIPTVEditorCreateOption(username);
+            }
         } else {
-            // User not found - show create option
-            showIPTVEditorCreateOption(username);
+            throw new Error('Failed to load IPTV Editor users');
         }
         
     } catch (error) {
@@ -2807,7 +2817,6 @@ function showIPTVEditorSyncResults(user, username) {
     }
     
     const expiryDate = user.expiry ? new Date(user.expiry).toLocaleDateString() : 'Unknown';
-    const lastUpdate = user.updatedAt ? new Date(user.updatedAt * 1000).toLocaleDateString() : 'Unknown';
     
     resultsDiv.innerHTML = `
         <div style="background: rgba(76, 175, 80, 0.1); border: 1px solid #4caf50; border-radius: 4px; padding: 15px;">
@@ -2815,33 +2824,30 @@ function showIPTVEditorSyncResults(user, username) {
                 <i class="fas fa-check-circle"></i> IPTV Editor Account Found
             </div>
             
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 15px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
                 <div>
-                    <span style="color: #4caf50; font-size: 0.9rem;">Username:</span><br>
-                    <span style="color: #fff; font-weight: bold;">${user.username}</span>
+                    <div style="color: #4fc3f7; font-size: 0.9rem;">Username:</div>
+                    <div style="color: #fff; font-weight: bold;">${user.username}</div>
                 </div>
                 <div>
-                    <span style="color: #4caf50; font-size: 0.9rem;">Max Connections:</span><br>
-                    <span style="color: #fff; font-weight: bold;">${user.max_connections || 1}</span>
+                    <div style="color: #4fc3f7; font-size: 0.9rem;">Max Connections:</div>
+                    <div style="color: #fff; font-weight: bold;">${user.max_connections}</div>
                 </div>
                 <div>
-                    <span style="color: #4caf50; font-size: 0.9rem;">Expiry:</span><br>
-                    <span style="color: #fff; font-weight: bold;">${expiryDate}</span>
+                    <div style="color: #4fc3f7; font-size: 0.9rem;">Expiry:</div>
+                    <div style="color: #fff; font-weight: bold;">${expiryDate}</div>
                 </div>
                 <div>
-                    <span style="color: #4caf50; font-size: 0.9rem;">Status:</span><br>
-                    <span style="color: #fff; font-weight: bold;">${user.enabled ? 'Active' : 'Inactive'}</span>
+                    <div style="color: #4fc3f7; font-size: 0.9rem;">Last updated:</div>
+                    <div style="color: #fff; font-weight: bold;">${user.last_updated}</div>
                 </div>
             </div>
             
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <button type="button" 
-                        onclick="syncIPTVEditorUser('${username}')"
-                        style="background: linear-gradient(45deg, #4caf50, #8bc34a); color: #fff; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold;">
-                    <i class="fas fa-sync"></i> Sync Data
-                </button>
-                <span style="color: #ccc; font-size: 0.85rem;">Last updated: ${lastUpdate}</span>
-            </div>
+            <button type="button" 
+                    onclick="syncIPTVEditorUser('${username}')"
+                    style="background: linear-gradient(45deg, #2196f3, #03a9f4); color: #fff; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold;">
+                <i class="fas fa-sync"></i> Sync Data
+            </button>
         </div>
     `;
 }
@@ -2876,16 +2882,24 @@ async function syncIPTVEditorUser(username) {
     try {
         Utils.showNotification('Syncing IPTV Editor account...', 'info');
         
+        // Get the current user ID from the form
+        const userId = getUserId(); // You'll need this helper function
+        
         const response = await fetch(`/api/iptv-editor/user/${username}/sync`, {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ user_id: userId })
         });
         
         const data = await response.json();
         
         if (data.success) {
-            Utils.showNotification('IPTV Editor account synced successfully', 'success');
-            // Refresh the check to show updated data
-            setTimeout(() => checkIPTVEditorAccess(), 1000);
+            Utils.showNotification('IPTV Editor account synced and saved successfully', 'success');
+            
+            // Update the display with new data (remove status)
+            showIPTVEditorSyncResults(data.user, username);
         } else {
             Utils.showNotification(`Sync failed: ${data.message}`, 'error');
         }

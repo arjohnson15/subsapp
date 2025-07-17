@@ -464,20 +464,37 @@ if (method === 'POST') {
     }
     
     // 3. Get All Users
-    async getAllUsers() {
-        try {
-            console.log('👥 Fetching all IPTV Editor users...');
-            
-            const response = await this.makeRequest('/api/reseller/get-data', {});
-            
-            console.log(`✅ Fetched ${response?.users?.length || 0} users from IPTV Editor`);
-            return response;
-            
-        } catch (error) {
-            console.error('❌ Failed to get all users:', error);
-            throw error;
+// FIXED VERSION:
+async getAllUsers() {
+    try {
+        console.log('👥 Fetching all IPTV Editor users...');
+        
+        // Get the default playlist ID from settings
+        const playlistId = await this.getSetting('default_playlist_id');
+        if (!playlistId) {
+            throw new Error('Default playlist ID not configured in IPTV Editor settings');
         }
+        
+        console.log('📺 Using playlist ID:', playlistId);
+        
+        // FIXED: Include playlist ID in request body
+        const requestData = {
+            playlist: playlistId
+        };
+        
+        const response = await this.makeRequest('/api/reseller/get-data', requestData);
+        
+        // The response contains an 'items' array, not 'users'
+        const users = response?.items || [];
+        console.log(`✅ Fetched ${users.length} users from IPTV Editor`);
+        
+        return users;  // Return the users array directly
+        
+    } catch (error) {
+        console.error('❌ Failed to get all users:', error);
+        throw error;
     }
+}
     
     // 4. Sync User
     async syncUser(userId) {
