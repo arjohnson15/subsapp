@@ -72,6 +72,16 @@ app.use('/api/email-schedules', emailScheduleRoutes);
 app.use('/api/iptv', iptvRoutes);
 app.use('/api/iptv-editor', iptvEditorRoutes); // NEW - IPTV Editor routes
 
+// Initialize IPTV Editor service
+async function initializeIPTVEditorService() {
+    try {
+        await iptvEditorService.initialize();
+        console.log('✅ IPTV Editor service initialized');
+    } catch (error) {
+        console.warn('⚠️ IPTV Editor service initialization failed:', error.message);
+    }
+}
+
 // Serve main application
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

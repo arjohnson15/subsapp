@@ -2096,58 +2096,6 @@ async saveDefaultGroups() {
 // IPTV EDITOR SETTINGS MANAGEMENT - SIMPLIFIED AND FIXED
 // =============================================================================
 
-// Test IPTV Editor Connection
-async testIPTVEditorConnection() {
-    const statusElement = document.getElementById('iptvConnectionStatus');
-    const testButton = document.querySelector('[onclick="testIPTVEditorConnection()"]');
-    
-    try {
-        // Show testing status
-        statusElement.textContent = 'Testing...';
-        statusElement.className = 'status-indicator testing';
-        testButton.disabled = true;
-        
-        // Get bearer token from form
-        const bearerToken = document.getElementById('iptvBearerToken').value.trim();
-        
-        if (!bearerToken) {
-            throw new Error('Bearer token is required');
-        }
-        
-        // Save token first, then test
-        await this.saveIPTVEditorToken(bearerToken);
-        
-        // Test connection
-        const response = await fetch('/api/iptv-editor/test-connection', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            statusElement.textContent = 'Connected';
-            statusElement.className = 'status-indicator connected';
-            Utils.showNotification('IPTV Editor connection successful', 'success');
-            return true;
-        } else {
-            throw new Error(result.message || 'Connection failed');
-        }
-        
-    } catch (error) {
-        console.error('❌ IPTV Editor connection test failed:', error);
-        statusElement.textContent = 'Connection Failed';
-        statusElement.className = 'status-indicator disconnected';
-        Utils.showNotification(`Connection failed: ${error.message}`, 'error');
-        return false;
-        
-    } finally {
-        testButton.disabled = false;
-    }
-},
-
 // Save IPTV Editor Bearer Token
 async saveIPTVEditorToken(token) {
     try {
@@ -2184,8 +2132,10 @@ async syncIPTVEditorPlaylists() {
     const playlistSelect = document.getElementById('iptvPlaylistSelect');
     
     try {
-        syncButton.disabled = true;
-        syncButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+        if (syncButton) {
+            syncButton.disabled = true;
+            syncButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+        }
         
         // First test connection
         const connectionOk = await Settings.testIPTVEditorConnection();
@@ -2193,36 +2143,25 @@ async syncIPTVEditorPlaylists() {
             throw new Error('Connection test failed - cannot sync playlists');
         }
         
-        // Sync playlists
-const response = await fetch('/api/iptv-editor/sync-playlists', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json'
-    }
-});
+        // Sync playlists (this will store them in database)
+        const response = await fetch('/api/iptv-editor/sync-playlists', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
         
         const result = await response.json();
-        console.log('🔍 Frontend received result:', result);
-console.log('🔍 result.success:', result.success);
-console.log('🔍 result.data:', result.data);
-console.log('🔍 result.data.playlist:', result.data ? result.data.playlist : 'N/A');
-
-if (result.success && result.data && result.data.playlist) {
-            // Clear existing options
-            playlistSelect.innerHTML = '<option value="">Select a playlist...</option>';
+        console.log('🔍 Sync result:', result);
+        
+        if (result.success) {
+            Utils.showNotification(`Synced ${result.count} playlists successfully`, 'success');
             
-            // Add playlists to dropdown
-            result.data.playlist.forEach(playlist => {
-                const option = document.createElement('option');
-                option.value = playlist.id;
-                option.textContent = playlist.name;
-                playlistSelect.appendChild(option);
-            });
-            
-            Utils.showNotification(`Loaded ${result.data.playlist.length} playlists successfully`, 'success');
+            // Reload the dropdown with newly stored playlists
+            await Settings.loadStoredPlaylists();
             
         } else {
-            throw new Error(result.message || 'No playlists found');
+            throw new Error(result.message || 'Sync failed');
         }
         
     } catch (error) {
@@ -2230,74 +2169,126 @@ if (result.success && result.data && result.data.playlist) {
         Utils.showNotification(`Failed to sync playlists: ${error.message}`, 'error');
         
     } finally {
-        syncButton.disabled = false;
-        syncButton.innerHTML = '<i class="fas fa-sync"></i> Sync Playlists';
+        if (syncButton) {
+            syncButton.disabled = false;
+            syncButton.innerHTML = '<i class="fas fa-sync"></i> Sync Playlists';
+        }
     }
 },
 
 // Load IPTV Editor Settings
 async loadIPTVEditorSettings() {
+    console.log('🎬 Loading IPTV Editor settings...');
     try {
         const response = await fetch('/api/iptv-editor/settings');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const result = await response.json();
+        console.log('📥 IPTV Editor settings response:', result);
         
         if (result.success && result.settings) {
             const settings = result.settings;
             
-            // Populate form fields
-            if (settings.bearer_token) {
-                document.getElementById('iptvBearerToken').value = settings.bearer_token;
+            // Safely populate form fields only if elements exist
+            const bearerTokenField = document.getElementById('iptvBearerToken');
+            if (bearerTokenField && settings.bearer_token) {
+                bearerTokenField.value = settings.bearer_token;
+                console.log('✅ Set bearer token');
             }
             
-            if (settings.default_playlist_id) {
-                document.getElementById('iptvPlaylistSelect').value = settings.default_playlist_id;
+            // Load stored playlists into dropdown first
+            await this.loadStoredPlaylists();
+            
+            // Set default playlist selection AFTER loading playlists
+            const playlistSelect = document.getElementById('iptvPlaylistSelect');
+            if (playlistSelect && settings.default_playlist_id) {
+                playlistSelect.value = settings.default_playlist_id;
+                console.log('✅ Set default playlist');
             }
             
-            if (settings.sync_enabled !== undefined) {
-                document.getElementById('iptvEditorSyncEnabled').checked = settings.sync_enabled === true || settings.sync_enabled === 'true';
-            }
+            // REMOVED: sync_enabled checkbox handling
             
             console.log('✅ IPTV Editor settings loaded successfully');
             return true;
+        } else {
+            console.log('⚠️ No IPTV Editor settings found or unsuccessful response');
+            return false;
         }
-        
-        return false;
         
     } catch (error) {
         console.error('❌ Failed to load IPTV Editor settings:', error);
+        
+        if (error.message.includes('404')) {
+            console.warn('🔧 IPTV Editor API endpoints not found - need to set up backend routes');
+            Utils.showNotification('IPTV Editor backend not configured. Please set up API routes.', 'warning');
+        } else {
+            Utils.showNotification(`Failed to load IPTV Editor settings: ${error.message}`, 'error');
+        }
+        
         return false;
+    }
+},
+
+// Load stored playlists into dropdown - NEW FUNCTION
+async loadStoredPlaylists() {
+    try {
+        const response = await fetch('/api/iptv-editor/playlists');
+        const result = await response.json();
+        
+        const playlistSelect = document.getElementById('iptvPlaylistSelect');
+        if (!playlistSelect) {
+            console.warn('Playlist select element not found');
+            return;
+        }
+        
+        // Clear existing options
+        playlistSelect.innerHTML = '<option value="">Select a playlist...</option>';
+        
+        if (result.success && result.data && result.data.length > 0) {
+            result.data.forEach(playlist => {
+                const option = document.createElement('option');
+                option.value = playlist.playlist_id;
+                option.textContent = `${playlist.name} (${playlist.customer_count} users)`;
+                playlistSelect.appendChild(option);
+            });
+            
+            console.log(`✅ Loaded ${result.data.length} stored playlists into dropdown`);
+        } else {
+            console.log('ℹ️ No stored playlists found - use sync button first');
+            
+            // Add informational option
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No playlists available - click Sync first';
+            option.disabled = true;
+            playlistSelect.appendChild(option);
+        }
+        
+    } catch (error) {
+        console.error('❌ Failed to load stored playlists:', error);
     }
 },
 
 // Save IPTV Editor Settings (called by main save button)
 async saveIPTVEditorSettings() {
     try {
-        const bearerToken = document.getElementById('iptvBearerToken')?.value?.trim();
-        const defaultPlaylist = document.getElementById('iptvPlaylistSelect')?.value;
-        const syncEnabled = document.getElementById('iptvEditorSyncEnabled')?.checked;
+        const bearerToken = document.getElementById('iptvBearerToken').value;
+        const playlistSelect = document.getElementById('iptvPlaylistSelect');
+        const defaultPlaylistId = playlistSelect ? playlistSelect.value : '';
+        const defaultPlaylistName = playlistSelect && playlistSelect.selectedOptions[0] ? 
+                                   playlistSelect.selectedOptions[0].textContent : '';
         
-        if (!bearerToken && !defaultPlaylist && !syncEnabled) {
-            // No IPTV Editor settings to save
-            return true;
-        }
+        // REMOVED: syncEnabled checkbox handling
         
-        const settings = {};
-        
-        if (bearerToken) {
-            settings.bearer_token = bearerToken;
-        }
-        
-        if (defaultPlaylist) {
-            settings.default_playlist_id = defaultPlaylist;
-            
-            // Get playlist name from selected option
-            const selectedOption = document.querySelector(`#iptvPlaylistSelect option[value="${defaultPlaylist}"]`);
-            if (selectedOption) {
-                settings.default_playlist_name = selectedOption.textContent;
-            }
-        }
-        
-        settings.sync_enabled = syncEnabled;
+        const settings = {
+            bearer_token: bearerToken,
+            default_playlist_id: defaultPlaylistId,
+            default_playlist_name: defaultPlaylistName
+            // REMOVED: sync_enabled
+        };
         
         const response = await fetch('/api/iptv-editor/settings', {
             method: 'POST',
@@ -2307,22 +2298,57 @@ async saveIPTVEditorSettings() {
             body: JSON.stringify(settings)
         });
         
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
         const result = await response.json();
-        if (!result.success) {
-            throw new Error(result.message);
-        }
         
-        console.log('✅ IPTV Editor settings saved successfully');
-        return true;
+        if (result.success) {
+            Utils.showNotification('IPTV Editor settings saved successfully', 'success');
+        } else {
+            throw new Error(result.message || 'Save failed');
+        }
         
     } catch (error) {
         console.error('❌ Failed to save IPTV Editor settings:', error);
-        Utils.showNotification(`Failed to save IPTV Editor settings: ${error.message}`, 'error');
+        Utils.showNotification(`Failed to save settings: ${error.message}`, 'error');
+    }
+},
+
+// Test IPTV Editor Connection - EXISTING (keep as is)
+async testIPTVEditorConnection() {
+    const testButton = document.querySelector('[onclick="testIPTVEditorConnection()"]');
+    
+    try {
+        if (testButton) {
+            testButton.disabled = true;
+            testButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+        }
+        
+        const response = await fetch('/api/iptv-editor/test-connection', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            Utils.showNotification('IPTV Editor connection successful!', 'success');
+            return true;
+        } else {
+            Utils.showNotification(`Connection failed: ${result.message}`, 'error');
+            return false;
+        }
+        
+    } catch (error) {
+        console.error('❌ IPTV Editor connection test failed:', error);
+        Utils.showNotification(`Connection test failed: ${error.message}`, 'error');
         return false;
+        
+    } finally {
+        if (testButton) {
+            testButton.disabled = false;
+            testButton.innerHTML = '<i class="fas fa-wifi"></i> Test Connection';
+        }
     }
 }
 };
@@ -2677,3 +2703,12 @@ window.testIPTVEditorConnection = function() {
 window.syncIPTVEditorPlaylists = function() {
     return Settings.syncIPTVEditorPlaylists();
 };
+
+// Automatically load IPTV Editor settings on page load if we're on the settings tab
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.location.hash.includes('settings')) {
+        if (typeof Settings !== 'undefined' && Settings.loadIPTVEditorSettings) {
+            Settings.loadIPTVEditorSettings();
+        }
+    }
+});

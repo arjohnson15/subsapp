@@ -7,10 +7,35 @@ const db = require('./database-config');
 
 class IPTVEditorService {
     constructor() {
-        this.baseURL = 'https://editor.iptveditor.com';
+        this.baseURL = 'https://editor.iptveditor.com'; // FIXED: Consistent naming
         this.bearerToken = null;
         this.defaultPlaylistId = null;
         this.initialized = false;
+    }
+    
+    // FIXED: Use consistent baseURL property name
+    async initialize() {
+        try {
+            const settings = await this.getAllSettings();
+            
+            // Update service configuration
+            if (settings.bearer_token) {
+                this.bearerToken = settings.bearer_token;
+            }
+            // REMOVED: base_url setting since we have a fixed URL
+            if (settings.default_playlist_id) {
+                this.defaultPlaylistId = settings.default_playlist_id;
+            }
+            
+            console.log('✅ IPTV Editor service initialized with database settings');
+            this.initialized = true; // FIXED: Set this after successful initialization
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Failed to initialize IPTV Editor service:', error);
+            this.initialized = false;
+            throw error;
+        }
     }
     
     // =============================================================================

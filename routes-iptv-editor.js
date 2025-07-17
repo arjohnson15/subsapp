@@ -274,6 +274,29 @@ router.post('/sync-playlists', checkIPTVEditorEnabled, async (req, res) => {
     }
 });
 
+// GET /api/iptv-editor/playlists - Get stored playlists from database
+router.get('/playlists', async (req, res) => {
+    try {
+        console.log('📺 Loading stored playlists from database...');
+        
+        const playlists = await iptvEditorService.getStoredPlaylists();
+        
+        res.json({ 
+            success: true, 
+            data: playlists,
+            message: 'Stored playlists loaded successfully'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error getting stored playlists:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to get stored playlists',
+            error: error.message
+        });
+    }
+});
+
 // User Management Routes
 router.get('/users', checkIPTVEditorEnabled, async (req, res) => {
     try {
