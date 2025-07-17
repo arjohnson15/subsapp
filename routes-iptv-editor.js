@@ -23,21 +23,35 @@ const handleValidationErrors = (req, res, next) => {
 // Middleware to check if IPTV Editor is enabled
 async function checkIPTVEditorEnabled(req, res, next) {
     try {
-        const enabled = await iptvEditorService.getSetting('sync_enabled');
-        if (!enabled) {
+        // Check if bearer token is configured (more meaningful than sync_enabled)
+        const bearerToken = await iptvEditorService.getSetting('bearer_token');
+        
+        if (!bearerToken || bearerToken.trim() === '') {
             return res.status(503).json({ 
                 success: false, 
-                message: 'IPTV Editor integration is disabled' 
+                message: 'IPTV Editor integration not configured - Bearer token missing' 
             });
         }
+        
+        // Initialize service to ensure it's ready
+        const initialized = await iptvEditorService.initialize();
+        if (!initialized) {
+            return res.status(503).json({ 
+                success: false, 
+                message: 'IPTV Editor service initialization failed' 
+            });
+        }
+        
         next();
     } catch (error) {
+        console.error('❌ Error checking IPTV Editor status:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to check IPTV Editor status' 
+            message: 'Failed to check IPTV Editor status',
+            error: error.message
         });
     }
-};
+}
 
 // Settings Routes
 router.get('/settings', async (req, res) => {
@@ -185,36 +199,30 @@ router.get('/channels', checkIPTVEditorEnabled, async (req, res) => {
     }
 });
 
-router.get('/playlists', checkIPTVEditorEnabled, async (req, res) => {
+router.get('/playlists', async (req, res) => {
     try {
-        console.log('📺 Loading stored IPTV Editor playlists...');
+        console.log('📺 Loading stored playlists from database...');
         
-        const playlists = await db.query(`
-            SELECT playlist_id, name, customer_count, channel_count, 
-                   movie_count, series_count, expiry_date, is_active, last_synced
-            FROM iptv_editor_playlists 
-            WHERE is_active = TRUE
-            ORDER BY name
-        `);
+        const playlists = await iptvEditorService.getStoredPlaylists();
         
         res.json({ 
             success: true, 
             data: playlists,
-            message: 'Playlists loaded successfully'
+            message: 'Stored playlists loaded successfully'
         });
         
     } catch (error) {
         console.error('❌ Error getting stored playlists:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to get playlists',
+            message: 'Failed to get stored playlists',
             error: error.message
         });
     }
 });
 
 // Playlist sync
-router.post('/sync-playlists', checkIPTVEditorEnabled, async (req, res) => {
+router.post('/sync-playlists', async (req, res) => {
     try {
         console.log('🔄 Syncing IPTV Editor playlists...');
         
@@ -261,7 +269,7 @@ router.post('/sync-playlists', checkIPTVEditorEnabled, async (req, res) => {
             success: true, 
             message: 'Playlists synced successfully',
             count: result.playlist.length,
-            playlists: result.playlist
+            data: result  // This contains the playlist array
         });
         
     } catch (error) {
