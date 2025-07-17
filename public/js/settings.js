@@ -83,7 +83,7 @@ async init() {
         }
         
         // Initialize IPTV Editor if elements exist on page
-        if (document.getElementById('iptvBearerToken')) {
+        if (document.getElementById('iptvBearerToken') && document.getElementById('iptvPlaylistSelect')) {
             try {
                 console.log('🎬 Initializing IPTV Editor...');
                 await this.loadIPTVEditorSettings();
