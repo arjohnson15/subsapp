@@ -266,95 +266,99 @@ getHeaders() {
     };
 }
     
-    async makeRequest(endpoint, data = {}, method = 'POST') {
-        // Ensure service is initialized
-        if (!this.initialized) {
-            const init = await this.initialize();
-            if (!init) {
-                throw new Error('IPTV Editor service not properly configured');
-            }
+async makeRequest(endpoint, data = {}, method = 'POST') {
+    // Ensure service is initialized
+    if (!this.initialized) {
+        const init = await this.initialize();
+        if (!init) {
+            throw new Error('IPTV Editor service not properly configured');
+        }
+    }
+    
+    const startTime = Date.now();
+    const url = `${this.baseURL}${endpoint}`;
+    
+    try {
+        console.log(`📡 Making ${method} request to ${endpoint}...`);
+        
+        console.log('🔍 Full URL:', url);
+        console.log('🔍 Headers being sent:', this.getHeaders());
+        console.log('🔍 Bearer token length:', this.bearerToken ? this.bearerToken.length : 'NULL');
+        console.log('🔍 Bearer token starts with:', this.bearerToken ? this.bearerToken.substring(0, 20) : 'NULL');
+        console.log('🔍 Request body:', JSON.stringify(data));
+        
+        const config = {
+            method,
+            url,
+            headers: this.getHeaders(),
+            timeout: 30000,
+            validateStatus: (status) => status < 500 // Don't throw on 4xx errors
+        };
+        
+        if (method === 'POST') {
+            config.data = Object.keys(data).length > 0 ? data : '';
         }
         
-        const startTime = Date.now();
-        const url = `${this.baseURL}${endpoint}`;
+        const response = await axios(config);
+        const duration = Date.now() - startTime;
         
-        try {
-            console.log(`📡 Making ${method} request to ${endpoint}...`);
-			
-			console.log('🔍 Full URL:', url);
-console.log('🔍 Headers being sent:', this.getHeaders());
-console.log('🔍 Bearer token length:', this.bearerToken ? this.bearerToken.length : 'NULL');
-console.log('🔍 Bearer token starts with:', this.bearerToken ? this.bearerToken.substring(0, 20) : 'NULL');
-console.log('🔍 Request body:', JSON.stringify(data));
-
-            
-            const config = {
-                method,
-                url,
-                headers: this.getHeaders(),
-                timeout: 30000,
-                validateStatus: (status) => status < 500 // Don't throw on 4xx errors
-            };
-            
-if (method === 'POST') {
-    config.data = Object.keys(data).length > 0 ? data : '';
-}
-            
-            const response = await axios(config);
-            const duration = Date.now() - startTime;
-            
-            // Check if response indicates success
-            if (response.status >= 400) {
-                throw new Error(`HTTP ${response.status}: ${response.data?.message || 'Request failed'}`);
-            }
-            
-            // Log successful request
-            await this.logSync(
-                this.getLogTypeFromEndpoint(endpoint),
-                data.user_id || null,
-                'success',
-                data,
-                response.data,
-                null,
-                duration
-            );
-            
-            console.log(`✅ Request to ${endpoint} completed successfully (${duration}ms)`);
-            return response.data;
-            
-} catch (error) {
-    const duration = Date.now() - startTime;
-    const errorMessage = error.response?.data?.message || error.message;
-    
-    // Enhanced error logging
-    console.error(`❌ Request to ${endpoint} failed (${duration}ms):`, errorMessage);
-    
-    if (error.response) {
-        console.error(`   Status: ${error.response.status}`);
-        console.error(`   Status Text: ${error.response.statusText}`);
-        console.error(`   Response Headers:`, JSON.stringify(error.response.headers, null, 2));
-        console.error(`   Response Data:`, JSON.stringify(error.response.data, null, 2));
-    } else if (error.request) {
-        console.error(`   No response received`);
-        console.error(`   Request details:`, error.request);
-    } else {
-        console.error(`   Error setting up request:`, error.message);
+        // Check if response indicates success
+        if (response.status >= 400) {
+            throw new Error(`HTTP ${response.status}: ${response.data?.message || 'Request failed'}`);
+        }
+        
+        // Log successful request
+        await this.logSync(
+            this.getLogTypeFromEndpoint(endpoint),
+            data.user_id || null,
+            'success',
+            data,
+            response.data,
+            null,
+            duration
+        );
+        
+        console.log(`✅ Request to ${endpoint} completed successfully (${duration}ms)`);
+        return response.data;
+        
+    } catch (error) {
+        const duration = Date.now() - startTime;
+        
+        // Enhanced error logging for debugging
+        console.error('❌ IPTV Editor API Error Details:');
+        console.error('   Endpoint:', endpoint);
+        console.error('   Method:', method);
+        console.error('   Duration:', duration + 'ms');
+        
+        if (error.response) {
+            console.error('   Status:', error.response.status);
+            console.error('   Status Text:', error.response.statusText);
+            console.error('   Response Headers:', JSON.stringify(error.response.headers, null, 2));
+            console.error('   Response Data:', JSON.stringify(error.response.data, null, 2));
+        } else if (error.request) {
+            console.error('   No response received');
+            console.error('   Request details:', error.request);
+        } else {
+            console.error('   Error setting up request:', error.message);
+        }
+        
+        console.error('   Original request URL:', url);
+        console.error('   Original request data:', JSON.stringify(data, null, 2));
+        
+        // Log failed request
+        await this.logSync(
+            this.getLogTypeFromEndpoint(endpoint),
+            data.user_id || null,
+            'error',
+            data,
+            error.response?.data || null,
+            error.response?.data?.message || error.message,
+            duration
+        );
+        
+        throw new Error(`IPTV Editor API Error: HTTP ${error.response?.status || 'Unknown'}: ${error.response?.data?.message || error.message || 'Request failed'}`);
     }
-    
-    // Log failed request
-    await this.logSync(
-        this.getLogTypeFromEndpoint(endpoint),
-        data.user_id || null,
-        'error',
-        data,
-        error.response?.data || null,
-        errorMessage,
-        duration
-    );
-    
-    throw new Error(`IPTV Editor API Error: ${errorMessage}`);
 }
-    }
     
     getLogTypeFromEndpoint(endpoint) {
         if (endpoint.includes('new-customer')) return 'user_create';
