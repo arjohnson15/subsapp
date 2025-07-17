@@ -433,35 +433,86 @@ if (method === 'POST') {
         }
     }
     
-    // 2. Delete User
-    async deleteUser(userId) {
-        try {
-            console.log(`🗑️ Deleting IPTV Editor user ${userId}...`);
-            
-            const iptvUser = await this.getIPTVEditorUser(userId);
-            if (!iptvUser) {
-                throw new Error('User not found in IPTV Editor');
-            }
-            
-            const data = {
-                user_id: iptvUser.iptv_editor_id
-            };
-            
-            const response = await this.makeRequest('/api/reseller/remove', data);
-            
-            // Remove from database if successful
-            if (response && response.success) {
-                await db.query('DELETE FROM iptv_editor_users WHERE user_id = ?', [userId]);
-                console.log(`✅ User ${userId} deleted successfully`);
-            }
-            
-            return response;
-            
-        } catch (error) {
-            console.error(`❌ Failed to delete user ${userId}:`, error);
-            throw error;
+// 2. Delete User
+// CORRECT Implementation for IPTV Editor deleteUser method
+// Replace the existing deleteUser method in iptv-editor-service.js
+
+async deleteUser(userId) {
+    try {
+        console.log(`🗑️ Deleting IPTV Editor user ${userId}...`);
+        
+        // Get the local IPTV Editor user record
+        const iptvUser = await this.getIPTVEditorUser(userId);
+        if (!iptvUser) {
+            throw new Error('User not found in IPTV Editor');
         }
+        
+        // Get the playlist ID from settings
+        const playlistId = await this.getSetting('default_playlist_id');
+        if (!playlistId) {
+            throw new Error('Default playlist ID not configured');
+        }
+        
+        // Prepare the correct API call body structure
+        const data = {
+            playlist: playlistId,  // Required: The playlist ID
+            items: [
+                {
+                    id: iptvUser.iptv_editor_id  // Required: The IPTV Editor user ID
+                }
+            ]
+        };
+        
+        console.log(`🗑️ Deleting IPTV Editor user ID ${iptvUser.iptv_editor_id} from playlist ${playlistId}`);
+        
+        const response = await this.makeRequest('/api/reseller/remove', data);
+        
+        // Remove from local database if successful
+        if (response) {  // IPTV Editor returns "200" string on success
+            await db.query('DELETE FROM iptv_editor_users WHERE user_id = ?', [userId]);
+            
+            // Update user table
+            await db.query(
+                'UPDATE users SET iptv_editor_enabled = FALSE WHERE id = ?',
+                [userId]
+            );
+            
+            console.log(`✅ User ${userId} (IPTV Editor ID: ${iptvUser.iptv_editor_id}) deleted successfully`);
+        }
+        
+        return response;
+        
+    } catch (error) {
+        console.error(`❌ Failed to delete user ${userId}:`, error);
+        throw error;
     }
+}
+
+// Alternative method to delete by IPTV Editor ID directly (if needed)
+async deleteUserByIPTVEditorId(iptvEditorId) {
+    try {
+        console.log(`🗑️ Deleting IPTV Editor user by ID: ${iptvEditorId}...`);
+        
+        const data = {
+            user_id: iptvEditorId
+        };
+        
+        const response = await this.makeRequest('/api/reseller/remove', data);
+        
+        if (response && response.success) {
+            // Find and remove from local database
+            await db.query('DELETE FROM iptv_editor_users WHERE iptv_editor_id = ?', [iptvEditorId]);
+            
+            console.log(`✅ IPTV Editor user ${iptvEditorId} deleted successfully`);
+        }
+        
+        return response;
+        
+    } catch (error) {
+        console.error(`❌ Failed to delete IPTV Editor user ${iptvEditorId}:`, error);
+        throw error;
+    }
+}
     
     // 3. Get All Users
 // FIXED VERSION:

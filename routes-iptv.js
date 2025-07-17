@@ -786,16 +786,14 @@ try {
       // User doesn't exist in IPTV Editor - CREATE them using SAME method as manual creation
       console.log('🆕 User not found in IPTV Editor, creating new user...');
       
-      // Get playlist ID from settings (same as manual route)
-      const playlistResult = await db.query(`
-        SELECT setting_value FROM settings WHERE setting_key = 'iptv_editor_default_playlist_id'
-      `);
-      
-      if (!playlistResult || playlistResult.length === 0 || !playlistResult[0].setting_value) {
-        throw new Error('IPTV Editor playlist ID not configured');
-      }
-      
-      const playlistId = playlistResult[0].setting_value;
+     // Get playlist ID using SAME method as manual creation
+const playlistId = await iptvEditorService.getSetting('default_playlist_id');
+
+if (!playlistId) {
+  throw new Error('IPTV Editor playlist ID not configured');
+}
+
+console.log('✅ Using playlist ID:', playlistId);
       
       // Get channel categories from database (same as manual route)
       const channelCategoriesResult = await db.query(`
@@ -1488,15 +1486,14 @@ if (userId) {
     `, [userId]);
     
     if (iptvEditorResult.length > 0) {
-      const iptvEditorUserId = iptvEditorResult[0].iptv_editor_id;
-      console.log(`🗑️ Deleting IPTV Editor user: ${iptvEditorUserId}`);
+      console.log(`🗑️ Deleting IPTV Editor user: ${userId}`);
       
-      await iptvEditorService.deleteUser(iptvEditorUserId);
-      
-      // Remove from local database
-      await db.query('DELETE FROM iptv_editor_users WHERE user_id = ?', [userId]);
+      // Use the corrected deleteUser method that expects local userId
+      await iptvEditorService.deleteUser(userId);
       
       console.log('✅ IPTV Editor user deleted successfully');
+    } else {
+      console.log(`ℹ️ No IPTV Editor account found for user ${userId}`);
     }
   } catch (iptvEditorError) {
     console.error('⚠️ IPTV Editor deletion failed (continuing with IPTV subscription deletion):', iptvEditorError.message);
