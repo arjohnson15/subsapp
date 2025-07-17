@@ -3390,6 +3390,27 @@ async function deleteSubscriptionEnhanced() {
   }
 }
 
+/**
+ * Check and show cleanup section if needed
+ * Call this when loading user data to determine if cleanup is needed
+ */
+function checkForOrphanedIPTVEditor(userData) {
+  const hasRegularIPTV = userData.iptv_line_id && userData.iptv_line_id !== 'None' && userData.iptv_line_id !== null;
+  const hasIPTVEditor = userData.iptv_editor_enabled === true || userData.iptv_editor_enabled === 1;
+  
+  const cleanupSection = document.getElementById('iptvEditorCleanupSection');
+  
+  if (cleanupSection) {
+    // Show cleanup section ONLY if has IPTV Editor but NO regular IPTV
+    if (hasIPTVEditor && !hasRegularIPTV) {
+      cleanupSection.style.display = 'block';
+      console.log('🔍 Orphaned IPTV Editor account detected - showing cleanup option');
+    } else {
+      cleanupSection.style.display = 'none';
+    }
+  }
+}
+
 // Make functions globally available
 window.cleanupIPTVEditor = cleanupIPTVEditor;
 window.deleteSubscriptionEnhanced = deleteSubscriptionEnhanced;
