@@ -2882,23 +2882,44 @@ async function syncIPTVEditorUser(username) {
     try {
         Utils.showNotification('Syncing IPTV Editor account...', 'info');
         
-        // Get the current user ID from the form
-        const userId = getUserId(); // You'll need this helper function
+        // Get the current user ID using multiple methods
+        let userId = null;
+        
+        // Method 1: Check URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        userId = urlParams.get('id') || urlParams.get('edit');
+        
+        // Method 2: Check form field
+        if (!userId) {
+            const userIdField = document.getElementById('userId');
+            if (userIdField && userIdField.value) {
+                userId = userIdField.value;
+            }
+        }
+        
+        // Method 3: Check app state
+        if (!userId && window.AppState && window.AppState.editingUserId) {
+            userId = window.AppState.editingUserId;
+        }
+        
+        if (!userId) {
+            Utils.showNotification('User ID not found. Please save the user first.', 'error');
+            return;
+        }
         
         const response = await fetch(`/api/iptv-editor/user/${username}/sync`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ user_id: userId })
+            body: JSON.stringify({ user_id: parseInt(userId) })
         });
         
         const data = await response.json();
         
         if (data.success) {
             Utils.showNotification('IPTV Editor account synced and saved successfully', 'success');
-            
-            // Update the display with new data (remove status)
+            // Update the display with new data
             showIPTVEditorSyncResults(data.user, username);
         } else {
             Utils.showNotification(`Sync failed: ${data.message}`, 'error');
@@ -2910,17 +2931,59 @@ async function syncIPTVEditorUser(username) {
     }
 }
 
-async function createIPTVEditorAccountNow(username) {
-    const userName = document.getElementById('userName').value;
-    const userEmail = document.getElementById('userEmail').value;
+// Helper function to get current user ID
+function getUserId() {
+    // Method 1: Check URL parameters for editing existing user
+    const urlParams = new URLSearchParams(window.location.search);
+    let userId = urlParams.get('id') || urlParams.get('edit');
     
-    if (!userName || !userEmail) {
-        Utils.showNotification('Please save basic user info first', 'error');
-        return;
+    if (userId) {
+        console.log('📋 Found user ID from URL:', userId);
+        return userId;
     }
     
+    // Method 2: Check form field
+    const userIdField = document.getElementById('userId');
+    if (userIdField && userIdField.value) {
+        userId = userIdField.value;
+        console.log('📋 Found user ID from form field:', userId);
+        return userId;
+    }
+    
+    // Method 3: Check app state
+    if (window.AppState && window.AppState.editingUserId) {
+        userId = window.AppState.editingUserId;
+        console.log('📋 Found user ID from AppState:', userId);
+        return userId;
+    }
+    
+    console.warn('⚠️ No user ID found using any method');
+    return null;
+}
+
+async function createIPTVEditorAccountNow(username) {
     try {
+        const userName = document.getElementById('userName')?.value;
+        const userEmail = document.getElementById('userEmail')?.value;
+        
+        if (!userName || !userEmail) {
+            Utils.showNotification('Please fill in user name and email first', 'error');
+            return;
+        }
+        
+        // Get the current user ID
+        const userId = getUserId();
+        if (!userId) {
+            Utils.showNotification('Please save the user first, then create IPTV Editor account', 'error');
+            return;
+        }
+        
         Utils.showNotification('Creating IPTV Editor account...', 'info');
+        
+        console.log('📤 Sending create request with data:', {
+            user_id: parseInt(userId),
+            username: username
+        });
         
         const response = await fetch('/api/iptv-editor/user/create', {
             method: 'POST',
@@ -2928,21 +2991,28 @@ async function createIPTVEditorAccountNow(username) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                username: username,
-                name: userName,
-                email: userEmail,
-                expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() // 1 year
+                user_id: parseInt(userId),
+                username: username
             })
         });
         
+        // Log the response for debugging
+        console.log('📥 Response status:', response.status);
+        
         const data = await response.json();
+        console.log('📥 Response data:', data);
         
         if (data.success) {
             Utils.showNotification('IPTV Editor account created successfully', 'success');
-            // Refresh the check to show the new account
-            setTimeout(() => checkIPTVEditorAccess(), 1000);
+            // Show the success results
+            showIPTVEditorSyncResults(data.user, username);
         } else {
             Utils.showNotification(`Failed to create account: ${data.message}`, 'error');
+            
+            // Log validation errors if they exist
+            if (data.errors) {
+                console.error('Validation errors:', data.errors);
+            }
         }
         
     } catch (error) {

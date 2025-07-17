@@ -485,67 +485,153 @@ router.post('/user/:username/sync', checkIPTVEditorEnabled, async (req, res) => 
     }
 });
 
-// Create user by username (different from existing /create-user)
+// Create user by username (updated to match IPTV Editor API format)
 router.post('/user/create', [
     body('user_id').isInt({ min: 1 }).withMessage('User ID must be a positive integer'),
     body('username').isString().notEmpty().withMessage('Username is required'),
-    body('password').optional().isString(),
-    body('max_connections').optional().isInt({ min: 1, max: 10 }),
-    body('expiry_date').optional().isISO8601(),
     handleValidationErrors
 ], checkIPTVEditorEnabled, async (req, res) => {
     try {
-        const { user_id, username, password, max_connections = 1, expiry_date } = req.body;
+        const { user_id, username } = req.body;
         console.log(`👤 Creating new IPTV Editor user: ${username} for local user ${user_id}`);
         
-        // Check if local user exists
-        const localUser = await db.query('SELECT id, name, email FROM users WHERE id = ?', [user_id]);
-        if (!localUser || localUser.length === 0) {
+        // Get local user data
+        const localUserResult = await db.query('SELECT name, email, iptv_username, iptv_password FROM users WHERE id = ?', [user_id]);
+        if (!localUserResult || localUserResult.length === 0) {
             return res.status(404).json({
                 success: false,
                 message: 'Local user not found'
             });
         }
         
-        // Generate password if not provided
-        const userPassword = password || Math.random().toString(36).substring(2, 10);
+        const localUser = localUserResult[0];
         
-        // Set default expiry if not provided (1 month from now)
-        const userExpiry = expiry_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-        
-        // Get playlist ID
-        const playlistId = await iptvEditorService.getSetting('default_playlist_id');
-        if (!playlistId) {
-            throw new Error('Default playlist ID not configured');
+        // Validate IPTV credentials exist
+        if (!localUser.iptv_username || !localUser.iptv_password) {
+            return res.status(400).json({
+                success: false,
+                message: 'User must have IPTV username and password saved before creating IPTV Editor account'
+            });
         }
         
-        // Prepare creation data (you'll need to implement the actual API call)
+        // Get playlist ID from settings
+        const playlistId = await iptvEditorService.getSetting('default_playlist_id');
+        if (!playlistId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Default playlist ID not configured in IPTV Editor settings'
+            });
+        }
+        
+        // Get all channel categories from database (from sync)
+        const channelCategoriesResult = await db.query(`
+            SELECT category_id FROM iptv_editor_categories 
+            WHERE type = 'channels' AND is_active = true 
+            ORDER BY category_id
+        `);
+        
+        const channelCategories = channelCategoriesResult.map(row => parseInt(row.category_id));
+        
+        if (channelCategories.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No channel categories found. Please sync categories first from IPTV Editor settings.'
+            });
+        }
+        
+        console.log(`📺 Using ${channelCategories.length} channel categories:`, channelCategories);
+        
+        // Prepare IPTV Editor creation data (exact format from your example)
         const creationData = {
             playlist: playlistId,
-            username: username,
-            password: userPassword,
-            max_connections: max_connections,
-            expiry: userExpiry,
-            name: localUser[0].name || username
+            items: {
+                name: localUser.email,  // Use email as name
+                note: "",
+                username: username,     // IPTV Editor username (frontend input)
+                password: localUser.iptv_password,  // From user's saved IPTV password
+                message: null,
+                channels_categories: channelCategories,  // All synced categories
+                vods_categories: [73],  // Hardcoded as requested
+                series_categories: [],  // Empty as in example
+                patterns: [
+                    {
+                        url: "https://pinkpony.lol",
+                        param1: localUser.iptv_username,  // User's IPTV username
+                        param2: localUser.iptv_password,  // User's IPTV password
+                        type: "xtream"
+                    }
+                ],
+                language: "en"  // Hardcoded
+            }
         };
         
-        console.log('📤 Would create user with data:', creationData);
+        console.log('📤 Sending creation request to IPTV Editor:', JSON.stringify(creationData, null, 2));
         
-        // TODO: Implement actual IPTV Editor user creation API call
-        // const creationResponse = await iptvEditorService.makeRequest('/api/reseller/new-customer', creationData);
+        // Call IPTV Editor API to create user
+        const creationResponse = await iptvEditorService.makeRequest('/api/reseller/new-customer', creationData);
         
-        // For now, return success with dummy data
+        console.log('✅ IPTV Editor creation response:', creationResponse);
+        
+        // FIXED: Save the new user data to local database - access through customer object
+        const userDataToSave = {
+            user_id: user_id,
+            iptv_editor_id: creationResponse.customer?.id || null,
+            iptv_editor_username: username,
+            iptv_editor_password: localUser.iptv_password,
+            m3u_code: creationResponse.customer?.m3u || null,
+            epg_code: creationResponse.customer?.epg || null,
+            expiry_date: creationResponse.customer?.expiry || null,
+            max_connections: creationResponse.customer?.max_connections || 1,
+            sync_status: 'created',
+            last_sync_time: new Date(),
+            raw_editor_data: JSON.stringify(creationResponse),
+            created_at: new Date()
+        };
+        
+        // FIXED: Convert undefined values to null before database insertion
+        const insertValues = [
+            userDataToSave.user_id,
+            userDataToSave.iptv_editor_id, 
+            userDataToSave.iptv_editor_username,
+            userDataToSave.iptv_editor_password,
+            userDataToSave.m3u_code,
+            userDataToSave.epg_code, 
+            userDataToSave.expiry_date,
+            userDataToSave.max_connections,
+            userDataToSave.sync_status,
+            userDataToSave.last_sync_time,
+            userDataToSave.raw_editor_data,
+            userDataToSave.created_at
+        ];
+        
+        // Convert any undefined values to null
+        const cleanedValues = insertValues.map(val => val === undefined ? null : val);
+        
+        // Insert into database
+        await db.query(`
+            INSERT INTO iptv_editor_users (
+                user_id, iptv_editor_id, iptv_editor_username, iptv_editor_password,
+                m3u_code, epg_code, expiry_date, max_connections,
+                sync_status, last_sync_time, raw_editor_data, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, cleanedValues);
+        
+        console.log(`✅ Created and saved IPTV Editor user for local user ${user_id}`);
+        
+        // FIXED: Return success response with proper customer object access
         res.json({
             success: true,
             user: {
                 username: username,
-                password: userPassword,
-                max_connections: max_connections,
-                expiry: userExpiry,
+                password: localUser.iptv_password,
+                max_connections: creationResponse.customer?.max_connections || 1,
+                expiry: creationResponse.customer?.expiry || null,
+                iptv_editor_id: creationResponse.customer?.id || null,
+                m3u_url: creationResponse.customer?.m3u ? `https://editor.iptveditor.com/m3u/${creationResponse.customer.m3u}` : null,
+                epg_url: creationResponse.customer?.epg ? `https://editor.iptveditor.com/epg/${creationResponse.customer.epg}` : null,
                 last_updated: new Date().toLocaleDateString()
             },
-            message: `IPTV Editor account would be created for ${username}`,
-            note: 'Creation API not yet implemented'
+            message: `IPTV Editor account created successfully for ${username}`
         });
         
     } catch (error) {
