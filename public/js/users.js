@@ -2811,8 +2811,18 @@ async function checkIPTVEditorAccess() {
 }
 
 function showIPTVEditorSyncResults(user, username) {
-    // FIXED: Store the user data globally so sync can access it
-    currentIPTVEditorData = user;
+    // Store the user data globally so sync can access it
+    currentIPTVEditorData = {
+        iptv_editor_id: user.id,
+        iptv_editor_username: user.username,
+        iptv_editor_password: user.password,
+        m3u_code: user.m3u,
+        epg_code: user.epg,
+        max_connections: user.max_connections,
+        expiry_date: user.expiry,
+        sync_status: 'found',
+        last_sync_time: new Date().toISOString()
+    };
     
     const resultsDiv = document.getElementById('editorAccessCheckResults');
     
@@ -2931,6 +2941,9 @@ async function syncIPTVEditorUser(username) {
             Utils.showNotification('IPTV Editor account synced and saved successfully', 'success');
             // Update the display with new data
             showIPTVEditorSyncResults(data.user, username);
+            
+            // Also load the IPTV status section
+            await loadIPTVEditorStatus(userId);
         } else {
             Utils.showNotification(`Sync failed: ${data.message}`, 'error');
         }
@@ -3123,48 +3136,6 @@ function hideIPTVEditorStatus() {
     if (indicator) indicator.style.display = 'none';
     
     currentIPTVEditorData = null;
-}
-
-// Enhanced sync function for IPTV Editor user
-async function syncIPTVEditorUser() {
-    if (!window.currentEditingUserId || !currentIPTVEditorData) {
-        Utils.showNotification('No IPTV Editor user to sync', 'error');
-        return;
-    }
-    
-    try {
-        const btn = document.getElementById('syncIptvEditorBtn');
-        btn.disabled = true;
-        btn.textContent = 'Syncing...';
-        
-        const response = await fetch(`/api/iptv-editor/user/${currentIPTVEditorData.iptv_editor_username}/sync`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                user_id: window.currentEditingUserId
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            Utils.showNotification('IPTV Editor user synced successfully', 'success');
-            // Reload the status to show updated info
-            await loadIPTVEditorStatus(window.currentEditingUserId);
-        } else {
-            Utils.showNotification('Sync failed: ' + data.message, 'error');
-        }
-        
-    } catch (error) {
-        console.error('Error syncing IPTV Editor user:', error);
-        Utils.showNotification('Sync failed: ' + error.message, 'error');
-    } finally {
-        const btn = document.getElementById('syncIptvEditorBtn');
-        btn.disabled = false;
-        btn.textContent = 'Sync';
-    }
 }
 
 // Function to copy IPTV Editor M3U URL
