@@ -2314,6 +2314,30 @@ async saveIPTVEditorSettings() {
     }
 },
 
+// Sync IPTV Editor Categories
+async syncIPTVEditorCategories() {
+    try {
+        const response = await fetch('/api/iptv-editor/sync-categories', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            Utils.showNotification(
+                `Categories synced: ${result.data.channels_synced} channels, ${result.data.vods_synced} VODs, ${result.data.series_synced} series`, 
+                'success'
+            );
+        } else {
+            Utils.showNotification('Failed to sync categories: ' + result.message, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error syncing categories:', error);
+        Utils.showNotification('Failed to sync categories', 'error');
+    }
+},
+
 // Test IPTV Editor Connection - EXISTING (keep as is)
 async testIPTVEditorConnection() {
     const testButton = document.querySelector('[onclick="testIPTVEditorConnection()"]');
