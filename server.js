@@ -129,57 +129,39 @@ cron.schedule('0 * * * *', async () => {
   }
 });
 
-// NEW - IPTV Editor Daily Sync (runs at 3 AM daily)
+// IPTV Editor Daily Playlist Sync (runs at 3 AM daily) - PLAYLISTS ONLY
 cron.schedule('0 3 * * *', async () => {
   try {
-    console.log('🎬 Starting IPTV Editor daily sync...');
+    console.log('🎬 Starting IPTV Editor daily playlist sync...');
     
-    // Check if IPTV Editor is enabled
-    const syncEnabled = await iptvEditorService.getSetting('sync_enabled');
-    if (!syncEnabled) {
-      console.log('⚠️ IPTV Editor sync is disabled - skipping');
-      return;
-    }
-    
-    // Initialize service
+    // Initialize service (no need to check sync_enabled setting anymore)
     const initialized = await iptvEditorService.initialize();
     if (!initialized) {
       console.log('❌ IPTV Editor service not properly configured - skipping sync');
       return;
     }
     
-    // Sync playlists
-    console.log('📺 Syncing IPTV Editor playlists...');
-    await iptvEditorService.updatePlaylists();
-    
-    // Sync all enabled users
-    console.log('👥 Syncing IPTV Editor users...');
-    const enabledUsers = await db.query(`
-      SELECT u.id, u.name 
-      FROM users u 
-      WHERE u.iptv_editor_enabled = TRUE AND u.include_in_iptv_editor = TRUE
-    `);
-    
-    let syncedCount = 0;
-    let errorCount = 0;
-    
-    for (const user of enabledUsers) {
-      try {
-        const iptvUser = await iptvEditorService.getIPTVEditorUser(user.id);
-        if (iptvUser) {
-          await iptvEditorService.syncUser(user.id);
-          syncedCount++;
-        }
-      } catch (error) {
-        console.error(`Failed to sync IPTV Editor user ${user.id} (${user.name}):`, error.message);
-        errorCount++;
-      }
+    // Check if bearer token is configured
+    const bearerToken = await iptvEditorService.getSetting('bearer_token');
+    if (!bearerToken) {
+      console.log('⚠️ IPTV Editor bearer token not configured - skipping playlist sync');
+      return;
     }
     
-    console.log(`✅ IPTV Editor sync completed: ${syncedCount} users synced, ${errorCount} errors`);
+    // Sync playlists ONLY (no user syncing)
+    console.log('📺 Syncing IPTV Editor playlists...');
+    const playlistResult = await iptvEditorService.updatePlaylists();
+    
+    if (playlistResult.success) {
+      console.log(`✅ Playlist sync completed: ${playlistResult.counts.inserted} new, ${playlistResult.counts.updated} updated, ${playlistResult.counts.deactivated} deactivated`);
+    } else {
+      console.log('⚠️ Playlist sync completed with issues');
+    }
+    
+    console.log('✅ IPTV Editor daily playlist sync completed successfully');
     
   } catch (error) {
-    console.error('❌ IPTV Editor daily sync failed:', error);
+    console.error('❌ IPTV Editor daily playlist sync failed:', error);
     
     // Log specific error details for debugging
     if (error.message) {

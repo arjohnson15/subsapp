@@ -566,23 +566,160 @@ async getPlaylists() {
     }
     
     // 8. Update Playlists
-    async updatePlaylists() {
-        try {
-            console.log('🔄 Updating IPTV Editor playlists...');
-            
-            const response = await this.makeRequest('/api/auto-updater/run-auto-updater', {});
-            
-            // Update last sync time
-            await this.setSetting('last_sync_time', new Date().toISOString(), 'string');
-            
-            console.log('✅ Playlists updated successfully');
-            return response;
-            
-        } catch (error) {
-            console.error('❌ Failed to update playlists:', error);
-            throw error;
+async updatePlaylists() {
+    try {
+        console.log('🔄 Updating IPTV Editor playlists (incremental sync)...');
+        
+        // Get current playlists from API
+        const response = await this.makeRequest('/api/playlist/list', {});
+        
+        if (!response || !response.playlist || !Array.isArray(response.playlist)) {
+            throw new Error('Invalid playlist data received from IPTV Editor API');
         }
+        
+        const apiPlaylists = response.playlist;
+        console.log(`📥 Retrieved ${apiPlaylists.length} playlists from IPTV Editor`);
+        
+        // Get existing playlists from database
+        const existingPlaylists = await db.query(`
+            SELECT playlist_id, name, customer_count, channel_count, 
+                   movie_count, series_count, expiry_date, max_connections,
+                   username, password, m3u_code, epg_code
+            FROM iptv_editor_playlists
+        `);
+        
+        // Create maps for efficient comparison
+        const existingMap = new Map();
+        existingPlaylists.forEach(playlist => {
+            existingMap.set(playlist.playlist_id, playlist);
+        });
+        
+        const apiMap = new Map();
+        apiPlaylists.forEach(playlist => {
+            apiMap.set(playlist.id, playlist);
+        });
+        
+        let insertCount = 0;
+        let updateCount = 0;
+        let deleteCount = 0;
+        
+        // Process API playlists (Insert new + Update changed)
+        for (const apiPlaylist of apiPlaylists) {
+            const existing = existingMap.get(apiPlaylist.id);
+            
+            if (!existing) {
+                // INSERT: New playlist
+                await db.query(`
+                    INSERT INTO iptv_editor_playlists (
+                        playlist_id, name, username, password, m3u_code, epg_code, 
+                        expiry_date, max_connections, customer_count, channel_count, 
+                        movie_count, series_count, last_synced, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW())
+                `, [
+                    apiPlaylist.id,
+                    apiPlaylist.name,
+                    apiPlaylist.username || null,
+                    apiPlaylist.password || null,
+                    apiPlaylist.m3u || null,
+                    apiPlaylist.epg || null,
+                    apiPlaylist.expiry ? new Date(apiPlaylist.expiry) : null,
+                    apiPlaylist.max_connections || 1,
+                    apiPlaylist.customerCount || 0,
+                    apiPlaylist.channel || 0,
+                    apiPlaylist.movie || 0,
+                    apiPlaylist.series || 0
+                ]);
+                
+                insertCount++;
+                console.log(`➕ Added new playlist: ${apiPlaylist.name}`);
+                
+            } else {
+                // CHECK: Has anything changed?
+                const hasChanges = (
+                    existing.name !== apiPlaylist.name ||
+                    existing.customer_count !== (apiPlaylist.customerCount || 0) ||
+                    existing.channel_count !== (apiPlaylist.channel || 0) ||
+                    existing.movie_count !== (apiPlaylist.movie || 0) ||
+                    existing.series_count !== (apiPlaylist.series || 0) ||
+                    existing.max_connections !== (apiPlaylist.max_connections || 1) ||
+                    existing.username !== (apiPlaylist.username || null) ||
+                    existing.password !== (apiPlaylist.password || null) ||
+                    existing.m3u_code !== (apiPlaylist.m3u || null) ||
+                    existing.epg_code !== (apiPlaylist.epg || null) ||
+                    this.formatDate(existing.expiry_date) !== this.formatDate(apiPlaylist.expiry)
+                );
+                
+                if (hasChanges) {
+                    // UPDATE: Changed playlist
+                    await db.query(`
+                        UPDATE iptv_editor_playlists SET
+                            name = ?, username = ?, password = ?, m3u_code = ?, epg_code = ?,
+                            expiry_date = ?, max_connections = ?, customer_count = ?,
+                            channel_count = ?, movie_count = ?, series_count = ?,
+                            last_synced = NOW(), updated_at = NOW()
+                        WHERE playlist_id = ?
+                    `, [
+                        apiPlaylist.name,
+                        apiPlaylist.username || null,
+                        apiPlaylist.password || null,
+                        apiPlaylist.m3u || null,
+                        apiPlaylist.epg || null,
+                        apiPlaylist.expiry ? new Date(apiPlaylist.expiry) : null,
+                        apiPlaylist.max_connections || 1,
+                        apiPlaylist.customerCount || 0,
+                        apiPlaylist.channel || 0,
+                        apiPlaylist.movie || 0,
+                        apiPlaylist.series || 0,
+                        apiPlaylist.id
+                    ]);
+                    
+                    updateCount++;
+                    console.log(`🔄 Updated playlist: ${apiPlaylist.name}`);
+                }
+            }
+        }
+        
+        // Remove playlists that no longer exist in API
+        for (const [playlistId] of existingMap) {
+            if (!apiMap.has(playlistId)) {
+                await db.query(`
+                    UPDATE iptv_editor_playlists 
+                    SET is_active = FALSE, updated_at = NOW() 
+                    WHERE playlist_id = ?
+                `, [playlistId]);
+                
+                deleteCount++;
+                console.log(`❌ Deactivated removed playlist: ${playlistId}`);
+            }
+        }
+        
+        // Update last sync time
+        await this.setSetting('last_sync_time', new Date().toISOString(), 'string');
+        
+        console.log(`✅ Playlist sync completed: +${insertCount} new, ~${updateCount} updated, -${deleteCount} deactivated`);
+        
+        return {
+            success: true,
+            message: `Sync completed: ${insertCount} new, ${updateCount} updated, ${deleteCount} deactivated`,
+            counts: {
+                inserted: insertCount,
+                updated: updateCount,
+                deactivated: deleteCount,
+                total: apiPlaylists.length
+            }
+        };
+        
+    } catch (error) {
+        console.error('❌ Failed to update playlists:', error);
+        throw error;
     }
+}
+
+// Helper function for date comparison
+formatDate(date) {
+    if (!date) return null;
+    return new Date(date).toISOString().split('T')[0]; // YYYY-MM-DD format
+}
     
     // =============================================================================
     // DATABASE HELPER METHODS
