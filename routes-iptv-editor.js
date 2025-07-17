@@ -1054,32 +1054,32 @@ for (const category of categories.channels) {
         
         // Sync VOD categories
         if (categories.vods && categories.vods.length > 0) {
-            // Clear existing VOD categories
-            await db.execute('DELETE FROM iptv_editor_categories WHERE type = ?', ['vods']);
-            
-            // Insert new VOD categories
-            for (const category of categories.vods) {
-                await db.execute(`
-                    INSERT INTO iptv_editor_categories (category_id, name, type, is_active)
-                    VALUES (?, ?, 'vods', true)
-                `, [category.value, category.text]);
-            }
+// Clear existing VOD categories
+await db.query('DELETE FROM iptv_editor_categories WHERE type = ?', ['vods']);
+
+// Insert new VOD categories
+for (const category of categories.vods) {
+    await db.query(`
+        INSERT INTO iptv_editor_categories (category_id, name, type, is_active)
+        VALUES (?, ?, 'vods', true)
+    `, [category.value, category.text]);
+}
             
             console.log(`✅ Synced ${categories.vods.length} VOD categories`);
         }
         
         // Sync series categories
         if (categories.series && categories.series.length > 0) {
-            // Clear existing series categories
-            await db.execute('DELETE FROM iptv_editor_categories WHERE type = ?', ['series']);
-            
-            // Insert new series categories
-            for (const category of categories.series) {
-                await db.execute(`
-                    INSERT INTO iptv_editor_categories (category_id, name, type, is_active)
-                    VALUES (?, ?, 'series', true)
-                `, [category.value, category.text]);
-            }
+// Clear existing series categories
+await db.query('DELETE FROM iptv_editor_categories WHERE type = ?', ['series']);
+
+// Insert new series categories
+for (const category of categories.series) {
+    await db.query(`
+        INSERT INTO iptv_editor_categories (category_id, name, type, is_active)
+        VALUES (?, ?, 'series', true)
+    `, [category.value, category.text]);
+}
             
             console.log(`✅ Synced ${categories.series.length} series categories`);
         }
@@ -1109,18 +1109,18 @@ router.get('/categories', async (req, res) => {
     try {
         console.log('📺 Loading stored IPTV Editor categories...');
         
-        const categories = await db.execute(`
-            SELECT category_id, name, type, is_active 
-            FROM iptv_editor_categories 
-            WHERE is_active = true 
-            ORDER BY type, name
-        `);
+const categories = await db.query(`
+    SELECT category_id, name, type, is_active 
+    FROM iptv_editor_categories 
+    WHERE is_active = true 
+    ORDER BY type, name
+`);
         
-        const result = {
-            channels: categories[0].filter(cat => cat.type === 'channels'),
-            vods: categories[0].filter(cat => cat.type === 'vods'),
-            series: categories[0].filter(cat => cat.type === 'series')
-        };
+const result = {
+    channels: categories.filter(cat => cat.type === 'channels'),
+    vods: categories.filter(cat => cat.type === 'vods'),
+    series: categories.filter(cat => cat.type === 'series')
+};
         
         res.json({ 
             success: true, 
