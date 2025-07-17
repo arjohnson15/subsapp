@@ -2379,7 +2379,7 @@ async testIPTVEditorConnection() {
 },
 
 // Sync IPTV Editor categories
-async function syncIPTVEditorCategories() {
+async syncIPTVEditorCategories() {
     try {
         const syncBtn = document.getElementById('syncCategoriesBtn');
         if (syncBtn) {
