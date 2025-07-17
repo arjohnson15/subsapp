@@ -2465,6 +2465,8 @@ document.getElementById('excludeAutomatedEmails').checked = user.exclude_automat
     }
     
     console.log(`✅ Form population completed for ${user.name}`);
+	
+	checkForOrphanedIPTVEditor(user);
 };
 
 // Show Plex libraries and pre-select user's current access - FIXED MODULE REFERENCE
@@ -3227,6 +3229,170 @@ async function deleteIPTVSubscription() {
         deleteBtn.disabled = false;
     }
 }
+
+/**
+ * Cleanup orphaned IPTV Editor users
+ * This can be used when regular deletion fails but IPTV Editor user still exists
+ */
+async function cleanupIPTVEditor(userId) {
+  try {
+    if (!userId) {
+      throw new Error('User ID is required for IPTV Editor cleanup');
+    }
+    
+    console.log(`🧹 Attempting IPTV Editor cleanup for user ${userId}`);
+    
+    // Show loading state
+    const cleanupBtn = document.getElementById('cleanupIPTVEditorBtn');
+    if (cleanupBtn) {
+      cleanupBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cleaning up...';
+      cleanupBtn.disabled = true;
+    }
+    
+    // Check if user has IPTV Editor account
+    const statusResponse = await fetch(`/api/iptv-editor/users/${userId}/status`);
+    const statusData = await statusResponse.json();
+    
+    if (!statusData.success || !statusData.iptvUser) {
+      throw new Error('No IPTV Editor account found for this user');
+    }
+    
+    // Attempt deletion via direct IPTV Editor API
+    const deleteResponse = await fetch(`/api/iptv-editor/users/${userId}`, {
+      method: 'DELETE'
+    });
+    
+    const deleteData = await deleteResponse.json();
+    
+    if (deleteData.success) {
+      if (window.Utils && window.Utils.showNotification) {
+        window.Utils.showNotification('IPTV Editor account cleaned up successfully', 'success');
+      } else {
+        alert('IPTV Editor account cleaned up successfully');
+      }
+      
+      // Refresh the user interface
+      if (typeof loadUserData === 'function') {
+        await loadUserData(userId);
+      }
+    } else {
+      throw new Error(deleteData.message || 'IPTV Editor cleanup failed');
+    }
+    
+  } catch (error) {
+    console.error('❌ IPTV Editor cleanup failed:', error);
+    
+    if (window.Utils && window.Utils.showNotification) {
+      window.Utils.showNotification(`Cleanup failed: ${error.message}`, 'error');
+    } else {
+      alert(`Cleanup failed: ${error.message}`);
+    }
+  } finally {
+    // Restore button state
+    const cleanupBtn = document.getElementById('cleanupIPTVEditorBtn');
+    if (cleanupBtn) {
+      cleanupBtn.innerHTML = '<i class="fas fa-broom"></i> Cleanup IPTV Editor';
+      cleanupBtn.disabled = false;
+    }
+  }
+}
+
+/**
+ * Enhanced delete subscription that handles orphaned accounts
+ * OPTIONAL: You can replace your existing deleteSubscription function with this enhanced version
+ * OR keep this as a separate function like deleteSubscriptionEnhanced()
+ */
+async function deleteSubscriptionEnhanced() {
+  try {
+    const userId = document.getElementById('userId').value; // Get from form
+    if (!userId) {
+      throw new Error('No user selected');
+    }
+    
+    // Get current user data to check what exists
+    const userResponse = await fetch(`/api/users/${userId}`);
+    const userData = await userResponse.json();
+    
+    const hasRegularIPTV = userData.user.iptv_line_id && userData.user.iptv_line_id !== 'None';
+    const hasIPTVEditor = userData.user.iptv_editor_enabled;
+    
+    if (!hasRegularIPTV && !hasIPTVEditor) {
+      throw new Error('No IPTV subscriptions found to delete');
+    }
+    
+    let confirmMessage = 'This will delete:\n';
+    if (hasRegularIPTV) confirmMessage += '• Regular IPTV subscription\n';
+    if (hasIPTVEditor) confirmMessage += '• IPTV Editor account\n';
+    confirmMessage += '\nThis action cannot be undone. Continue?';
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+    
+    // Show loading state on delete button
+    const deleteBtn = document.getElementById('iptvDeleteBtn');
+    if (deleteBtn) {
+      deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+      deleteBtn.disabled = true;
+    }
+    
+    try {
+      // If we have a regular IPTV subscription, use the enhanced deletion endpoint
+      if (hasRegularIPTV) {
+        const lineId = userData.user.iptv_line_id;
+        const response = await fetch(`/api/iptv/subscription/${lineId}?userId=${userId}`, {
+          method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        // Show detailed results
+        if (result.success) {
+          let message = result.message;
+          if (!result.details.all_successful) {
+            message += '\n\nSome components failed - you may need to use the cleanup button.';
+          }
+          
+          if (window.Utils && window.Utils.showNotification) {
+            window.Utils.showNotification(message, result.details.all_successful ? 'success' : 'warning');
+          } else {
+            alert(message);
+          }
+        } else {
+          throw new Error(result.message);
+        }
+      } else if (hasIPTVEditor) {
+        // Only IPTV Editor exists - clean it up directly
+        await cleanupIPTVEditor(userId);
+      }
+      
+      // Refresh user data
+      if (typeof loadUserData === 'function') {
+        await loadUserData(userId);
+      }
+      
+    } finally {
+      // Restore delete button state
+      if (deleteBtn) {
+        deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete Subscription';
+        deleteBtn.disabled = false;
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ Enhanced deletion failed:', error);
+    
+    if (window.Utils && window.Utils.showNotification) {
+      window.Utils.showNotification(`Deletion failed: ${error.message}`, 'error');
+    } else {
+      alert(`Deletion failed: ${error.message}`);
+    }
+  }
+}
+
+// Make functions globally available
+window.cleanupIPTVEditor = cleanupIPTVEditor;
+window.deleteSubscriptionEnhanced = deleteSubscriptionEnhanced;
 
 // Enhanced IPTV check button initialization with proper cleanup
 window.initializeIPTVCheck = function() {

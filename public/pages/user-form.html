@@ -272,6 +272,19 @@
         </button>
     </div>
 </div>
+
+<!-- Cleanup button for orphaned IPTV Editor accounts -->
+<div id="iptvEditorCleanupSection" style="margin-top: 10px; display: none;">
+    <div style="padding: 10px; background: rgba(255, 193, 7, 0.1); border: 1px solid #ffc107; border-radius: 5px;">
+        <p style="margin: 0 0 10px 0; color: #856404;">
+            <i class="fas fa-exclamation-triangle"></i> 
+            Orphaned IPTV Editor account detected. No regular IPTV subscription found.
+        </p>
+        <button type="button" id="cleanupIPTVEditorBtn" class="btn btn-warning btn-small" onclick="cleanupIPTVEditor(document.getElementById('userId').value)">
+            <i class="fas fa-broom"></i> Cleanup IPTV Editor Account
+        </button>
+    </div>
+</div>
 		
 		<!-- Delete Button Row (Bottom Right) -->
 <div style="display: flex; justify-content: flex-end; margin-top: 15px; padding-top: 10px; border-top: 1px solid #333;">
