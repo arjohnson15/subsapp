@@ -4,6 +4,7 @@ const router = express.Router();
 const { body, param, validationResult } = require('express-validator');
 const db = require('./database-config');
 const iptvService = require('./iptv-service');
+const iptvEditorService = require('./iptv-editor-service');
 
 // Helper function to handle validation errors
 const handleValidationErrors = (req, res, next) => {
@@ -739,6 +740,135 @@ if (action === 'extend') {
       notes || null,
       user_id
     ]);
+	
+// Automatically create/link IPTV Editor user for all IPTV subscriptions
+console.log('🎯 Creating/linking IPTV Editor user for IPTV subscription...');
+
+try {
+  // Check if user already exists in local IPTV Editor table
+  const existingLocalIPTVUser = await db.query(`
+    SELECT iptv_editor_id FROM iptv_editor_users WHERE user_id = ?
+  `, [user_id]);
+  
+  if (existingLocalIPTVUser.length === 0) {
+    // User not in local table - check if they exist in IPTV Editor API
+    const iptvEditorService = require('./iptv-editor-service');
+    
+    // Search for user by username in IPTV Editor
+    const apiUsers = await iptvEditorService.getAllUsers();
+    const existingAPIUser = apiUsers.find(apiUser => 
+      apiUser.username && apiUser.username.toLowerCase() === finalUsername.toLowerCase()
+    );
+    
+    if (existingAPIUser) {
+      // User exists in IPTV Editor - LINK them
+      console.log('🔗 User exists in IPTV Editor, linking...');
+      
+      await db.query(`
+        INSERT INTO iptv_editor_users (
+          user_id, iptv_editor_id, iptv_editor_username, iptv_editor_password,
+          m3u_code, epg_code, expiry_date, max_connections, sync_status, last_sync_time
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'synced', NOW())
+      `, [
+        user_id,
+        existingAPIUser.id,
+        finalUsername,
+        actualPassword,
+        existingAPIUser.m3u || '',
+        existingAPIUser.epg || '',
+        expirationForDB,
+        maxConnections || 2
+      ]);
+      
+      console.log('✅ IPTV Editor user linked successfully');
+      
+    } else {
+      // User doesn't exist in IPTV Editor - CREATE them using SAME method as manual creation
+      console.log('🆕 User not found in IPTV Editor, creating new user...');
+      
+      // Get playlist ID from settings (same as manual route)
+      const playlistResult = await db.query(`
+        SELECT setting_value FROM settings WHERE setting_key = 'iptv_editor_default_playlist_id'
+      `);
+      
+      if (!playlistResult || playlistResult.length === 0 || !playlistResult[0].setting_value) {
+        throw new Error('IPTV Editor playlist ID not configured');
+      }
+      
+      const playlistId = playlistResult[0].setting_value;
+      
+      // Get channel categories from database (same as manual route)
+      const channelCategoriesResult = await db.query(`
+        SELECT category_id FROM iptv_editor_categories 
+        WHERE type = 'channels' AND is_active = true 
+        ORDER BY category_id
+      `);
+      
+      const channelCategories = channelCategoriesResult.map(row => parseInt(row.category_id));
+      
+      // Use fallback if no categories found
+      const finalChannelCategories = channelCategories.length > 0 ? channelCategories : [73];
+      
+      console.log(`📺 Using ${finalChannelCategories.length} channel categories for IPTV Editor creation`);
+      
+      // Create using EXACT same format as manual creation
+      const creationData = {
+        playlist: playlistId,
+        items: {
+          name: user.email,  // Use user email as name
+          note: "",
+          username: finalUsername,  // IPTV Editor username
+          password: actualPassword,  // IPTV password
+          message: null,
+          channels_categories: finalChannelCategories,  // Channel categories
+          vods_categories: [73],  // Hardcoded like manual
+          series_categories: [],  // Empty like manual
+          patterns: [
+            {
+              url: "https://pinkpony.lol",
+              param1: finalUsername,  // IPTV username
+              param2: actualPassword,  // IPTV password
+              type: "xtream"
+            }
+          ],
+          language: "en"
+        }
+      };
+      
+      console.log('📤 Sending IPTV Editor creation request...');
+      
+      // Make API call using SAME method as manual creation
+      const response = await iptvEditorService.makeRequest('/api/reseller/new-customer', creationData);
+      
+      // Save to database using SAME method as manual creation
+      if (response && response.customer) {
+        await db.query(`
+          INSERT INTO iptv_editor_users (
+            user_id, iptv_editor_id, iptv_editor_username, iptv_editor_password,
+            m3u_code, epg_code, expiry_date, max_connections, sync_status, last_sync_time
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'synced', NOW())
+        `, [
+          user_id,
+          response.customer.id,
+          finalUsername,
+          actualPassword,
+          response.customer.m3u || '',
+          response.customer.epg || '',
+          expirationForDB,
+          maxConnections || 2
+        ]);
+        
+        console.log('✅ IPTV Editor user created successfully');
+      } else {
+        throw new Error('Invalid response from IPTV Editor API');
+      }
+    }
+  } else {
+    console.log('🔄 User already linked to IPTV Editor, skipping');
+  }
+} catch (iptvEditorError) {
+  console.error('⚠️ IPTV Editor integration failed (continuing with IPTV subscription):', iptvEditorError.message);
+}
     
     // Log the activity
     await iptvService.logActivity(
@@ -1346,6 +1476,32 @@ router.delete('/subscription/:lineId', [
     
     // Step 1: Delete from panel first
     const panelResult = await iptvService.deleteUserSubscription(lineId);
+	
+	// Delete from IPTV Editor first if user exists there
+if (userId) {
+  try {
+    const iptvEditorService = require('./iptv-editor-service');
+    
+    // Check if user has IPTV Editor account
+    const iptvEditorResult = await db.query(`
+      SELECT iptv_editor_id FROM iptv_editor_users WHERE user_id = ?
+    `, [userId]);
+    
+    if (iptvEditorResult.length > 0) {
+      const iptvEditorUserId = iptvEditorResult[0].iptv_editor_id;
+      console.log(`🗑️ Deleting IPTV Editor user: ${iptvEditorUserId}`);
+      
+      await iptvEditorService.deleteUser(iptvEditorUserId);
+      
+      // Remove from local database
+      await db.query('DELETE FROM iptv_editor_users WHERE user_id = ?', [userId]);
+      
+      console.log('✅ IPTV Editor user deleted successfully');
+    }
+  } catch (iptvEditorError) {
+    console.error('⚠️ IPTV Editor deletion failed (continuing with IPTV subscription deletion):', iptvEditorError.message);
+  }
+}
     
     // Step 2: Clear from database if user ID provided
     if (userId) {
