@@ -1038,16 +1038,16 @@ router.post('/sync-categories', async (req, res) => {
         
         // Sync channel categories
         if (categories.channels && categories.channels.length > 0) {
-            // Clear existing channel categories
-            await db.execute('DELETE FROM iptv_editor_categories WHERE type = ?', ['channels']);
-            
-            // Insert new channel categories
-            for (const category of categories.channels) {
-                await db.execute(`
-                    INSERT INTO iptv_editor_categories (category_id, name, type, is_active)
-                    VALUES (?, ?, 'channels', true)
-                `, [category.value, category.text]);
-            }
+// Clear existing categories
+await db.query('DELETE FROM iptv_editor_categories WHERE type = ?', ['channels']);
+
+// Insert new categories
+for (const category of categories.channels) {
+    await db.query(`
+        INSERT INTO iptv_editor_categories (category_id, name, type, is_active)
+        VALUES (?, ?, 'channels', true)
+    `, [category.value, category.text]);
+}
             
             console.log(`✅ Synced ${categories.channels.length} channel categories`);
         }
