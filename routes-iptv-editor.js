@@ -485,6 +485,13 @@ router.post('/user/:username/sync', checkIPTVEditorEnabled, async (req, res) => 
     }
 });
 
+// Helper function to convert ISO date to MySQL timestamp
+function convertToMySQLTimestamp(isoDateString) {
+    if (!isoDateString) return null;
+    const date = new Date(isoDateString);
+    return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 // Create user by username (updated to match IPTV Editor API format)
 router.post('/user/create', [
     body('user_id').isInt({ min: 1 }).withMessage('User ID must be a positive integer'),
@@ -580,12 +587,12 @@ router.post('/user/create', [
             iptv_editor_password: localUser.iptv_password,
             m3u_code: creationResponse.customer?.m3u || null,
             epg_code: creationResponse.customer?.epg || null,
-            expiry_date: creationResponse.customer?.expiry || null,
+            expiry_date: convertToMySQLTimestamp(creationResponse.customer?.expiry), // FIXED: Convert ISO date
             max_connections: creationResponse.customer?.max_connections || 1,
-            sync_status: 'created',
-            last_sync_time: new Date(),
+            sync_status: 'synced',
+            last_sync_time: convertToMySQLTimestamp(new Date().toISOString()), // FIXED: Convert to MySQL format
             raw_editor_data: JSON.stringify(creationResponse),
-            created_at: new Date()
+            created_at: convertToMySQLTimestamp(new Date().toISOString()) // FIXED: Convert to MySQL format
         };
         
         // FIXED: Convert undefined values to null before database insertion
