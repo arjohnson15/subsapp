@@ -921,38 +921,222 @@ router.post('/users/:id/sync', checkIPTVEditorEnabled, async (req, res) => {
     }
 });
 
-router.get('/users/:id/status', checkIPTVEditorEnabled, async (req, res) => {
+router.get('/user/:userId/status', checkIPTVEditorEnabled, async (req, res) => {
     try {
-        const userId = parseInt(req.params.id);
+        const { userId } = req.params;
         
-        if (!userId || isNaN(userId)) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Invalid user ID' 
-            });
-        }
+        const result = await db.query(
+            'SELECT * FROM iptv_editor_users WHERE user_id = ?',
+            [userId]
+        );
         
-        console.log(`📊 Getting IPTV Editor user ${userId} status...`);
-        
-        const iptvUser = await iptvEditorService.getIPTVEditorUser(userId);
-        
-        if (!iptvUser) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'User not found in IPTV Editor' 
-            });
-        }
-        
-        res.json({ 
-            success: true, 
-            data: iptvUser 
+        res.json({
+            success: true,
+            iptvUser: result.length > 0 ? result[0] : null
         });
         
     } catch (error) {
-        console.error('❌ Error getting IPTV Editor user status:', error);
-        res.status(500).json({ 
-            success: false, 
+        console.error('Error getting IPTV Editor user status:', error);
+        res.status(500).json({
+            success: false,
             message: 'Failed to get user status',
+            error: error.message
+        });
+    }
+});
+
+// Helper function to convert ISO date to MySQL timestamp
+function convertToMySQLTimestamp(isoDateString) {
+    if (!isoDateString) return null;
+    const date = new Date(isoDateString);
+    return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+// Sync user data from IPTV Editor panel - ADD THIS ROUTE
+router.post('/user/:username/sync', checkIPTVEditorEnabled, async (req, res) => {
+    try {
+        const { username } = req.params;
+        const { user_id } = req.body;
+        console.log(`🔄 Syncing IPTV Editor user: ${username} for local user ${user_id}`);
+        
+        if (!user_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'User ID is required for syncing'
+            });
+        }
+        
+        // Get all users from IPTV Editor to find the one we want to sync
+        const allUsers = await iptvEditorService.getAllUsers();
+        
+        if (!allUsers || !Array.isArray(allUsers)) {
+            throw new Error('Failed to retrieve users from IPTV Editor');
+        }
+        
+        // Find the specific user by username
+        const targetUser = allUsers.find(user => 
+            user.username && user.username.toLowerCase() === username.toLowerCase()
+        );
+        
+        if (!targetUser) {
+            return res.status(404).json({
+                success: false,
+                message: `User '${username}' not found in IPTV Editor`
+            });
+        }
+        
+        console.log('👤 Found user in IPTV Editor:', targetUser);
+        
+        // Prepare user data for database save
+        const userDataToSave = {
+            user_id: user_id,
+            iptv_editor_id: targetUser.id,
+            iptv_editor_username: targetUser.username,
+            iptv_editor_password: targetUser.password,
+            m3u_code: targetUser.m3u,
+            epg_code: targetUser.epg,
+            expiry_date: convertToMySQLTimestamp(targetUser.expiry),
+            max_connections: targetUser.max_connections,
+            sync_status: 'synced',
+            last_sync_time: convertToMySQLTimestamp(new Date().toISOString()),
+            raw_editor_data: JSON.stringify(targetUser),
+            raw_sync_data: JSON.stringify(allUsers)
+        };
+        
+        // Check if user already exists in local database
+        const existingRecord = await db.query(
+            'SELECT id FROM iptv_editor_users WHERE user_id = ?',
+            [user_id]
+        );
+        
+        if (existingRecord && existingRecord.length > 0) {
+            // Update existing record
+            await db.query(`
+                UPDATE iptv_editor_users SET 
+                    iptv_editor_id = ?, iptv_editor_username = ?, iptv_editor_password = ?,
+                    m3u_code = ?, epg_code = ?, expiry_date = ?, max_connections = ?,
+                    sync_status = ?, last_sync_time = ?, raw_editor_data = ?, raw_sync_data = ?
+                WHERE user_id = ?
+            `, [
+                userDataToSave.iptv_editor_id, userDataToSave.iptv_editor_username, 
+                userDataToSave.iptv_editor_password, userDataToSave.m3u_code, 
+                userDataToSave.epg_code, userDataToSave.expiry_date, 
+                userDataToSave.max_connections, userDataToSave.sync_status, 
+                userDataToSave.last_sync_time, userDataToSave.raw_editor_data, 
+                userDataToSave.raw_sync_data, user_id
+            ]);
+            console.log(`✅ Updated existing IPTV Editor record for user ${user_id}`);
+        } else {
+            // Insert new record
+            await db.query(`
+                INSERT INTO iptv_editor_users (
+                    user_id, iptv_editor_id, iptv_editor_username, iptv_editor_password,
+                    m3u_code, epg_code, expiry_date, max_connections,
+                    sync_status, last_sync_time, raw_editor_data, raw_sync_data, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                user_id, userDataToSave.iptv_editor_id, userDataToSave.iptv_editor_username,
+                userDataToSave.iptv_editor_password, userDataToSave.m3u_code,
+                userDataToSave.epg_code, userDataToSave.expiry_date,
+                userDataToSave.max_connections, userDataToSave.sync_status,
+                userDataToSave.last_sync_time, userDataToSave.raw_editor_data,
+                userDataToSave.raw_sync_data, convertToMySQLTimestamp(new Date().toISOString())
+            ]);
+            console.log(`✅ Created new IPTV Editor record for user ${user_id}`);
+        }
+        
+        // Update main users table
+        await db.query('UPDATE users SET iptv_editor_enabled = TRUE WHERE id = ?', [user_id]);
+        
+        // Return response data
+        const responseData = {
+            username: targetUser.username,
+            max_connections: targetUser.max_connections,
+            expiry: targetUser.expiry,
+            last_updated: new Date().toLocaleDateString(),
+            iptv_editor_id: targetUser.id,
+            m3u_url: targetUser.m3u ? `https://editor.iptveditor.com/m3u/${targetUser.m3u}` : null,
+            epg_url: targetUser.epg ? `https://editor.iptveditor.com/epg/${targetUser.epg}` : null,
+            xtream_url: targetUser.m3u ? `https://xtream.johnsonflix.tv/${targetUser.m3u}` : null
+        };
+        
+        res.json({
+            success: true,
+            user: responseData,
+            message: `User '${username}' synced and saved successfully`
+        });
+        
+    } catch (error) {
+        console.error('❌ Error syncing IPTV Editor user:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to sync user',
+            error: error.message
+        });
+    }
+});
+
+// Delete IPTV Editor user - ADD THIS ROUTE
+router.delete('/user/:username', checkIPTVEditorEnabled, async (req, res) => {
+    try {
+        const { username } = req.params;
+        const { user_id } = req.body;
+        
+        console.log(`🗑️ Deleting IPTV Editor user: ${username} for local user ${user_id}`);
+        
+        if (!user_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'User ID is required for deletion'
+            });
+        }
+        
+        // Get user data from local database
+        const localRecord = await db.query(
+            'SELECT * FROM iptv_editor_users WHERE user_id = ? AND iptv_editor_username = ?',
+            [user_id, username]
+        );
+        
+        if (localRecord.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'IPTV Editor user not found in local database'
+            });
+        }
+        
+        const iptvUser = localRecord[0];
+        
+        // Delete from IPTV Editor service
+        try {
+            const deleteData = {
+                id: iptvUser.iptv_editor_id
+            };
+            
+            const deleteResponse = await iptvEditorService.makeRequest('/api/reseller/remove', deleteData);
+            console.log('✅ IPTV Editor deletion response:', deleteResponse);
+        } catch (deleteError) {
+            console.warn('⚠️ Warning: Failed to delete from IPTV Editor service:', deleteError.message);
+            // Continue with local deletion even if remote deletion fails
+        }
+        
+        // Delete from local database
+        await db.query('DELETE FROM iptv_editor_users WHERE user_id = ?', [user_id]);
+        
+        // Update main users table
+        await db.query('UPDATE users SET iptv_editor_enabled = FALSE WHERE id = ?', [user_id]);
+        
+        console.log(`✅ IPTV Editor user deleted successfully for local user ${user_id}`);
+        
+        res.json({
+            success: true,
+            message: `IPTV Editor user '${username}' deleted successfully`
+        });
+        
+    } catch (error) {
+        console.error('❌ Error deleting IPTV Editor user:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete IPTV Editor user',
             error: error.message
         });
     }

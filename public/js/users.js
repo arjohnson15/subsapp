@@ -952,10 +952,13 @@ async editUser(userId) {
         // No more automatic API calls that interfere with editing
         
         // Populate form with database data only
-        setTimeout(() => {
-            console.log(`🔧 Populating form for editing user: ${user.name}`);
-            window.populateFormForEditing(user);
-        }, 1200);
+setTimeout(async () => {
+    console.log(`🔧 Populating form for editing user: ${user.name}`);
+    window.populateFormForEditing(user);
+    
+    // Load IPTV Editor status
+    await loadIPTVEditorStatus(user.id);
+}, 1200);
         
     } catch (error) {
         Utils.handleError(error, 'Loading user for editing');
@@ -3034,6 +3037,218 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Global variable to store IPTV Editor data
+let currentIPTVEditorData = null;
+
+// Function to load IPTV Editor status for a user
+async function loadIPTVEditorStatus(userId) {
+    if (!userId) return;
+    
+    try {
+        const response = await fetch(`/api/iptv-editor/user/${userId}/status`);
+        const data = await response.json();
+        
+        if (data.success && data.iptvUser) {
+            currentIPTVEditorData = data.iptvUser;
+            displayIPTVEditorStatus(data.iptvUser);
+        } else {
+            hideIPTVEditorStatus();
+        }
+    } catch (error) {
+        console.error('Error loading IPTV Editor status:', error);
+        hideIPTVEditorStatus();
+    }
+}
+
+// Function to display IPTV Editor status
+function displayIPTVEditorStatus(iptvUser) {
+    const statusSection = document.getElementById('iptvEditorStatusSection');
+    const m3uSection = document.getElementById('iptvEditorM3USection');
+    const indicator = document.getElementById('iptvEditorIndicator');
+    
+    if (statusSection) {
+        statusSection.style.display = 'block';
+        
+        // Update status details
+        document.getElementById('iptvEditorUsername').textContent = iptvUser.iptv_editor_username || '-';
+        document.getElementById('iptvEditorLastSync').textContent = iptvUser.last_sync_time ? 
+            new Date(iptvUser.last_sync_time).toLocaleDateString() : '-';
+        document.getElementById('iptvEditorSyncStatus').textContent = iptvUser.sync_status || '-';
+        
+        // Update status dot color based on sync status
+        const statusDot = document.getElementById('iptvEditorStatusDot');
+        if (statusDot) {
+            switch (iptvUser.sync_status) {
+                case 'synced':
+                    statusDot.style.background = '#4caf50';
+                    break;
+                case 'error':
+                    statusDot.style.background = '#f44336';
+                    break;
+                default:
+                    statusDot.style.background = '#ff9800';
+            }
+        }
+    }
+    
+    // Show M3U Plus URL if available
+    if (m3uSection && iptvUser.m3u_code) {
+        m3uSection.style.display = 'block';
+        const m3uUrl = `https://xtream.johnsonflix.tv/${iptvUser.m3u_code}`;
+        document.getElementById('iptvEditorM3UUrl').value = m3uUrl;
+    }
+    
+    // Show indicator
+    if (indicator) {
+        indicator.style.display = 'flex';
+    }
+}
+
+// Function to hide IPTV Editor status
+function hideIPTVEditorStatus() {
+    const statusSection = document.getElementById('iptvEditorStatusSection');
+    const m3uSection = document.getElementById('iptvEditorM3USection');
+    const indicator = document.getElementById('iptvEditorIndicator');
+    
+    if (statusSection) statusSection.style.display = 'none';
+    if (m3uSection) m3uSection.style.display = 'none';
+    if (indicator) indicator.style.display = 'none';
+    
+    currentIPTVEditorData = null;
+}
+
+// Enhanced sync function for IPTV Editor user
+async function syncIPTVEditorUser() {
+    if (!currentEditingUserId || !currentIPTVEditorData) {
+        Utils.showNotification('No IPTV Editor user to sync', 'error');
+        return;
+    }
+    
+    try {
+        const btn = document.getElementById('syncIptvEditorBtn');
+        btn.disabled = true;
+        btn.textContent = 'Syncing...';
+        
+        const response = await fetch(`/api/iptv-editor/user/${currentIPTVEditorData.iptv_editor_username}/sync`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: currentEditingUserId
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            Utils.showNotification('IPTV Editor user synced successfully', 'success');
+            // Reload the status to show updated info
+            await loadIPTVEditorStatus(currentEditingUserId);
+        } else {
+            Utils.showNotification('Sync failed: ' + data.message, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error syncing IPTV Editor user:', error);
+        Utils.showNotification('Sync failed: ' + error.message, 'error');
+    } finally {
+        const btn = document.getElementById('syncIptvEditorBtn');
+        btn.disabled = false;
+        btn.textContent = 'Sync';
+    }
+}
+
+// Function to copy IPTV Editor M3U URL
+function copyEditorM3UUrl() {
+    const urlInput = document.getElementById('iptvEditorM3UUrl');
+    if (urlInput && urlInput.value) {
+        urlInput.select();
+        document.execCommand('copy');
+        Utils.showNotification('IPTV Editor M3U URL copied to clipboard', 'success');
+    }
+}
+
+// Enhanced delete function that handles both IPTV services
+async function deleteIPTVSubscription() {
+    if (!currentEditingUserId) {
+        Utils.showNotification('No user selected', 'error');
+        return;
+    }
+    
+    // Check what services need to be deleted
+    const hasRegularIPTV = document.getElementById('iptvLineId').textContent !== 'None';
+    const hasIPTVEditor = currentIPTVEditorData !== null;
+    
+    if (!hasRegularIPTV && !hasIPTVEditor) {
+        Utils.showNotification('No IPTV subscriptions found to delete', 'error');
+        return;
+    }
+    
+    // Build confirmation message
+    let confirmMessage = '⚠️ WARNING: This will permanently delete:\n\n';
+    if (hasRegularIPTV) {
+        confirmMessage += `• Regular IPTV subscription (Line ID: ${document.getElementById('iptvLineId').textContent})\n`;
+    }
+    if (hasIPTVEditor) {
+        confirmMessage += `• IPTV Editor account (${currentIPTVEditorData.iptv_editor_username})\n`;
+    }
+    confirmMessage += '\nThis action cannot be undone. Are you sure you want to proceed?';
+    
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    try {
+        const deleteBtn = document.getElementById('iptvDeleteBtn');
+        deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+        deleteBtn.disabled = true;
+        
+        // Delete regular IPTV subscription if exists (use existing IPTV.deleteSubscription logic)
+        if (hasRegularIPTV) {
+            // Call the existing IPTV delete function
+            await IPTV.deleteSubscription();
+        }
+        
+        // Delete IPTV Editor account if exists
+        if (hasIPTVEditor) {
+            const response = await fetch(`/api/iptv-editor/user/${currentIPTVEditorData.iptv_editor_username}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: currentEditingUserId
+                })
+            });
+            
+            const result = await response.json();
+            if (!result.success) {
+                throw new Error('Failed to delete IPTV Editor: ' + result.message);
+            }
+        }
+        
+        Utils.showNotification('All IPTV subscriptions deleted successfully', 'success');
+        
+        // Reset IPTV Editor interface
+        hideIPTVEditorStatus();
+        
+        // Hide M3U sections
+        const m3uSection = document.getElementById('iptvM3USection');
+        const editorM3uSection = document.getElementById('iptvEditorM3USection');
+        if (m3uSection) m3uSection.style.display = 'none';
+        if (editorM3uSection) editorM3uSection.style.display = 'none';
+        
+    } catch (error) {
+        console.error('Error deleting IPTV subscriptions:', error);
+        Utils.showNotification('Delete failed: ' + error.message, 'error');
+    } finally {
+        const deleteBtn = document.getElementById('iptvDeleteBtn');
+        deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete Subscription';
+        deleteBtn.disabled = false;
+    }
+}
 
 // Enhanced IPTV check button initialization with proper cleanup
 window.initializeIPTVCheck = function() {
