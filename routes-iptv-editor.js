@@ -344,6 +344,220 @@ router.get('/users', checkIPTVEditorEnabled, async (req, res) => {
     }
 });
 
+// Sync user by username (different from existing /users/:id/sync)
+router.post('/user/:username/sync', checkIPTVEditorEnabled, async (req, res) => {
+    try {
+        const { username } = req.params;
+        const { user_id } = req.body;
+        
+        console.log(`🔄 Syncing IPTV Editor user: ${username}`);
+        
+        if (!user_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'User ID is required for syncing'
+            });
+        }
+        
+        // Get all users from IPTV Editor to find the one we want to sync
+        const allUsers = await iptvEditorService.getAllUsers();
+        
+        if (!allUsers || !Array.isArray(allUsers)) {
+            throw new Error('Failed to retrieve users from IPTV Editor');
+        }
+        
+        // Find the specific user by username
+        const targetUser = allUsers.find(user => 
+            user.username && user.username.toLowerCase() === username.toLowerCase()
+        );
+        
+        if (!targetUser) {
+            return res.status(404).json({
+                success: false,
+                message: `User '${username}' not found in IPTV Editor`
+            });
+        }
+        
+        console.log(`📋 Found user to sync:`, targetUser);
+        
+        // Call the force-sync endpoint to get fresh data from PinkPony
+        const playlistId = await iptvEditorService.getSetting('default_playlist_id');
+        const syncData = {
+            playlist: playlistId,
+            items: [{
+                id: targetUser.id,
+                username: targetUser.username,
+                password: targetUser.password
+            }],
+            xtream: {
+                url: "https://pinkpony.lol",
+                param1: targetUser.username,
+                param2: targetUser.password,
+                type: "xtream"
+            }
+        };
+        
+        const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', syncData);
+        console.log(`✅ Force-sync response:`, syncResponse);
+        
+        // Save/update in database
+        const userDataToSave = {
+            iptv_editor_id: targetUser.id,
+            iptv_editor_username: targetUser.username,
+            iptv_editor_password: targetUser.password,
+            m3u_code: targetUser.m3u,
+            epg_code: targetUser.epg,
+            expiry_date: syncResponse.expiry || targetUser.expiry,
+            max_connections: syncResponse.max_connections || targetUser.max_connections,
+            time_shift: syncResponse.time_shift || 0,
+            sync_status: 'synced',
+            last_sync_time: new Date(),
+            raw_editor_data: JSON.stringify(targetUser),
+            raw_sync_data: JSON.stringify(syncResponse)
+        };
+        
+        // Check if record exists
+        const existingRecord = await db.query(
+            'SELECT id FROM iptv_editor_users WHERE user_id = ?',
+            [user_id]
+        );
+        
+        if (existingRecord && existingRecord.length > 0) {
+            // Update existing record
+            await db.query(`
+                UPDATE iptv_editor_users SET 
+                    iptv_editor_id = ?, iptv_editor_username = ?, iptv_editor_password = ?,
+                    m3u_code = ?, epg_code = ?, expiry_date = ?, max_connections = ?,
+                    time_shift = ?, sync_status = ?, last_sync_time = ?,
+                    raw_editor_data = ?, raw_sync_data = ?
+                WHERE user_id = ?
+            `, [
+                userDataToSave.iptv_editor_id, userDataToSave.iptv_editor_username, 
+                userDataToSave.iptv_editor_password, userDataToSave.m3u_code, 
+                userDataToSave.epg_code, userDataToSave.expiry_date, 
+                userDataToSave.max_connections, userDataToSave.time_shift,
+                userDataToSave.sync_status, userDataToSave.last_sync_time,
+                userDataToSave.raw_editor_data, userDataToSave.raw_sync_data,
+                user_id
+            ]);
+        } else {
+            // Insert new record
+            await db.query(`
+                INSERT INTO iptv_editor_users (
+                    user_id, iptv_editor_id, iptv_editor_username, iptv_editor_password,
+                    m3u_code, epg_code, expiry_date, max_connections, time_shift,
+                    sync_status, last_sync_time, raw_editor_data, raw_sync_data, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            `, [
+                user_id, userDataToSave.iptv_editor_id, userDataToSave.iptv_editor_username,
+                userDataToSave.iptv_editor_password, userDataToSave.m3u_code,
+                userDataToSave.epg_code, userDataToSave.expiry_date,
+                userDataToSave.max_connections, userDataToSave.time_shift,
+                userDataToSave.sync_status, userDataToSave.last_sync_time,
+                userDataToSave.raw_editor_data, userDataToSave.raw_sync_data
+            ]);
+        }
+        
+        // Return response data
+        const responseData = {
+            username: targetUser.username,
+            max_connections: syncResponse.max_connections || targetUser.max_connections,
+            expiry: syncResponse.expiry || targetUser.expiry,
+            last_updated: new Date().toLocaleDateString(),
+            iptv_editor_id: targetUser.id,
+            m3u_url: targetUser.m3u ? `https://editor.iptveditor.com/m3u/${targetUser.m3u}` : null,
+            epg_url: targetUser.epg ? `https://editor.iptveditor.com/epg/${targetUser.epg}` : null
+        };
+        
+        res.json({
+            success: true,
+            user: responseData,
+            message: `User '${username}' synced and saved successfully`
+        });
+        
+    } catch (error) {
+        console.error('❌ Error syncing IPTV Editor user:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to sync user',
+            error: error.message
+        });
+    }
+});
+
+// Create user by username (different from existing /create-user)
+router.post('/user/create', [
+    body('user_id').isInt({ min: 1 }).withMessage('User ID must be a positive integer'),
+    body('username').isString().notEmpty().withMessage('Username is required'),
+    body('password').optional().isString(),
+    body('max_connections').optional().isInt({ min: 1, max: 10 }),
+    body('expiry_date').optional().isISO8601(),
+    handleValidationErrors
+], checkIPTVEditorEnabled, async (req, res) => {
+    try {
+        const { user_id, username, password, max_connections = 1, expiry_date } = req.body;
+        console.log(`👤 Creating new IPTV Editor user: ${username} for local user ${user_id}`);
+        
+        // Check if local user exists
+        const localUser = await db.query('SELECT id, name, email FROM users WHERE id = ?', [user_id]);
+        if (!localUser || localUser.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Local user not found'
+            });
+        }
+        
+        // Generate password if not provided
+        const userPassword = password || Math.random().toString(36).substring(2, 10);
+        
+        // Set default expiry if not provided (1 month from now)
+        const userExpiry = expiry_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        
+        // Get playlist ID
+        const playlistId = await iptvEditorService.getSetting('default_playlist_id');
+        if (!playlistId) {
+            throw new Error('Default playlist ID not configured');
+        }
+        
+        // Prepare creation data (you'll need to implement the actual API call)
+        const creationData = {
+            playlist: playlistId,
+            username: username,
+            password: userPassword,
+            max_connections: max_connections,
+            expiry: userExpiry,
+            name: localUser[0].name || username
+        };
+        
+        console.log('📤 Would create user with data:', creationData);
+        
+        // TODO: Implement actual IPTV Editor user creation API call
+        // const creationResponse = await iptvEditorService.makeRequest('/api/reseller/new-customer', creationData);
+        
+        // For now, return success with dummy data
+        res.json({
+            success: true,
+            user: {
+                username: username,
+                password: userPassword,
+                max_connections: max_connections,
+                expiry: userExpiry,
+                last_updated: new Date().toLocaleDateString()
+            },
+            message: `IPTV Editor account would be created for ${username}`,
+            note: 'Creation API not yet implemented'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error creating IPTV Editor user:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to create IPTV Editor user',
+            error: error.message
+        });
+    }
+});
+
 // Sync user data from IPTV Editor panel
 router.post('/user/:username/sync', checkIPTVEditorEnabled, async (req, res) => {
     try {
