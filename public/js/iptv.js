@@ -926,10 +926,29 @@ if (result.data.iptv_editor_success || result.data.iptv_editor_created || result
     
     // Force reload the user data to show IPTV Editor section
     if (this.currentUser) {
-        setTimeout(() => {
-            console.log('🔄 Reloading page to show IPTV Editor data...');
-            window.location.reload();
-        }, 2500); // Reload after notifications show
+// *** FIXED: Refresh user status with proper delay but NO page reload ***
+setTimeout(() => {
+    console.log('🔄 Refreshing IPTV status...');
+    this.loadCurrentUserIPTVStatus();
+    
+    // *** ALSO LOAD IPTV EDITOR STATUS ***
+    setTimeout(() => {
+        console.log('🔄 Refreshing IPTV Editor status...');
+        fetch(`/api/iptv-editor/user/${userId}/status`)
+            .then(r => r.json())
+            .then(data => {
+                console.log('📊 IPTV Editor status loaded:', data);
+                if (data.success && data.iptvUser) {
+                    if (typeof loadIPTVEditorStatus === 'function') {
+                        loadIPTVEditorStatus(userId);
+                    } else if (typeof displayIPTVEditorStatus === 'function') {
+                        displayIPTVEditorStatus(data.iptvUser);
+                    }
+                }
+            })
+            .catch(err => console.log('⚠️ IPTV Editor status load failed:', err));
+    }, 500); // Load IPTV Editor status 500ms after main status
+}, 2000); // Give time for notifications to show
     }
 }
     
@@ -960,10 +979,28 @@ if (result.data.iptv_editor_success || result.data.iptv_editor_created || result
         alert(successMessage);
     }
     
-    // Refresh user status to ensure everything is current
+// Refresh user status to ensure everything is current
+setTimeout(() => {
+    this.loadCurrentUserIPTVStatus();
+    
+    // *** ALSO LOAD IPTV EDITOR STATUS ***
     setTimeout(() => {
-        this.loadCurrentUserIPTVStatus();
-    }, 1000);
+        console.log('🔄 Refreshing IPTV Editor status...');
+        fetch(`/api/iptv-editor/user/${userId}/status`)
+            .then(r => r.json())
+            .then(data => {
+                console.log('📊 IPTV Editor status loaded:', data);
+                if (data.success && data.iptvUser) {
+                    if (typeof loadIPTVEditorStatus === 'function') {
+                        loadIPTVEditorStatus(userId);
+                    } else if (typeof displayIPTVEditorStatus === 'function') {
+                        displayIPTVEditorStatus(data.iptvUser);
+                    }
+                }
+            })
+            .catch(err => console.log('⚠️ IPTV Editor status load failed:', err));
+    }, 500);
+}, 1000);
     
 } else {
     // Show success without enhanced data

@@ -797,36 +797,51 @@ try {
       existingUser.max_connections || 2
     ]);
     
-// Wait a moment for the user to be fully created before syncing
-console.log('⏳ Waiting 2 seconds before force-sync...');
-await new Promise(resolve => setTimeout(resolve, 2000));
+// Enhanced force-sync for existing user
+console.log('🔄 Triggering force-sync for existing IPTV Editor user...');
 
-// Force sync the newly created user  
 const forceSyncData = {
   playlist: settings.default_playlist_id,
   items: [{
-    id: createResponse.customer.id,
-    username: finalUsername,    // IPTV panel username
-    password: actualPassword    // IPTV panel password
+    id: existingUser.id,           // ✅ FIXED: Use existingUser.id, not createResponse.customer.id
+    username: finalUsername,
+    password: actualPassword
   }],
   xtream: {
     url: "https://pinkpony.lol",
-    param1: finalUsername,      // IPTV panel username  
-    param2: actualPassword,     // IPTV panel password
+    param1: finalUsername,
+    param2: actualPassword,
     type: "xtream"
   }
 };
 
 try {
+  const syncStartTime = Date.now();
   const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
-  console.log('✅ IPTV Editor user force-synced successfully');
+  const syncDuration = Date.now() - syncStartTime;
+  
+  console.log(`✅ IPTV Editor force-sync completed in ${syncDuration}ms:`, syncResponse);
+  
+  // Log the sync
+  await db.query(`
+    INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, duration_ms)
+    VALUES ('user_link_sync', ?, 'success', ?, ?, ?)
+  `, [
+    user_id,
+    JSON.stringify(forceSyncData),
+    JSON.stringify(syncResponse),
+    syncDuration
+  ]);
+  
 } catch (syncError) {
-  console.log('⚠️ Force-sync failed (but user was created successfully):', syncError.message);
-  // Continue - we'll mark as 'pending' and can sync later
+  console.error('⚠️ Force-sync failed for existing user:', syncError.message);
+  
+  // Log the failed sync
+  await db.query(`
+    INSERT INTO iptv_sync_logs (sync_type, user_id, status, error_message)
+    VALUES ('user_link_sync', ?, 'error', ?)
+  `, [user_id, syncError.message]);
 }
-    
-    const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
-    console.log('✅ IPTV Editor user synced successfully');
     
     iptvEditorSynced = true;
     iptvEditorData = {
@@ -876,33 +891,54 @@ try {
     if (createResponse && createResponse.customer) {
       console.log('✅ IPTV Editor user created successfully');
       
-// Wait a moment for the user to be fully created before syncing
-console.log('⏳ Waiting 2 seconds before force-sync...');
-await new Promise(resolve => setTimeout(resolve, 2000));
+if (createResponse && createResponse.customer) {
+  console.log('✅ IPTV Editor user created successfully');
+  
+  // Enhanced force-sync with logging
+  console.log('🔄 Triggering force-sync for newly created IPTV Editor user...');
 
-// Force sync the newly created user  
-const forceSyncData = {
-  playlist: settings.default_playlist_id,
-  items: [{
-    id: createResponse.customer.id,
-    username: finalUsername,    // IPTV panel username
-    password: actualPassword    // IPTV panel password
-  }],
-  xtream: {
-    url: "https://pinkpony.lol",
-    param1: finalUsername,      // IPTV panel username  
-    param2: actualPassword,     // IPTV panel password
-    type: "xtream"
+  const forceSyncData = {
+    playlist: settings.default_playlist_id,
+    items: [{
+      id: createResponse.customer.id,
+      username: finalUsername,
+      password: actualPassword
+    }],
+    xtream: {
+      url: "https://pinkpony.lol",
+      param1: finalUsername,
+      param2: actualPassword,
+      type: "xtream"
+    }
+  };
+
+  try {
+    const syncStartTime = Date.now();
+    const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
+    const syncDuration = Date.now() - syncStartTime;
+    
+    console.log(`✅ IPTV Editor force-sync completed in ${syncDuration}ms:`, syncResponse);
+    
+    // Log the sync
+    await db.query(`
+      INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, duration_ms)
+      VALUES ('user_create_sync', ?, 'success', ?, ?, ?)
+    `, [
+      user_id,
+      JSON.stringify(forceSyncData),
+      JSON.stringify(syncResponse),
+      syncDuration
+    ]);
+    
+  } catch (syncError) {
+    console.error('⚠️ Force-sync failed for new user (but creation was successful):', syncError.message);
+    
+    // Log the failed sync
+    await db.query(`
+      INSERT INTO iptv_sync_logs (sync_type, user_id, status, error_message)
+      VALUES ('user_create_sync', ?, 'error', ?)
+    `, [user_id, syncError.message]);
   }
-};
-
-try {
-  const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
-  console.log('✅ IPTV Editor user force-synced successfully');
-} catch (syncError) {
-  console.log('⚠️ Force-sync failed (but user was created successfully):', syncError.message);
-  // Continue - we'll mark as 'pending' and can sync later
-}
       
       const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
       console.log('✅ IPTV Editor user force-synced successfully');
@@ -1553,16 +1589,18 @@ router.delete('/subscription/:lineId', [
 ], async (req, res) => {
   try {
     const { lineId } = req.params;
-    const { userId } = req.query; // Optional user ID for database cleanup
+    const { userId } = req.query;
     
-    console.log(`🗑️ Processing complete IPTV subscription deletion for line: ${lineId}`);
+    console.log(`🗑️ Starting comprehensive IPTV deletion for line: ${lineId}, user: ${userId}`);
     
     await iptvService.initialize();
     
     let panelResult = null;
     let panelDeleted = false;
+    let iptvEditorDeleted = false;
+    let databaseCleared = false;
     
-    // Step 1: Try to delete from panel (but don't fail if already gone)
+    // Step 1: Delete from IPTV panel
     try {
       panelResult = await iptvService.deleteUserSubscription(lineId);
       panelDeleted = true;
@@ -1570,38 +1608,47 @@ router.delete('/subscription/:lineId', [
     } catch (panelError) {
       console.log('ℹ️ Panel deletion failed (subscription may not exist):', panelError.message);
       panelResult = { error: panelError.message };
-      panelDeleted = false;
     }
 
-    // Step 2: ALWAYS try to delete from IPTV Editor if user exists there
-    let iptvEditorDeleted = false;
+    // Step 2: Delete from IPTV Editor if user exists there
     if (userId) {
       try {
-        const iptvEditorService = require('./iptv-editor-service');
+        console.log(`🔍 Checking for IPTV Editor account for user ${userId}...`);
         
-        // Check if user has IPTV Editor account
         const iptvEditorResult = await db.query(`
-          SELECT iptv_editor_id FROM iptv_editor_users WHERE user_id = ?
+          SELECT iptv_editor_id, iptv_editor_username FROM iptv_editor_users WHERE user_id = ?
         `, [userId]);
         
         if (iptvEditorResult.length > 0) {
-          console.log(`🗑️ Deleting IPTV Editor user: ${userId}`);
+          const editorUser = iptvEditorResult[0];
+          console.log(`🗑️ Deleting IPTV Editor user: ${editorUser.iptv_editor_username} (ID: ${editorUser.iptv_editor_id})`);
           
-          await iptvEditorService.deleteUser(userId);
+          // Load IPTV Editor Service
+          const iptvEditorService = require('./iptv-editor-service');
+          
+          // Delete from IPTV Editor API
+          try {
+            const deleteData = { id: editorUser.iptv_editor_id };
+            const deleteResponse = await iptvEditorService.makeRequest('/api/reseller/remove', deleteData);
+            console.log('✅ IPTV Editor API deletion successful:', deleteResponse);
+          } catch (apiError) {
+            console.warn('⚠️ IPTV Editor API deletion failed:', apiError.message);
+          }
+          
+          // CRITICAL: Delete from local database
+          await db.query('DELETE FROM iptv_editor_users WHERE user_id = ?', [userId]);
+          console.log('✅ IPTV Editor user deleted from local database');
+          
           iptvEditorDeleted = true;
-          
-          console.log('✅ IPTV Editor user deleted successfully');
         } else {
           console.log(`ℹ️ No IPTV Editor account found for user ${userId}`);
         }
       } catch (iptvEditorError) {
         console.error('⚠️ IPTV Editor deletion failed:', iptvEditorError.message);
-        // Don't throw - continue with database cleanup
       }
     }
     
-    // Step 3: Clear from database if user ID provided
-    let databaseCleared = false;
+    // Step 3: Clear from main users table
     if (userId) {
       try {
         console.log(`🧹 Clearing IPTV data from database for user: ${userId}`);
@@ -1617,6 +1664,7 @@ router.delete('/subscription/:lineId', [
             iptv_channel_group_id = NULL,
             iptv_connections = NULL,
             iptv_is_trial = FALSE,
+            iptv_editor_enabled = FALSE,
             implayer_code = NULL,
             device_count = 1,
             updated_at = NOW()
@@ -1630,47 +1678,53 @@ router.delete('/subscription/:lineId', [
       }
     }
     
-    // Step 4: Log the activity
+    // Step 4: Log the comprehensive activity
     try {
       await db.query(`
         INSERT INTO iptv_activity_log (user_id, line_id, action, success, api_response, created_at)
-        VALUES (?, ?, 'delete', ?, ?, NOW())
+        VALUES (?, ?, 'comprehensive_delete', ?, ?, NOW())
       `, [
         userId || null, 
         lineId, 
-        panelDeleted || iptvEditorDeleted || databaseCleared, // Success if ANY part worked
+        panelDeleted || iptvEditorDeleted || databaseCleared,
         JSON.stringify({
-          panel: panelResult,
+          panel_deleted: panelDeleted,
+          panel_result: panelResult,
           iptv_editor_deleted: iptvEditorDeleted,
-          database_cleared: databaseCleared
+          database_cleared: databaseCleared,
+          timestamp: new Date().toISOString()
         })
       ]);
     } catch (logError) {
-      console.error('❌ Failed to log activity:', logError.message);
+      console.error('❌ Failed to log comprehensive deletion:', logError.message);
     }
     
-    // Step 5: Return comprehensive response
-    const allSuccessful = panelDeleted && iptvEditorDeleted && databaseCleared;
+    // Step 5: Return detailed response
     const anySuccessful = panelDeleted || iptvEditorDeleted || databaseCleared;
+    
+    let message = `Deletion completed for line ${lineId}`;
+    if (panelDeleted) message += ' - Panel ✅';
+    if (iptvEditorDeleted) message += ' - IPTV Editor ✅';
+    if (databaseCleared) message += ' - Database ✅';
     
     res.json({
       success: anySuccessful,
-      message: generateDeletionMessage(panelDeleted, iptvEditorDeleted, databaseCleared, lineId, userId),
+      message: message,
       details: {
         lineId: lineId,
         userId: userId,
         panel_deleted: panelDeleted,
         iptv_editor_deleted: iptvEditorDeleted,
         database_cleared: databaseCleared,
-        all_successful: allSuccessful
+        comprehensive_cleanup: true
       }
     });
     
   } catch (error) {
-    console.error('❌ Critical error in subscription deletion:', error);
+    console.error('❌ Comprehensive IPTV deletion failed:', error);
     res.status(500).json({
       success: false,
-      message: 'Critical deletion error occurred',
+      message: 'Failed to delete IPTV subscription',
       error: error.message
     });
   }
