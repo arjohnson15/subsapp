@@ -879,6 +879,13 @@ async createSubscription(action) {
         }
         
         console.log('✅ IPTV subscription created successfully:', result);
+		
+		// DEBUG: Log all response data
+console.log('🐛 Full response data:', result.data);
+console.log('🐛 IPTV Editor created:', result.data.iptv_editor_created);
+console.log('🐛 IPTV Editor synced:', result.data.iptv_editor_synced); 
+console.log('🐛 IPTV Editor success:', result.data.iptv_editor_success);
+console.log('🐛 IPTV Editor data:', result.data.iptv_editor_data);
         
 // Update the IPTV status display with enhanced data
 if (result.data) {
@@ -891,6 +898,40 @@ if (result.data) {
     
     // CRITICAL FIX: Populate form fields with retrieved data
     this.populateFormFieldsAfterCreation(result.data);
+	
+	// IPTV EDITOR SUCCESS HANDLING - ADD THIS SECTION
+if (result.data.iptv_editor_success || result.data.iptv_editor_created || result.data.iptv_editor_synced) {
+    console.log('🎯 IPTV Editor integration completed:', result.data.iptv_editor_data);
+    
+    // Show IPTV Editor success notification
+    let editorMessage = '';
+    if (result.data.iptv_editor_created) {
+        editorMessage = '✅ IPTV Editor user created successfully!';
+    } else if (result.data.iptv_editor_synced) {
+        editorMessage = '✅ IPTV Editor user found and synced successfully!';
+    }
+    
+    if (editorMessage) {
+        if (window.Utils && window.Utils.showNotification) {
+            // Show separate notification for IPTV Editor
+            setTimeout(() => {
+                window.Utils.showNotification(editorMessage, 'success');
+            }, 1500); // Delay slightly so it shows after main message
+        }
+        
+        // Log to console for debugging
+        console.log('🎯 ' + editorMessage);
+        console.log('🎯 IPTV Editor Data:', result.data.iptv_editor_data);
+    }
+    
+    // Force reload the user data to show IPTV Editor section
+    if (this.currentUser) {
+        setTimeout(() => {
+            console.log('🔄 Reloading page to show IPTV Editor data...');
+            window.location.reload();
+        }, 2500); // Reload after notifications show
+    }
+}
     
     // Update interface state
     this.userHasExistingIPTVData = true;

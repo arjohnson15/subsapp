@@ -797,21 +797,33 @@ try {
       existingUser.max_connections || 2
     ]);
     
-    // Force sync the user
-    const forceSyncData = {
-      playlist: settings.default_playlist_id,
-      items: [{
-        id: existingUser.id,
-        username: finalUsername,
-        password: actualPassword
-      }],
-      xtream: {
-        url: "https://pinkpony.lol",
-        param1: finalUsername,
-        param2: actualPassword,
-        type: "xtream"
-      }
-    };
+// Wait a moment for the user to be fully created before syncing
+console.log('⏳ Waiting 2 seconds before force-sync...');
+await new Promise(resolve => setTimeout(resolve, 2000));
+
+// Force sync the newly created user  
+const forceSyncData = {
+  playlist: settings.default_playlist_id,
+  items: [{
+    id: createResponse.customer.id,
+    username: finalUsername,    // IPTV panel username
+    password: actualPassword    // IPTV panel password
+  }],
+  xtream: {
+    url: "https://pinkpony.lol",
+    param1: finalUsername,      // IPTV panel username  
+    param2: actualPassword,     // IPTV panel password
+    type: "xtream"
+  }
+};
+
+try {
+  const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
+  console.log('✅ IPTV Editor user force-synced successfully');
+} catch (syncError) {
+  console.log('⚠️ Force-sync failed (but user was created successfully):', syncError.message);
+  // Continue - we'll mark as 'pending' and can sync later
+}
     
     const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
     console.log('✅ IPTV Editor user synced successfully');
@@ -864,21 +876,33 @@ try {
     if (createResponse && createResponse.customer) {
       console.log('✅ IPTV Editor user created successfully');
       
-      // Force sync the newly created user  
-      const forceSyncData = {
-        playlist: settings.default_playlist_id,
-        items: [{
-          id: createResponse.customer.id,
-          username: finalUsername,
-          password: actualPassword
-        }],
-        xtream: {
-          url: "https://pinkpony.lol",
-          param1: finalUsername,
-          param2: actualPassword,
-          type: "xtream"
-        }
-      };
+// Wait a moment for the user to be fully created before syncing
+console.log('⏳ Waiting 2 seconds before force-sync...');
+await new Promise(resolve => setTimeout(resolve, 2000));
+
+// Force sync the newly created user  
+const forceSyncData = {
+  playlist: settings.default_playlist_id,
+  items: [{
+    id: createResponse.customer.id,
+    username: finalUsername,    // IPTV panel username
+    password: actualPassword    // IPTV panel password
+  }],
+  xtream: {
+    url: "https://pinkpony.lol",
+    param1: finalUsername,      // IPTV panel username  
+    param2: actualPassword,     // IPTV panel password
+    type: "xtream"
+  }
+};
+
+try {
+  const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
+  console.log('✅ IPTV Editor user force-synced successfully');
+} catch (syncError) {
+  console.log('⚠️ Force-sync failed (but user was created successfully):', syncError.message);
+  // Continue - we'll mark as 'pending' and can sync later
+}
       
       const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
       console.log('✅ IPTV Editor user force-synced successfully');
