@@ -2986,6 +2986,8 @@ function getUserId() {
     return null;
 }
 
+// Add this to public/js/users.js - update the createIPTVEditorAccountNow function
+
 async function createIPTVEditorAccountNow(username) {
     try {
         const userName = document.getElementById('userName')?.value;
@@ -3030,19 +3032,55 @@ async function createIPTVEditorAccountNow(username) {
         if (data.success) {
             Utils.showNotification('IPTV Editor account created successfully', 'success');
             // Show the success results
-            showIPTVEditorSyncResults(data.user, username);
+            showIPTVEditorSyncResults(data.user, data.user.username); // Use actual username from response
         } else {
-            Utils.showNotification(`Failed to create account: ${data.message}`, 'error');
-            
-            // Log validation errors if they exist
-            if (data.errors) {
-                console.error('Validation errors:', data.errors);
+            // FIXED: Handle username conflict specifically
+            if (data.error_type === 'username_taken') {
+                Utils.showNotification(`Username "${data.taken_username}" is already taken in IPTV Editor. Please change the IPTV Username field and try again.`, 'error');
+                
+                // Highlight the IPTV username field
+                const iptvUsernameField = document.getElementById('iptvUsername');
+                if (iptvUsernameField) {
+                    iptvUsernameField.style.borderColor = '#f44336';
+                    iptvUsernameField.focus();
+                    
+                    // Remove highlight after 3 seconds
+                    setTimeout(() => {
+                        iptvUsernameField.style.borderColor = '';
+                    }, 3000);
+                }
+                
+                // Show specific error in the results div
+                const resultsDiv = document.getElementById('editorAccessCheckResults');
+                if (resultsDiv) {
+                    resultsDiv.style.display = 'block';
+                    resultsDiv.innerHTML = `
+                        <div style="background: rgba(244, 67, 54, 0.1); border: 1px solid #f44336; border-radius: 4px; padding: 15px;">
+                            <div style="color: #f44336; font-weight: bold; margin-bottom: 10px;">
+                                <i class="fas fa-exclamation-triangle"></i> Username Already Taken
+                            </div>
+                            <div style="color: #fff; margin-bottom: 10px; font-size: 0.9rem;">
+                                The IPTV username "<strong>${data.taken_username}</strong>" is already in use in IPTV Editor.
+                            </div>
+                            <div style="color: #ccc; font-size: 0.85rem;">
+                                Please change the IPTV Username field above and try again.
+                            </div>
+                        </div>
+                    `;
+                }
+            } else {
+                Utils.showNotification(`Failed to create account: ${data.message}`, 'error');
+                
+                // Log validation errors if they exist
+                if (data.errors) {
+                    console.error('Validation errors:', data.errors);
+                }
             }
         }
         
     } catch (error) {
         console.error('Error creating IPTV Editor account:', error);
-        Utils.showNotification('Failed to create IPTV Editor account', 'error');
+        Utils.showNotification('Error creating IPTV Editor account. Please try again.', 'error');
     }
 }
 
