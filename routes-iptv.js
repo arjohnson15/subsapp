@@ -870,11 +870,10 @@ console.log('✅ Using playlist ID:', playlistId);
           if (localUserCheck.length === 0) {
             console.error(`❌ Local user ${user_id} not found, skipping IPTV Editor sync`);
           } else {
-			const syncResult = await iptvEditorService.syncUser({
-              iptvEditorId: response.customer.id,
-              username: response.customer.username,
-              password: response.customer.password
-            }, user_id);
+			const syncResult = await iptvEditorService.syncUser(
+              response.customer.id,  // Just pass the IPTV Editor customer ID
+              user_id               // Your local user ID
+            );
             console.log('✅ IPTV Editor user synced successfully after creation');
           }
         } catch (syncError) {
