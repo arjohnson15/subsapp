@@ -399,8 +399,26 @@ router.post('/user/create', [
             });
         }
         
-        // FIXED: Check if the IPTV username is already taken BEFORE attempting to create
-        const usernameToCheck = localUser.iptv_username || username;
+        // FIXED: Use the manual username for IPTV Editor, IPTV username for param1
+        const iptvEditorUsername = username; // The username typed in manually
+        const iptvPanelUsername = localUser.iptv_username; // The IPTV panel username
+        
+        if (!iptvPanelUsername) {
+            return res.status(400).json({
+                success: false,
+                message: 'User must have an IPTV username set before creating IPTV Editor account'
+            });
+        }
+        
+        if (!localUser.iptv_password) {
+            return res.status(400).json({
+                success: false,
+                message: 'User must have an IPTV password set before creating IPTV Editor account'
+            });
+        }
+        
+        // Check if IPTV Editor username is available
+        const usernameToCheck = iptvEditorUsername;
         
         try {
             console.log(`🔍 Checking if username "${usernameToCheck}" is available...`);
@@ -437,13 +455,16 @@ router.post('/user/create', [
         }
         
         // If we get here, username is available - proceed with creation
+        // Generate password for IPTV Editor user
+        const iptvEditorPassword = localUser.iptv_password;
+        
         const creationData = {
             playlist: settings.default_playlist_id,
             items: {
                 name: localUser.email, // Use user email as display name
                 note: "",
-                username: usernameToCheck, // Use the validated username
-                password: localUser.iptv_password || `pass${Math.random().toString(36).substring(2, 8)}`,
+                username: iptvEditorUsername, // FIXED: Use the manually entered username
+                password: iptvEditorPassword,
                 message: null,
                 channels_categories: [73], // Default channel categories
                 vods_categories: [73], // Default VOD categories
@@ -451,8 +472,8 @@ router.post('/user/create', [
                 patterns: [
                     {
                         url: "https://pinkpony.lol",
-                        param1: usernameToCheck,
-                        param2: localUser.iptv_password || `pass${Math.random().toString(36).substring(2, 8)}`,
+                        param1: iptvPanelUsername, // FIXED: Use IPTV panel username as param1
+                        param2: iptvEditorPassword, // Use IPTV password
                         type: "xtream"
                     }
                 ],
@@ -470,7 +491,7 @@ router.post('/user/create', [
             const insertData = [
                 user_id,
                 response.customer.id,
-                usernameToCheck, // FIXED: Use actual IPTV username, not check field value
+                iptvEditorUsername,
                 localUser.iptv_password || creationData.items.password,
                 response.customer.m3u,
                 response.customer.epg,
@@ -1338,14 +1359,17 @@ router.post('/create-user', [
             
             res.json({
                 success: true,
-                message: 'IPTV Editor user created successfully',
-                data: {
-                    iptv_editor_user_id: result.customer.id,
-                    username: iptv_username,
-                    m3u_url: result.customer.m3u ? `https://editor.iptveditor.com/m3u/${result.customer.m3u}` : null,
-                    epg_url: result.customer.epg ? `https://editor.iptveditor.com/epg/${result.customer.epg}` : null,
-                    max_connections: result.customer.max_connections,
-                    expiry: result.customer.expiry
+                message: 'IPTV Editor account created successfully',
+                user: {
+                    iptv_editor_id: response.customer.id,
+                    iptv_editor_username: iptvEditorUsername, // The IPTV Editor username (manually entered)
+                    iptv_panel_username: iptvPanelUsername, // The IPTV panel username (used in param1)
+                    m3u_code: response.customer.m3u,
+                    epg_code: response.customer.epg,
+                    m3u_url: response.customer.m3u ? `https://editor.iptveditor.com/m3u/${response.customer.m3u}` : null,
+                    epg_url: response.customer.epg ? `https://editor.iptveditor.com/epg/${response.customer.epg}` : null,
+                    expiry_date: response.customer.expiry,
+                    max_connections: response.customer.max_connections || 1
                 }
             });
         } else {
