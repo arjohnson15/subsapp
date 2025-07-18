@@ -492,7 +492,7 @@ router.post('/user/create', [
                 user_id,
                 response.customer.id,
                 iptvEditorUsername,
-                localUser.iptv_password || creationData.items.password,
+                iptvEditorPassword,
                 response.customer.m3u,
                 response.customer.epg,
                 response.customer.expiry ? new Date(response.customer.expiry * 1000) : null,
@@ -518,7 +518,7 @@ router.post('/user/create', [
                 success: true,
                 user: {
                     username: usernameToCheck, // FIXED: Return actual username used
-                    password: localUser.iptv_password || creationData.items.password,
+                    password: iptvEditorPassword,
                     max_connections: response.customer.max_connections || 1,
                     expiry: response.customer.expiry || null,
                     iptv_editor_id: response.customer.id || null,
