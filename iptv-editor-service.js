@@ -552,96 +552,43 @@ async getAllUsers() {
 }
     
     // 4. Sync User
-async syncUser(userId) {
+async syncUser(userData, userId) {
+    await this.initialize();
+    const startTime = Date.now();
+    
+    const requestData = {
+        playlist: this.defaultPlaylistId,
+        items: [{
+            id: userData.iptvEditorId,
+            username: userData.username,
+            password: userData.password
+        }],
+        xtream: {
+            url: "https://pinkpony.lol",
+            param1: userData.username,
+            param2: userData.password,
+            type: "xtream"
+        }
+    };
+    
     try {
-        console.log(`🔄 Syncing user ${userId} with IPTV Editor API...`);
+        console.log('📤 Calling force-sync API with:', requestData);
         
-        // Initialize if needed
-        if (!this.bearerToken || !this.defaultPlaylistId) {
-            await this.initialize();
-        }
-        
-        // Get user's IPTV Editor data from local database
-        const result = await db.query(
-            'SELECT * FROM iptv_editor_users WHERE user_id = ?',
-            [userId]
-        );
-        
-        if (result.length === 0) {
-            throw new Error(`User ${userId} not found in IPTV Editor database`);
-        }
-        
-        const iptvUser = result[0];
-        
-        // STEP 1: Call force-sync to update the user data in IPTV Editor
-        console.log('📤 Calling IPTV Editor force-sync API to update user...');
-        
-        const forceSyncResponse = await axios.post('https://editor.iptveditor.com/api/reseller/force-sync', {
-            playlist: this.defaultPlaylistId,
-            items: [{
-                id: iptvUser.iptv_editor_id,
-                username: iptvUser.iptv_editor_username,
-                password: iptvUser.iptv_editor_password
-            }],
-            xtream: {
-                url: "https://pinkpony.lol",
-                param1: iptvUser.iptv_editor_username,
-                param2: iptvUser.iptv_editor_password,
-                type: "xtream"
-            }
-        }, {
-            headers: {
-                'Authorization': `Bearer ${this.bearerToken}`,
-                'Content-Type': 'application/json',
-                'Origin': 'https://cloud.iptveditor.com'
-            },
+        const response = await axios.post(`${this.baseURL}/api/reseller/force-sync`, requestData, {
+            headers: this.getHeaders(),
             timeout: 30000
         });
         
-        console.log('✅ Force-sync completed:', forceSyncResponse.data);
+        console.log('✅ Force-sync response:', response.data);
         
-        // STEP 2: Now get the updated data
-        console.log('📥 Fetching updated user data...');
-        const allUsers = await this.getAllUsers();
+        const duration = Date.now() - startTime;
+        await this.logSync('user_sync', userId, 'success', requestData, response.data, null, duration);
         
-        // Find the updated user
-        const updatedUser = allUsers.find(user => 
-            user.username && user.username.toLowerCase() === iptvUser.iptv_editor_username.toLowerCase()
-        );
-        
-        if (updatedUser) {
-            // Update local database with fresh data
-            await db.query(`
-                UPDATE iptv_editor_users 
-                SET sync_status = 'synced', last_sync_time = NOW(),
-                    expiry_date = ?, max_connections = ?
-                WHERE user_id = ?
-            `, [
-                updatedUser.expiry ? new Date(updatedUser.expiry).toISOString().slice(0, 19).replace('T', ' ') : null,
-                updatedUser.max_connections || 1,
-                userId
-            ]);
-            
-            console.log('✅ Local database updated with fresh data');
-        }
-        
-        return {
-            success: true,
-            message: 'User synced successfully',
-            forceSyncData: forceSyncResponse.data,
-            userData: updatedUser
-        };
-        
+        return response.data;
     } catch (error) {
-        console.error('❌ Error syncing with IPTV Editor:', error);
-        
-        // Update local database with error status
-        await db.query(`
-            UPDATE iptv_editor_users 
-            SET sync_status = 'error', last_sync_time = NOW()
-            WHERE user_id = ?
-        `, [userId]);
-        
+        console.error('❌ Force-sync failed:', error);
+        const duration = Date.now() - startTime;
+        await this.logSync('user_sync', userId, 'error', requestData, null, error.message, duration);
         throw error;
     }
 }
