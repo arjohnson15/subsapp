@@ -354,9 +354,7 @@ function convertToMySQLTimestamp(isoDateString) {
     return date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
-// Add this to routes-iptv-editor.js
 
-// FIXED: Add username validation before creating user
 router.post('/user/create', [
     body('user_id').isInt({ min: 1 }).withMessage('User ID must be a positive integer'),
     body('username').isString().notEmpty().withMessage('Username is required'),
