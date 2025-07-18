@@ -890,9 +890,7 @@ try {
     
     if (createResponse && createResponse.customer) {
       console.log('✅ IPTV Editor user created successfully');
-      
-if (createResponse && createResponse.customer) {
-  console.log('✅ IPTV Editor user created successfully');
+     
   
   // Enhanced force-sync with logging
   console.log('🔄 Triggering force-sync for newly created IPTV Editor user...');
