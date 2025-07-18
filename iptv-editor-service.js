@@ -552,42 +552,99 @@ async getAllUsers() {
 }
     
     // 4. Sync User
-    async syncUser(userId) {
-        try {
-            console.log(`🔄 Syncing IPTV Editor user ${userId}...`);
-            
-            const iptvUser = await this.getIPTVEditorUser(userId);
-            if (!iptvUser) {
-                throw new Error('User not found in IPTV Editor');
-            }
-            
-            const data = {
-                user_id: iptvUser.iptv_editor_id
-            };
-            
-            const response = await this.makeRequest('/api/reseller/force-sync', data);
-            
-            // Update sync status
-            await db.query(
-                'UPDATE iptv_editor_users SET sync_status = ?, last_sync_time = NOW() WHERE user_id = ?',
-                ['synced', userId]
-            );
-            
-            console.log(`✅ User ${userId} synced successfully`);
-            return response;
-            
-        } catch (error) {
-            console.error(`❌ Failed to sync user ${userId}:`, error);
-            
-            // Update sync status to error
-            await db.query(
-                'UPDATE iptv_editor_users SET sync_status = ?, last_sync_time = NOW() WHERE user_id = ?',
-                ['error', userId]
-            );
-            
-            throw error;
+async syncUser(userId) {
+    try {
+        console.log(`🔄 Syncing user ${userId} with IPTV Editor API...`);
+        
+        // Initialize if needed
+        if (!this.bearerToken || !this.defaultPlaylistId) {
+            await this.initialize();
         }
+        
+        // Get user's IPTV Editor data from local database
+        const result = await db.query(
+            'SELECT * FROM iptv_editor_users WHERE user_id = ?',
+            [userId]
+        );
+        
+        if (result.length === 0) {
+            throw new Error(`User ${userId} not found in IPTV Editor database`);
+        }
+        
+        const iptvUser = result[0];
+        
+        // STEP 1: Call force-sync to update the user data in IPTV Editor
+        console.log('📤 Calling IPTV Editor force-sync API to update user...');
+        
+        const forceSyncResponse = await axios.post('https://editor.iptveditor.com/api/reseller/force-sync', {
+            playlist: this.defaultPlaylistId,
+            items: [{
+                id: iptvUser.iptv_editor_id,
+                username: iptvUser.iptv_editor_username,
+                password: iptvUser.iptv_editor_password
+            }],
+            xtream: {
+                url: "https://pinkpony.lol",
+                param1: iptvUser.iptv_editor_username,
+                param2: iptvUser.iptv_editor_password,
+                type: "xtream"
+            }
+        }, {
+            headers: {
+                'Authorization': `Bearer ${this.bearerToken}`,
+                'Content-Type': 'application/json',
+                'Origin': 'https://cloud.iptveditor.com'
+            },
+            timeout: 30000
+        });
+        
+        console.log('✅ Force-sync completed:', forceSyncResponse.data);
+        
+        // STEP 2: Now get the updated data
+        console.log('📥 Fetching updated user data...');
+        const allUsers = await this.getAllUsers();
+        
+        // Find the updated user
+        const updatedUser = allUsers.find(user => 
+            user.username && user.username.toLowerCase() === iptvUser.iptv_editor_username.toLowerCase()
+        );
+        
+        if (updatedUser) {
+            // Update local database with fresh data
+            await db.query(`
+                UPDATE iptv_editor_users 
+                SET sync_status = 'synced', last_sync_time = NOW(),
+                    expiry_date = ?, max_connections = ?
+                WHERE user_id = ?
+            `, [
+                updatedUser.expiry ? new Date(updatedUser.expiry).toISOString().slice(0, 19).replace('T', ' ') : null,
+                updatedUser.max_connections || 1,
+                userId
+            ]);
+            
+            console.log('✅ Local database updated with fresh data');
+        }
+        
+        return {
+            success: true,
+            message: 'User synced successfully',
+            forceSyncData: forceSyncResponse.data,
+            userData: updatedUser
+        };
+        
+    } catch (error) {
+        console.error('❌ Error syncing with IPTV Editor:', error);
+        
+        // Update local database with error status
+        await db.query(`
+            UPDATE iptv_editor_users 
+            SET sync_status = 'error', last_sync_time = NOW()
+            WHERE user_id = ?
+        `, [userId]);
+        
+        throw error;
     }
+}
     
     // 5. Get Playlists
 async getPlaylists() {
