@@ -744,6 +744,10 @@ if (action === 'extend') {
 // Automatically create/link IPTV Editor user for all IPTV subscriptions
 console.log('🎯 Creating/linking IPTV Editor user for IPTV subscription...');
 
+// Automatically create/link IPTV Editor user for all IPTV subscriptions
+console.log('🎯 Creating/linking IPTV Editor user for IPTV subscription...');
+let iptvEditorCreated = false;
+
 try {
   // Check if user already exists in local IPTV Editor table
   const existingLocalIPTVUser = await db.query(`
@@ -856,11 +860,23 @@ console.log('✅ Using playlist ID:', playlistId);
         ]);
         
         console.log('✅ IPTV Editor user created, now syncing to get correct data...');
+		console.log('✅ IPTV Editor user created, now syncing to get correct data...');
+        iptvEditorCreated = true;
         
-        // Immediately sync the user to get correct expiry and all data
+// Immediately sync the user to get correct expiry and all data
         try {
-          const syncResult = await iptvEditorService.syncUser(user_id);
-          console.log('✅ IPTV Editor user synced successfully after creation');
+          // Validate local user exists before syncing
+          const localUserCheck = await db.query('SELECT id FROM users WHERE id = ?', [user_id]);
+          if (localUserCheck.length === 0) {
+            console.error(`❌ Local user ${user_id} not found, skipping IPTV Editor sync`);
+          } else {
+			const syncResult = await iptvEditorService.syncUser({
+              iptvEditorId: response.customer.id,
+              username: response.customer.username,
+              password: response.customer.password
+            }, user_id);
+            console.log('✅ IPTV Editor user synced successfully after creation');
+          }
         } catch (syncError) {
           console.warn('⚠️ IPTV Editor sync failed after creation:', syncError.message);
         }
@@ -895,7 +911,7 @@ console.log('✅ Using playlist ID:', playlistId);
     
     console.log(`✅ IPTV subscription ${action} completed for user ${user_id}`);
     
-    // FIXED: Return response with correct password data
+// FIXED: Return response with correct password data
     res.json({
       success: true,
       message: `IPTV subscription ${action.replace('_', ' ')} successful`,
@@ -932,7 +948,16 @@ console.log('✅ Using playlist ID:', playlistId);
         
         // Additional metadata
         created_at: userData?.created_at,
-        owner: userData?.owner
+        owner: userData?.owner,
+        
+// IPTV Editor data for frontend updates
+        iptv_editor_created: iptvEditorCreated,
+        iptv_editor_data: existingLocalIPTVUser.length === 0 ? {
+          username: finalUsername,
+          id: response?.customer?.id || null,
+          m3u: response?.customer?.m3u || null,
+          epg: response?.customer?.epg || null
+        } : null
       }
     });
   } catch (error) {
