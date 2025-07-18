@@ -248,10 +248,10 @@
     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
         <div id="iptvEditorStatusDot" style="width: 12px; height: 12px; border-radius: 50%; background: #4fc3f7;"></div>
         <span style="color: #4fc3f7; font-weight: bold;">IPTV Editor Account Active</span>
-        <button type="button" id="syncIptvEditorBtn" onclick="syncIPTVEditorUser()" 
-                style="background: #4fc3f7; color: #000; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.8rem;">
-            Sync
-        </button>
+        <button type="button" id="syncIptvEditorBtn" onclick="handleIPTVEditorSync()" 
+        style="background: #4fc3f7; color: #000; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.8rem;">
+    Sync
+</button>
     </div>
     <div id="iptvEditorDetails" style="font-size: 0.85rem; color: #ccc;">
         <div>Username: <span id="iptvEditorUsername">-</span></div>

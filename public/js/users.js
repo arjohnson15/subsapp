@@ -2722,6 +2722,19 @@ function retryPreSelection(serverGroup, userLibraries, extractLibraryId, findChe
     }
 };
 
+// Add this function to handle the sync button click with proper username
+function handleIPTVEditorSync() {
+    const username = document.getElementById('iptvUsername')?.value || 
+                    document.getElementById('iptvEditorUsername')?.textContent;
+    
+    if (!username) {
+        Utils.showNotification('No IPTV username found to sync', 'error');
+        return;
+    }
+    
+    syncIPTVEditorUser(username);
+}
+
 
 // Export for global access
 window.Users.loadUsers = window.Users.loadUsers.bind(window.Users);
