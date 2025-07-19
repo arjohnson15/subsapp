@@ -2027,20 +2027,47 @@ if (!user) {
         
       } else {
         // User doesn't exist in IPTV Editor - Create new user
-        console.log('❌ User not found in IPTV Editor, creating new user...');
-        
-        const createData = {
-          playlist: settings.default_playlist_id,
-          email: user.email,
-          username: user.iptv_username,
-          password: user.iptv_password,
-          max_connections: user.iptv_connections || 2,
-          expiry: user.iptv_expiration ? new Date(user.iptv_expiration).toISOString() : null,
-          note: `JohnsonFlix User: ${user.name}`,
-          channels: [], // Will be populated with all available categories
-          vods: [73], // Default VOD category
-          series: [] // Will be populated with available series categories
-        };
+console.log('❌ User not found in IPTV Editor, creating new user...');
+
+// Get all active channel categories from database
+const categoriesResult = await db.query(`
+  SELECT category_id FROM iptv_editor_categories 
+  WHERE type = 'channels' AND is_active = true
+`);
+
+let channelCategories = [];
+if (Array.isArray(categoriesResult) && categoriesResult.length > 0) {
+  channelCategories = categoriesResult.map(cat => cat.category_id);
+} else if (categoriesResult && Array.isArray(categoriesResult[0]) && categoriesResult[0].length > 0) {
+  channelCategories = categoriesResult[0].map(cat => cat.category_id);
+}
+
+console.log(`📺 Found ${channelCategories.length} channel categories`);
+
+// Get VOD categories (default to [73] if none found)
+// Use only VOD category 73 (standard)
+const vodCategories = [73];
+
+const createData = {
+  playlist: settings.default_playlist_id,
+  items: {
+    name: user.email,
+    note: `JohnsonFlix User: ${user.name}`,
+    username: user.iptv_username,
+    password: user.iptv_password,
+    message: null,
+    channels_categories: channelCategories,
+    vods_categories: vodCategories,
+    series_categories: [],
+    patterns: [{
+      url: "https://pinkpony.lol",
+      param1: user.iptv_username,
+      param2: user.iptv_password,
+      type: "xtream"
+    }],
+    language: "en"
+  }
+};
         
         const createStartTime = Date.now();
         const createResponse = await iptvEditorService.makeRequest('/api/reseller/new-customer', createData);

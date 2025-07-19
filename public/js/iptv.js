@@ -2650,17 +2650,33 @@ async saveLinkedAccount(userId, iptvData) {
         statusMessage += `\n⏰ Test completed at: ${new Date().toLocaleString()}`;
         
         // Show notification
-        if (window.Utils && window.Utils.showNotification) {
+if (window.Utils && window.Utils.showNotification) {
   window.Utils.showNotification(statusMessage, editorResults.iptv_editor_success ? 'success' : 'error');
 } else {
   alert(statusMessage);
 }
         
-        // Update UI if successful
-        if (editorResults.iptv_editor_success && typeof this.loadUserStatus === 'function') {
-            // Refresh the user's IPTV status display
-            this.loadUserStatus(userId);
-        }
+// Update UI if successful - Use same method as real IPTV subscription creation
+if (editorResults.iptv_editor_success) {
+  console.log('🔄 Refreshing IPTV status display after successful IPTV Editor creation...');
+  
+  // Create fake result data structure to match what updateIPTVStatus expects
+  const updateData = {
+    iptv_editor_created: editorResults.iptv_editor_created,
+    iptv_editor_synced: editorResults.iptv_editor_synced,
+    iptv_editor_success: editorResults.iptv_editor_success,
+    iptv_editor_data: editorResults.iptv_editor_data
+  };
+  
+  // Use the exact same methods as real IPTV subscription creation
+  if (typeof this.updateIPTVStatus === 'function') {
+    this.updateIPTVStatus(updateData);
+  }
+  
+  if (typeof this.populateFormFieldsAfterCreation === 'function') {
+    this.populateFormFieldsAfterCreation(updateData);
+  }
+}
         
         return result;
         
@@ -2684,7 +2700,11 @@ async saveLinkedAccount(userId, iptvData) {
         const userId = this.getCurrentUserId();
         
         if (!userId) {
-            this.showNotification('Please select a user first', 'warning');
+            if (window.Utils && window.Utils.showNotification) {
+  window.Utils.showNotification('Please select a user first', 'warning');
+} else {
+  alert('Please select a user first');
+}
             return;
         }
         
