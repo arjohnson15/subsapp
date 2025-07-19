@@ -848,7 +848,7 @@ try {
       existingUser.epg || '',
       expirationForDB,
       existingUser.max_connections || 2,
-      syncSuccess ? 'synced' : 'sync_failed'
+      syncSuccess ? 'synced' : 'error'
     ]);
     
     iptvEditorCreated = true;
@@ -861,7 +861,7 @@ try {
       m3u_url: existingUser.m3u ? `https://editor.iptveditor.com/m3u/${existingUser.m3u}` : null,
       epg_url: existingUser.epg ? `https://editor.iptveditor.com/epg/${existingUser.epg}` : null,
       action: syncSuccess ? 'linked_and_synced' : 'linked_no_sync',
-      sync_status: syncSuccess ? 'synced' : 'sync_failed'
+      sync_status: syncSuccess ? 'synced' : 'error'
     };
     
   } else {
@@ -968,7 +968,7 @@ try {
         createResponse.customer.epg || '',
         expirationForDB,
         createResponse.customer.max_connections || 2,
-        syncSuccess ? 'synced' : 'sync_failed'
+        syncSuccess ? 'synced' : 'error'
       ]);
       
       iptvEditorCreated = true;
@@ -981,7 +981,7 @@ try {
         m3u_url: createResponse.customer.m3u ? `https://editor.iptveditor.com/m3u/${createResponse.customer.m3u}` : null,
         epg_url: createResponse.customer.epg ? `https://editor.iptveditor.com/epg/${createResponse.customer.epg}` : null,
         action: syncSuccess ? 'created_and_synced' : 'created_no_sync',
-        sync_status: syncSuccess ? 'synced' : 'sync_failed'
+        sync_status: syncSuccess ? 'synced' : 'error'
       };
       
     } else {
