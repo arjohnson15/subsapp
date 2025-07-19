@@ -770,12 +770,65 @@ try {
     // User exists in IPTV Editor - Link/Sync them
     console.log('✅ User found in IPTV Editor, linking and syncing...');
     
-    // Save to local database (link the user)
+    // Enhanced force-sync for existing user with proper error handling
+    console.log('🔄 Triggering force-sync for existing IPTV Editor user...');
+
+    const forceSyncData = {
+      playlist: settings.default_playlist_id,
+      items: [{
+        id: existingUser.id,
+        username: finalUsername,
+        password: actualPassword
+      }],
+      xtream: {
+        url: "https://pinkpony.lol",
+        param1: finalUsername,
+        param2: actualPassword,
+        type: "xtream"
+      }
+    };
+
+    let syncSuccess = false;
+    try {
+      const syncStartTime = Date.now();
+      const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
+      const syncDuration = Date.now() - syncStartTime;
+      
+      console.log(`✅ IPTV Editor force-sync completed in ${syncDuration}ms:`, syncResponse);
+      
+      // Log the sync
+      await db.query(`
+        INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, duration_ms)
+        VALUES ('user_link_sync', ?, 'success', ?, ?, ?)
+      `, [
+        user_id,
+        JSON.stringify(forceSyncData),
+        JSON.stringify(syncResponse),
+        syncDuration
+      ]);
+      
+      syncSuccess = true;
+      iptvEditorSynced = true;
+      
+    } catch (syncError) {
+      console.error('⚠️ Force-sync failed for existing user (but continuing):', syncError.message);
+      
+      // Log the failed sync
+      await db.query(`
+        INSERT INTO iptv_sync_logs (sync_type, user_id, status, error_message)
+        VALUES ('user_link_sync', ?, 'error', ?)
+      `, [user_id, syncError.message]);
+      
+      syncSuccess = false;
+      iptvEditorSynced = false;
+    }
+    
+    // Save to local database (link the user) - do this regardless of sync success
     await db.query(`
       INSERT INTO iptv_editor_users (
         user_id, iptv_editor_id, iptv_editor_username, iptv_editor_password,
         m3u_code, epg_code, expiry_date, max_connections, sync_status, last_sync_time
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'synced', NOW())
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
       ON DUPLICATE KEY UPDATE
         iptv_editor_id = VALUES(iptv_editor_id),
         iptv_editor_username = VALUES(iptv_editor_username),
@@ -784,7 +837,7 @@ try {
         epg_code = VALUES(epg_code),
         expiry_date = VALUES(expiry_date),
         max_connections = VALUES(max_connections),
-        sync_status = 'synced',
+        sync_status = VALUES(sync_status),
         last_sync_time = NOW()
     `, [
       user_id,
@@ -794,56 +847,11 @@ try {
       existingUser.m3u || '',
       existingUser.epg || '',
       expirationForDB,
-      existingUser.max_connections || 2
+      existingUser.max_connections || 2,
+      syncSuccess ? 'synced' : 'sync_failed'
     ]);
     
-// Enhanced force-sync for existing user
-console.log('🔄 Triggering force-sync for existing IPTV Editor user...');
-
-const forceSyncData = {
-  playlist: settings.default_playlist_id,
-  items: [{
-    id: existingUser.id,           // ✅ FIXED: Use existingUser.id, not createResponse.customer.id
-    username: finalUsername,
-    password: actualPassword
-  }],
-  xtream: {
-    url: "https://pinkpony.lol",
-    param1: finalUsername,
-    param2: actualPassword,
-    type: "xtream"
-  }
-};
-
-try {
-  const syncStartTime = Date.now();
-  const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
-  const syncDuration = Date.now() - syncStartTime;
-  
-  console.log(`✅ IPTV Editor force-sync completed in ${syncDuration}ms:`, syncResponse);
-  
-  // Log the sync
-  await db.query(`
-    INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, duration_ms)
-    VALUES ('user_link_sync', ?, 'success', ?, ?, ?)
-  `, [
-    user_id,
-    JSON.stringify(forceSyncData),
-    JSON.stringify(syncResponse),
-    syncDuration
-  ]);
-  
-} catch (syncError) {
-  console.error('⚠️ Force-sync failed for existing user:', syncError.message);
-  
-  // Log the failed sync
-  await db.query(`
-    INSERT INTO iptv_sync_logs (sync_type, user_id, status, error_message)
-    VALUES ('user_link_sync', ?, 'error', ?)
-  `, [user_id, syncError.message]);
-}
-    
-    iptvEditorSynced = true;
+    iptvEditorCreated = true;
     iptvEditorData = {
       username: finalUsername,
       m3u_code: existingUser.m3u || '',
@@ -852,7 +860,8 @@ try {
       max_connections: existingUser.max_connections || 2,
       m3u_url: existingUser.m3u ? `https://editor.iptveditor.com/m3u/${existingUser.m3u}` : null,
       epg_url: existingUser.epg ? `https://editor.iptveditor.com/epg/${existingUser.epg}` : null,
-      action: 'synced'
+      action: syncSuccess ? 'linked_and_synced' : 'linked_no_sync',
+      sync_status: syncSuccess ? 'synced' : 'sync_failed'
     };
     
   } else {
@@ -890,63 +899,66 @@ try {
     
     if (createResponse && createResponse.customer) {
       console.log('✅ IPTV Editor user created successfully');
-     
-  
-  // Enhanced force-sync with logging
-  console.log('🔄 Triggering force-sync for newly created IPTV Editor user...');
-
-  const forceSyncData = {
-    playlist: settings.default_playlist_id,
-    items: [{
-      id: createResponse.customer.id,
-      username: finalUsername,
-      password: actualPassword
-    }],
-    xtream: {
-      url: "https://pinkpony.lol",
-      param1: finalUsername,
-      param2: actualPassword,
-      type: "xtream"
-    }
-  };
-
-  try {
-    const syncStartTime = Date.now();
-    const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
-    const syncDuration = Date.now() - syncStartTime;
-    
-    console.log(`✅ IPTV Editor force-sync completed in ${syncDuration}ms:`, syncResponse);
-    
-    // Log the sync
-    await db.query(`
-      INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, duration_ms)
-      VALUES ('user_create_sync', ?, 'success', ?, ?, ?)
-    `, [
-      user_id,
-      JSON.stringify(forceSyncData),
-      JSON.stringify(syncResponse),
-      syncDuration
-    ]);
-    
-  } catch (syncError) {
-    console.error('⚠️ Force-sync failed for new user (but creation was successful):', syncError.message);
-    
-    // Log the failed sync
-    await db.query(`
-      INSERT INTO iptv_sync_logs (sync_type, user_id, status, error_message)
-      VALUES ('user_create_sync', ?, 'error', ?)
-    `, [user_id, syncError.message]);
-  }
       
-      const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
-      console.log('✅ IPTV Editor user force-synced successfully');
-      
-      // Save to local database
+      // Enhanced force-sync for new user with proper error handling
+      console.log('🔄 Triggering force-sync for newly created IPTV Editor user...');
+
+      const forceSyncData = {
+        playlist: settings.default_playlist_id,
+        items: [{
+          id: createResponse.customer.id,
+          username: finalUsername,
+          password: actualPassword
+        }],
+        xtream: {
+          url: "https://pinkpony.lol",
+          param1: finalUsername,
+          param2: actualPassword,
+          type: "xtream"
+        }
+      };
+
+      let syncSuccess = false;
+      try {
+        const syncStartTime = Date.now();
+        const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
+        const syncDuration = Date.now() - syncStartTime;
+        
+        console.log(`✅ IPTV Editor force-sync completed in ${syncDuration}ms:`, syncResponse);
+        
+        // Log the sync
+        await db.query(`
+          INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, duration_ms)
+          VALUES ('user_create_sync', ?, 'success', ?, ?, ?)
+        `, [
+          user_id,
+          JSON.stringify(forceSyncData),
+          JSON.stringify(syncResponse),
+          syncDuration
+        ]);
+        
+        syncSuccess = true;
+        iptvEditorSynced = true;
+        
+      } catch (syncError) {
+        console.error('⚠️ Force-sync failed for new user (but creation was successful):', syncError.message);
+        
+        // Log the failed sync
+        await db.query(`
+          INSERT INTO iptv_sync_logs (sync_type, user_id, status, error_message)
+          VALUES ('user_create_sync', ?, 'error', ?)
+        `, [user_id, syncError.message]);
+        
+        syncSuccess = false;
+        iptvEditorSynced = false;
+      }
+
+      // Save to local database - do this regardless of sync success
       await db.query(`
         INSERT INTO iptv_editor_users (
           user_id, iptv_editor_id, iptv_editor_username, iptv_editor_password,
           m3u_code, epg_code, expiry_date, max_connections, sync_status, last_sync_time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'synced', NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
       `, [
         user_id,
         createResponse.customer.id,
@@ -955,7 +967,8 @@ try {
         createResponse.customer.m3u || '',
         createResponse.customer.epg || '',
         expirationForDB,
-        createResponse.customer.max_connections || 2
+        createResponse.customer.max_connections || 2,
+        syncSuccess ? 'synced' : 'sync_failed'
       ]);
       
       iptvEditorCreated = true;
@@ -967,7 +980,8 @@ try {
         max_connections: createResponse.customer.max_connections || 2,
         m3u_url: createResponse.customer.m3u ? `https://editor.iptveditor.com/m3u/${createResponse.customer.m3u}` : null,
         epg_url: createResponse.customer.epg ? `https://editor.iptveditor.com/epg/${createResponse.customer.epg}` : null,
-        action: 'created'
+        action: syncSuccess ? 'created_and_synced' : 'created_no_sync',
+        sync_status: syncSuccess ? 'synced' : 'sync_failed'
       };
       
     } else {
@@ -978,8 +992,18 @@ try {
   // Update user table to mark IPTV Editor as enabled
   await db.query('UPDATE users SET iptv_editor_enabled = TRUE WHERE id = ?', [user_id]);
   
+  console.log(`✅ IPTV Editor integration completed for user ${user_id}`);
+  
 } catch (iptvEditorError) {
   console.error('⚠️ IPTV Editor integration failed (continuing with IPTV subscription):', iptvEditorError.message);
+  
+  // Set flags to indicate failure
+  iptvEditorCreated = false;
+  iptvEditorSynced = false;
+  iptvEditorData = {
+    action: 'failed',
+    error: iptvEditorError.message
+  };
 }
     
     // Log the activity
