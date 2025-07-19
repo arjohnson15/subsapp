@@ -296,7 +296,7 @@ async makeRequest(endpoint, data = {}, method = 'POST') {
         };
         
         if (method === 'POST') {
-            config.data = Object.keys(data).length > 0 ? data : '';
+            config.data = data;
         }
         
         const response = await axios(config);
