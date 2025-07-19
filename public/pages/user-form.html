@@ -419,9 +419,40 @@
         </button>
     </div>
 </div>
+
+<!-- ✅ MOVE THE TEST SECTION HERE -->
+<div class="iptv-editor-testing" style="margin-top: 20px; padding: 15px; border: 2px dashed #00ffff; border-radius: 8px; background: rgba(0, 255, 255, 0.1);">
+    <h6 style="color: #00ffff; margin-bottom: 10px;">🧪 IPTV Editor Automation Testing</h6>
+    <p style="color: #ccc; font-size: 0.9em; margin-bottom: 15px;">
+        Test the automated IPTV Editor user creation/sync workflow without creating a new IPTV subscription.
+        <br><strong>Note:</strong> User must already have an IPTV subscription.
+    </p>
+    
+    <div class="test-controls">
+        <button type="button" 
+                id="testIPTVEditorBtn" 
+                class="btn btn-secondary"
+                style="background: linear-gradient(135deg, #ff6b35, #f7931e); border: none; padding: 8px 16px;"
+                onclick="IPTV.handleTestIPTVEditorAutomation()">
+            🧪 Test IPTV Editor Automation
+        </button>
+        
+        <div id="testingStatus" style="margin-top: 10px; color: #00ffff; font-size: 0.9em;"></div>
+    </div>
+    
+    <div class="test-info" style="margin-top: 15px; font-size: 0.8em; color: #888;">
+        <strong>What this test does:</strong>
+        <ul style="margin: 5px 0 0 20px; color: #aaa;">
+            <li>Checks if user exists in IPTV Editor</li>
+            <li>Creates new IPTV Editor user if not found</li>
+            <li>Syncs existing IPTV Editor user if found</li>
+            <li>Links IPTV Editor account to JohnsonFlix user</li>
+            <li>Generates M3U and EPG URLs</li>
+            <li>Logs all operations for debugging</li>
+        </ul>
+    </div>
+</div>
         </div>
-
-
         <div class="form-group">
             <label>Subscription Information:</label>
             <div class="form-grid">

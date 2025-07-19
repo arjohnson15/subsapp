@@ -2571,6 +2571,128 @@ async saveLinkedAccount(userId, iptvData) {
     } catch (error) {
       console.error('❌ Failed to initialize channel groups section:', error);
     }
+  },
+  
+  /**
+   * Test IPTV Editor automation workflow - NEW METHOD
+   */
+     /**
+   * Test IPTV Editor automation workflow - NEW METHOD
+   */
+     /**
+   * Test IPTV Editor automation workflow - NEW METHOD
+   */
+     /**
+   * Test IPTV Editor automation workflow - NEW METHOD
+   */
+  async testIPTVEditorAutomation(userId) {
+    try {
+        console.log(`🧪 Testing IPTV Editor automation for user ${userId}...`);
+        
+        const requestData = {
+            user_id: parseInt(userId)
+        };
+        
+        console.log('📤 Sending test automation request:', requestData);
+        
+        // Make API request to test endpoint
+        const response = await fetch('/api/iptv/test-iptv-editor-automation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.message || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        if (!result.success) {
+            throw new Error(result.message || 'Test automation failed');
+        }
+        
+        console.log('✅ IPTV Editor automation test completed:', result);
+        
+        // Show detailed results
+        const userData = result.data.user_info;
+        const editorResults = result.data.iptv_editor_results;
+        
+        let statusMessage = `🧪 Test Results for ${userData.name} (${userData.iptv_username}):\n\n`;
+        
+        if (editorResults.iptv_editor_success) {
+            if (editorResults.iptv_editor_created) {
+                statusMessage += '✅ IPTV Editor user created successfully!\n';
+                statusMessage += `📝 IPTV Editor ID: ${editorResults.iptv_editor_data.iptv_editor_id}\n`;
+                if (editorResults.iptv_editor_data.m3u_url) {
+                    statusMessage += `🔗 M3U URL: ${editorResults.iptv_editor_data.m3u_url}\n`;
+                }
+                if (editorResults.iptv_editor_data.epg_url) {
+                    statusMessage += `📺 EPG URL: ${editorResults.iptv_editor_data.epg_url}\n`;
+                }
+            } else if (editorResults.iptv_editor_synced) {
+                statusMessage += '✅ IPTV Editor user found and synced successfully!\n';
+                statusMessage += `📝 IPTV Editor ID: ${editorResults.iptv_editor_data.iptv_editor_id}\n`;
+            }
+            
+            if (editorResults.iptv_editor_data.sync_status === 'synced') {
+                statusMessage += '🔄 Sync Status: Successfully synced\n';
+            }
+        } else {
+            statusMessage += '❌ IPTV Editor automation failed\n';
+            if (editorResults.iptv_editor_data?.error) {
+                statusMessage += `Error: ${editorResults.iptv_editor_data.error}\n`;
+            }
+        }
+        
+        statusMessage += `\n⏰ Test completed at: ${new Date().toLocaleString()}`;
+        
+        // Show notification
+        if (window.Utils && window.Utils.showNotification) {
+  window.Utils.showNotification(statusMessage, editorResults.iptv_editor_success ? 'success' : 'error');
+} else {
+  alert(statusMessage);
+}
+        
+        // Update UI if successful
+        if (editorResults.iptv_editor_success && typeof this.loadUserStatus === 'function') {
+            // Refresh the user's IPTV status display
+            this.loadUserStatus(userId);
+        }
+        
+        return result;
+        
+    } catch (error) {
+        console.error('❌ IPTV Editor automation test failed:', error);
+        
+        this.showNotification(
+            `❌ Test failed: ${error.message}`,
+            'error'
+        );
+        
+        throw error;
+    }
+  },
+
+  /**
+   * Event handler for test button - NEW METHOD
+   */
+  async handleTestIPTVEditorAutomation() {
+    try {
+        const userId = this.getCurrentUserId();
+        
+        if (!userId) {
+            this.showNotification('Please select a user first', 'warning');
+            return;
+        }
+        
+        await this.testIPTVEditorAutomation(userId);
+        
+    } catch (error) {
+        console.error('Test button error:', error);
+    }
   }
 };
 
