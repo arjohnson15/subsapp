@@ -2656,26 +2656,43 @@ if (window.Utils && window.Utils.showNotification) {
   alert(statusMessage);
 }
         
-// Update UI if successful - Use same method as real IPTV subscription creation
+// Update UI if successful - Complete comprehensive reload
 if (editorResults.iptv_editor_success) {
-  console.log('🔄 Refreshing IPTV status display after successful IPTV Editor creation...');
+  console.log('🔄 Starting comprehensive user data reload after IPTV Editor success...');
   
-  // Create fake result data structure to match what updateIPTVStatus expects
-  const updateData = {
-    iptv_editor_created: editorResults.iptv_editor_created,
-    iptv_editor_synced: editorResults.iptv_editor_synced,
-    iptv_editor_success: editorResults.iptv_editor_success,
-    iptv_editor_data: editorResults.iptv_editor_data
-  };
-  
-  // Use the exact same methods as real IPTV subscription creation
-  if (typeof this.updateIPTVStatus === 'function') {
-    this.updateIPTVStatus(updateData);
-  }
-  
-  if (typeof this.populateFormFieldsAfterCreation === 'function') {
-    this.populateFormFieldsAfterCreation(updateData);
-  }
+  // Comprehensive reload function (from your working console command)
+  setTimeout(async () => {
+    const userId = this.getCurrentUserId();
+    console.log('🔄 Reloading all user data for:', userId);
+    
+    try {
+      // Reload IPTV status
+      await this.loadCurrentUserIPTVStatus();
+      
+      // Reload IPTV Editor status
+      const response = await fetch(`/api/iptv-editor/user/${userId}/status`);
+      const data = await response.json();
+      if (data.success && data.iptvUser) {
+        // Try to call IPTV Editor display function
+        if (typeof loadIPTVEditorStatus === 'function') {
+          loadIPTVEditorStatus(userId);
+        } else if (typeof displayIPTVEditorStatus === 'function') {
+          displayIPTVEditorStatus(data.iptvUser);
+        } else {
+          console.log('✅ IPTV Editor data loaded:', data.iptvUser);
+        }
+      }
+      
+      // Full user reload as backup
+      if (typeof loadAndPopulateUser === 'function') {
+        loadAndPopulateUser(userId);
+      }
+      
+      console.log('✅ Complete comprehensive reload finished');
+    } catch (error) {
+      console.error('❌ Comprehensive reload failed:', error);
+    }
+  }, 1000); // 1 second delay to allow API to complete
 }
         
         return result;
