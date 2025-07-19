@@ -2052,7 +2052,7 @@ const createData = {
   playlist: settings.default_playlist_id,
   items: {
     name: user.email,
-    note: `JohnsonFlix User: ${user.name}`,
+    note: user.iptv_notes || "",
     username: user.iptv_username,
     password: user.iptv_password,
     message: null,
