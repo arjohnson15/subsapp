@@ -1079,6 +1079,10 @@ await new Promise(resolve => setTimeout(resolve, 3000));
     success: iptvEditorResults.iptv_editor_success,
     error: iptvEditorResults.iptv_editor_error
   });
+  
+  // 🔄 SIMPLE: Just emit a console log that frontend can detect
+console.log(`FRONTEND_REFRESH_TRIGGER:${user_id}`);
+
 });
 	
   } catch (error) {
