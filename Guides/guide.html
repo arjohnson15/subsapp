@@ -1,0 +1,222 @@
+<!-- ==================== EDIT WELCOME MESSAGE BELOW ==================== -->
+<!-- To customize the welcome message, scroll down to the email body section and -->
+<!-- edit the three <p> tags after "Your IPTV account details are listed below:" -->
+<!-- Look for: EDITABLE WELCOME MESSAGE SECTION -->
+<!-- ==================== EDIT WELCOME MESSAGE BELOW ==================== -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JohnsonFlix IPTV Welcome Email</title>
+  <style>
+    /* Mobile responsive styles */
+    @media only screen and (max-width: 600px) {
+      .email-container {
+        padding: 15px !important;
+        margin: 10px !important;
+      }
+      
+      .mobile-button {
+        display: block !important;
+        width: 160px !important;
+        margin: 10px auto !important;
+        padding: 12px 20px !important;
+        font-size: 14px !important;
+      }
+      
+      .mobile-text {
+        font-size: 16px !important;
+      }
+      
+      .mobile-stack {
+        display: block !important;
+        width: 100% !important;
+      }
+      
+      .info-row {
+        margin-bottom: 15px !important;
+      }
+      
+      .info-value {
+        font-size: 14px !important;
+        padding: 12px !important;
+      }
+    }
+  </style>
+</head>
+<body style="font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; color: #333;">
+
+<div class="email-container" style="background: #ffffff; padding: 30px; border-radius: 8px; max-width: 700px; margin: auto; text-align: center; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+  
+  <!-- Logo with GitHub raw URL (more reliable than blob URLs) -->
+  <img src="https://raw.githubusercontent.com/arjohnson15/imagesjohnsonflix/main/logo_full.old.png" 
+       alt="JOHNSONFLIX" 
+       style="max-width: 100%; width: 350px; height: auto; margin: 0 auto 20px; display: block; border: 0; outline: none; text-decoration: none; font-size: 24px; font-weight: bold; color: #b833ff; text-align: center;" 
+       width="350" 
+       height="auto">
+
+  <!-- Fixed welcome message -->
+  <p style="color: #333; font-size: 18px; font-weight: bold; margin-bottom: 15px; line-height: 1.4;">Welcome to JohnsonFlix IPTV!</p>
+  <p style="color: #555; font-size: 16px; margin-bottom: 25px; line-height: 1.6;">Your account has been successfully activated and is ready to use.</p>
+  
+  <!-- ==================== EDITABLE WELCOME MESSAGE SECTION ==================== -->
+  <!-- EDIT THE PARAGRAPHS INSIDE THIS DIV TO CUSTOMIZE THE WELCOME MESSAGE -->
+  <!-- To hide the blue box completely, leave the div empty like: <div class="editable-message-box"></div> -->
+  <div style="background: rgba(79, 195, 247, 0.1); border: 2px solid rgba(79, 195, 247, 0.3); border-radius: 8px; padding: 20px; margin: 20px 0; text-align: left;">
+    <p style="margin-bottom: 15px; color: #555; line-height: 1.6; font-size: 16px;"><strong>Important Update:</strong> We've upgraded to a new private provider to deliver the most reliable and stable streaming experience possible.</p>
+    <p style="margin-bottom: 15px; color: #555; line-height: 1.6; font-size: 16px;"><strong>Your username and password have been updated</strong> - please use the new credentials listed below if you are not using iMPlayer or the Roku app. If you use iMPlayer or the Roku app I have already updated the credentials for you.</p>
+    <p style="margin-bottom: 0; color: #555; line-height: 1.6; font-size: 16px;">If you had favorites saved you will need to set those back up due to the backend provider change.</p>
+  </div>
+  <!-- ==================== END EDITABLE WELCOME MESSAGE SECTION ==================== -->
+
+  <h3 style="color: #333; font-size: 20px; margin: 30px 0 20px 0; font-weight: bold;">Your IPTV account details are listed below:</h3>
+
+  <!-- Credentials in consistent info-row format -->
+  <div style="margin: 20px 0;">
+    <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 20px;">
+      <span style="font-weight: bold; color: #222; text-align: left; width: 100%; margin-bottom: 5px;">Xtream API URL/DNS:</span>
+      <span style="background: #f4f4f4; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace; font-size: 1rem; color: #333; text-align: left; word-wrap: break-word; width: 100%;">https://xtream.johnsonflix.tv</span>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 20px;">
+      <span style="font-weight: bold; color: #222; text-align: left; width: 100%; margin-bottom: 5px;">Username:</span>
+      <span style="background: #f4f4f4; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace; font-size: 1rem; color: #333; text-align: left; word-wrap: break-word; width: 100%;">{{iptv_username}}</span>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 20px;">
+      <span style="font-weight: bold; color: #222; text-align: left; width: 100%; margin-bottom: 5px;">Password:</span>
+      <span style="background: #f4f4f4; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace; font-size: 1rem; color: #333; text-align: left; word-wrap: break-word; width: 100%;">{{iptv_password}}</span>
+    </div>
+  </div>
+
+  <hr style="border: none; height: 1px; background: #ccc; margin: 30px 0;">
+
+  <h3 style="color: #b833ff; font-size: 20px; margin-bottom: 15px; font-weight: bold;">Recommended App: JohnsonFlix+ (Android TV Only)</h3>
+  
+  <!-- App Guide Link -->
+<div style="margin-bottom: 20px;">
+  <a href="https://guide.johnsonflix.com" 
+     style="display: inline-flex; align-items: center; padding: 12px 20px; background: linear-gradient(135deg, #b833ff, #8a2be2); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(184, 51, 255, 0.3);"
+     onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(184, 51, 255, 0.4)'"
+     onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(184, 51, 255, 0.3)'">
+    📱 View App Guide
+  </a>
+</div>
+
+  <p style="color: #555; margin-bottom: 20px; line-height: 1.6; font-size: 16px;">
+    <strong>For Android TV users:</strong> We highly recommend our custom JohnsonFlix+ app designed specifically for our service. It's completely free and provides the best viewing experience with optimized performance and features. Use the downloader app to install.
+  </p>
+  
+  <!-- Downloader code in consistent format -->
+  <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 20px;">
+    <span style="font-weight: bold; color: #222; text-align: left; width: 100%; margin-bottom: 5px;">Downloader Code:</span>
+    <span style="background: #f4f4f4; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace; font-size: 1rem; color: #333; text-align: left; word-wrap: break-word; width: 100%;">6551264</span>
+  </div>
+  
+  <p style="color: #555; margin-bottom: 15px; line-height: 1.6; font-size: 16px;">
+    Once installed, the <strong>Johnsonflix+</strong> playlist will be your primary option. If for any reason it's unavailable, you can switch to the <strong>Pink Backup</strong> playlist which connects directly to the backend.
+  </p>
+  <p style="color: #555; margin-bottom: 15px; line-height: 1.6; font-size: 16px;">
+    Note that the Pink Backup may not include EPG data or channel logos, as these are added on our end and not available through the direct route.
+  </p>
+  <p style="color: #555; margin-bottom: 20px; line-height: 1.6; font-size: 16px;">
+    Both playlists use the same login credentials listed above.
+  </p>
+
+  <hr style="border: none; height: 1px; background: #ccc; margin: 30px 0;">
+
+  <h3 style="color: #b833ff; font-size: 20px; margin-bottom: 15px; font-weight: bold;">iMPlayer for Apple and Android</h3>
+  <p style="color: #555; margin-bottom: 15px; line-height: 1.6; font-size: 16px;">
+    <strong>Existing iMPlayer users:</strong> You can continue using your current licenses and add more devices. Android users may want to consider switching to our custom JohnsonFlix+ app for additional features.
+  </p>
+  <p style="color: #555; margin-bottom: 20px; line-height: 1.6; font-size: 16px;">
+    <strong>New licenses:</strong> iMPlayer works on iOS, tvOS, Android TV, and Android mobile devices with features like EPG, logos, favorites, and cloud sync. Future licenses cost $10 per device.
+  </p>
+  
+  <!-- iMPlayer codes matching the format of other sections -->
+  <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 20px;">
+    <span style="font-weight: bold; color: #222; text-align: left; width: 100%; margin-bottom: 5px;">IMPlayer Code:</span>
+    <span style="background: #f4f4f4; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace; font-size: 1rem; color: #333; text-align: left; word-wrap: break-word; width: 100%;">{{implayer_code}}</span>
+  </div>
+  <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 20px;">
+    <span style="font-weight: bold; color: #222; text-align: left; width: 100%; margin-bottom: 5px;">Downloader Code:</span>
+    <span style="background: #f4f4f4; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace; font-size: 1rem; color: #333; text-align: left; word-wrap: break-word; width: 100%;">82375</span>
+  </div>
+
+  <!-- Button with better sizing like you mentioned -->
+  <table style="margin: 15px auto;">
+    <tr>
+      <td style="padding: 0;">
+        <a href="https://help.implayer.tv/1.+Getting+Started/1.2+How+to+Install+iMPlayer" 
+           class="mobile-button"
+           style="background-color: #22bdee; color: white; padding: 10px 16px; text-decoration: none; font-size: 13px; font-weight: bold; border-radius: 6px; display: inline-block; line-height: 1.2;">
+          How to Install iMPlayer
+        </a>
+      </td>
+    </tr>
+  </table>
+ 
+  <hr style="border: none; height: 1px; background: #ccc; margin: 30px 0;">
+
+  <h3 style="color: #b833ff; font-size: 20px; margin-bottom: 15px; font-weight: bold;">Roku Users</h3>
+  <p style="color: #555; margin-bottom: 15px; line-height: 1.6; font-size: 16px;">
+    <strong>Limited Support:</strong> Roku devices have very limited support, so the user experience isn't as good as Android, but playback works just as well.
+  </p>
+  <p style="color: #555; margin-bottom: 20px; line-height: 1.6; font-size: 16px;">
+    <strong>Setup Process:</strong> Roku does not use the Xtream API credentials. You'll need to reach out to us for activation instructions.
+  </p>
+  
+  <!-- Roku info in consistent format -->
+  <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 20px;">
+    <span style="font-weight: bold; color: #222; text-align: left; width: 100%; margin-bottom: 5px;">Roku Channel Store:</span>
+    <span style="background: #f4f4f4; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace; font-size: 1rem; color: #333; text-align: left; word-wrap: break-word; width: 100%;">
+      <a href="https://channelstore.roku.com/en-ot/details/7fb9f6373cf3d1d2073fcf4eb7e47f39:133a44044a10c40235818b1ad8d42ca4/iptv-plus" 
+         style="color: #22bdee; text-decoration: underline;">
+        Search "IPTV Plus" in Roku Channel Store
+      </a>
+    </span>
+  </div>
+  
+  <p style="color: #555; margin-bottom: 20px; line-height: 1.6; font-size: 16px;">
+    After installing the app, contact us with your device's MAC address so we can activate it and add the playlist for you.
+  </p>
+
+  <hr style="border: none; height: 1px; background: #ccc; margin: 30px 0;">
+
+  <h3 style="color: #b833ff; font-size: 20px; margin-bottom: 15px; font-weight: bold;">Alternative Apps & Web Player</h3>
+  
+  <!-- Alternative apps in consistent format -->
+  <div style="margin: 20px 0;">
+    <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 20px;">
+      <span style="font-weight: bold; color: #222; text-align: left; width: 100%; margin-bottom: 5px;">Windows:</span>
+      <span style="background: #f4f4f4; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace; font-size: 1rem; color: #333; text-align: left; word-wrap: break-word; width: 100%;">
+        <a href="https://download.iptveditor.com/iptveditor_player.exe" 
+           style="color: #22bdee; text-decoration: underline;">
+          https://download.iptveditor.com
+        </a>
+      </span>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 20px;">
+      <span style="font-weight: bold; color: #222; text-align: left; width: 100%; margin-bottom: 5px;">Mac:</span>
+      <span style="background: #f4f4f4; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace; font-size: 1rem; color: #333; text-align: left; word-wrap: break-word; width: 100%;">
+        <a href="https://download.iptveditor.com/iptveditor_player_mac.zip" 
+           style="color: #22bdee; text-decoration: underline;">
+          https://download.iptveditor.com
+        </a>
+      </span>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 20px;">
+      <span style="font-weight: bold; color: #222; text-align: left; width: 100%; margin-bottom: 5px;">Web Player:</span>
+      <span style="background: #f4f4f4; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace; font-size: 1rem; color: #333; text-align: left; word-wrap: break-word; width: 100%;">
+        <a href="http://web.johnsonflix.com" 
+           style="color: #22bdee; text-decoration: underline;">
+          http://web.johnsonflix.com
+        </a>
+      </span>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

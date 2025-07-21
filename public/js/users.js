@@ -2826,15 +2826,15 @@ async function checkIPTVEditorAccess() {
 }
 
 function showIPTVEditorSyncResults(user, username) {
-    // Store the user data globally so sync can access it
+    // Store the user data globally so sync can access it - FIXED: Handle different response structures
     currentIPTVEditorData = {
-        iptv_editor_id: user.id,
-        iptv_editor_username: user.username,
-        iptv_editor_password: user.password,
-        m3u_code: user.m3u,
-        epg_code: user.epg,
+        iptv_editor_id: user.iptv_editor_id || user.id,  // Handle both response formats
+        iptv_editor_username: user.iptv_editor_username || user.username,
+        iptv_editor_password: user.iptv_editor_password || user.password,
+        m3u_code: user.m3u_code || user.m3u,
+        epg_code: user.epg_code || user.epg,
         max_connections: user.max_connections,
-        expiry_date: user.expiry,
+        expiry_date: user.expiry_date || user.expiry,
         sync_status: 'found',
         last_sync_time: new Date().toISOString()
     };
@@ -2847,7 +2847,7 @@ function showIPTVEditorSyncResults(user, username) {
         iptvUsernameField.value = username;
     }
     
-    const expiryDate = user.expiry ? new Date(user.expiry).toLocaleDateString() : 'Unknown';
+    const expiryDate = (user.expiry_date || user.expiry) ? new Date(user.expiry_date || user.expiry).toLocaleDateString() : 'Unknown';
     
     resultsDiv.innerHTML = `
         <div style="background: rgba(76, 175, 80, 0.1); border: 1px solid #4caf50; border-radius: 4px; padding: 15px;">
