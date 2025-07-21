@@ -2952,16 +2952,18 @@ async function syncIPTVEditorUser(username) {
         
         const data = await response.json();
         
-        if (data.success) {
-            Utils.showNotification('IPTV Editor account synced and saved successfully', 'success');
-            // Update the display with new data
-            showIPTVEditorSyncResults(data.user, username);
-            
-            // Also load the IPTV status section
-            await loadIPTVEditorStatus(userId);
-        } else {
-            Utils.showNotification(`Sync failed: ${data.message}`, 'error');
-        }
+if (data.success) {
+    Utils.showNotification('IPTV Editor account synced and saved successfully', 'success');
+    // Update the display with new data - FIXED: Use data.data instead of data.user
+    if (data.data) {
+        showIPTVEditorSyncResults(data.data, username);
+    }
+    
+    // Also load the IPTV status section
+    await loadIPTVEditorStatus(userId);
+} else {
+    Utils.showNotification(`Sync failed: ${data.message}`, 'error');
+}
         
     } catch (error) {
         console.error('Error syncing IPTV Editor user:', error);
