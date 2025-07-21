@@ -31,7 +31,7 @@ router.get('/packages', async (req, res) => {
     
     // Ensure packages is an array before filtering
     if (!Array.isArray(packages)) {
-      console.error('❌ Packages is not an array:', typeof packages);
+      console.error('? Packages is not an array:', typeof packages);
       return res.json({
         success: true,
         packages: {
@@ -68,7 +68,7 @@ router.get('/packages', async (req, res) => {
       breakdown: breakdown
     });
   } catch (error) {
-    console.error('❌ Error getting packages:', error);
+    console.error('? Error getting packages:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get packages',
@@ -82,7 +82,7 @@ router.get('/packages', async (req, res) => {
  */
 router.post('/sync-packages', async (req, res) => {
   try {
-    console.log('🔄 Starting package sync (trial + paid)...');
+    console.log('?? Starting package sync (trial + paid)...');
     
     await iptvService.initialize();
     const count = await iptvService.syncPackagesFromPanel();
@@ -103,7 +103,7 @@ router.post('/sync-packages', async (req, res) => {
       breakdown: breakdown
     });
   } catch (error) {
-    console.error('❌ Error syncing packages:', error);
+    console.error('? Error syncing packages:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to sync packages',
@@ -117,7 +117,7 @@ router.post('/sync-packages', async (req, res) => {
  */
 router.get('/bouquets', async (req, res) => {
   try {
-    console.log('🔍 Getting bouquets from database...');
+    console.log('?? Getting bouquets from database...');
     
     const result = await db.query(`
       SELECT bouquet_id, name, category, is_active, synced_at 
@@ -126,8 +126,8 @@ router.get('/bouquets', async (req, res) => {
       ORDER BY category, name
     `);
     
-    console.log('🔍 Database result type:', typeof result);
-    console.log('🔍 Database result length:', Array.isArray(result) ? result.length : 'not array');
+    console.log('?? Database result type:', typeof result);
+    console.log('?? Database result length:', Array.isArray(result) ? result.length : 'not array');
     
     // Handle different return formats from mysql2
     let rows;
@@ -136,11 +136,11 @@ router.get('/bouquets', async (req, res) => {
     } else if (result && Array.isArray(result[0])) {
       rows = result[0];
     } else {
-      console.log('🔍 Unexpected result format:', result);
+      console.log('?? Unexpected result format:', result);
       rows = [];
     }
     
-    console.log('🔍 Final rows count:', rows.length);
+    console.log('?? Final rows count:', rows.length);
     
     if (!rows || rows.length === 0) {
       return res.json({
@@ -166,7 +166,7 @@ router.get('/bouquets', async (req, res) => {
       });
     });
     
-    console.log('✅ Returning', rows.length, 'bouquets in', Object.keys(groupedBouquets).length, 'categories');
+    console.log('? Returning', rows.length, 'bouquets in', Object.keys(groupedBouquets).length, 'categories');
     
     res.json({
       success: true,
@@ -174,7 +174,7 @@ router.get('/bouquets', async (req, res) => {
       total: rows.length
     });
   } catch (error) {
-    console.error('❌ Error getting bouquets:', error);
+    console.error('? Error getting bouquets:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get bouquets',
@@ -197,7 +197,7 @@ router.post('/sync-bouquets', async (req, res) => {
       count: count
     });
   } catch (error) {
-    console.error('❌ Error syncing bouquets:', error);
+    console.error('? Error syncing bouquets:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to sync bouquets',
@@ -215,7 +215,7 @@ router.get('/channel-groups', async (req, res) => {
     
     // Ensure groups is an array before mapping
     if (!Array.isArray(groups)) {
-      console.error('❌ Channel groups is not an array:', typeof groups);
+      console.error('? Channel groups is not an array:', typeof groups);
       return res.json({
         success: true,
         channelGroups: [],
@@ -237,7 +237,7 @@ router.get('/channel-groups', async (req, res) => {
       total: parsedGroups.length
     });
   } catch (error) {
-    console.error('❌ Error getting channel groups:', error);
+    console.error('? Error getting channel groups:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get channel groups',
@@ -253,10 +253,10 @@ router.get('/channel-groups/:id', [
   param('id').isInt().withMessage('Invalid group ID'),
   handleValidationErrors
 ], async (req, res) => {
-  console.log('🔍 Channel group route called with ID:', req.params.id); // ADD THIS LINE
+  console.log('?? Channel group route called with ID:', req.params.id); // ADD THIS LINE
 try {
   const { id } = req.params;
-  console.log('🔍 Looking for channel group ID:', id);
+  console.log('?? Looking for channel group ID:', id);
   
   const result = await db.query(`
     SELECT id, name, description, bouquet_ids, is_active, created_at, updated_at
@@ -264,22 +264,22 @@ try {
     WHERE id = ?
   `, [id]);
   
-  console.log('🔍 Database result:', result);
-  console.log('🔍 Result type:', typeof result);
-  console.log('🔍 Is array?:', Array.isArray(result));
+  console.log('?? Database result:', result);
+  console.log('?? Result type:', typeof result);
+  console.log('?? Is array?:', Array.isArray(result));
   
 // Handle different return formats from mysql2
 const rows = Array.isArray(result) ? result[0] : result;
 
-console.log('🔍 Processed rows:', rows);
-console.log('🔍 Rows type:', typeof rows);
-console.log('🔍 Rows is array?:', Array.isArray(rows));
+console.log('?? Processed rows:', rows);
+console.log('?? Rows type:', typeof rows);
+console.log('?? Rows is array?:', Array.isArray(rows));
 
 // If rows is an array, get the first item. If it's an object, use it directly
 let group;
 if (Array.isArray(rows)) {
   if (rows.length === 0) {
-    console.log('❌ No rows found in array');
+    console.log('? No rows found in array');
     return res.status(404).json({
       success: false,
       message: 'Channel group not found'
@@ -290,13 +290,13 @@ if (Array.isArray(rows)) {
   // Single object result
   group = rows;
 } else {
-  console.log('❌ Invalid result format');
+  console.log('? Invalid result format');
   return res.status(404).json({
     success: false,
     message: 'Channel group not found'
   });
 }
-  console.log('✅ Found group:', group);
+  console.log('? Found group:', group);
     
     // Parse bouquet_ids JSON
     const parsedGroup = {
@@ -311,7 +311,7 @@ if (Array.isArray(rows)) {
       channelGroup: parsedGroup
     });
   } catch (error) {
-    console.error('❌ Error getting channel group:', error);
+    console.error('? Error getting channel group:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get channel group',
@@ -339,7 +339,7 @@ router.post('/channel-groups', [
       groupId: groupId
     });
   } catch (error) {
-    console.error('❌ Error creating channel group:', error);
+    console.error('? Error creating channel group:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create channel group',
@@ -368,7 +368,7 @@ router.put('/channel-groups/:id', [
       message: 'Channel group updated successfully'
     });
   } catch (error) {
-    console.error('❌ Error updating channel group:', error);
+    console.error('? Error updating channel group:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update channel group',
@@ -394,7 +394,7 @@ router.delete('/channel-groups/:id', [
       message: 'Channel group deleted successfully'
     });
   } catch (error) {
-    console.error('❌ Error deleting channel group:', error);
+    console.error('? Error deleting channel group:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete channel group',
@@ -456,7 +456,7 @@ router.get('/user/:id', [
       }
     });
   } catch (error) {
-    console.error('❌ Error getting user IPTV status:', error);
+    console.error('? Error getting user IPTV status:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get user IPTV status',
@@ -467,7 +467,7 @@ router.get('/user/:id', [
 
 /**
  * POST /api/iptv/subscription - Create or extend IPTV subscription with data retrieval
- * FIXED VERSION - Only changed the data extraction and response structure
+ * UPDATED VERSION - With IPTV Editor automation integration
  */
 router.post('/subscription', [
   body('user_id').isInt().withMessage('Invalid user ID'),
@@ -479,15 +479,15 @@ router.post('/subscription', [
   try {
     const { user_id, package_id, channel_group_id, action, username, password, notes } = req.body;
     
-    console.log('🔄 Processing IPTV subscription request:', { user_id, package_id, channel_group_id, action, username });
+    console.log('?? Processing IPTV subscription request:', { user_id, package_id, channel_group_id, action, username });
     
     await iptvService.initialize();
     
     // Get user data - FIXED QUERY RESULT HANDLING
     const userResult = await db.query('SELECT * FROM users WHERE id = ?', [user_id]);
-    console.log('📊 Raw user query result:', userResult);
-    console.log('📊 User result type:', typeof userResult);
-    console.log('📊 User result is array:', Array.isArray(userResult));
+    console.log('?? Raw user query result:', userResult);
+    console.log('?? User result type:', typeof userResult);
+    console.log('?? User result is array:', Array.isArray(userResult));
     
     // Handle different possible result structures from mysql2
     let user = null;
@@ -501,19 +501,19 @@ router.post('/subscription', [
     }
     
     if (!user) {
-      console.error('❌ User not found for ID:', user_id);
-      console.error('❌ Raw result was:', userResult);
+      console.error('? User not found for ID:', user_id);
+      console.error('? Raw result was:', userResult);
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
     
-    console.log('✅ Found user:', { id: user.id, name: user.name, email: user.email });
+    console.log('? Found user:', { id: user.id, name: user.name, email: user.email });
     
     // Get package information - FIXED QUERY RESULT HANDLING
     const packageResult = await db.query('SELECT * FROM iptv_packages WHERE package_id = ?', [package_id]);
-    console.log('📊 Raw package query result:', packageResult);
+    console.log('?? Raw package query result:', packageResult);
     
     let packageInfo = null;
     if (Array.isArray(packageResult) && packageResult.length > 0) {
@@ -525,91 +525,91 @@ router.post('/subscription', [
     }
     
     if (!packageInfo) {
-      console.error('❌ Package not found for ID:', package_id);
-      console.error('❌ Raw package result was:', packageResult);
+      console.error('? Package not found for ID:', package_id);
+      console.error('? Raw package result was:', packageResult);
       return res.status(404).json({
         success: false,
         message: 'Package not found'
       });
     }
     
-    console.log('✅ Found package:', { id: packageInfo.package_id, name: packageInfo.package_name, type: packageInfo.package_type });
+    console.log('? Found package:', { id: packageInfo.package_id, name: packageInfo.package_name, type: packageInfo.package_type });
 	
-// **CRITICAL VALIDATION**: For extend action, validate connection count matches
-if (action === 'extend') {
-  if (!user.iptv_line_id) {
-    return res.status(400).json({
-      success: false,
-      message: 'No existing IPTV subscription to extend. User must have an active IPTV line to extend.'
-    });
-  }
-  
-  // Validate connection count matches current user's package
-  if (user.iptv_connections && parseInt(packageInfo.connections) !== parseInt(user.iptv_connections)) {
-    return res.status(400).json({
-      success: false,
-      message: `Connection mismatch: User currently has ${user.iptv_connections} connections, but selected package has ${packageInfo.connections} connections. For extensions, you must use a package with the same number of connections.`,
-      details: {
-        current_connections: parseInt(user.iptv_connections),
-        selected_connections: parseInt(packageInfo.connections),
-        user_line_id: user.iptv_line_id,
-        user_package: user.iptv_package_name
+    // **CRITICAL VALIDATION**: For extend action, validate connection count matches
+    if (action === 'extend') {
+      if (!user.iptv_line_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'No existing IPTV subscription to extend. User must have an active IPTV line to extend.'
+        });
       }
-    });
-  }
-  
-  // Additional validation: ensure user has username
-  if (!user.iptv_username) {
-    return res.status(400).json({
-      success: false,
-      message: 'User has a line ID but no username. Cannot extend subscription without existing username.'
-    });
-  }
-  
-  console.log(`✅ Extension validation passed:`, {
-    line_id: user.iptv_line_id,
-    username: user.iptv_username,
-    current_connections: user.iptv_connections,
-    package_connections: packageInfo.connections,
-    package_name: packageInfo.name
-  });
-}
+      
+      // Validate connection count matches current user's package
+      if (user.iptv_connections && parseInt(packageInfo.connections) !== parseInt(user.iptv_connections)) {
+        return res.status(400).json({
+          success: false,
+          message: `Connection mismatch: User currently has ${user.iptv_connections} connections, but selected package has ${packageInfo.connections} connections. For extensions, you must use a package with the same number of connections.`,
+          details: {
+            current_connections: parseInt(user.iptv_connections),
+            selected_connections: parseInt(packageInfo.connections),
+            user_line_id: user.iptv_line_id,
+            user_package: user.iptv_package_name
+          }
+        });
+      }
+      
+      // Additional validation: ensure user has username
+      if (!user.iptv_username) {
+        return res.status(400).json({
+          success: false,
+          message: 'User has a line ID but no username. Cannot extend subscription without existing username.'
+        });
+      }
+      
+      console.log(`? Extension validation passed:`, {
+        line_id: user.iptv_line_id,
+        username: user.iptv_username,
+        current_connections: user.iptv_connections,
+        package_connections: packageInfo.connections,
+        package_name: packageInfo.name
+      });
+    }
     
-// Get channel group bouquets - ENHANCED DEBUGGING
+    // Get channel group bouquets - ENHANCED DEBUGGING
     const channelGroupResult = await db.query('SELECT bouquet_ids FROM iptv_channel_groups WHERE id = ?', [channel_group_id]);
-    console.log('📊 Raw channel group query result:', channelGroupResult);
-    console.log('📊 Channel group result type:', typeof channelGroupResult);
-    console.log('📊 Channel group result is array:', Array.isArray(channelGroupResult));
-    console.log('📊 Channel group result length:', channelGroupResult?.length);
+    console.log('?? Raw channel group query result:', channelGroupResult);
+    console.log('?? Channel group result type:', typeof channelGroupResult);
+    console.log('?? Channel group result is array:', Array.isArray(channelGroupResult));
+    console.log('?? Channel group result length:', channelGroupResult?.length);
     
     let channelGroup = null;
     if (Array.isArray(channelGroupResult) && channelGroupResult.length > 0) {
       channelGroup = channelGroupResult[0];
-      console.log('📊 Used direct array access - channelGroup:', channelGroup);
+      console.log('?? Used direct array access - channelGroup:', channelGroup);
     } else if (channelGroupResult && Array.isArray(channelGroupResult[0]) && channelGroupResult[0].length > 0) {
       channelGroup = channelGroupResult[0][0];
-      console.log('📊 Used nested array access - channelGroup:', channelGroup);
+      console.log('?? Used nested array access - channelGroup:', channelGroup);
     } else if (channelGroupResult && channelGroupResult.bouquet_ids) {
       channelGroup = channelGroupResult;
-      console.log('📊 Used direct object access - channelGroup:', channelGroup);
+      console.log('?? Used direct object access - channelGroup:', channelGroup);
     }
     
-    console.log('📊 Final channelGroup value:', channelGroup);
-    console.log('📊 channelGroup type:', typeof channelGroup);
-    console.log('📊 channelGroup has bouquet_ids:', !!channelGroup?.bouquet_ids);
-    console.log('📊 bouquet_ids value:', channelGroup?.bouquet_ids);
-    console.log('📊 bouquet_ids type:', typeof channelGroup?.bouquet_ids);
+    console.log('?? Final channelGroup value:', channelGroup);
+    console.log('?? channelGroup type:', typeof channelGroup);
+    console.log('?? channelGroup has bouquet_ids:', !!channelGroup?.bouquet_ids);
+    console.log('?? bouquet_ids value:', channelGroup?.bouquet_ids);
+    console.log('?? bouquet_ids type:', typeof channelGroup?.bouquet_ids);
     
     if (!channelGroup || !channelGroup.bouquet_ids) {
-      console.error('❌ Channel group not found for ID:', channel_group_id);
-      console.error('❌ Raw channel group result was:', channelGroupResult);
+      console.error('? Channel group not found for ID:', channel_group_id);
+      console.error('? Raw channel group result was:', channelGroupResult);
       return res.status(404).json({
         success: false,
         message: 'Channel group not found'
       });
     }
     
-    console.log('✅ Found channel group with bouquets:', channelGroup.bouquet_ids);
+    console.log('? Found channel group with bouquets:', channelGroup.bouquet_ids);
     
     // Handle bouquet IDs - keep as comma-separated string for IPTV API
     let bouquetIds = channelGroup.bouquet_ids;
@@ -620,12 +620,12 @@ if (action === 'extend') {
         const parsed = JSON.parse(bouquetIds);
         bouquetIds = parsed.join(',');
       } catch (error) {
-        console.warn('⚠️ Failed to parse JSON bouquet IDs, using as-is');
+        console.warn('?? Failed to parse JSON bouquet IDs, using as-is');
       }
     }
     
-    console.log('✅ Final bouquet IDs for API:', bouquetIds);
-    console.log('✅ Bouquet IDs type:', typeof bouquetIds);
+    console.log('? Final bouquet IDs for API:', bouquetIds);
+    console.log('? Bouquet IDs type:', typeof bouquetIds);
     
     // Check credits for paid subscriptions
     if (action === 'create_paid') {
@@ -677,14 +677,14 @@ if (action === 'extend') {
     }
     
     if (!result || !result.success) {
-      console.error('❌ IPTV service failed:', result?.message || 'Unknown error');
+      console.error('? IPTV service failed:', result?.message || 'Unknown error');
       return res.status(400).json({
         success: false,
         message: result?.message || 'IPTV service failed'
       });
     }
     
-    console.log('✅ IPTV service success:', result);
+    console.log('? IPTV service success:', result);
     
     // FIXED: Extract data correctly from service result
     const { userData, m3uPlusURL } = result;
@@ -741,270 +741,154 @@ if (action === 'extend') {
       user_id
     ]);
 
-// Automatically create/link IPTV Editor user for all IPTV subscriptions
-console.log('🎯 Processing IPTV Editor user for IPTV subscription...');
-let iptvEditorCreated = false;
-let iptvEditorSynced = false;
-let iptvEditorData = null;
-
-try {
-  // Step 1: Check if user exists in IPTV Editor by username
-  console.log(`🔍 Checking if username "${finalUsername}" exists in IPTV Editor...`);
-  
-  // Get IPTV Editor settings first
-  const iptvEditorService = require('./iptv-editor-service');
-  const settings = await iptvEditorService.getAllSettings();
-  
-  if (!settings.bearer_token || !settings.default_playlist_id) {
-    console.log('⚠️ IPTV Editor not configured properly, skipping');
-    throw new Error('IPTV Editor not configured');
-  }
-  
-  // Get all IPTV Editor users to check if our user exists
-  const apiUsers = await iptvEditorService.getAllUsers();
-  const existingUser = apiUsers.find(apiUser => 
-    apiUser.username && apiUser.username.toLowerCase() === finalUsername.toLowerCase()
-  );
-  
-  if (existingUser) {
-    // User exists in IPTV Editor - Link/Sync them
-    console.log('✅ User found in IPTV Editor, linking and syncing...');
+    // ?? NEW: IPTV EDITOR AUTOMATION (FROM TESTED WORKFLOW)
+    console.log(`?? Starting IPTV Editor automation for user ${user_id}...`);
     
-    // Enhanced force-sync for existing user with proper error handling
-    console.log('🔄 Triggering force-sync for existing IPTV Editor user...');
-
-    const forceSyncData = {
-      playlist: settings.default_playlist_id,
-      items: [{
-        id: existingUser.id,
-        username: finalUsername,
-        password: actualPassword
-      }],
-      xtream: {
-        url: "https://pinkpony.lol",
-        param1: finalUsername,
-        param2: actualPassword,
-        type: "xtream"
-      }
+    let iptvEditorResults = {
+      iptv_editor_created: false,
+      iptv_editor_synced: false,
+      iptv_editor_success: false,
+      iptv_editor_data: null,
+      iptv_editor_error: null
     };
-
-    let syncSuccess = false;
+    
     try {
-      const syncStartTime = Date.now();
-      const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
-      const syncDuration = Date.now() - syncStartTime;
-      
-      console.log(`✅ IPTV Editor force-sync completed in ${syncDuration}ms:`, syncResponse);
-      
-      // Log the sync
-      await db.query(`
-        INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, duration_ms)
-        VALUES ('user_link_sync', ?, 'success', ?, ?, ?)
-      `, [
-        user_id,
-        JSON.stringify(forceSyncData),
-        JSON.stringify(syncResponse),
-        syncDuration
-      ]);
-      
-      syncSuccess = true;
-      iptvEditorSynced = true;
-      
-    } catch (syncError) {
-      console.error('⚠️ Force-sync failed for existing user (but continuing):', syncError.message);
-      
-      // Log the failed sync
-      await db.query(`
-        INSERT INTO iptv_sync_logs (sync_type, user_id, status, error_message)
-        VALUES ('user_link_sync', ?, 'error', ?)
-      `, [user_id, syncError.message]);
-      
-      syncSuccess = false;
-      iptvEditorSynced = false;
-    }
-    
-    // Save to local database (link the user) - do this regardless of sync success
-    await db.query(`
-      INSERT INTO iptv_editor_users (
-        user_id, iptv_editor_id, iptv_editor_username, iptv_editor_password,
-        m3u_code, epg_code, expiry_date, max_connections, sync_status, last_sync_time
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-      ON DUPLICATE KEY UPDATE
-        iptv_editor_id = VALUES(iptv_editor_id),
-        iptv_editor_username = VALUES(iptv_editor_username),
-        iptv_editor_password = VALUES(iptv_editor_password),
-        m3u_code = VALUES(m3u_code),
-        epg_code = VALUES(epg_code),
-        expiry_date = VALUES(expiry_date),
-        max_connections = VALUES(max_connections),
-        sync_status = VALUES(sync_status),
-        last_sync_time = NOW()
-    `, [
-      user_id,
-      existingUser.id,
-      finalUsername,
-      actualPassword,
-      existingUser.m3u || '',
-      existingUser.epg || '',
-      expirationForDB,
-      existingUser.max_connections || 2,
-      syncSuccess ? 'synced' : 'error'
-    ]);
-    
-    iptvEditorCreated = true;
-    iptvEditorData = {
-      username: finalUsername,
-      m3u_code: existingUser.m3u || '',
-      epg_code: existingUser.epg || '',
-      iptv_editor_id: existingUser.id,
-      max_connections: existingUser.max_connections || 2,
-      m3u_url: existingUser.m3u ? `https://editor.iptveditor.com/m3u/${existingUser.m3u}` : null,
-      epg_url: existingUser.epg ? `https://editor.iptveditor.com/epg/${existingUser.epg}` : null,
-      action: syncSuccess ? 'linked_and_synced' : 'linked_no_sync',
-      sync_status: syncSuccess ? 'synced' : 'error'
-    };
-    
-  } else {
-    // User doesn't exist in IPTV Editor - Create them
-    console.log('❌ User not found in IPTV Editor, creating new user...');
-    
-    // Calculate expiry date for IPTV Editor (ISO format)
-    const expiryDate = new Date(expirationForDB);
-    const expiryISO = expiryDate.toISOString();
-    
-    // Create using exact format from manual process
-    const creationData = {
-      playlist: settings.default_playlist_id,
-      items: {
-        name: user.email,
-        note: "",
-        username: finalUsername,
-        password: actualPassword,
-        message: null,
-        vods_categories: [73],
-        series_categories: [],
-        patterns: [{
-          url: "https://pinkpony.lol",
-          param1: finalUsername,
-          param2: actualPassword,
-          type: "xtream"
-        }],
-        language: "en",
-        expiry: expiryISO
+      // Check if user has IPTV subscription (they should since we just created it)
+      if (!finalUsername || !actualPassword) {
+        throw new Error('User does not have IPTV credentials');
       }
-    };
-    
-    console.log('📤 Sending IPTV Editor creation request...');
-    const createResponse = await iptvEditorService.makeRequest('/api/reseller/new-customer', creationData);
-    
-    if (createResponse && createResponse.customer) {
-      console.log('✅ IPTV Editor user created successfully');
       
-      // Enhanced force-sync for new user with proper error handling
-      console.log('🔄 Triggering force-sync for newly created IPTV Editor user...');
-
-      const forceSyncData = {
-        playlist: settings.default_playlist_id,
-        items: [{
-          id: createResponse.customer.id,
-          username: finalUsername,
-          password: actualPassword
-        }],
-        xtream: {
-          url: "https://pinkpony.lol",
-          param1: finalUsername,
-          param2: actualPassword,
-          type: "xtream"
-        }
-      };
-
-      let syncSuccess = false;
+      console.log(`? User ${user_id} has IPTV subscription:`, {
+        username: finalUsername,
+        has_password: !!actualPassword
+      });
+      
+      // Check if IPTV Editor service is available
+      if (!iptvEditorService) {
+        throw new Error('IPTV Editor service not available');
+      }
+      
+      // Initialize IPTV Editor service
+      await iptvEditorService.initialize();
+      console.log('? IPTV Editor service initialized');
+      
+      // Step 1: Check if user exists in IPTV Editor
+      console.log('?? Step 1: Checking if user exists in IPTV Editor...');
+      let customerData = null;
+      
       try {
-        const syncStartTime = Date.now();
-        const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
-        const syncDuration = Date.now() - syncStartTime;
+        const customers = await iptvEditorService.getAllCustomers();
+        console.log(`?? Found ${customers.length} customers in IPTV Editor`);
         
-        console.log(`✅ IPTV Editor force-sync completed in ${syncDuration}ms:`, syncResponse);
+        // Check by username (case-insensitive)
+        customerData = customers.find(customer => 
+          customer.username && customer.username.toLowerCase() === finalUsername.toLowerCase()
+        );
         
-        // Log the sync
+        if (customerData) {
+          console.log('? Found existing customer in IPTV Editor:', {
+            id: customerData.id,
+            username: customerData.username,
+            name: customerData.name
+          });
+        } else {
+          console.log('? Customer not found in IPTV Editor');
+        }
+      } catch (error) {
+        console.error('? Error checking customers:', error);
+        throw new Error(`Failed to check existing customers: ${error.message}`);
+      }
+      
+      if (customerData) {
+        // Step 2A: User exists - sync existing user
+        console.log(`?? Step 2A: Syncing existing IPTV Editor user ${customerData.id}...`);
+        
+        try {
+          const syncResult = await iptvEditorService.syncExistingUser(customerData.id, user_id);
+          console.log('? IPTV Editor sync result:', syncResult);
+          
+          iptvEditorResults.iptv_editor_synced = true;
+          iptvEditorResults.iptv_editor_success = true;
+          iptvEditorResults.iptv_editor_data = {
+            customer_id: customerData.id,
+            username: customerData.username,
+            m3u_url: syncResult.m3u_url || null,
+            epg_url: syncResult.epg_url || null,
+            action: 'synced_existing',
+            sync_status: 'success'
+          };
+          
+          console.log('? IPTV Editor sync completed successfully');
+          
+        } catch (syncError) {
+          console.error('? IPTV Editor sync failed:', syncError);
+          throw new Error(`Sync failed: ${syncError.message}`);
+        }
+        
+      } else {
+        // Step 2B: User doesn't exist - create new user
+        console.log('?? Step 2B: Creating new IPTV Editor user...');
+        
+        try {
+          const createResult = await iptvEditorService.createNewCustomer({
+            userId: user_id,
+            name: user.name,
+            username: finalUsername,
+            password: actualPassword,
+            expiry: finalExpirationDate,
+            note: `JohnsonFlix User: ${user.name} - Auto-created during subscription`
+          });
+          
+          console.log('? IPTV Editor creation result:', createResult);
+          
+          iptvEditorResults.iptv_editor_created = true;
+          iptvEditorResults.iptv_editor_success = true;
+          iptvEditorResults.iptv_editor_data = {
+            customer_id: createResult.customer_id,
+            username: createResult.username,
+            m3u_url: createResult.m3u_url || null,
+            epg_url: createResult.epg_url || null,
+            action: 'created_new',
+            sync_status: 'success'
+          };
+          
+          console.log('? IPTV Editor user created successfully');
+          
+        } catch (createError) {
+          console.error('? IPTV Editor creation failed:', createError);
+          throw new Error(`Creation failed: ${createError.message}`);
+        }
+      }
+      
+      // Step 3: Update user record with IPTV Editor status
+      if (iptvEditorResults.iptv_editor_success) {
+        console.log('?? Step 3: Updating user record with IPTV Editor status...');
+        
         await db.query(`
-          INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, duration_ms)
-          VALUES ('user_create_sync', ?, 'success', ?, ?, ?)
+          UPDATE users SET 
+            iptv_editor_enabled = TRUE,
+            iptv_editor_customer_id = ?,
+            iptv_editor_last_sync = NOW()
+          WHERE id = ?
         `, [
-          user_id,
-          JSON.stringify(forceSyncData),
-          JSON.stringify(syncResponse),
-          syncDuration
+          iptvEditorResults.iptv_editor_data.customer_id,
+          user_id
         ]);
         
-        syncSuccess = true;
-        iptvEditorSynced = true;
-        
-      } catch (syncError) {
-        console.error('⚠️ Force-sync failed for new user (but creation was successful):', syncError.message);
-        
-        // Log the failed sync
-        await db.query(`
-          INSERT INTO iptv_sync_logs (sync_type, user_id, status, error_message)
-          VALUES ('user_create_sync', ?, 'error', ?)
-        `, [user_id, syncError.message]);
-        
-        syncSuccess = false;
-        iptvEditorSynced = false;
+        console.log('? User record updated with IPTV Editor status');
       }
-
-      // Save to local database - do this regardless of sync success
-      await db.query(`
-        INSERT INTO iptv_editor_users (
-          user_id, iptv_editor_id, iptv_editor_username, iptv_editor_password,
-          m3u_code, epg_code, expiry_date, max_connections, sync_status, last_sync_time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-      `, [
-        user_id,
-        createResponse.customer.id,
-        finalUsername,
-        actualPassword,
-        createResponse.customer.m3u || '',
-        createResponse.customer.epg || '',
-        expirationForDB,
-        createResponse.customer.max_connections || 2,
-        syncSuccess ? 'synced' : 'error'
-      ]);
       
-      iptvEditorCreated = true;
-      iptvEditorData = {
-        username: finalUsername,
-        m3u_code: createResponse.customer.m3u || '',
-        epg_code: createResponse.customer.epg || '',
-        iptv_editor_id: createResponse.customer.id,
-        max_connections: createResponse.customer.max_connections || 2,
-        m3u_url: createResponse.customer.m3u ? `https://editor.iptveditor.com/m3u/${createResponse.customer.m3u}` : null,
-        epg_url: createResponse.customer.epg ? `https://editor.iptveditor.com/epg/${createResponse.customer.epg}` : null,
-        action: syncSuccess ? 'created_and_synced' : 'created_no_sync',
-        sync_status: syncSuccess ? 'synced' : 'error'
-      };
+      console.log('?? IPTV Editor automation completed successfully:', {
+        created: iptvEditorResults.iptv_editor_created,
+        synced: iptvEditorResults.iptv_editor_synced,
+        success: iptvEditorResults.iptv_editor_success
+      });
       
-    } else {
-      throw new Error('Invalid response from IPTV Editor API');
+    } catch (editorError) {
+      console.error('?? IPTV Editor automation failed (IPTV subscription still successful):', editorError);
+      iptvEditorResults.iptv_editor_error = editorError.message;
+      iptvEditorResults.iptv_editor_success = false;
     }
-  }
-  
-  // Update user table to mark IPTV Editor as enabled
-  await db.query('UPDATE users SET iptv_editor_enabled = TRUE WHERE id = ?', [user_id]);
-  
-  console.log(`✅ IPTV Editor integration completed for user ${user_id}`);
-  
-} catch (iptvEditorError) {
-  console.error('⚠️ IPTV Editor integration failed (continuing with IPTV subscription):', iptvEditorError.message);
-  
-  // Set flags to indicate failure
-  iptvEditorCreated = false;
-  iptvEditorSynced = false;
-  iptvEditorData = {
-    action: 'failed',
-    error: iptvEditorError.message
-  };
-}
     
     // Log the activity
     await iptvService.logActivity(
@@ -1023,9 +907,9 @@ try {
       await iptvService.syncCreditBalance();
     }
     
-    console.log(`✅ IPTV subscription ${action} completed for user ${user_id}`);
+    console.log(`? IPTV subscription ${action} completed for user ${user_id}`);
     
-// FIXED: Return response with correct password data
+    // ENHANCED RESPONSE with IPTV Editor results
     res.json({
       success: true,
       message: `IPTV subscription ${action.replace('_', ' ')} successful`,
@@ -1064,16 +948,17 @@ try {
         created_at: userData?.created_at,
         owner: userData?.owner,
         
-		// IPTV Editor data for frontend updates
-iptv_editor_created: iptvEditorCreated,
-iptv_editor_synced: iptvEditorSynced,
-iptv_editor_success: iptvEditorCreated || iptvEditorSynced,
-iptv_editor_data: (iptvEditorCreated || iptvEditorSynced) ? iptvEditorData : null
+        // ?? NEW: IPTV Editor automation results
+        iptv_editor_created: iptvEditorResults.iptv_editor_created,
+        iptv_editor_synced: iptvEditorResults.iptv_editor_synced,
+        iptv_editor_success: iptvEditorResults.iptv_editor_success,
+        iptv_editor_data: iptvEditorResults.iptv_editor_data,
+        iptv_editor_error: iptvEditorResults.iptv_editor_error
       }
     });
 	
   } catch (error) {
-    console.error('❌ Error processing IPTV subscription:', error);
+    console.error('? Error processing IPTV subscription:', error);
     
     // Log the failed activity
     try {
@@ -1088,7 +973,7 @@ iptv_editor_data: (iptvEditorCreated || iptvEditorSynced) ? iptvEditorData : nul
         null
       );
     } catch (logError) {
-      console.error('❌ Failed to log error activity:', logError);
+      console.error('? Failed to log error activity:', logError);
     }
     
     res.status(500).json({
@@ -1110,7 +995,7 @@ router.post('/match-existing-user', [
   try {
     const { user_id, iptv_username } = req.body;
     
-    console.log(`🔍 Searching for existing IPTV user: ${iptv_username} for local user ID: ${user_id}`);
+    console.log(`?? Searching for existing IPTV user: ${iptv_username} for local user ID: ${user_id}`);
     
     await iptvService.initialize();
     
@@ -1152,7 +1037,7 @@ router.post('/match-existing-user', [
       });
     }
     
-    console.log('✅ Found matching IPTV user:', matchingUser);
+    console.log('? Found matching IPTV user:', matchingUser);
     
     // FIXED: Extract and format the data using local timezone to match panel display
     let expirationForDB = null;
@@ -1163,25 +1048,25 @@ if (matchingUser.expire_date) {
   expirationFormatted = matchingUser.exp_date || 'Unknown';
   
   // DEBUGGING - Add these lines right before the date conversion
-  console.log('🔍 DEBUG: About to convert timestamp:', matchingUser.expire_date);
+  console.log('?? DEBUG: About to convert timestamp:', matchingUser.expire_date);
   const panelTimestamp = new Date(matchingUser.expire_date * 1000);
-  console.log('🔍 DEBUG: Date object created:', panelTimestamp);
-  console.log('🔍 DEBUG: Date ISO string:', panelTimestamp.toISOString());
-  console.log('🔍 DEBUG: getFullYear():', panelTimestamp.getFullYear());
-  console.log('🔍 DEBUG: getMonth():', panelTimestamp.getMonth());
-  console.log('🔍 DEBUG: getDate():', panelTimestamp.getDate());
-  console.log('🔍 DEBUG: getUTCFullYear():', panelTimestamp.getUTCFullYear());
-  console.log('🔍 DEBUG: getUTCMonth():', panelTimestamp.getUTCMonth());
-  console.log('🔍 DEBUG: getUTCDate():', panelTimestamp.getUTCDate());
+  console.log('?? DEBUG: Date object created:', panelTimestamp);
+  console.log('?? DEBUG: Date ISO string:', panelTimestamp.toISOString());
+  console.log('?? DEBUG: getFullYear():', panelTimestamp.getFullYear());
+  console.log('?? DEBUG: getMonth():', panelTimestamp.getMonth());
+  console.log('?? DEBUG: getDate():', panelTimestamp.getDate());
+  console.log('?? DEBUG: getUTCFullYear():', panelTimestamp.getUTCFullYear());
+  console.log('?? DEBUG: getUTCMonth():', panelTimestamp.getUTCMonth());
+  console.log('?? DEBUG: getUTCDate():', panelTimestamp.getUTCDate());
 
   const year = panelTimestamp.getFullYear();
   const month = String(panelTimestamp.getMonth() + 1).padStart(2, '0');
   const day = String(panelTimestamp.getDate()).padStart(2, '0');
   expirationForDB = `${year}-${month}-${day}`;
 
-  console.log('🔍 DEBUG: Final result:', expirationForDB);
+  console.log('?? DEBUG: Final result:', expirationForDB);
   
-  console.log(`📅 Panel expiration (using local timezone): ${matchingUser.expire_date} → ${expirationForDB} (formatted: ${expirationFormatted})`);
+  console.log(`?? Panel expiration (using local timezone): ${matchingUser.expire_date} ? ${expirationForDB} (formatted: ${expirationFormatted})`);
 }
 
 // WITH THIS SIMPLE VERSION:
@@ -1196,7 +1081,7 @@ if (matchingUser.expire_date) {
     const [day, month, year] = datePart.split('-'); // Split DD-MM-YYYY
     expirationForDB = `${year}-${month}-${day}`; // Convert to YYYY-MM-DD for database
     
-    console.log(`📅 Panel expiration (using panel date as-is): ${matchingUser.exp_date} → ${expirationForDB}`);
+    console.log(`?? Panel expiration (using panel date as-is): ${matchingUser.exp_date} ? ${expirationForDB}`);
   }
 }
     
@@ -1238,7 +1123,7 @@ if (matchingUser.expire_date) {
       matchingUser
     );
     
-    console.log(`✅ Successfully matched and updated user ${user_id} with IPTV data`);
+    console.log(`? Successfully matched and updated user ${user_id} with IPTV data`);
     
     // Return the matched user data
     res.json({
@@ -1259,7 +1144,7 @@ if (matchingUser.expire_date) {
     });
     
   } catch (error) {
-    console.error('❌ Error matching existing IPTV user:', error);
+    console.error('? Error matching existing IPTV user:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to match existing IPTV user',
@@ -1279,7 +1164,7 @@ router.post('/link-existing-user', [
   try {
     const { user_id, iptv_data } = req.body;
     
-    console.log(`🔗 Linking existing IPTV account to user ${user_id}:`, iptv_data);
+    console.log(`?? Linking existing IPTV account to user ${user_id}:`, iptv_data);
     
     // Extract password from panel_data if it exists, otherwise try direct property
     const password = iptv_data.panel_data?.password || iptv_data.password || null;
@@ -1307,7 +1192,7 @@ router.post('/link-existing-user', [
       user_id
     ]);
     
-    console.log('📊 Update result:', updateResult);
+    console.log('?? Update result:', updateResult);
     
     // Get the updated user data
     const userResult = await db.query('SELECT * FROM users WHERE id = ?', [user_id]);
@@ -1324,7 +1209,7 @@ router.post('/link-existing-user', [
     });
     
   } catch (error) {
-    console.error('❌ Error linking existing IPTV account:', error);
+    console.error('? Error linking existing IPTV account:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to link existing IPTV account',
@@ -1390,7 +1275,7 @@ if (panelUser.expire_date) {
     const [day, month, year] = datePart.split('-'); // Split DD-MM-YYYY
     expirationForDB = `${year}-${month}-${day}`; // Convert to YYYY-MM-DD for database
     
-    console.log(`📅 Storing panel expiration (using panel date as-is): ${panelUser.exp_date} → ${expirationForDB}`);
+    console.log(`?? Storing panel expiration (using panel date as-is): ${panelUser.exp_date} ? ${expirationForDB}`);
   }
 }
 
@@ -1424,7 +1309,7 @@ await db.query(`
     });
     
   } catch (error) {
-    console.error('❌ Error syncing user from panel:', error);
+    console.error('? Error syncing user from panel:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to sync user from panel',
@@ -1446,7 +1331,7 @@ router.get('/credits', async (req, res) => {
       last_updated: new Date().toISOString()
     });
   } catch (error) {
-    console.error('❌ Error getting credit balance:', error);
+    console.error('? Error getting credit balance:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get credit balance',
@@ -1469,7 +1354,7 @@ router.post('/sync-credits', async (req, res) => {
       credits: balance
     });
   } catch (error) {
-    console.error('❌ Error syncing credits:', error);
+    console.error('? Error syncing credits:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to sync credit balance',
@@ -1491,7 +1376,7 @@ router.post('/test-connection', async (req, res) => {
       res.status(400).json(result);
     }
   } catch (error) {
-    console.error('❌ Error testing IPTV connection:', error);
+    console.error('? Error testing IPTV connection:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to test connection',
@@ -1551,7 +1436,7 @@ router.get('/activity/:userId', [
       total: Array.isArray(rows) ? rows.length : 0
     });
   } catch (error) {
-    console.error('❌ Error getting IPTV activity:', error);
+    console.error('? Error getting IPTV activity:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get IPTV activity',
@@ -1592,7 +1477,7 @@ router.delete('/user/:id', [
       message: 'IPTV subscription data cleared from database'
     });
   } catch (error) {
-    console.error('❌ Error removing IPTV subscription:', error);
+    console.error('? Error removing IPTV subscription:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to remove IPTV subscription',
@@ -1613,7 +1498,7 @@ router.delete('/subscription/:lineId', [
     const { lineId } = req.params;
     const { userId } = req.query;
     
-    console.log(`🗑️ Starting comprehensive IPTV deletion for line: ${lineId}, user: ${userId}`);
+    console.log(`??? Starting comprehensive IPTV deletion for line: ${lineId}, user: ${userId}`);
     
     await iptvService.initialize();
     
@@ -1626,16 +1511,16 @@ router.delete('/subscription/:lineId', [
     try {
       panelResult = await iptvService.deleteUserSubscription(lineId);
       panelDeleted = true;
-      console.log('✅ IPTV panel subscription deleted successfully');
+      console.log('? IPTV panel subscription deleted successfully');
     } catch (panelError) {
-      console.log('ℹ️ Panel deletion failed (subscription may not exist):', panelError.message);
+      console.log('?? Panel deletion failed (subscription may not exist):', panelError.message);
       panelResult = { error: panelError.message };
     }
 
     // Step 2: Delete from IPTV Editor if user exists there
     if (userId) {
       try {
-        console.log(`🔍 Checking for IPTV Editor account for user ${userId}...`);
+        console.log(`?? Checking for IPTV Editor account for user ${userId}...`);
         
         const iptvEditorResult = await db.query(`
           SELECT iptv_editor_id, iptv_editor_username FROM iptv_editor_users WHERE user_id = ?
@@ -1643,7 +1528,7 @@ router.delete('/subscription/:lineId', [
         
         if (iptvEditorResult.length > 0) {
           const editorUser = iptvEditorResult[0];
-          console.log(`🗑️ Deleting IPTV Editor user: ${editorUser.iptv_editor_username} (ID: ${editorUser.iptv_editor_id})`);
+          console.log(`??? Deleting IPTV Editor user: ${editorUser.iptv_editor_username} (ID: ${editorUser.iptv_editor_id})`);
           
           // Load IPTV Editor Service
           const iptvEditorService = require('./iptv-editor-service');
@@ -1652,28 +1537,28 @@ router.delete('/subscription/:lineId', [
           try {
             const deleteData = { id: editorUser.iptv_editor_id };
             const deleteResponse = await iptvEditorService.makeRequest('/api/reseller/remove', deleteData);
-            console.log('✅ IPTV Editor API deletion successful:', deleteResponse);
+            console.log('? IPTV Editor API deletion successful:', deleteResponse);
           } catch (apiError) {
-            console.warn('⚠️ IPTV Editor API deletion failed:', apiError.message);
+            console.warn('?? IPTV Editor API deletion failed:', apiError.message);
           }
           
           // CRITICAL: Delete from local database
           await db.query('DELETE FROM iptv_editor_users WHERE user_id = ?', [userId]);
-          console.log('✅ IPTV Editor user deleted from local database');
+          console.log('? IPTV Editor user deleted from local database');
           
           iptvEditorDeleted = true;
         } else {
-          console.log(`ℹ️ No IPTV Editor account found for user ${userId}`);
+          console.log(`?? No IPTV Editor account found for user ${userId}`);
         }
       } catch (iptvEditorError) {
-        console.error('⚠️ IPTV Editor deletion failed:', iptvEditorError.message);
+        console.error('?? IPTV Editor deletion failed:', iptvEditorError.message);
       }
     }
     
     // Step 3: Clear from main users table
     if (userId) {
       try {
-        console.log(`🧹 Clearing IPTV data from database for user: ${userId}`);
+        console.log(`?? Clearing IPTV data from database for user: ${userId}`);
         
         await db.query(`
           UPDATE users SET 
@@ -1694,9 +1579,9 @@ router.delete('/subscription/:lineId', [
         `, [userId]);
         
         databaseCleared = true;
-        console.log(`✅ Database cleared for user ${userId}`);
+        console.log(`? Database cleared for user ${userId}`);
       } catch (dbError) {
-        console.error('❌ Database cleanup failed:', dbError.message);
+        console.error('? Database cleanup failed:', dbError.message);
       }
     }
     
@@ -1718,16 +1603,16 @@ router.delete('/subscription/:lineId', [
         })
       ]);
     } catch (logError) {
-      console.error('❌ Failed to log comprehensive deletion:', logError.message);
+      console.error('? Failed to log comprehensive deletion:', logError.message);
     }
     
     // Step 5: Return detailed response
     const anySuccessful = panelDeleted || iptvEditorDeleted || databaseCleared;
     
     let message = `Deletion completed for line ${lineId}`;
-    if (panelDeleted) message += ' - Panel ✅';
-    if (iptvEditorDeleted) message += ' - IPTV Editor ✅';
-    if (databaseCleared) message += ' - Database ✅';
+    if (panelDeleted) message += ' - Panel ?';
+    if (iptvEditorDeleted) message += ' - IPTV Editor ?';
+    if (databaseCleared) message += ' - Database ?';
     
     res.json({
       success: anySuccessful,
@@ -1743,7 +1628,7 @@ router.delete('/subscription/:lineId', [
     });
     
   } catch (error) {
-    console.error('❌ Comprehensive IPTV deletion failed:', error);
+    console.error('? Comprehensive IPTV deletion failed:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete IPTV subscription',
@@ -1761,15 +1646,15 @@ function generateDeletionMessage(panelDeleted, iptvEditorDeleted, databaseCleare
   let message = `Subscription ${lineId} deletion completed with mixed results: `;
   const results = [];
   
-  if (panelDeleted) results.push('Panel ✅');
-  else results.push('Panel ❌');
+  if (panelDeleted) results.push('Panel ?');
+  else results.push('Panel ?');
   
   if (userId) {
-    if (iptvEditorDeleted) results.push('IPTV Editor ✅');
-    else results.push('IPTV Editor ❌');
+    if (iptvEditorDeleted) results.push('IPTV Editor ?');
+    else results.push('IPTV Editor ?');
     
-    if (databaseCleared) results.push('Database ✅');
-    else results.push('Database ❌');
+    if (databaseCleared) results.push('Database ?');
+    else results.push('Database ?');
   }
   
   return message + results.join(', ');
@@ -1789,7 +1674,7 @@ router.get('/packages/trial', async (req, res) => {
       total: trialPackages.length
     });
   } catch (error) {
-    console.error('❌ Error getting trial packages:', error);
+    console.error('? Error getting trial packages:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get trial packages',
@@ -1812,7 +1697,7 @@ router.get('/packages/paid', async (req, res) => {
       total: paidPackages.length
     });
   } catch (error) {
-    console.error('❌ Error getting paid packages:', error);
+    console.error('? Error getting paid packages:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get paid packages',
@@ -1843,7 +1728,7 @@ router.get('/packages/stats', async (req, res) => {
       stats: stats
     });
   } catch (error) {
-    console.error('❌ Error getting package stats:', error);
+    console.error('? Error getting package stats:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get package statistics',
@@ -1871,7 +1756,7 @@ router.post('/test-iptv-editor-automation', [
   try {
     const { user_id } = req.body;
     
-    console.log(`🧪 Testing IPTV Editor automation for user ${user_id}...`);
+    console.log(`?? Testing IPTV Editor automation for user ${user_id}...`);
     
 // Get user data first
 const userResult = await db.query('SELECT * FROM users WHERE id = ?', [user_id]);
@@ -1888,7 +1773,7 @@ if (Array.isArray(userResult) && userResult.length > 0) {
 }
 
 if (!user) {
-  console.error('❌ User not found for ID:', user_id);
+  console.error('? User not found for ID:', user_id);
   return res.status(404).json({
     success: false,
     message: 'User not found'
@@ -1903,7 +1788,7 @@ if (!user) {
       });
     }
     
-    console.log(`✅ User ${user_id} has IPTV subscription:`, {
+    console.log(`? User ${user_id} has IPTV subscription:`, {
       username: user.iptv_username,
       has_password: !!user.iptv_password,
       expiration: user.iptv_expiration
@@ -1916,16 +1801,16 @@ if (!user) {
     let iptvEditorData = null;
     
     try {
-      console.log('🎯 Starting IPTV Editor automation simulation...');
+      console.log('?? Starting IPTV Editor automation simulation...');
       
       // Step 1: Check if user exists in IPTV Editor by username
-      console.log(`🔍 Checking if username "${user.iptv_username}" exists in IPTV Editor...`);
+      console.log(`?? Checking if username "${user.iptv_username}" exists in IPTV Editor...`);
       
       // Get IPTV Editor settings first
       const settings = await iptvEditorService.getAllSettings();
       
       if (!settings.bearer_token || !settings.default_playlist_id) {
-        console.log('⚠️ IPTV Editor not configured properly, skipping');
+        console.log('?? IPTV Editor not configured properly, skipping');
         throw new Error('IPTV Editor not configured');
       }
       
@@ -1937,10 +1822,10 @@ if (!user) {
       
       if (existingUser) {
         // User exists in IPTV Editor - Link/Sync them
-        console.log('✅ User found in IPTV Editor, linking and syncing...');
+        console.log('? User found in IPTV Editor, linking and syncing...');
         
         // Enhanced force-sync for existing user with proper error handling
-        console.log('🔄 Triggering force-sync for existing IPTV Editor user...');
+        console.log('?? Triggering force-sync for existing IPTV Editor user...');
 
         const forceSyncData = {
           playlist: settings.default_playlist_id,
@@ -1963,7 +1848,7 @@ if (!user) {
           const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
           const syncDuration = Date.now() - syncStartTime;
           
-          console.log(`✅ IPTV Editor force-sync completed in ${syncDuration}ms:`, syncResponse);
+          console.log(`? IPTV Editor force-sync completed in ${syncDuration}ms:`, syncResponse);
           
           // Log the sync
           await db.query(`
@@ -1975,7 +1860,7 @@ if (!user) {
           iptvEditorSynced = true;
           
         } catch (syncError) {
-          console.error('❌ Force-sync failed:', syncError.message);
+          console.error('? Force-sync failed:', syncError.message);
           
           // Log the sync failure
           await db.query(`
@@ -2005,7 +1890,7 @@ if (!user) {
             syncSuccess ? 'synced' : 'error'
           ]);
           
-          console.log(`🔗 Linked existing IPTV Editor user ${existingUser.id} to JohnsonFlix user ${user_id}`);
+          console.log(`?? Linked existing IPTV Editor user ${existingUser.id} to JohnsonFlix user ${user_id}`);
         } else {
           // Update existing link
           await db.query(`
@@ -2014,7 +1899,7 @@ if (!user) {
             WHERE user_id = ?
           `, [syncSuccess ? 'synced' : 'error', user_id]);
           
-          console.log(`🔄 Updated existing link for user ${user_id}`);
+          console.log(`?? Updated existing link for user ${user_id}`);
         }
         
         iptvEditorData = {
@@ -2027,7 +1912,7 @@ if (!user) {
         
       } else {
         // User doesn't exist in IPTV Editor - Create new user
-console.log('❌ User not found in IPTV Editor, creating new user...');
+console.log('? User not found in IPTV Editor, creating new user...');
 
 // Get all active channel categories from database
 const categoriesResult = await db.query(`
@@ -2042,7 +1927,7 @@ if (Array.isArray(categoriesResult) && categoriesResult.length > 0) {
   channelCategories = categoriesResult[0].map(cat => cat.category_id);
 }
 
-console.log(`📺 Found ${channelCategories.length} channel categories`);
+console.log(`?? Found ${channelCategories.length} channel categories`);
 
 // Get VOD categories (default to [73] if none found)
 // Use only VOD category 73 (standard)
@@ -2073,7 +1958,7 @@ const createData = {
         const createResponse = await iptvEditorService.makeRequest('/api/reseller/new-customer', createData);
         const createDuration = Date.now() - createStartTime;
         
-        console.log(`✅ IPTV Editor user created in ${createDuration}ms:`, createResponse);
+        console.log(`? IPTV Editor user created in ${createDuration}ms:`, createResponse);
         
         // Log the creation
         await db.query(`
@@ -2104,7 +1989,7 @@ const createData = {
             const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', newSyncData);
             const syncDuration = Date.now() - syncStartTime;
             
-            console.log(`✅ New user sync completed in ${syncDuration}ms:`, syncResponse);
+            console.log(`? New user sync completed in ${syncDuration}ms:`, syncResponse);
             
             // Log the sync
             await db.query(`
@@ -2116,7 +2001,7 @@ const createData = {
             iptvEditorSynced = true;
             
           } catch (syncError) {
-            console.error('❌ New user sync failed:', syncError.message);
+            console.error('? New user sync failed:', syncError.message);
             
             // Log the sync failure
             await db.query(`
@@ -2166,10 +2051,10 @@ const createData = {
       // Update user table to mark IPTV Editor as enabled
       await db.query('UPDATE users SET iptv_editor_enabled = TRUE WHERE id = ?', [user_id]);
       
-      console.log(`✅ IPTV Editor automation simulation completed for user ${user_id}`);
+      console.log(`? IPTV Editor automation simulation completed for user ${user_id}`);
       
     } catch (iptvEditorError) {
-      console.error('⚠️ IPTV Editor automation failed:', iptvEditorError.message);
+      console.error('?? IPTV Editor automation failed:', iptvEditorError.message);
       
       // Set flags to indicate failure
       iptvEditorCreated = false;
@@ -2207,7 +2092,7 @@ const createData = {
     });
     
   } catch (error) {
-    console.error('❌ Test endpoint error:', error);
+    console.error('? Test endpoint error:', error);
     res.status(500).json({
       success: false,
       message: 'Test automation failed: ' + error.message,
