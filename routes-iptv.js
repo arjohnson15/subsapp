@@ -975,6 +975,9 @@ setImmediate(async () => {
         
         // Enhanced force-sync for new user with proper error handling
         console.log('🔄 Triggering force-sync for newly created IPTV Editor user...');
+		
+		console.log('⏳ Waiting 3 seconds for new credentials to activate...');
+await new Promise(resolve => setTimeout(resolve, 3000));
 
         const forceSyncData = {
           playlist: settings.default_playlist_id,
@@ -1641,7 +1644,7 @@ router.delete('/subscription/:lineId', [
     // Step 2: Delete from IPTV Editor if user exists there
     if (userId) {
       try {
-        console.log(`?? Checking for IPTV Editor account for user ${userId}...`);
+        console.log(`🔍 Checking for IPTV Editor account for user ${userId}...`);
         
         const iptvEditorResult = await db.query(`
           SELECT iptv_editor_id, iptv_editor_username FROM iptv_editor_users WHERE user_id = ?
@@ -1649,30 +1652,33 @@ router.delete('/subscription/:lineId', [
         
         if (iptvEditorResult.length > 0) {
           const editorUser = iptvEditorResult[0];
-          console.log(`??? Deleting IPTV Editor user: ${editorUser.iptv_editor_username} (ID: ${editorUser.iptv_editor_id})`);
+          console.log(`🗑️ Deleting IPTV Editor user: ${editorUser.iptv_editor_username} (ID: ${editorUser.iptv_editor_id})`);
           
           // Load IPTV Editor Service
           const iptvEditorService = require('./iptv-editor-service');
           
-          // Delete from IPTV Editor API
+          // Use the corrected deleteUser method
           try {
-            const deleteData = { id: editorUser.iptv_editor_id };
-            const deleteResponse = await iptvEditorService.makeRequest('/api/reseller/remove', deleteData);
-            console.log('? IPTV Editor API deletion successful:', deleteResponse);
+            const deleteResponse = await iptvEditorService.deleteUser(userId);
+            console.log('✅ IPTV Editor deletion successful:', deleteResponse);
+            iptvEditorDeleted = true;
           } catch (apiError) {
-            console.warn('?? IPTV Editor API deletion failed:', apiError.message);
+            console.warn('⚠️ IPTV Editor deletion failed:', apiError.message);
+            // Still try to clean up local database even if API fails
+            try {
+              await db.query('DELETE FROM iptv_editor_users WHERE user_id = ?', [userId]);
+              await db.query('UPDATE users SET iptv_editor_enabled = FALSE WHERE id = ?', [userId]);
+              console.log('✅ IPTV Editor user cleaned up from local database');
+              iptvEditorDeleted = true;
+            } catch (localCleanupError) {
+              console.error('❌ Failed to clean up local IPTV Editor data:', localCleanupError.message);
+            }
           }
-          
-          // CRITICAL: Delete from local database
-          await db.query('DELETE FROM iptv_editor_users WHERE user_id = ?', [userId]);
-          console.log('? IPTV Editor user deleted from local database');
-          
-          iptvEditorDeleted = true;
         } else {
-          console.log(`?? No IPTV Editor account found for user ${userId}`);
+          console.log(`ℹ️ No IPTV Editor account found for user ${userId}`);
         }
       } catch (iptvEditorError) {
-        console.error('?? IPTV Editor deletion failed:', iptvEditorError.message);
+        console.error('❌ IPTV Editor deletion failed:', iptvEditorError.message);
       }
     }
     
@@ -1710,7 +1716,7 @@ router.delete('/subscription/:lineId', [
     try {
       await db.query(`
         INSERT INTO iptv_activity_log (user_id, line_id, action, success, api_response, created_at)
-        VALUES (?, ?, 'comprehensive_delete', ?, ?, NOW())
+        VALUES (?, ?, 'delete', ?, ?, NOW())
       `, [
         userId || null, 
         lineId, 
@@ -1724,7 +1730,7 @@ router.delete('/subscription/:lineId', [
         })
       ]);
     } catch (logError) {
-      console.error('? Failed to log comprehensive deletion:', logError.message);
+      console.error('❌ Failed to log comprehensive deletion:', logError.message);
     }
     
     // Step 5: Return detailed response
