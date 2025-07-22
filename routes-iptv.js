@@ -1980,6 +1980,37 @@ if (!user) {
           const syncDuration = Date.now() - syncStartTime;
           
           console.log(`? IPTV Editor force-sync completed in ${syncDuration}ms:`, syncResponse);
+		  
+		// Signal frontend to refresh user data
+console.log(`IPTV_EDITOR_COMPLETED:${user_id}:${JSON.stringify({
+  success: true,
+  created: iptvEditorResults.iptv_editor_created,
+  synced: iptvEditorResults.iptv_editor_synced,
+  refreshCode: `(async function() {
+    const userId = ${user_id};
+    console.log('🔄 Reloading all user data for:', userId);
+    try {
+        await window.IPTV.loadCurrentUserIPTVStatus();
+        const response = await fetch('/api/iptv-editor/user/' + userId + '/status');
+        const data = await response.json();
+        if (data.success && data.iptvUser) {
+            if (typeof loadIPTVEditorStatus === 'function') {
+                loadIPTVEditorStatus(userId);
+            } else if (typeof displayIPTVEditorStatus === 'function') {
+                displayIPTVEditorStatus(data.iptvUser);
+            } else {
+                console.log('✅ IPTV Editor data loaded:', data.iptvUser);
+            }
+        }
+        if (typeof loadAndPopulateUser === 'function') {
+            loadAndPopulateUser(userId);
+        }
+        console.log('✅ Complete reload finished');
+    } catch (error) {
+        console.error('❌ Reload failed:', error);
+    }
+})();`
+})}`);  
           
           // Log the sync
           await db.query(`
