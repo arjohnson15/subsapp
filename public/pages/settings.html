@@ -278,20 +278,39 @@
 <div class="settings-section">
     <h3>IPTV Editor Integration</h3>
     
-    <!-- Existing Fields -->
+    <!-- Bearer Token Input -->
     <div class="form-group">
-        <label for="iptvBearerToken">Bearer Token</label>
-        <input type="password" id="iptvBearerToken" placeholder="Enter IPTV Editor Bearer Token">
-        <small>Get this from IPTV Editor login (expires monthly)</small>
+        <label for="iptvBearerToken">Bearer Token *</label>
+        <input type="password" id="iptvBearerToken" placeholder="Enter your IPTV Editor bearer token">
+        <small style="color: #4fc3f7;">Required for API authentication (get from IPTV Editor login - expires monthly)</small>
     </div>
     
+    <!-- Test Connection Button -->
+    <div class="form-group">
+        <button type="button" onclick="testIPTVEditorConnection()" class="btn btn-test">
+            <i class="fas fa-wifi"></i> Test Connection
+        </button>
+        <span id="iptvConnectionStatus" class="status-indicator"></span>
+    </div>
+    
+    <!-- Sync Playlists Button -->
+    <div class="form-group">
+        <button type="button" onclick="syncIPTVEditorPlaylists()" class="btn btn-secondary" style="margin-right: 10px;">
+            <i class="fas fa-sync"></i> Sync Playlists
+        </button>
+        <button type="button" id="syncCategoriesBtn" onclick="syncIPTVEditorCategories()" class="btn btn-secondary">
+            <i class="fas fa-sync"></i> Sync Categories
+        </button>
+        <small style="color: #4fc3f7; display: block; margin-top: 5px;">Load available playlists and categories from IPTV Editor</small>
+    </div>
+    
+    <!-- Default Playlist Selection -->
     <div class="form-group">
         <label for="iptvPlaylistSelect">Default Playlist</label>
         <select id="iptvPlaylistSelect">
             <option value="">Select a playlist...</option>
         </select>
-        <button type="button" id="syncPlaylistsBtn" class="btn btn-secondary">Sync Playlists</button>
-        <small>This will automatically populate provider settings below</small>
+        <small style="color: #4fc3f7;">This playlist will be used for all new user accounts</small>
     </div>
     
     <!-- NEW: Auto-populated Provider Settings -->
