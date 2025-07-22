@@ -19,6 +19,51 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
+async function forceSyncWithRetry(syncData, operation, user_id) {
+    const MAX_RETRIES = 2; // Try up to 3 times total (1 initial + 2 retries)
+    const RETRY_DELAY = 3000; // 3 seconds between retries
+    
+    for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+        try {
+            console.log(`🔄 Force-sync attempt ${attempt}/${MAX_RETRIES + 1} for ${operation}...`);
+            
+            const syncStartTime = Date.now();
+            const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', syncData);
+            const syncDuration = Date.now() - syncStartTime;
+            
+            console.log(`✅ Force-sync completed successfully in ${syncDuration}ms on attempt ${attempt}`);
+            
+            // Log successful sync
+            await db.query(`
+                INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, duration_ms)
+                VALUES (?, ?, 'success', ?, ?, ?)
+            `, [operation, user_id, JSON.stringify(syncData), JSON.stringify(syncResponse), syncDuration]);
+            
+            return { success: true, response: syncResponse, duration: syncDuration };
+            
+        } catch (error) {
+            const isHttp500 = error.message.includes('HTTP 500') || error.message.includes('500');
+            
+            console.error(`❌ Force-sync attempt ${attempt} failed:`, error.message);
+            
+            // If it's an HTTP 500 and we have retries left, try again
+            if (isHttp500 && attempt <= MAX_RETRIES) {
+                console.log(`⏳ HTTP 500 detected, waiting ${RETRY_DELAY/1000} seconds before retry...`);
+                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+                continue; // Try again
+            }
+            
+            // Final failure - log it and return error
+            await db.query(`
+                INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, error_message)
+                VALUES (?, ?, 'error', ?, NULL, ?)
+            `, [operation, user_id, JSON.stringify(syncData), `Failed after ${attempt} attempts: ${error.message}`]);
+            
+            throw error; // Re-throw the error for the calling code to handle
+        }
+    }
+}
+
 // Initialize IPTV service on startup
 iptvService.initialize().catch(console.error);
 
@@ -873,32 +918,17 @@ setImmediate(async () => {
         }
       };
 
-      let syncSuccess = false;
-      try {
-        const syncStartTime = Date.now();
-        const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
-        const syncDuration = Date.now() - syncStartTime;
-        
-        console.log(`✅ IPTV Editor force-sync completed in ${syncDuration}ms:`, syncResponse);
-        
-        // Log the sync
-        await db.query(`
-          INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, duration_ms)
-          VALUES ('user_link_sync', ?, 'success', ?, ?, ?)
-        `, [user_id, JSON.stringify(forceSyncData), JSON.stringify(syncResponse), syncDuration]);
-        
-        syncSuccess = true;
-        iptvEditorResults.iptv_editor_synced = true;
-        
-      } catch (syncError) {
-        console.error('⚠️ Force-sync failed:', syncError.message);
-        
-        // Log the sync failure
-        await db.query(`
-          INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, error_message)
-          VALUES ('user_link_sync', ?, 'error', ?, NULL, ?)
-        `, [user_id, JSON.stringify(forceSyncData), syncError.message]);
-      }
+let syncSuccess = false;
+        try {
+          const syncResult = await forceSyncWithRetry(forceSyncData, 'user_link_sync', user_id);
+          console.log(`✅ Existing user force-sync completed successfully`);
+          syncSuccess = true;
+          iptvEditorResults.iptv_editor_synced = true;
+          
+        } catch (syncError) {
+          console.error('❌ Existing user force-sync failed after all retries:', syncError.message);
+          syncSuccess = false;
+        }
       
       // Check if user is already linked in our database
       const linkRows = await db.query(
@@ -994,31 +1024,16 @@ await new Promise(resolve => setTimeout(resolve, 3000));
           }
         };
 
-        let syncSuccess = false;
+let syncSuccess = false;
         try {
-          const syncStartTime = Date.now();
-          const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', forceSyncData);
-          const syncDuration = Date.now() - syncStartTime;
-          
-          console.log(`✅ IPTV Editor force-sync completed in ${syncDuration}ms:`, syncResponse);
-          
-          // Log the sync
-          await db.query(`
-            INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, duration_ms)
-            VALUES ('user_create_sync', ?, 'success', ?, ?, ?)
-          `, [user_id, JSON.stringify(forceSyncData), JSON.stringify(syncResponse), syncDuration]);
-          
+          const syncResult = await forceSyncWithRetry(forceSyncData, 'user_create_sync', user_id);
+          console.log(`✅ New user force-sync completed successfully`);
           syncSuccess = true;
           iptvEditorResults.iptv_editor_synced = true;
           
         } catch (syncError) {
-          console.error('❌ New user sync failed:', syncError.message);
-          
-          // Log the sync failure
-          await db.query(`
-            INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, error_message)
-            VALUES ('user_create_sync', ?, 'error', ?, NULL, ?)
-          `, [user_id, JSON.stringify(forceSyncData), syncError.message]);
+          console.error('❌ New user force-sync failed after all retries:', syncError.message);
+          // Don't throw - user was created successfully, just sync failed
         }
         
         // Save to our database
