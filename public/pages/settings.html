@@ -278,39 +278,76 @@
 <div class="settings-section">
     <h3>IPTV Editor Integration</h3>
     
-    <!-- Bearer Token Input -->
+    <!-- Existing Fields -->
     <div class="form-group">
-        <label for="iptvBearerToken">Bearer Token *</label>
-        <input type="password" id="iptvBearerToken" placeholder="Enter your IPTV Editor bearer token">
-        <small style="color: #4fc3f7;">Required for API authentication (get from IPTV Editor login - expires monthly)</small>
+        <label for="iptvBearerToken">Bearer Token</label>
+        <input type="password" id="iptvBearerToken" placeholder="Enter IPTV Editor Bearer Token">
+        <small>Get this from IPTV Editor login (expires monthly)</small>
     </div>
     
-    <!-- Test Connection Button -->
-    <div class="form-group">
-        <button type="button" onclick="testIPTVEditorConnection()" class="btn btn-test">
-            <i class="fas fa-wifi"></i> Test Connection
-        </button>
-        <span id="iptvConnectionStatus" class="status-indicator"></span>
-    </div>
-    
-<!-- Sync Playlists Button -->
-   <div class="form-group">
-       <button type="button" onclick="syncIPTVEditorPlaylists()" class="btn btn-secondary" style="margin-right: 10px;">
-           <i class="fas fa-sync"></i> Sync Playlists
-       </button>
-       <button type="button" id="syncCategoriesBtn" onclick="syncIPTVEditorCategories()" class="btn btn-secondary">
-           <i class="fas fa-sync"></i> Sync Categories
-       </button>
-       <small style="color: #4fc3f7; display: block; margin-top: 5px;">Load available playlists and categories from IPTV Editor</small>
-   </div>
-    
-    <!-- Default Playlist Selection -->
     <div class="form-group">
         <label for="iptvPlaylistSelect">Default Playlist</label>
         <select id="iptvPlaylistSelect">
             <option value="">Select a playlist...</option>
         </select>
-        <small style="color: #4fc3f7;">This playlist will be used for all new user accounts</small>
+        <button type="button" id="syncPlaylistsBtn" class="btn btn-secondary">Sync Playlists</button>
+        <small>This will automatically populate provider settings below</small>
+    </div>
+    
+    <!-- NEW: Auto-populated Provider Settings -->
+    <div class="provider-settings-group" style="margin-top: 20px;">
+        <h4>Provider Settings (Auto-populated from selected playlist)</h4>
+        
+        <div class="form-group">
+            <label for="providerBaseUrl">Provider Base URL</label>
+            <input type="text" id="providerBaseUrl" readonly style="background-color: #f5f5f5;">
+            <small>Automatically extracted from selected playlist</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="providerUsername">Provider Username</label>
+            <input type="text" id="providerUsername" readonly style="background-color: #f5f5f5;">
+            <small>Automatically extracted from selected playlist</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="providerPassword">Provider Password</label>
+            <input type="password" id="providerPassword" readonly style="background-color: #f5f5f5;">
+            <small>Automatically extracted from selected playlist</small>
+        </div>
+    </div>
+    
+    <!-- NEW: Auto-Updater Settings -->
+    <div class="auto-updater-settings-group" style="margin-top: 20px;">
+        <h4>Auto-Updater Settings</h4>
+        
+        <div class="form-group">
+            <label for="autoUpdaterSchedule">Auto-Update Schedule</label>
+            <select id="autoUpdaterSchedule">
+                <option value="6">Every 6 hours</option>
+                <option value="12">Every 12 hours</option>
+                <option value="24" selected>Every 24 hours (Daily)</option>
+                <option value="48">Every 48 hours</option>
+                <option value="168">Every 168 hours (Weekly)</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="autoUpdaterEnabled"> Enable Scheduled Auto-Updates
+            </label>
+            <small>When enabled, playlist will sync automatically on the selected schedule</small>
+        </div>
+        
+        <!-- NEW: Manual Update Button -->
+        <div class="form-group">
+            <button type="button" id="updatePlaylistBtn" class="btn btn-primary">
+                Update Playlist Now
+                <small style="display: block; font-weight: normal;">
+                    Force sync playlist content with IPTV panel (this may take several minutes)
+                </small>
+            </button>
+        </div>
     </div>
 </div>
 

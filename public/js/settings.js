@@ -10,6 +10,7 @@ const Settings = {
     availableTags: [], 
 	iptvEditorSettings: {},
     iptvEditorUsers: [],
+	
     
 async init() {
     try {
@@ -2413,6 +2414,101 @@ async syncIPTVEditorCategories() {
             syncBtn.disabled = false;
         }
     }
+},
+
+// NEW: Handle playlist selection change
+async onPlaylistChange(playlistId) {
+    try {
+        if (!playlistId) {
+            document.getElementById('providerBaseUrl').value = '';
+            document.getElementById('providerUsername').value = '';
+            document.getElementById('providerPassword').value = '';
+            return;
+        }
+
+        console.log('🔄 Playlist changed, extracting provider settings...');
+        
+        const response = await fetch('/api/iptv-editor/playlists');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            const selectedPlaylist = result.data.find(p => p.playlist_id === playlistId);
+            
+            if (selectedPlaylist && selectedPlaylist.patterns && selectedPlaylist.patterns[0]) {
+                const pattern = selectedPlaylist.patterns[0];
+                
+                console.log('✅ Found provider settings:', pattern);
+                
+                document.getElementById('providerBaseUrl').value = pattern.url || '';
+                document.getElementById('providerUsername').value = pattern.param1 || '';
+                document.getElementById('providerPassword').value = pattern.param2 || '';
+                
+                await this.saveProviderSettings({
+                    provider_base_url: pattern.url,
+                    provider_username: pattern.param1,
+                    provider_password: pattern.param2
+                });
+                
+                console.log('✅ Provider settings auto-populated and saved');
+            }
+        }
+    } catch (error) {
+        console.error('❌ Failed to extract provider settings:', error);
+        Utils.showNotification('Failed to extract provider settings', 'error');
+    }
+},
+
+// NEW: Save provider settings
+async saveProviderSettings(settings) {
+    try {
+        const response = await fetch('/api/iptv-editor/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+        
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || 'Failed to save provider settings');
+        }
+    } catch (error) {
+        console.error('❌ Failed to save provider settings:', error);
+        throw error;
+    }
+},
+
+// NEW: Handle manual update button click
+async handleUpdatePlaylistNow() {
+    try {
+        const updateBtn = document.getElementById('updatePlaylistBtn');
+        const originalText = updateBtn.innerHTML;
+        
+        updateBtn.disabled = true;
+        updateBtn.innerHTML = 'Updating... <small style="display: block;">This may take several minutes</small>';
+        
+        console.log('🚀 Starting manual playlist update...');
+        
+        const response = await fetch('/api/auto-updater/run-auto-updater', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            Utils.showNotification('Playlist updated successfully!', 'success');
+            console.log('✅ Manual update completed:', result);
+        } else {
+            throw new Error(result.message || 'Update failed');
+        }
+    } catch (error) {
+        console.error('❌ Manual update failed:', error);
+        Utils.showNotification(`Update failed: ${error.message}`, 'error');
+    } finally {
+        const updateBtn = document.getElementById('updatePlaylistBtn');
+        updateBtn.disabled = false;
+        updateBtn.innerHTML = originalText;
+    }
 }
 };
 
@@ -2777,5 +2873,23 @@ document.addEventListener('DOMContentLoaded', function() {
         if (typeof Settings !== 'undefined' && Settings.loadIPTVEditorSettings) {
             Settings.loadIPTVEditorSettings();
         }
+    }
+    
+    // ADD YOUR NEW EVENT LISTENERS HERE:
+    
+    // NEW: Add playlist change listener
+    const playlistSelect = document.getElementById('iptvPlaylistSelect');
+    if (playlistSelect) {
+        playlistSelect.addEventListener('change', function() {
+            Settings.onPlaylistChange(this.value);
+        });
+    }
+    
+    // NEW: Add manual update button listener
+    const updateBtn = document.getElementById('updatePlaylistBtn');
+    if (updateBtn) {
+        updateBtn.addEventListener('click', function() {
+            Settings.handleUpdatePlaylistNow();
+        });
     }
 });

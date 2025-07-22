@@ -1641,4 +1641,44 @@ router.use((error, req, res, next) => {
     });
 });
 
+// POST /api/auto-updater/run-auto-updater - Manual playlist sync
+router.post('/run-auto-updater', async (req, res) => {
+    try {
+        console.log('🔄 Starting auto-updater playlist sync...');
+        
+        await iptvEditorService.initialize();
+        const settings = await iptvEditorService.getAllSettings();
+        
+        const required = ['bearer_token', 'default_playlist_id', 'provider_base_url', 'provider_username', 'provider_password'];
+        const missing = required.filter(key => !settings[key] || settings[key].trim() === '');
+        
+        if (missing.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Missing required settings: ${missing.join(', ')}. Please configure IPTV Editor settings first.`
+            });
+        }
+        
+        console.log('✅ All required settings found, proceeding with sync...');
+        
+        const result = await iptvEditorService.runAutoUpdater();
+        
+        res.json({
+            success: true,
+            message: 'Auto-updater completed successfully',
+            data: result,
+            stats: result.stats || {},
+            duration: result.duration || 'Unknown'
+        });
+        
+    } catch (error) {
+        console.error('❌ Auto-updater failed:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Auto-updater failed',
+            error: error.message
+        });
+    }
+});
+
 module.exports = router;
