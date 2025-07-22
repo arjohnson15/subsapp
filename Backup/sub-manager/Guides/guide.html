@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JohnsonFlix+ IPTV App User Guide</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #8e24aa;
+            --secondary-color: #3f51b5;
+            --accent-color: #4fc3f7;
+            --success-color: #4caf50;
+            --warning-color: #ff9800;
+            --error-color: #f44336;
+            --info-color: #2196f3;
+            
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+            --spacing-xl: 32px;
+            
+            --font-sm: 0.9rem;
+            --font-md: 1rem;
+            --font-lg: 1.2rem;
+            --font-xl: 1.5rem;
+            --font-xxl: 2rem;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 30%, #0f3460 100%);
+            color: white;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: var(--spacing-xl);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: var(--spacing-xl);
+            padding: var(--spacing-xl) 0;
+            border-bottom: 2px solid rgba(79, 195, 247, 0.3);
+        }
+
+        .logo {
+            width: 200px;
+            height: auto;
+            margin: 0 auto var(--spacing-md);
+            display: block;
+        }
+
+        .header h1 {
+            font-size: var(--font-xxl);
+            background: linear-gradient(45deg, #ff00ff, #00ffff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: var(--font-lg);
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(79, 195, 247, 0.2);
+            border-radius: 12px;
+            padding: var(--spacing-xl);
+            margin-bottom: var(--spacing-xl);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .section h2 {
+            color: var(--accent-color);
+            font-size: var(--font-xl);
+            margin-bottom: var(--spacing-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .section h3 {
+            color: var(--accent-color);
+            font-size: var(--font-lg);
+            margin: var(--spacing-lg) 0 var(--spacing-md) 0;
+            border-left: 4px solid var(--accent-color);
+            padding-left: var(--spacing-md);
+        }
+
+        .section h4 {
+            color: #ff9800;
+            margin: var(--spacing-md) 0 var(--spacing-sm) 0;
+            font-size: var(--font-md);
+        }
+
+        .step-container {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: var(--spacing-lg);
+            margin: var(--spacing-md) 0;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border-radius: 50%;
+            font-weight: bold;
+            margin-right: var(--spacing-sm);
+            font-size: var(--font-sm);
+        }
+
+        .image-placeholder {
+            width: 100%;
+            max-width: 800px;
+            height: 400px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px dashed rgba(79, 195, 247, 0.5);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: var(--spacing-lg) auto;
+            color: rgba(255, 255, 255, 0.6);
+            font-style: italic;
+            transition: all 0.3s ease;
+        }
+
+        .image-placeholder:hover {
+            border-color: var(--accent-color);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .image-placeholder i {
+            font-size: 3rem;
+            margin-bottom: var(--spacing-sm);
+            color: var(--accent-color);
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--spacing-lg);
+            margin: var(--spacing-lg) 0;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(79, 195, 247, 0.3);
+            border-radius: 8px;
+            padding: var(--spacing-lg);
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(79, 195, 247, 0.2);
+        }
+
+        .feature-card h4 {
+            color: var(--accent-color);
+            margin-bottom: var(--spacing-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .warning-box {
+            background: rgba(255, 152, 0, 0.1);
+            border: 1px solid rgba(255, 152, 0, 0.3);
+            border-radius: 8px;
+            padding: var(--spacing-md);
+            margin: var(--spacing-md) 0;
+            display: flex;
+            align-items: flex-start;
+            gap: var(--spacing-sm);
+        }
+
+        .warning-box i {
+            color: var(--warning-color);
+            font-size: var(--font-lg);
+            margin-top: 2px;
+        }
+
+        .info-box {
+            background: rgba(33, 150, 243, 0.1);
+            border: 1px solid rgba(33, 150, 243, 0.3);
+            border-radius: 8px;
+            padding: var(--spacing-md);
+            margin: var(--spacing-md) 0;
+            display: flex;
+            align-items: flex-start;
+            gap: var(--spacing-sm);
+        }
+
+        .info-box i {
+            color: var(--info-color);
+            font-size: var(--font-lg);
+            margin-top: 2px;
+        }
+
+        .success-box {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 8px;
+            padding: var(--spacing-md);
+            margin: var(--spacing-md) 0;
+            display: flex;
+            align-items: flex-start;
+            gap: var(--spacing-sm);
+        }
+
+        .success-box i {
+            color: var(--success-color);
+            font-size: var(--font-lg);
+            margin-top: 2px;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(79, 195, 247, 0.3);
+            border-radius: 8px;
+            padding: var(--spacing-md);
+            font-family: 'Courier New', monospace;
+            font-size: var(--font-sm);
+            color: var(--accent-color);
+            margin: var(--spacing-md) 0;
+        }
+
+        .table-of-contents {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .table-of-contents h2 {
+            color: var(--accent-color);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .toc-list {
+            list-style: none;
+        }
+
+        .toc-list li {
+            margin: var(--spacing-sm) 0;
+        }
+
+        .toc-list a {
+            color: white;
+            text-decoration: none;
+            transition: color 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .toc-list a:hover {
+            color: var(--accent-color);
+        }
+
+        .footer {
+            text-align: center;
+            padding: var(--spacing-xl) 0;
+            border-top: 2px solid rgba(79, 195, 247, 0.3);
+            margin-top: var(--spacing-xl);
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: var(--spacing-md);
+            }
+            
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .image-placeholder {
+                height: 300px;
+            }
+            
+            .header h1 {
+                font-size: var(--font-xl);
+            }
+        }
+
+        @media print {
+            body {
+                background: white;
+                color: black;
+            }
+            
+            .section {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+            
+            .image-placeholder {
+                border: 2px solid #ccc;
+                background: #f9f9f9;
+                color: #666;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <img src="https://plexrequest.johnsonflix.com/logo_stacked.svg" alt="JohnsonFlix Logo" class="logo">
+            <h1><i class="fas fa-tv"></i> JohnsonFlix+ IPTV App User Guide</h1>
+            <p>Complete Setup and Usage Instructions</p>
+        </header>
+
+        <section class="table-of-contents">
+            <h2><i class="fas fa-list"></i> Table of Contents</h2>
+            <ul class="toc-list">
+                <li><a href="#getting-started"><i class="fas fa-play-circle"></i> Getting Started</a></li>
+                <li><a href="#initial-configuration"><i class="fas fa-cog"></i> Initial Configuration</a></li>
+                <li><a href="#additional-settings"><i class="fas fa-sliders-h"></i> Additional Settings</a></li>
+                <li><a href="#using-the-app"><i class="fas fa-desktop"></i> Using the App</a></li>
+                <li><a href="#troubleshooting"><i class="fas fa-wrench"></i> Troubleshooting</a></li>
+                <li><a href="#support"><i class="fas fa-life-ring"></i> Support</a></li>
+            </ul>
+        </section>
+
+        <section id="getting-started" class="section">
+            <h2><i class="fas fa-play-circle"></i> Getting Started</h2>
+
+            <h3>First Time Setup</h3>
+            <p>When you first open the app, you'll be presented with the welcome screen that says "Welcome to JohnsonFlix+" with the message "Add a playlist to get started."</p>
+
+            <img src="images/welcome-screen.jpg" alt="Welcome Screen" style="width: 65%; max-width: 800px; height: auto; border-radius: 12px; margin: 24px auto; display: block; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
+            <p style="text-align: center; color: rgba(255, 255, 255, 0.6); font-style: italic; margin-top: 8px;">Welcome screen with "Add playlist" and "Settings" buttons</p>
+
+            <h4>Adding Your Playlist:</h4>
+            <div class="step-container">
+                <p><span class="step-number">1</span> Click the <strong>"Add playlist"</strong> button</p>
+                <p><span class="step-number">2</span> Select the <strong>"JohnsonFlix+"</strong> playlist from the service menu</p>
+                
+                <div class="info-box">
+                    <i class="fas fa-info-circle"></i>
+                    <div>
+                        <p><strong>Primary Playlist:</strong> This is your main playlist with robust guide data and channel organization</p>
+                        <p><strong>Backup Option:</strong> If this server is down (we'll notify you), you can use the <strong>"Pink Backup"</strong> playlist as a direct backup to provider servers</p>
+                    </div>
+                </div>
+
+                <img src="images/service-selection.jpg" alt="Service Selection" style="width: 65%; max-width: 800px; height: auto; border-radius: 12px; margin: 24px auto; display: block; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
+                <p style="text-align: center; color: rgba(255, 255, 255, 0.6); font-style: italic; margin-top: 8px;">Service menu showing JohnsonFlix+, Kemo Backup, and Pink Backup options</p>
+
+                <p><span class="step-number">3</span> Enter your <strong>username and password</strong> (provided in your welcome email)</p>
+
+                <img src="images/login-details.jpg" alt="Login Details" style="width: 65%; max-width: 800px; height: auto; border-radius: 12px; margin: 24px auto; display: block; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
+                <p style="text-align: center; color: rgba(255, 255, 255, 0.6); font-style: italic; margin-top: 8px;">Login form with username/password fields and checkboxes</p>
+
+                <p><span class="step-number">4</span> The app will load all channels and show "Playlist is processed" with the channel count</p>
+                <p><span class="step-number">5</span> Click <strong>"Done"</strong> to complete the setup</p>
+
+                <img src="images/playlist-processed.jpg" alt="Playlist Processed" style="width: 65%; max-width: 800px; height: auto; border-radius: 12px; margin: 24px auto; display: block; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
+                <p style="text-align: center; color: rgba(255, 255, 255, 0.6); font-style: italic; margin-top: 8px;">Completion screen showing "Playlist is processed" with channel count</p>
+            </div>
+
+            <div class="warning-box">
+                <i class="fas fa-clock"></i>
+                <p><strong>Note:</strong> Please allow a couple minutes on first startup to download all metadata and channel guide information.</p>
+            </div>
+        </section>
+
+        <section id="initial-configuration" class="section">
+            <h2><i class="fas fa-cog"></i> Initial Configuration</h2>
+
+            <h3>General Settings</h3>
+            <p>Navigate to <strong>Settings</strong> from the left-hand menu to configure these important options:</p>
+
+            <img src="images/settings-menu.jpg" alt="Settings Menu" style="width: 65%; max-width: 800px; height: auto; border-radius: 12px; margin: 24px auto; display: block; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
+            <p style="text-align: center; color: rgba(255, 255, 255, 0.6); font-style: italic; margin-top: 8px;">Main interface showing left menu with TV, Recordings, My list, and Settings options</p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4><i class="fas fa-power-off"></i> Auto Launch Options</h4>
+                    <ul>
+                        <li><strong>Auto start app on boot</strong> - App will launch when your device starts</li>
+                        <li><strong>Auto start app on wake up from sleep mode</strong> - App will launch when device wakes (may not work on all devices)</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <h4><i class="fas fa-magic"></i> Convenience Features</h4>
+                    <ul>
+                        <li><strong>Turn on last channel on app start</strong> - Automatically plays the last channel you were watching</li>
+                        <li><strong>Switch to picture-in-picture mode on press Home</strong> - Keeps your show playing in a small window when you go to device home screen</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>Playlist Configuration</h3>
+            <p>Go to <strong>Settings > Playlists</strong> and select the <strong>JohnsonFlix+</strong> playlist:</p>
+
+            <img src="images/playlist-settings.jpg" alt="Playlist Settings" style="width: 65%; max-width: 800px; height: auto; border-radius: 12px; margin: 24px auto; display: block; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
+            <p style="text-align: center; color: rgba(255, 255, 255, 0.6); font-style: italic; margin-top: 8px;">Playlist management screen showing JohnsonFlix+ with channel count</p>
+
+            <h4>Update Settings:</h4>
+            <div class="step-container">
+                <p><span class="step-number">1</span> Set <strong>Update interval</strong> to <strong>4 hours</strong></p>
+                <p><span class="step-number">2</span> Enable <strong>Update on app start</strong></p>
+
+                <img src="images/update-options.jpg" alt="Update Options" style="width: 40%; max-width: 800px; height: auto; border-radius: 12px; margin: 24px auto; display: block; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
+                <p style="text-align: center; color: rgba(255, 255, 255, 0.6); font-style: italic; margin-top: 8px;">Update options showing interval settings and toggles</p>
+
+                <div class="info-box">
+                    <i class="fas fa-sync-alt"></i>
+                    <div>
+                        <p>This ensures channel data updates every 4 hours. PPV and ESPN+ channels can update multiple times daily.</p>
+                        <p>Use <strong>"Update playlist"</strong> option to force manual updates when needed.</p>
+                    </div>
+                </div>
+            </div>
+
+            <h3>EPG (Electronic Program Guide) Settings</h3>
+            <p>Navigate to <strong>Settings > EPG</strong>:</p>
+
+            <img src="images/epg-settings.jpg" alt="EPG Settings" style="width: 40%; max-width: 800px; height: auto; border-radius: 12px; margin: 24px auto; display: block; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
+            <p style="text-align: center; color: rgba(255, 255, 255, 0.6); font-style: italic; margin-top: 8px;">EPG configuration screen with various update options</p>
+
+            <div class="step-container">
+                <h4>Configuration:</h4>
+                <ul>
+                    <li>Set <strong>Past days to keep EPG</strong> to <strong>1 day</strong> (or your preference for historical guide data)</li>
+                    <li>Set <strong>Update interval</strong> to <strong>4 hours</strong> (should match your playlist update interval)</li>
+                    <li>Enable <strong>Update on app start</strong></li>
+                    <li>Enable <strong>Update on playlists change</strong></li>
+                    <li>Enable <strong>Store program descriptions</strong></li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="additional-settings" class="section">
+            <h2><i class="fas fa-sliders-h"></i> Additional Settings</h2>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4><i class="fas fa-paint-brush"></i> Appearance</h4>
+                    <p>Customize the look and functionality of your app:</p>
+                    <ul>
+                        <li>Toggle channel numbers in TV guide</li>
+                        <li>Enable 2-line channel names</li>
+                        <li>Various visual customization options</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <h4><i class="fas fa-play"></i> Playback</h4>
+                    <p>Important playback settings:</p>
+                    <ul>
+                        <li><strong>Buffer size</strong> - Increase if experiencing buffering issues due to slow internet</li>
+                        <li><strong>Audio pass through</strong> - Advanced audio option (only adjust if you know what this is)</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <h4><i class="fas fa-record-vinyl"></i> Recording (DVR Function)</h4>
+                    <ul>
+                        <li>Requires sufficient internal storage or external storage device</li>
+                        <li>Set storage location for recorded media</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <h4><i class="fas fa-bell"></i> Reminders</h4>
+                    <ul>
+                        <li>Set reminders for live events</li>
+                        <li>Helps ensure you don't miss important shows or games</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <h4><i class="fas fa-remote-control"></i> Remote Control</h4>
+                    <ul>
+                        <li>View default button functions for guide and player</li>
+                        <li>Customize button assignments to your preference</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section id="using-the-app" class="section">
+            <h2><i class="fas fa-desktop"></i> Using the App</h2>
+
+            <h3>Player Controls and Menu Bar</h3>
+            <p>While watching a channel in full screen, you'll see the menu bar with various functions:</p>
+
+            <img src="images/top-menu-bar.jpg" alt="Top Menu Bar" style="width: 100%; max-width: 800px; height: auto; border-radius: 12px; margin: 24px auto; display: block; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
+            <p style="text-align: center; color: rgba(255, 255, 255, 0.6); font-style: italic; margin-top: 8px;">interface showing Search, Channels list, Recordings, Multiview, Picture-in-picture, and other controls</p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4><i class="fas fa-search"></i> Search</h4>
+                    <p>Find channels and content</p>
+                </div>
+                <div class="feature-card">
+                    <h4><i class="fas fa-list"></i> Channels List</h4>
+                    <p>Browse all available channels</p>
+                </div>
+                <div class="feature-card">
+                    <h4><i class="fas fa-record-vinyl"></i> Recordings</h4>
+                    <p>Access DVR recordings</p>
+                </div>
+                <div class="feature-card">
+                    <h4><i class="fas fa-th"></i> Multiview</h4>
+                    <p>Multi-channel viewing</p>
+                </div>
+				 <div class="feature-card">
+                    <h4><i class="fas fa-th"></i> Picture-in-Picture</h4>
+                    <p>Switch to Picture-in-Picture Mode</p>
+                </div>
+            </div>
+
+            <h3>Multiview Mode</h3>
+            <p>The app supports multiview for watching multiple channels simultaneously:</p>
+
+            <div class="step-container">
+                <p><span class="step-number">1</span> While watching a channel in full screen, press <strong>Select</strong> to show channel information</p>
+                <p><span class="step-number">2</span> Press <strong>Down</strong> for more options</p>
+
+                <img src="images/multiview-loading.jpg" alt="Multiview Menu Loading" style="width: 65%; max-width: 800px; height: auto; border-radius: 12px; margin: 24px auto; display: block; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
+                <p style="text-align: center; color: rgba(255, 255, 255, 0.6); font-style: italic; margin-top: 8px;">Loading screen with multiview menu options appearing</p>
+
+                <p><span class="step-number">3</span> Select <strong>"Multiview"</strong> to access multi-screen options</p>
+                <p><span class="step-number">4</span> Each screen requires one stream (4 screens = 4 stream subscription needed)</p>
+
+                <img src="images/multiview-options.jpg" alt="Multiview Options" style="width: 65%; max-width: 800px; height: auto; border-radius: 12px; margin: 24px auto; display: block; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
+                <p style="text-align: center; color: rgba(255, 255, 255, 0.6); font-style: italic; margin-top: 8px;">Multiview context menu showing Add screen, Search and add, Change channel, Pause, Enlarge screen, Full screen, Remove screen options</p>
+            </div>
+
+            <h4>Multiview Controls:</h4>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4><i class="fas fa-plus"></i> Add Screen</h4>
+                    <p>Add additional channels to view</p>
+                </div>
+                <div class="feature-card">
+                    <h4><i class="fas fa-search-plus"></i> Search and Add</h4>
+                    <p>Find and add specific channels</p>
+                </div>
+                <div class="feature-card">
+                    <h4><i class="fas fa-exchange-alt"></i> Change Channel</h4>
+                    <p>Switch channel on selected screen</p>
+                </div>
+                <div class="feature-card">
+                    <h4><i class="fas fa-expand-arrows-alt"></i> Enlarge Screen</h4>
+                    <p>Make one screen larger than others</p>
+                </div>
+                <div class="feature-card">
+                    <h4><i class="fas fa-expand"></i> Full Screen</h4>
+                    <p>Return to single channel view</p>
+                </div>
+                <div class="feature-card">
+                    <h4><i class="fas fa-times"></i> Remove Screen</h4>
+                    <p>Remove a screen from multiview</p>
+                </div>
+            </div>
+
+            <img src="images/multiview-screens.jpg" alt="Multiple Screens Active" style="width: 100%; max-width: 800px; height: auto; border-radius: 12px; margin: 24px auto; display: block; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
+            <p style="text-align: center; color: rgba(255, 255, 255, 0.6); font-style: italic; margin-top: 8px;">Multiview display showing multiple channels simultaneously with sports content</p>
+
+            <div class="info-box">
+                <i class="fas fa-volume-up"></i>
+                <p><strong>Note:</strong> Use arrow keys to toggle between screens and change audio source</p>
+            </div>
+
+            <h3>Picture-in-Picture Mode</h3>
+            <ul>
+                <li>Access through the multiview menu or automatic activation (if enabled in settings)</li>
+                <li>Keeps content playing in a small window while using other device functions</li>
+            </ul>
+        </section>
+
+        <section id="troubleshooting" class="section">
+            <h2><i class="fas fa-wrench"></i> Troubleshooting</h2>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4><i class="fas fa-buffer"></i> Buffering Issues</h4>
+                    <ul>
+                        <li>Increase buffer size in <strong>Settings > Playback</strong></li>
+                        <li>Check your internet connection speed</li>
+                        <li>Try switching to backup playlist if issues persist</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <h4><i class="fas fa-server"></i> Server Issues</h4>
+                    <ul>
+                        <li>If JohnsonFlix+ playlist is unavailable, switch to "Pink Backup" playlist</li>
+                        <li>We will notify you of any planned server maintenance</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <h4><i class="fas fa-sync-alt"></i> Channel Updates</h4>
+                    <ul>
+                        <li>Channels and guide data update every 4 hours automatically</li>
+                        <li>Force manual updates through <strong>Settings > Playlists > Update playlist</strong></li>
+                        <li>PPV and ESPN+ channels may update multiple times daily</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+        <footer class="footer">
+            <p>&copy; 2025 JohnsonFlix+ - Premium IPTV Experience</p>
+        </footer>
+    </div>
+</body>
+</html>

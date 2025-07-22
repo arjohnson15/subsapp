@@ -1,0 +1,962 @@
+/* ==========================================
+   JOHNSONFLIX RESPONSIVE THEME CSS
+   COMPLETE REPLACEMENT FOR themes.css
+   ========================================== */
+
+/* CSS Custom Properties for Dynamic Theming */
+:root {
+    --primary-color: #8e24aa;
+    --secondary-color: #3f51b5;
+    --accent-color: #4fc3f7;
+    --success-color: #4caf50;
+    --warning-color: #ff9800;
+    --error-color: #f44336;
+    --info-color: #2196f3;
+    
+    /* Responsive Breakpoints */
+    --mobile: 480px;
+    --tablet: 768px;
+    --desktop: 1024px;
+    --large: 1200px;
+    
+    /* Dynamic Spacing */
+    --spacing-xs: clamp(4px, 1vw, 8px);
+    --spacing-sm: clamp(8px, 2vw, 16px);
+    --spacing-md: clamp(12px, 3vw, 24px);
+    --spacing-lg: clamp(16px, 4vw, 32px);
+    --spacing-xl: clamp(20px, 5vw, 40px);
+    
+    /* Dynamic Font Sizes */
+    --font-xs: clamp(0.7rem, 2vw, 0.85rem);
+    --font-sm: clamp(0.8rem, 2.5vw, 0.95rem);
+    --font-md: clamp(0.9rem, 3vw, 1.1rem);
+    --font-lg: clamp(1.1rem, 3.5vw, 1.4rem);
+    --font-xl: clamp(1.3rem, 4vw, 2rem);
+    --font-xxl: clamp(1.8rem, 6vw, 2.5rem);
+    
+    /* Container Widths */
+    --container-sm: min(95%, 480px);
+    --container-md: min(90%, 768px);
+    --container-lg: min(85%, 1024px);
+    --container-xl: min(80%, 1200px);
+}
+
+/* ==========================================
+   DASHBOARD GRID SYSTEM
+   ========================================== */
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-xl);
+    width: 100%;
+}
+
+.stat-number {
+    font-size: var(--font-xxl);
+    font-weight: bold;
+    background: linear-gradient(45deg, #ff00ff, #00ffff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.2;
+}
+
+/* ==========================================
+   QUICK ACTIONS RESPONSIVE GRID
+   ========================================== */
+
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
+}
+
+.quick-action {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: var(--spacing-md);
+    border-radius: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    text-decoration: none;
+    color: white;
+    font-size: var(--font-md);
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.quick-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+/* ==========================================
+   COMING SOON ACTIONS
+   ========================================== */
+
+.coming-soon-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+    gap: var(--spacing-md);
+    margin: var(--spacing-xl) 0;
+}
+
+.coming-soon-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: var(--spacing-xl) var(--spacing-md);
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: default;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.coming-soon-card:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.08) 100%);
+}
+
+.coming-soon-card h4 {
+    color: #4fc3f7;
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-lg);
+}
+
+.coming-soon-card p {
+    color: rgba(255, 255, 255, 0.6);
+    font-style: italic;
+    margin: 0;
+    font-size: var(--font-sm);
+}
+
+/* ==========================================
+   PLEX SPLIT CONTAINER
+   ========================================== */
+
+.plex-split-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: var(--spacing-sm) 0;
+    min-height: clamp(50px, 8vw, 70px);
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+}
+
+.plex-split-left,
+.plex-split-right {
+    flex: 1;
+    min-width: 100px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.plex-split-divider {
+    width: 2px;
+    height: clamp(30px, 6vw, 50px);
+    background: linear-gradient(180deg, transparent 0%, #4fc3f7 20%, #4fc3f7 80%, transparent 100%);
+    margin: 0 var(--spacing-sm);
+    opacity: 0.6;
+}
+
+.plex-split-label {
+    font-size: var(--font-sm);
+    color: #4fc3f7;
+    margin-bottom: var(--spacing-xs);
+    font-weight: bold;
+}
+
+.plex-split-number {
+    font-size: var(--font-xl);
+    font-weight: bold;
+    background: linear-gradient(45deg, #ff00ff, #00ffff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+}
+
+/* ==========================================
+   EXPIRING SOON SECTION
+   ========================================== */
+
+.expiring-soon {
+    background: rgba(255, 152, 0, 0.1);
+    border: 1px solid rgba(255, 152, 0, 0.3);
+    border-radius: 8px;
+    padding: var(--spacing-md);
+    margin-top: var(--spacing-md);
+}
+
+.expiring-soon h4 {
+    color: #ff9800;
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-lg);
+}
+
+.expiring-user {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-xs) 0;
+    border-bottom: 1px solid rgba(255, 152, 0, 0.2);
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+}
+
+.expiring-user:last-child {
+    border-bottom: none;
+}
+
+/* ==========================================
+   PLEX LIBRARY STYLES
+   ========================================== */
+
+.library-checkboxes {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: var(--spacing-md);
+    margin-top: var(--spacing-sm);
+}
+
+.library-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.library-group h5 {
+    color: #4fc3f7;
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-md);
+}
+
+.library-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+    gap: var(--spacing-xs);
+}
+
+.library-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    font-size: var(--font-sm);
+    transition: background-color 0.2s ease;
+}
+
+.library-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.library-item input[type="checkbox"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+    accent-color: #4fc3f7;
+}
+
+.library-item label {
+    margin: 0;
+    cursor: pointer;
+    flex: 1;
+    font-size: var(--font-xs);
+}
+
+.plex-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+/* ==========================================
+   SETTINGS SECTIONS
+   ========================================== */
+
+.settings-section {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+}
+
+.settings-section h3 {
+    color: #4fc3f7;
+    margin-bottom: var(--spacing-md);
+    font-size: var(--font-lg);
+}
+
+.color-picker {
+    width: clamp(40px, 8vw, 60px);
+    height: clamp(30px, 6vw, 40px);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+/* ==========================================
+   EMAIL TEMPLATE EDITOR
+   ========================================== */
+
+.template-editor {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+}
+
+.template-preview {
+    background: white;
+    color: black;
+    padding: var(--spacing-md);
+    border-radius: 8px;
+    min-height: 300px;
+    font-size: var(--font-sm);
+	overflow-y: visible;
+    height: auto;
+}
+
+.dynamic-fields {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.dynamic-fields h4 {
+    color: #4fc3f7;
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-md);
+}
+
+.field-tag {
+    display: inline-block;
+    background: linear-gradient(45deg, #8e24aa, #3f51b5);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: 6px;
+    margin: var(--spacing-xs);
+    cursor: pointer;
+    font-size: var(--font-xs);
+    transition: transform 0.2s ease;
+}
+
+.field-tag:hover {
+    transform: scale(1.05);
+}
+
+/* ==========================================
+   RESPONSIVE TABLE SYSTEM
+   ========================================== */
+
+.table-container {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    overflow: auto;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    margin-bottom: var(--spacing-xl);
+    max-width: 100%;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 800px;
+    table-layout: auto;
+}
+
+th, td {
+    text-align: left;
+    padding: var(--spacing-sm) var(--spacing-xs);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    vertical-align: middle;
+    font-size: var(--font-sm);
+}
+
+th {
+    background: linear-gradient(45deg, #8e24aa, #3f51b5);
+    font-weight: bold;
+    cursor: pointer;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    white-space: nowrap;
+}
+
+th:hover {
+    background: linear-gradient(45deg, #9c27b0, #3f51b5);
+}
+
+tbody tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+
+/* ==========================================
+   TAG SYSTEM
+   ========================================== */
+
+.tag {
+    display: inline-block;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: 12px;
+    font-size: var(--font-xs);
+    margin: 1px;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.tag-plex1 { background: linear-gradient(45deg, #4caf50, #8bc34a); }
+.tag-plex2 { background: linear-gradient(45deg, #2196f3, #03a9f4); }
+.tag-iptv { background: linear-gradient(45deg, #ff9800, #ffc107); }
+.tag-free { background: linear-gradient(45deg, #9c27b0, #e91e63); }
+
+/* ==========================================
+   SUBSCRIPTION MANAGEMENT
+   ========================================== */
+
+.subscription-form {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.subscription-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+}
+
+.subscription-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.subscription-type-badge {
+    display: inline-block;
+    padding: 2px var(--spacing-sm);
+    border-radius: 12px;
+    font-size: var(--font-xs);
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.subscription-type-plex {
+    background: linear-gradient(45deg, #4caf50, #8bc34a);
+}
+
+.subscription-type-iptv {
+    background: linear-gradient(45deg, #ff9800, #ffc107);
+}
+
+#subscriptionFormContainer {
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ==========================================
+   RESPONSIVE BREAKPOINTS
+   ========================================== */
+
+/* Mobile Phones (0-480px) */
+@media (max-width: 480px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-sm);
+    }
+    
+    .plex-split-container {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .plex-split-divider {
+        width: 50%;
+        height: 2px;
+        margin: var(--spacing-xs) 0;
+    }
+    
+    .library-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .plex-actions {
+        flex-direction: column;
+    }
+    
+    .subscription-actions {
+        flex-direction: column;
+    }
+    
+    th, td {
+        padding: var(--spacing-xs);
+        font-size: var(--font-xs);
+    }
+    
+    .btn-small {
+        font-size: var(--font-xs);
+        padding: var(--spacing-xs);
+        margin: 1px;
+    }
+}
+
+/* Tablets (481-768px) */
+@media (min-width: 481px) and (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    }
+    
+    .template-editor {
+        grid-template-columns: 1fr;
+    }
+    
+    .library-list {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    }
+    
+    .subscription-stats {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+}
+
+/* Desktop (769px and up) */
+@media (min-width: 769px) {
+    .template-editor {
+        grid-template-columns: 1fr 1fr;
+    }
+    
+    .plex-split-container {
+        margin: var(--spacing-md) 0;
+    }
+    
+    .library-list {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+}
+
+/* Large Screens (1200px and up) */
+@media (min-width: 1200px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+    
+    .subscription-stats {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    
+    .library-list {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+}
+
+/* ==========================================
+   ACCESSIBILITY AND INTERACTIONS
+   ========================================== */
+
+/* Focus States */
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+    .tag,
+    .btn-small,
+    .quick-action {
+        border: 2px solid white;
+    }
+}
+
+/* ==========================================
+   PRINT STYLES
+   ========================================== */
+
+@media print {
+    .plex-actions,
+    .subscription-actions,
+    .quick-actions,
+    .btn,
+    .btn-small {
+        display: none !important;
+    }
+    
+    .table-container {
+        box-shadow: none;
+        background: white;
+    }
+    
+    th, td {
+        border: 1px solid #000;
+        color: #000;
+    }
+    
+    th {
+        background: #f0f0f0 !important;
+    }
+}
+
+/* Enhanced Email Template Editor */
+.template-preview-large {
+    background: white;
+    color: black;
+    padding: 30px;
+    border-radius: 12px;
+    min-height: 400px;
+    font-size: 14px;
+    line-height: 1.6;
+    border: 2px solid rgba(79, 195, 247, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 100%;
+    overflow-y: visible;
+}
+
+.template-preview-large h1,
+.template-preview-large h2,
+.template-preview-large h3 {
+    margin-top: 0;
+}
+
+.template-preview-large p {
+    margin-bottom: 15px;
+}
+
+/* Tag Selector */
+.tag-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+/* Form Section Styling */
+.form-section {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    border: 1px solid rgba(79, 195, 247, 0.2);
+}
+
+.form-section h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #4fc3f7;
+    font-size: 16px;
+}
+
+/* Enhanced Checkbox Styles */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 8px;
+}
+
+.checkbox-label input[type="checkbox"] {
+    margin-right: 10px;
+    width: 18px;
+    height: 18px;
+    accent-color: #8e24aa;
+}
+
+.checkbox-label .checkmark {
+    margin-left: 5px;
+}
+
+/* Email Recipients Styling */
+.form-group input[type="email"],
+.form-group input[type="text"] {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid rgba(79, 195, 247, 0.3);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: white;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.form-group input[type="email"]:focus,
+.form-group input[type="text"]:focus {
+    border-color: #4fc3f7;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(79, 195, 247, 0.2);
+}
+
+/* ==========================================
+   ENHANCED EMAIL MANAGER STYLES - FIXED
+   ========================================== */
+
+/* Dynamic Fields Collapsible */
+.dynamic-fields-container {
+    margin-bottom: 30px;
+}
+
+.collapsible-header {
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid rgba(79, 195, 247, 0.3);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.collapsible-header:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(79, 195, 247, 0.5);
+}
+
+.collapsible-header h4 {
+    color: #4fc3f7;
+    margin: 0;
+    font-size: 16px;
+}
+
+.collapsible-header #dynamicFieldsToggle {
+    color: #4fc3f7;
+    font-size: 18px;
+    font-weight: bold;
+    transition: transform 0.3s ease;
+}
+
+.dynamic-fields {
+    margin-top: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 20px;
+    border: 1px solid rgba(79, 195, 247, 0.2);
+}
+
+/* Enhanced Email Preview */
+.email-preview-section {
+    margin: 30px 0;
+}
+
+.preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+/* Fixed Email Preview Styles */
+.email-preview-container {
+    background: white;
+    color: black;
+    border-radius: 12px;
+    border: 2px solid rgba(79, 195, 247, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    max-width: 100%;
+}
+
+/* Normal preview (unchanged) */
+.email-preview-container:not(.large-view) #emailPreview {
+    padding: 30px;
+    min-height: 400px;
+    max-height: 70vh;
+    overflow-y: auto;
+    font-size: 14px;
+    line-height: 1.6;
+    font-family: Arial, sans-serif;
+}
+
+/* Preview placeholder */
+.preview-placeholder {
+    color: #666;
+    text-align: center;
+    padding: 40px;
+    margin: 0;
+}
+
+/* Responsive adjustments for large view */
+@media (max-width: 768px) {
+    .email-preview-container.large-view {
+        padding: 10px !important;
+    }
+    
+    .email-preview-container.large-view #emailPreview {
+        padding: 20px !important;
+        max-height: 95vh !important;
+    }
+}
+
+/* Enhanced Field Tags */
+.field-tag {
+    display: inline-block;
+    background: linear-gradient(45deg, #8e24aa, #3f51b5);
+    padding: 6px 12px;
+    border-radius: 6px;
+    margin: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s ease;
+    color: white;
+    border: none;
+    font-weight: 500;
+}
+
+.field-tag:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(142, 36, 170, 0.3);
+}
+
+/* Enhanced Bulk Email Section */
+.bulk-email-section {
+    margin-top: 40px;
+    padding: 25px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(79, 195, 247, 0.3);
+    transition: all 0.3s ease;
+}
+
+.bulk-email-section:hover {
+    border-color: rgba(79, 195, 247, 0.5);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.bulk-email-section h4 {
+    color: #4fc3f7;
+    margin-bottom: 20px;
+    font-size: 18px;
+}
+
+/* ==========================================
+   EMAIL MODAL FIX - FINAL WORKING VERSION
+   ========================================== */
+
+#emailPreviewContainer.large-view {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 99999 !important;
+    background: rgba(0, 0, 0, 0.9) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 20px !important;
+    box-sizing: border-box !important;
+    border-radius: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+}
+
+#emailPreviewContainer.large-view #emailPreview {
+    width: 80vw !important;
+    height: 80vh !important;
+    max-width: 1000px !important;
+    max-height: none !important;
+    background: white !important;
+    color: black !important;
+    border-radius: 12px !important;
+    padding: 30px !important;
+    overflow-y: auto !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    position: relative !important;
+    transform: none !important;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    #emailPreviewContainer.large-view {
+        padding: 10px !important;
+    }
+    
+    #emailPreviewContainer.large-view #emailPreview {
+        width: 95vw !important;
+        height: 85vh !important;
+        padding: 20px !important;
+    }
+}
+
+/* NUCLEAR OPTION - FINAL OVERRIDE */
+#emailPreviewContainer[style*="position: fixed"] {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 999999 !important;
+    background: rgba(0, 0, 0, 0.9) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 20px !important;
+    border: none !important;
+    border-radius: 0 !important;
+    max-width: none !important;
+    overflow: hidden !important;
+}
+
+#emailPreview[style*="width: 80vw"] {
+    width: 80vw !important;
+    height: 80vh !important;
+    max-width: 1000px !important;
+    background: white !important;
+    color: black !important;
+    border-radius: 12px !important;
+    padding: 30px !important;
+    overflow-y: auto !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    max-height: none !important;
+    min-height: auto !important;
+    line-height: 1.6 !important;
+    font-family: Arial, sans-serif !important;
+    font-size: 14px !important;
+}

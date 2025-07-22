@@ -11,15 +11,15 @@ const IPTV = {
    * Initialize IPTV module
    */
   async init() {
-    console.log('📺 Initializing IPTV module...');
+    console.log('?? Initializing IPTV module...');
     try {
       await this.loadPackages();
       await this.loadChannelGroups();
       await this.loadCreditBalance();
       this.bindEvents();
-      console.log('✅ IPTV module initialized');
+      console.log('? IPTV module initialized');
     } catch (error) {
-      console.error('❌ Failed to initialize IPTV module:', error);
+      console.error('? Failed to initialize IPTV module:', error);
       if (window.Utils && window.Utils.showNotification) {
         window.Utils.showNotification('Failed to initialize IPTV module', 'error');
       } else if (window.showNotification) {
@@ -38,12 +38,12 @@ const IPTV = {
       
       if (data.success) {
         this.packages = data.packages;
-        console.log('📦 Loaded IPTV packages:', data.total);
+        console.log('?? Loaded IPTV packages:', data.total);
       } else {
         throw new Error(data.message);
       }
     } catch (error) {
-      console.error('❌ Failed to load packages:', error);
+      console.error('? Failed to load packages:', error);
       this.packages = { trial: [], basic: [], full: [], live_tv: [] }; // Default empty structure
       if (window.Utils && window.Utils.showNotification) {
         window.Utils.showNotification('Failed to load IPTV packages', 'error');
@@ -61,12 +61,12 @@ const IPTV = {
       
       if (data.success) {
         this.channelGroups = data.channelGroups || [];
-        console.log('📺 Loaded channel groups:', data.total || this.channelGroups.length);
+        console.log('?? Loaded channel groups:', data.total || this.channelGroups.length);
       } else {
         throw new Error(data.message);
       }
     } catch (error) {
-      console.error('❌ Failed to load channel groups:', error);
+      console.error('? Failed to load channel groups:', error);
       this.channelGroups = []; // Default to empty array
       if (window.Utils && window.Utils.showNotification) {
         window.Utils.showNotification('Failed to load channel groups', 'error');
@@ -79,28 +79,28 @@ const IPTV = {
    */
   async loadCreditBalance() {
     try {
-      console.log('💳 Loading credit balance from database...');
+      console.log('?? Loading credit balance from database...');
       
       // Load from settings API (same as settings page)
       const response = await fetch('/api/settings');
       const data = await response.json();
       
-      console.log('💳 Settings API response:', data);
+      console.log('?? Settings API response:', data);
       
       // Handle FLAT OBJECT format (your current API response)
       if (data.iptv_credits_balance !== undefined) {
         this.creditBalance = parseInt(data.iptv_credits_balance) || 0;
-        console.log(`💳 Loaded credits from FLAT response: ${this.creditBalance}`);
+        console.log(`?? Loaded credits from FLAT response: ${this.creditBalance}`);
       }
       // Handle ARRAY format (expected format)
       else if (data.success && data.settings && Array.isArray(data.settings)) {
         const creditSetting = data.settings.find(s => s.setting_key === 'iptv_credits_balance');
         if (creditSetting && creditSetting.setting_value !== undefined) {
           this.creditBalance = parseInt(creditSetting.setting_value) || 0;
-          console.log(`💳 Loaded credits from ARRAY response: ${this.creditBalance}`);
+          console.log(`?? Loaded credits from ARRAY response: ${this.creditBalance}`);
         } else {
           this.creditBalance = 0;
-          console.log('💳 No credit balance setting found in array, defaulting to 0');
+          console.log('?? No credit balance setting found in array, defaulting to 0');
         }
       }
       // Handle case where settings exist but no success flag
@@ -108,10 +108,10 @@ const IPTV = {
         const creditSetting = data.settings.find(s => s.setting_key === 'iptv_credits_balance');
         if (creditSetting && creditSetting.setting_value !== undefined) {
           this.creditBalance = parseInt(creditSetting.setting_value) || 0;
-          console.log(`💳 Loaded credits from array (no success flag): ${this.creditBalance}`);
+          console.log(`?? Loaded credits from array (no success flag): ${this.creditBalance}`);
         } else {
           this.creditBalance = 0;
-          console.log('💳 No credit balance setting found in array (no success flag), defaulting to 0');
+          console.log('?? No credit balance setting found in array (no success flag), defaulting to 0');
         }
       }
       // Fallback - try to find any iptv_credits_balance property
@@ -121,7 +121,7 @@ const IPTV = {
         for (const key in data) {
           if (key === 'iptv_credits_balance') {
             this.creditBalance = parseInt(data[key]) || 0;
-            console.log(`💳 Found credits in property search: ${this.creditBalance}`);
+            console.log(`?? Found credits in property search: ${this.creditBalance}`);
             found = true;
             break;
           }
@@ -129,14 +129,14 @@ const IPTV = {
         
         if (!found) {
           this.creditBalance = 0;
-          console.log('💳 No credit balance found anywhere, defaulting to 0');
+          console.log('?? No credit balance found anywhere, defaulting to 0');
         }
       }
       
       this.updateCreditDisplay();
       
     } catch (error) {
-      console.error('❌ Failed to load credit balance:', error);
+      console.error('? Failed to load credit balance:', error);
       this.creditBalance = 0;
       this.updateCreditDisplay();
     }
@@ -174,7 +174,7 @@ const IPTV = {
  * Show IPTV section when IPTV tag is checked - Updated for check existing feature
  */
 showIPTVSection(userId) {
-  console.log('📺 Showing IPTV section for user:', userId);
+  console.log('?? Showing IPTV section for user:', userId);
   
   this.currentUser = userId;
   
@@ -198,7 +198,7 @@ showIPTVSection(userId) {
     this.handleActionChange();
   }, 100);
   
-  console.log('✅ IPTV section shown');
+  console.log('? IPTV section shown');
 },
 
   /**
@@ -237,7 +237,7 @@ async loadUserStatus(userId) {
       this.userHasExistingIPTVData = false;
     }
   } catch (error) {
-    console.error('❌ Failed to load user IPTV status:', error);
+    console.error('? Failed to load user IPTV status:', error);
     this.userHasExistingIPTVData = false;
   }
 },
@@ -251,7 +251,7 @@ displayUserStatus(user) {
   
   // CRITICAL: Store the line ID for delete functionality
   this.currentLineId = user.iptv_line_id;
-  console.log('📋 Stored line ID for deletion:', this.currentLineId);
+  console.log('?? Stored line ID for deletion:', this.currentLineId);
   
   const statusElements = {
     'currentLineId': user.iptv_line_id || 'None',
@@ -293,17 +293,17 @@ displayUserStatus(user) {
 populatePackageSelect(showTrialPackages = false) {
   const select = document.getElementById('iptvPackageSelect');
   if (!select) {
-    console.warn('📦 Package select element not found - IPTV section may not be visible yet');
+    console.warn('?? Package select element not found - IPTV section may not be visible yet');
     return false;
   }
   
-  console.log('📦 Populating package dropdown, showTrialPackages:', showTrialPackages);
+  console.log('?? Populating package dropdown, showTrialPackages:', showTrialPackages);
   
   select.innerHTML = '<option value="">Select Package...</option>';
   
   // Check if we have package data
   if (!this.packages || Object.keys(this.packages).length === 0) {
-    console.warn('📦 No package data available to populate');
+    console.warn('?? No package data available to populate');
     select.innerHTML = '<option value="">No packages available</option>';
     return false;
   }
@@ -340,7 +340,7 @@ populatePackageSelect(showTrialPackages = false) {
  */
 handleTrialCheckboxChange(event) {
   const isTrialUser = event.target.checked;
-  console.log('🔄 Trial checkbox changed:', isTrialUser);
+  console.log('?? Trial checkbox changed:', isTrialUser);
   
   // Repopulate packages with new filter
   this.populatePackageSelect(isTrialUser);
@@ -360,17 +360,17 @@ handleTrialCheckboxChange(event) {
   populateChannelGroupSelect() {
     const select = document.getElementById('iptvChannelGroupSelect');
     if (!select) {
-      console.warn('📺 Channel group select element not found - IPTV section may not be visible yet');
+      console.warn('?? Channel group select element not found - IPTV section may not be visible yet');
       return false;
     }
     
-    console.log('📺 Populating channel group dropdown with data:', this.channelGroups);
+    console.log('?? Populating channel group dropdown with data:', this.channelGroups);
     
     select.innerHTML = '<option value="">Select Channel Group...</option>';
     
     // Check if we have channel group data
     if (!this.channelGroups || this.channelGroups.length === 0) {
-      console.warn('📺 No channel group data available to populate');
+      console.warn('?? No channel group data available to populate');
       select.innerHTML = '<option value="">No channel groups available</option>';
       return false;
     }
@@ -384,7 +384,7 @@ handleTrialCheckboxChange(event) {
 	
 	this.setDefaultChannelGroup();
     
-    console.log(`✅ Channel group dropdown populated with ${this.channelGroups.length} groups`);
+    console.log(`? Channel group dropdown populated with ${this.channelGroups.length} groups`);
     return true;
   },
   
@@ -399,7 +399,7 @@ setDefaultChannelGroup() {
   
   const isTrialUser = trialCheckbox ? trialCheckbox.checked : false;
   
-  console.log(`📺 Setting default channel group for ${isTrialUser ? 'trial' : 'paid'} user`);
+  console.log(`?? Setting default channel group for ${isTrialUser ? 'trial' : 'paid'} user`);
   
   // Find default channel group based on trial state
   const defaultOption = Array.from(select.options).find(option => {
@@ -413,9 +413,9 @@ setDefaultChannelGroup() {
   
   if (defaultOption) {
     select.value = defaultOption.value;
-    console.log(`✅ Set default channel group: ${defaultOption.textContent}`);
+    console.log(`? Set default channel group: ${defaultOption.textContent}`);
   } else {
-    console.log('⚠️ No default channel group found');
+    console.log('?? No default channel group found');
   }
 },
 
@@ -448,12 +448,12 @@ setDefaultChannelGroup() {
         const select = document.getElementById('iptvChannelGroupSelect');
         if (select) {
           select.value = defaultGroupId;
-          console.log(`📺 Set default channel group: ${defaultGroupId} (${isTrialUser ? 'trial' : 'paid'})`);
+          console.log(`?? Set default channel group: ${defaultGroupId} (${isTrialUser ? 'trial' : 'paid'})`);
         }
       }
       
     } catch (error) {
-      console.error('❌ Failed to load default channel group:', error);
+      console.error('? Failed to load default channel group:', error);
     }
   },
 
@@ -503,7 +503,7 @@ setDefaultChannelGroup() {
     
     const group = this.channelGroups.find(g => g.id == groupId);
     if (group && group.description) {
-      console.log(`📺 Selected channel group: ${group.name}`);
+      console.log(`?? Selected channel group: ${group.name}`);
     }
   },
 
@@ -527,7 +527,7 @@ setDefaultChannelGroup() {
       }
     });
     
-    console.log(`💳 Updated credit display: ${this.creditBalance}`);
+    console.log(`?? Updated credit display: ${this.creditBalance}`);
   },
 
   /**
@@ -568,27 +568,27 @@ setDefaultChannelGroup() {
    * Load packages filtered for extension (same connections only) - NEW FUNCTION
    */
   loadPackagesForExtension() {
-    console.log('🔄 Loading packages for extension...');
+    console.log('?? Loading packages for extension...');
     
     // Get current user data from the stored status
     const currentUser = this.currentUserData;
     
     if (!currentUser || !currentUser.iptv_connections) {
-      console.warn('⚠️ No current user or connection info for filtering');
+      console.warn('?? No current user or connection info for filtering');
       // Show warning message
       const select = document.getElementById('iptvPackageSelect');
       if (select) {
-        select.innerHTML = '<option value="">⚠️ User has no existing IPTV subscription to extend</option>';
+        select.innerHTML = '<option value="">?? User has no existing IPTV subscription to extend</option>';
       }
       return;
     }
     
     const currentConnections = parseInt(currentUser.iptv_connections);
-    console.log(`🔍 Filtering packages for ${currentConnections} connections`);
+    console.log(`?? Filtering packages for ${currentConnections} connections`);
     
     const select = document.getElementById('iptvPackageSelect');
     if (!select) {
-      console.warn('📦 Package select element not found');
+      console.warn('?? Package select element not found');
       return;
     }
     
@@ -596,7 +596,7 @@ setDefaultChannelGroup() {
     
     // Check if we have package data
     if (!this.packages || Object.keys(this.packages).length === 0) {
-      console.warn('📦 No package data available');
+      console.warn('?? No package data available');
       select.innerHTML = '<option value="">No packages available</option>';
       return;
     }
@@ -633,15 +633,15 @@ setDefaultChannelGroup() {
     });
     
     if (matchingPackagesFound === 0) {
-      select.innerHTML = `<option value="">❌ No packages available for ${currentConnections} connections</option>`;
-      console.warn(`⚠️ No packages found with ${currentConnections} connections`);
+      select.innerHTML = `<option value="">? No packages available for ${currentConnections} connections</option>`;
+      console.warn(`?? No packages found with ${currentConnections} connections`);
     } else {
-      console.log(`✅ Found ${matchingPackagesFound} packages with ${currentConnections} connections`);
+      console.log(`? Found ${matchingPackagesFound} packages with ${currentConnections} connections`);
       
       // Add helpful message
       const infoOption = document.createElement('option');
       infoOption.disabled = true;
-      infoOption.textContent = `ℹ️ Showing only packages with ${currentConnections} connections (same as current)`;
+      infoOption.textContent = `?? Showing only packages with ${currentConnections} connections (same as current)`;
       infoOption.style.fontStyle = 'italic';
       infoOption.style.color = '#4fc3f7';
       select.insertBefore(infoOption, select.children[1]);
@@ -745,7 +745,7 @@ setDefaultChannelGroup() {
       action = 'create_paid';
     }
     
-    console.log(`🎯 Executing action: ${action}`);
+    console.log(`?? Executing action: ${action}`);
     
     // Call the unified subscription method
     await this.createSubscription(action);
@@ -779,7 +779,7 @@ async createSubscription(action) {
     let originalText = 'Submit'; // Declare at top level
     
     try {
-        console.log(`🎯 Creating IPTV subscription with action: ${action}`);
+        console.log(`?? Creating IPTV subscription with action: ${action}`);
         
         // Get form data
         const packageId = document.getElementById('iptvPackageSelect').value;
@@ -795,7 +795,7 @@ async createSubscription(action) {
         const userIdField = document.getElementById('userId');
         if (userIdField && userIdField.value) {
             userId = userIdField.value;
-            console.log('📋 Found user ID from form field:', userId);
+            console.log('?? Found user ID from form field:', userId);
         }
         
         // Method 2: Try URL parameters
@@ -803,20 +803,20 @@ async createSubscription(action) {
             const urlParams = new URLSearchParams(window.location.search);
             userId = urlParams.get('id');
             if (userId) {
-                console.log('📋 Found user ID from URL:', userId);
+                console.log('?? Found user ID from URL:', userId);
             }
         }
         
         // Method 3: Try current user from IPTV module
         if (!userId && this.currentUser) {
             userId = this.currentUser;
-            console.log('📋 Found user ID from IPTV.currentUser:', userId);
+            console.log('?? Found user ID from IPTV.currentUser:', userId);
         }
         
         // Method 4: Try app state
         if (!userId && window.AppState && window.AppState.editingUserId) {
             userId = window.AppState.editingUserId;
-            console.log('📋 Found user ID from AppState:', userId);
+            console.log('?? Found user ID from AppState:', userId);
         }
         
         if (!userId) {
@@ -832,7 +832,7 @@ async createSubscription(action) {
         }
         
         if (action === 'create_paid' && !username) {
-			console.log('⚠️ No username provided for paid subscription - will be auto-generated by panel');
+			console.log('?? No username provided for paid subscription - will be auto-generated by panel');
 		}
         
         // Show loading state
@@ -857,7 +857,7 @@ async createSubscription(action) {
             notes: notes || undefined
         };
         
-        console.log('📤 Sending IPTV subscription request:', requestData);
+        console.log('?? Sending IPTV subscription request:', requestData);
         
         // Make API request to enhanced endpoint
         const response = await fetch('/api/iptv/subscription', {
@@ -878,18 +878,11 @@ async createSubscription(action) {
             throw new Error(result.message || 'Unknown error occurred');
         }
         
-        console.log('✅ IPTV subscription created successfully:', result);
-		
-		// DEBUG: Log all response data
-console.log('🐛 Full response data:', result.data);
-console.log('🐛 IPTV Editor created:', result.data.iptv_editor_created);
-console.log('🐛 IPTV Editor synced:', result.data.iptv_editor_synced); 
-console.log('🐛 IPTV Editor success:', result.data.iptv_editor_success);
-console.log('🐛 IPTV Editor data:', result.data.iptv_editor_data);
+        console.log('? IPTV subscription created successfully:', result);
         
 // Update the IPTV status display with enhanced data
 if (result.data) {
-    console.log('🔄 Updating UI with returned data:', result.data);
+    console.log('?? Updating UI with returned data:', result.data);
     
     // Update the current IPTV status section
     if (typeof this.updateIPTVStatus === 'function') {
@@ -899,98 +892,6 @@ if (result.data) {
     // CRITICAL FIX: Populate form fields with retrieved data
     this.populateFormFieldsAfterCreation(result.data);
     
-    // IPTV EDITOR SUCCESS HANDLING - Show notifications only
-    if (result.data.iptv_editor_success || result.data.iptv_editor_created || result.data.iptv_editor_synced) {
-        console.log('🎯 IPTV Editor integration completed:', result.data.iptv_editor_data);
-        
-        // Show IPTV Editor success notification
-        let editorMessage = '';
-        if (result.data.iptv_editor_created) {
-            editorMessage = '✅ IPTV Editor user created successfully!';
-        } else if (result.data.iptv_editor_synced) {
-            editorMessage = '✅ IPTV Editor user found and synced successfully!';
-        }
-        
-        if (editorMessage) {
-            if (window.Utils && window.Utils.showNotification) {
-                setTimeout(() => {
-                    window.Utils.showNotification(editorMessage, 'success');
-                }, 1500);
-            }
-            console.log('🎯 ' + editorMessage);
-            console.log('🎯 IPTV Editor Data:', result.data.iptv_editor_data);
-        }
-    }
-
-// ALWAYS USE YOUR EXACT WORKING CONSOLE COMMAND after ANY successful subscription
-setTimeout(async function() {
-    const userId = window.IPTV.getCurrentUserId();
-    console.log('🔄 Reloading all user data for:', userId);
-    try {
-        // Step 1: Reload IPTV status
-        console.log('📊 Step 1: Loading current user IPTV status...');
-        await window.IPTV.loadCurrentUserIPTVStatus();
-        console.log('✅ Step 1 completed');
-        
-        // Step 2: Try IPTV Editor status with retries (since it might need time after creation)
-        console.log('📊 Step 2: Fetching IPTV Editor status with retries...');
-        let iptvEditorFound = false;
-        const maxEditorRetries = 5;
-        
-        for (let attempt = 1; attempt <= maxEditorRetries; attempt++) {
-            console.log(`📊 Step 2.${attempt}: IPTV Editor fetch attempt ${attempt}/${maxEditorRetries}...`);
-            
-            try {
-                const response = await fetch(`/api/iptv-editor/user/${userId}/status`);
-                const data = await response.json();
-                console.log(`📊 Step 2.${attempt}b: IPTV Editor status:`, data);
-                
-                if (data.success && data.iptvUser) {
-                    console.log('📊 IPTV Editor data found! Calling display functions...');
-                    
-                    if (typeof loadIPTVEditorStatus === 'function') {
-                        loadIPTVEditorStatus(userId);
-                    } else if (typeof displayIPTVEditorStatus === 'function') {
-                        displayIPTVEditorStatus(data.iptvUser);
-                    } else {
-                        console.log('✅ IPTV Editor data loaded:', data.iptvUser);
-                    }
-                    
-                    iptvEditorFound = true;
-                    break;
-                } else {
-                    console.log(`📊 Step 2.${attempt}c: IPTV Editor data not ready yet...`);
-                    if (attempt < maxEditorRetries) {
-                        console.log(`⏳ Waiting 3 seconds before retry ${attempt + 1}...`);
-                        await new Promise(resolve => setTimeout(resolve, 3000));
-                    }
-                }
-            } catch (editorError) {
-                console.error(`❌ IPTV Editor fetch attempt ${attempt} failed:`, editorError);
-                if (attempt < maxEditorRetries) {
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                }
-            }
-        }
-        
-        if (!iptvEditorFound) {
-            console.log('⚠️ IPTV Editor data not found after all retries');
-        }
-        
-        // Step 3: Full user reload
-console.log('📊 Step 3: IPTV status already refreshed, skipping full user reload...');
-
-        
-        // Step 4: Final IPTV status refresh (your working method)
-        console.log('📊 Step 4: Final IPTV status refresh...');
-        await window.IPTV.loadCurrentUserIPTVStatus();
-        
-        console.log('✅ Complete reload finished');
-    } catch (error) {
-        console.error('❌ Reload failed:', error);
-    }
-}, 3000); // Increased to 3 seconds initial delay
-    
     // Update interface state
     this.userHasExistingIPTVData = true;
     this.updateStatusInterface();
@@ -999,17 +900,17 @@ console.log('📊 Step 3: IPTV status already refreshed, skipping full user relo
     let successMessage = `${action.replace('_', ' ')} successful!`;
     
     if (result.data.panel_data_retrieved) {
-        successMessage += `\n✅ Panel data retrieved successfully`;
-        successMessage += `\n🆔 Line ID: ${result.data.line_id}`;
+        successMessage += `\n? Panel data retrieved successfully`;
+        successMessage += `\n?? Line ID: ${result.data.line_id}`;
         if (result.data.password) {
-            successMessage += `\n🔑 Password: ${result.data.password}`;
+            successMessage += `\n?? Password: ${result.data.password}`;
         }
         if (result.data.days_until_expiration !== null) {
-            successMessage += `\n📅 Days until expiration: ${result.data.days_until_expiration}`;
+            successMessage += `\n?? Days until expiration: ${result.data.days_until_expiration}`;
         }
-        successMessage += `\n🔗 M3U URL: Available for copy`;
+        successMessage += `\n?? M3U URL: Available for copy`;
     } else {
-        successMessage += `\n⚠️ Panel data retrieval incomplete - check manually`;
+        successMessage += `\n?? Panel data retrieval incomplete - check manually`;
     }
     
     if (window.Utils && window.Utils.showNotification) {
@@ -1017,6 +918,11 @@ console.log('📊 Step 3: IPTV status already refreshed, skipping full user relo
     } else {
         alert(successMessage);
     }
+    
+    // Refresh user status to ensure everything is current
+    setTimeout(() => {
+        this.loadCurrentUserIPTVStatus();
+    }, 1000);
     
 } else {
     // Show success without enhanced data
@@ -1029,7 +935,7 @@ console.log('📊 Step 3: IPTV status already refreshed, skipping full user relo
 }
         
     } catch (error) {
-        console.error('❌ IPTV subscription creation failed:', error);
+        console.error('? IPTV subscription creation failed:', error);
         
         let errorMessage = 'Failed to create IPTV subscription';
         if (error.message) {
@@ -1091,7 +997,7 @@ console.log('📊 Step 3: IPTV status already refreshed, skipping full user relo
  * Update IPTV status display - ENHANCED WITH DAYS CALCULATION AND M3U URL
  */
 updateIPTVStatus(data) {
-    console.log('📺 Updating IPTV status display:', data);
+    console.log('?? Updating IPTV status display:', data);
     
     // Update Line ID
     const lineIdElement = document.getElementById('iptvLineId');
@@ -1107,49 +1013,34 @@ updateIPTVStatus(data) {
         connectionsElement.textContent = max > 0 ? `${current}/${max}` : '0/0';
     }
     
-// Calculate and Update Days Until Expiration - FIXED VERSION
-const daysLeftElement = document.getElementById('iptvDaysLeft');
-if (daysLeftElement) {
-    if (data.iptv_expiration) {
-        // FIXED: Proper timezone-safe date calculation
-        const expirationDateStr = data.iptv_expiration.split('T')[0]; // Get just YYYY-MM-DD
-        const today = new Date();
-        
-        // Create dates at midnight local time to avoid timezone issues
-        const expiration = new Date(expirationDateStr + 'T00:00:00');
-        const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        
-        // Calculate days difference
-        const timeDiff = expiration.getTime() - todayMidnight.getTime();
-        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-        
-        console.log('📅 Days calculation debug:', {
-            expirationInput: data.iptv_expiration,
-            expirationDateStr: expirationDateStr,
-            expirationParsed: expiration,
-            todayMidnight: todayMidnight,
-            timeDiff: timeDiff,
-            daysDiff: daysDiff
-        });
-        
-        if (daysDiff > 1) {
-            daysLeftElement.textContent = `${daysDiff} days`;
-            daysLeftElement.style.color = daysDiff > 7 ? '#4CAF50' : (daysDiff > 3 ? '#FF9800' : '#F44336');
-        } else if (daysDiff === 1) {
-            daysLeftElement.textContent = 'Tomorrow';
-            daysLeftElement.style.color = '#F44336';
-        } else if (daysDiff === 0) {
-            daysLeftElement.textContent = 'Expires today';
-            daysLeftElement.style.color = '#F44336';
+    // Calculate and Update Days Until Expiration
+    const daysLeftElement = document.getElementById('iptvDaysLeft');
+    if (daysLeftElement) {
+        if (data.iptv_expiration) {
+            const now = new Date();
+            const expiration = new Date(data.iptv_expiration);
+            
+            // Calculate days difference
+            const timeDiff = expiration.getTime() - now.getTime();
+            const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+            
+            if (daysDiff > 0) {
+                daysLeftElement.textContent = `${daysDiff} days`;
+                daysLeftElement.style.color = daysDiff > 7 ? '#4caf50' : '#ff9800';
+            } else if (daysDiff === 0) {
+                daysLeftElement.textContent = 'Expires today';
+                daysLeftElement.style.color = '#ff9800';
+            } else {
+                daysLeftElement.textContent = 'Expired';
+                daysLeftElement.style.color = '#f44336';
+            }
+            
+            console.log(`?? Calculated days until expiration: ${daysDiff}`);
         } else {
-            daysLeftElement.textContent = 'Expired';
-            daysLeftElement.style.color = '#F44336';
+            daysLeftElement.textContent = 'None';
+            daysLeftElement.style.color = '#fff';
         }
-    } else {
-        daysLeftElement.textContent = 'N/A';
-        daysLeftElement.style.color = '#666';
     }
-}
     
 const expirationElement = document.getElementById('iptvExpiration');
 if (expirationElement) {
@@ -1170,7 +1061,7 @@ if (expirationElement) {
         
         expirationElement.textContent = date.toLocaleDateString();
         
-        console.log(`📅 Frontend display: ${data.iptv_expiration} → ${dateString} → ${date.toLocaleDateString()}`);
+        console.log(`?? Frontend display: ${data.iptv_expiration} ? ${dateString} ? ${date.toLocaleDateString()}`);
     } else {
         expirationElement.textContent = 'None';
     }
@@ -1179,7 +1070,7 @@ if (expirationElement) {
 // Update M3U URL - Enhanced with multiple field checks and better data source detection
 const m3uUrl = data.iptv_m3u_url || data.m3u_url || data.m3u_plus_url;
 
-console.log('🔗 Checking for M3U URL in data...', {
+console.log('?? Checking for M3U URL in data...', {
     iptv_m3u_url: data.iptv_m3u_url,
     m3u_url: data.m3u_url, 
     m3u_plus_url: data.m3u_plus_url,
@@ -1187,7 +1078,7 @@ console.log('🔗 Checking for M3U URL in data...', {
 });
 
 if (m3uUrl) {
-    console.log('🔗 Found M3U URL:', m3uUrl);
+    console.log('?? Found M3U URL:', m3uUrl);
     
     // Try multiple possible M3U field IDs
     const m3uFields = ['iptvM3UUrl', 'iptv_m3u_url', 'm3uUrl', 'iptvM3ULink'];
@@ -1197,52 +1088,46 @@ if (m3uUrl) {
         const m3uElement = document.getElementById(fieldId);
         if (m3uElement) {
             m3uElement.value = m3uUrl;
-            console.log(`✅ Set M3U field ${fieldId}`);
+            console.log(`? Set M3U field ${fieldId}`);
             fieldSet = true;
             break;
         }
     }
     
     if (!fieldSet) {
-        console.warn('⚠️ No M3U URL field found to populate');
+        console.warn('?? No M3U URL field found to populate');
     }
     
     // Show M3U section if it exists
     const m3uSection = document.getElementById('iptvM3USection');
     if (m3uSection) {
         m3uSection.style.display = 'block';
-        console.log('✅ Showed M3U section');
+        console.log('? Showed M3U section');
     } else {
-        console.warn('⚠️ M3U section element not found');
+        console.warn('?? M3U section element not found');
     }
 } else {
-    console.log('⚠️ No M3U URL found in data - available fields:', Object.keys(data).filter(key => key.toLowerCase().includes('m3u')));
+    console.log('?? No M3U URL found in data - available fields:', Object.keys(data).filter(key => key.toLowerCase().includes('m3u')));
     const m3uSection = document.getElementById('iptvM3USection');
     if (m3uSection) {
         m3uSection.style.display = 'none';
     }
 }
     
-// Update Status Indicator - FIXED VERSION
-const statusDot = document.getElementById('iptvStatusDot');
-const statusText = document.getElementById('iptvStatusText');
-const trialIndicator = document.getElementById('iptvTrialIndicator');
-
-if (statusDot && statusText) {
-    if (data.enabled === false) {
-        statusDot.style.background = '#f44336';
-        statusText.textContent = 'Disabled';
-    } else if (data.iptv_line_id || data.line_id) {
-        if (data.iptv_expiration && data.iptv_expiration !== 'FREE') {
-            // FIXED: Use same timezone-safe logic as the Days Left calculation
-            const expirationDateStr = data.iptv_expiration.split('T')[0]; // Get just YYYY-MM-DD
-            const today = new Date();
+    // Update Status Indicator
+    const statusDot = document.getElementById('iptvStatusDot');
+    const statusText = document.getElementById('iptvStatusText');
+    const trialIndicator = document.getElementById('iptvTrialIndicator');
+    
+    if (statusDot && statusText) {
+        if (data.enabled === false) {
+            statusDot.style.background = '#f44336';
+            statusText.textContent = 'Disabled';
+        } else if (data.iptv_line_id || data.line_id) {
+            const now = new Date();
+            const expiration = data.iptv_expiration ? new Date(data.iptv_expiration) : null;
             
-            // Create dates at midnight local time to avoid timezone issues
-            const expiration = new Date(expirationDateStr + 'T00:00:00');
-            const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-            
-            if (expiration < todayMidnight) {
+            if (expiration && expiration < now) {
                 statusDot.style.background = '#f44336';
                 statusText.textContent = 'Expired';
             } else {
@@ -1250,14 +1135,10 @@ if (statusDot && statusText) {
                 statusText.textContent = 'Active';
             }
         } else {
-            statusDot.style.background = '#4caf50';
-            statusText.textContent = 'Active';
+            statusDot.style.background = '#f44336';
+            statusText.textContent = 'Inactive';
         }
-    } else {
-        statusDot.style.background = '#f44336';
-        statusText.textContent = 'Inactive';
     }
-}
     
     // Show/hide trial indicator
     if (trialIndicator) {
@@ -1273,7 +1154,7 @@ if (statusDot && statusText) {
  * Populate form fields after successful subscription creation
  */
 populateFormFieldsAfterCreation(data) {
-    console.log('📝 Populating form fields after subscription creation:', data);
+    console.log('?? Populating form fields after subscription creation:', data);
     
     // Update username fields - try multiple possible field IDs
     if (data.username || data.iptv_username) {
@@ -1288,7 +1169,7 @@ populateFormFieldsAfterCreation(data) {
             const field = document.getElementById(fieldId);
             if (field) {
                 field.value = username;
-                console.log(`✅ Set username field ${fieldId}: ${username}`);
+                console.log(`? Set username field ${fieldId}: ${username}`);
             }
         }
     }
@@ -1306,7 +1187,7 @@ populateFormFieldsAfterCreation(data) {
             const field = document.getElementById(fieldId);
             if (field) {
                 field.value = password;
-                console.log(`✅ Set password field ${fieldId}: ${password}`);
+                console.log(`? Set password field ${fieldId}: ${password}`);
             }
         }
     }
@@ -1319,7 +1200,7 @@ populateFormFieldsAfterCreation(data) {
             const field = document.getElementById(fieldId);
             if (field) {
                 field.value = m3uUrl;
-                console.log(`✅ Set M3U URL field ${fieldId}`);
+                console.log(`? Set M3U URL field ${fieldId}`);
                 break;
             }
         }
@@ -1330,14 +1211,14 @@ populateFormFieldsAfterCreation(data) {
  * Populate basic user info fields with IPTV data - NEW METHOD
  */
 populateBasicUserFields(userData) {
-    console.log('📋 Populating basic user fields with IPTV data:', userData);
+    console.log('?? Populating basic user fields with IPTV data:', userData);
     
     // Populate IPTV username in basic info section
     if (userData.iptv_username) {
         const iptvUsernameField = document.getElementById('iptvUsername');
         if (iptvUsernameField) {
             iptvUsernameField.value = userData.iptv_username;
-            console.log('✅ Set basic IPTV username field');
+            console.log('? Set basic IPTV username field');
         }
     }
     
@@ -1346,7 +1227,7 @@ populateBasicUserFields(userData) {
         const iptvPasswordField = document.getElementById('iptvPassword');
         if (iptvPasswordField) {
             iptvPasswordField.value = userData.iptv_password;
-            console.log('✅ Set basic IPTV password field');
+            console.log('? Set basic IPTV password field');
         }
     }
     
@@ -1355,7 +1236,7 @@ populateBasicUserFields(userData) {
         const implayerField = document.getElementById('implayerCode');
         if (implayerField) {
             implayerField.value = userData.implayer_code;
-            console.log('✅ Set iMPlayer code field');
+            console.log('? Set iMPlayer code field');
         }
     }
     
@@ -1364,7 +1245,7 @@ populateBasicUserFields(userData) {
         const deviceCountField = document.getElementById('deviceCount');
         if (deviceCountField) {
             deviceCountField.value = userData.device_count;
-            console.log('✅ Set device count field');
+            console.log('? Set device count field');
         }
     }
 },
@@ -1377,11 +1258,11 @@ async loadCurrentUserIPTVStatus() {
         const userId = this.getCurrentUserId();
         
         if (!userId) {
-            console.warn('⚠️ No user ID found for IPTV status loading');
+            console.warn('?? No user ID found for IPTV status loading');
             return;
         }
         
-        console.log('📊 Loading IPTV status for user:', userId);
+        console.log('?? Loading IPTV status for user:', userId);
         
         const response = await fetch(`/api/iptv/user/${userId}`);
         const result = await response.json();
@@ -1400,7 +1281,7 @@ async loadCurrentUserIPTVStatus() {
                     const field = document.getElementById(fieldId);
                     if (field) {
                         field.value = result.user.iptv_username;
-                        console.log(`✅ Set username field ${fieldId}: ${result.user.iptv_username}`);
+                        console.log(`? Set username field ${fieldId}: ${result.user.iptv_username}`);
                     }
                 }
             }
@@ -1411,12 +1292,12 @@ async loadCurrentUserIPTVStatus() {
             // Try multiple sources for password
             if (result.user.iptv_password) {
                 passwordValue = result.user.iptv_password;
-                console.log('🔑 Found password in user.iptv_password:', passwordValue);
+                console.log('?? Found password in user.iptv_password:', passwordValue);
             } else if (result.user.panel_data && result.user.panel_data.password) {
                 passwordValue = result.user.panel_data.password;
-                console.log('🔑 Found password in user.panel_data.password:', passwordValue);
+                console.log('?? Found password in user.panel_data.password:', passwordValue);
             } else {
-                console.log('🔑 No password found in user data');
+                console.log('?? No password found in user data');
             }
 
             if (passwordValue) {
@@ -1429,11 +1310,11 @@ async loadCurrentUserIPTVStatus() {
                     const field = document.getElementById(fieldId);
                     if (field) {
                         field.value = passwordValue;
-                        console.log(`✅ Set password field ${fieldId}: ${passwordValue}`);
+                        console.log(`? Set password field ${fieldId}: ${passwordValue}`);
                     }
                 }
             } else {
-                console.warn('⚠️ No password value found to populate');
+                console.warn('?? No password value found to populate');
             }
 
 // Update IPTV Expiration field in subscription section - FIXED: NO CONVERSION  
@@ -1455,19 +1336,19 @@ if (result.user.iptv_expiration) {
         }
     }
     
-    console.log(`📅 Using IPTV expiration as-is (no conversion): ${result.user.iptv_expiration} → ${dateValue}`);
+    console.log(`?? Using IPTV expiration as-is (no conversion): ${result.user.iptv_expiration} ? ${dateValue}`);
     
     if (dateValue) {
         for (const fieldId of iptvExpirationFields) {
             const field = document.getElementById(fieldId);
             if (field) {
                 field.value = dateValue;
-                console.log(`✅ Set IPTV expiration field ${fieldId}: ${dateValue}`);
+                console.log(`? Set IPTV expiration field ${fieldId}: ${dateValue}`);
             }
         }
     }
 } else {
-    console.log('📅 No IPTV expiration date found to populate');
+    console.log('?? No IPTV expiration date found to populate');
 }
             
             // Update interface state
@@ -1486,7 +1367,7 @@ if (result.user.iptv_expiration) {
             }
             
         } else {
-            console.log('📋 No existing IPTV data for user');
+            console.log('?? No existing IPTV data for user');
             this.updateIPTVStatus({
                 line_id: null, max_connections: 0, current_connections: 0,
                 days_until_expiration: null, expiration_date: null,
@@ -1501,7 +1382,7 @@ if (result.user.iptv_expiration) {
         }
         
     } catch (error) {
-        console.error('❌ Failed to load user IPTV status:', error);
+        console.error('? Failed to load user IPTV status:', error);
     }
 },
 
@@ -1513,7 +1394,7 @@ if (result.user.iptv_expiration) {
     const button = document.querySelector('button[onclick*="IPTV.syncCredits"]');
     
     if (!button) {
-      console.error('❌ Sync credits button not found');
+      console.error('? Sync credits button not found');
       return;
     }
     
@@ -1522,7 +1403,7 @@ if (result.user.iptv_expiration) {
     button.disabled = true;
     
     try {
-      console.log('💳 Syncing credit balance from panel...');
+      console.log('?? Syncing credit balance from panel...');
       
       // Use the same API endpoint as settings page
       const response = await fetch('/api/iptv/sync-credits', { method: 'POST' });
@@ -1543,15 +1424,15 @@ if (result.user.iptv_expiration) {
         } else if (window.showNotification) {
           window.showNotification(`Credit balance synced: ${credits} credits`, 'success');
         } else {
-          console.log(`✅ Credit balance synced: ${credits} credits`);
+          console.log(`? Credit balance synced: ${credits} credits`);
         }
         
-        console.log(`✅ Credit balance synced successfully: ${credits} credits`);
+        console.log(`? Credit balance synced successfully: ${credits} credits`);
       } else {
         throw new Error(data.message || 'Sync failed');
       }
     } catch (error) {
-      console.error('❌ Failed to sync credits:', error);
+      console.error('? Failed to sync credits:', error);
       
       // Show error notification
       if (window.Utils && window.Utils.showNotification) {
@@ -1591,22 +1472,22 @@ if (result.user.iptv_expiration) {
         lineId = lineIdElement ? lineIdElement.textContent.trim() : null;
       }
 
-      console.log('🗑️ Using line ID for deletion:', lineId);
+      console.log('??? Using line ID for deletion:', lineId);
 
       if (!lineId || lineId === 'None' || lineId === '') {
         throw new Error('No active IPTV subscription found to delete.');
       }
       
-      console.log(`🗑️ Attempting to delete subscription for user ${userId}, line ${lineId}`);
+      console.log(`??? Attempting to delete subscription for user ${userId}, line ${lineId}`);
       
       // Show confirmation dialog
-      const confirmMessage = `⚠️ WARNING: This will permanently delete the IPTV subscription!\n\n` +
+      const confirmMessage = `?? WARNING: This will permanently delete the IPTV subscription!\n\n` +
                             `Line ID: ${lineId}\n` +
                             `This action cannot be undone.\n\n` +
                             `Are you sure you want to proceed?`;
       
       if (!confirm(confirmMessage)) {
-        console.log('❌ User cancelled deletion');
+        console.log('? User cancelled deletion');
         return;
       }
       
@@ -1617,7 +1498,7 @@ if (result.user.iptv_expiration) {
         deleteBtn.disabled = true;
       }
       
-      console.log(`📤 Sending delete request for line ${lineId}`);
+      console.log(`?? Sending delete request for line ${lineId}`);
       
       // Make delete request to the panel + database endpoint
       const response = await fetch(`/api/iptv/subscription/${lineId}?userId=${userId}`, {
@@ -1634,10 +1515,10 @@ if (result.user.iptv_expiration) {
       }
       
       if (result.success) {
-        console.log('✅ Subscription deleted successfully:', result);
+        console.log('? Subscription deleted successfully:', result);
         
         // Show success message
-        const successMessage = `✅ Subscription deleted successfully!\n\n` +
+        const successMessage = `? Subscription deleted successfully!\n\n` +
                               `Line ${lineId} has been removed from the panel` +
                               (result.databaseCleared ? ' and database.' : '.');
         
@@ -1661,16 +1542,16 @@ if (result.user.iptv_expiration) {
         // Reset form state
         this.resetIPTVForm();
         
-        console.log('🔄 Status interface updated after deletion');
+        console.log('?? Status interface updated after deletion');
         
       } else {
         throw new Error(result.message || 'Delete request failed');
       }
       
     } catch (error) {
-      console.error('❌ Failed to delete IPTV subscription:', error);
+      console.error('? Failed to delete IPTV subscription:', error);
       
-      let errorMessage = '❌ Failed to delete IPTV subscription\n\n';
+      let errorMessage = '? Failed to delete IPTV subscription\n\n';
       if (error.message.includes('No active IPTV subscription')) {
         errorMessage += 'No active subscription found to delete.';
       } else if (error.message.includes('No user selected')) {
@@ -1746,7 +1627,7 @@ if (result.user.iptv_expiration) {
       }
       
     } catch (error) {
-      console.error('❌ Connection test failed:', error);
+      console.error('? Connection test failed:', error);
       if (window.Utils && window.Utils.showNotification) {
         window.Utils.showNotification('Connection test failed', 'error');
       } else if (window.showNotification) {
@@ -1787,7 +1668,7 @@ if (result.user.iptv_expiration) {
       }
       
     } catch (error) {
-      console.error('❌ Failed to sync user status:', error);
+      console.error('? Failed to sync user status:', error);
       if (window.Utils && window.Utils.showNotification) {
         window.Utils.showNotification(`Failed to sync user status: ${error.message}`, 'error');
       } else if (window.showNotification) {
@@ -1839,7 +1720,7 @@ if (result.user.iptv_expiration) {
         throw new Error(data.message);
       }
     } catch (error) {
-      console.error('❌ Failed to get user activity:', error);
+      console.error('? Failed to get user activity:', error);
       return [];
     }
   },
@@ -1856,7 +1737,7 @@ if (result.user.iptv_expiration) {
       const field = document.getElementById(fieldId);
       if (field && field.value) {
         userId = field.value;
-        console.log(`📋 Found user ID from field ${fieldId}:`, userId);
+        console.log(`?? Found user ID from field ${fieldId}:`, userId);
         break;
       }
     }
@@ -1866,20 +1747,20 @@ if (result.user.iptv_expiration) {
       const urlParams = new URLSearchParams(window.location.search);
       userId = urlParams.get('id');
       if (userId) {
-        console.log('📋 Found user ID from URL:', userId);
+        console.log('?? Found user ID from URL:', userId);
       }
     }
     
     // Method 3: IPTV module state
     if (!userId && this.currentUser) {
       userId = this.currentUser;
-      console.log('📋 Found user ID from IPTV.currentUser:', userId);
+      console.log('?? Found user ID from IPTV.currentUser:', userId);
     }
     
     // Method 4: App state
     if (!userId && window.AppState && window.AppState.editingUserId) {
       userId = window.AppState.editingUserId;
-      console.log('📋 Found user ID from AppState:', userId);
+      console.log('?? Found user ID from AppState:', userId);
     }
     
     // Method 5: Try to extract from current page context
@@ -1891,7 +1772,7 @@ if (result.user.iptv_expiration) {
         const idIndex = pathParts.indexOf('edit');
         if (idIndex !== -1 && pathParts[idIndex + 1]) {
           userId = pathParts[idIndex + 1];
-          console.log('📋 Found user ID from URL path:', userId);
+          console.log('?? Found user ID from URL path:', userId);
         }
       }
     }
@@ -1899,9 +1780,9 @@ if (result.user.iptv_expiration) {
     if (userId) {
       // Store for future use
       this.currentUser = userId;
-      console.log('✅ Using user ID:', userId);
+      console.log('? Using user ID:', userId);
     } else {
-      console.warn('⚠️ No user ID found using any method');
+      console.warn('?? No user ID found using any method');
     }
     
     return userId;
@@ -1914,27 +1795,27 @@ updateStatusInterface() {
     const statusDisplay = document.getElementById('iptvStatusDisplay');
     const checkExistingInterface = document.getElementById('checkExistingInterface');
     
-    console.log('🔄 Updating status interface, userHasExistingIPTVData:', this.userHasExistingIPTVData);
+    console.log('?? Updating status interface, userHasExistingIPTVData:', this.userHasExistingIPTVData);
     
     if (this.userHasExistingIPTVData) {
         // User has IPTV data - show normal status display
         if (statusDisplay) {
             statusDisplay.style.display = 'block';
-            console.log('✅ Showing IPTV status display');
+            console.log('? Showing IPTV status display');
         }
         if (checkExistingInterface) {
             checkExistingInterface.style.display = 'none';
-            console.log('✅ Hiding check existing interface');
+            console.log('? Hiding check existing interface');
         }
     } else {
         // User has no IPTV data - show check existing interface
         if (statusDisplay) {
             statusDisplay.style.display = 'none';
-            console.log('✅ Hiding IPTV status display');
+            console.log('? Hiding IPTV status display');
         }
         if (checkExistingInterface) {
             checkExistingInterface.style.display = 'block';
-            console.log('✅ Showing check existing interface');
+            console.log('? Showing check existing interface');
             this.initializeCheckExistingInterface();
         }
     }
@@ -1991,7 +1872,7 @@ updateStatusInterface() {
     usernameInput.disabled = true;
     
     try {
-      console.log(`🔍 Checking for existing IPTV access: ${username}`);
+      console.log(`?? Checking for existing IPTV access: ${username}`);
       
       // Get current user ID
       const userId = this.getCurrentUserId();
@@ -2025,7 +1906,7 @@ updateStatusInterface() {
       this.showAccessCheckSuccess(result.iptv_data);
       
     } catch (error) {
-      console.error('❌ Error checking existing access:', error);
+      console.error('? Error checking existing access:', error);
       this.showAccessCheckError(error.message);
     } finally {
       // Restore button state
@@ -2130,17 +2011,17 @@ showAccessCheckSuccess(iptvData) {
 
 linkExistingAccount() {
   try {
-    console.log('🔗 Linking existing IPTV account...');
+    console.log('?? Linking existing IPTV account...');
     
     if (!this.foundIPTVData) {
-      console.error('❌ No IPTV data found to link');
+      console.error('? No IPTV data found to link');
       return;
     }
     
     // Get current user ID
     const userId = this.getCurrentUserId();
     if (!userId) {
-      console.error('❌ No user ID found');
+      console.error('? No user ID found');
       return;
     }
     
@@ -2155,13 +2036,13 @@ linkExistingAccount() {
     this.saveLinkedAccount(userId, this.foundIPTVData);
     
   } catch (error) {
-    console.error('❌ Error in linkExistingAccount:', error);
+    console.error('? Error in linkExistingAccount:', error);
   }
 },
 
 async saveLinkedAccount(userId, iptvData) {
   try {
-    console.log('💾 Saving linked IPTV account to database...');
+    console.log('?? Saving linked IPTV account to database...');
     
     const response = await fetch('/api/iptv/link-existing-user', {
       method: 'POST',
@@ -2180,7 +2061,7 @@ async saveLinkedAccount(userId, iptvData) {
       throw new Error(result.message || 'Failed to save linked account');
     }
     
-    console.log('✅ Account linked and saved successfully');
+    console.log('? Account linked and saved successfully');
     
     // Update interface state
     this.userHasExistingIPTVData = true;
@@ -2221,10 +2102,10 @@ async saveLinkedAccount(userId, iptvData) {
       } else if (window.showNotification && typeof window.showNotification === 'function') {
         window.showNotification('IPTV account linked successfully!', 'success');
       } else {
-        console.log('✅ IPTV account linked successfully!');
+        console.log('? IPTV account linked successfully!');
       }
     } catch (notificationError) {
-      console.warn('⚠️ Could not show notification:', notificationError);
+      console.warn('?? Could not show notification:', notificationError);
       // Don't fail the whole operation for notification issues
     }
     
@@ -2233,12 +2114,12 @@ async saveLinkedAccount(userId, iptvData) {
       try {
         this.loadCurrentUserIPTVStatus();
       } catch (statusError) {
-        console.warn('⚠️ Could not refresh IPTV status:', statusError);
+        console.warn('?? Could not refresh IPTV status:', statusError);
       }
     }, 1000);
     
   } catch (error) {
-    console.error('❌ Error saving linked account:', error);
+    console.error('? Error saving linked account:', error);
     
     // Reset interface state
     this.userHasExistingIPTVData = false;
@@ -2257,11 +2138,11 @@ async saveLinkedAccount(userId, iptvData) {
       } else if (window.showNotification && typeof window.showNotification === 'function') {
         window.showNotification(`Failed to save linked account: ${error.message}`, 'error');
       } else {
-        console.error('❌ Failed to save linked account:', error.message);
+        console.error('? Failed to save linked account:', error.message);
         alert(`Failed to save linked account: ${error.message}`);
       }
     } catch (notificationError) {
-      console.warn('⚠️ Could not show error notification:', notificationError);
+      console.warn('?? Could not show error notification:', notificationError);
       // Fallback to alert
       alert(`Failed to save linked account: ${error.message}`);
     }
@@ -2274,7 +2155,7 @@ async saveLinkedAccount(userId, iptvData) {
    * Show channel group creation form (Fixed for settings page)
    */
   showChannelGroupForm() {
-    console.log('📋 Opening channel group form...');
+    console.log('?? Opening channel group form...');
     
     // Show the form that's already in the settings page instead of creating a modal
     const form = document.getElementById('channelGroupForm');
@@ -2295,7 +2176,7 @@ async saveLinkedAccount(userId, iptvData) {
       // Scroll to form
       form.scrollIntoView({ behavior: 'smooth' });
     } else {
-      console.error('❌ Channel group form not found in settings page');
+      console.error('? Channel group form not found in settings page');
       if (window.Utils && window.Utils.showNotification) {
         window.Utils.showNotification('Channel group form not found', 'error');
       } else if (window.showNotification) {
@@ -2319,7 +2200,7 @@ async saveLinkedAccount(userId, iptvData) {
    */
   async loadBouquetsForSelection() {
     try {
-      console.log('📺 Loading bouquets for selection...');
+      console.log('?? Loading bouquets for selection...');
       
       const response = await fetch('/api/iptv/bouquets');
       if (!response.ok) {
@@ -2329,11 +2210,11 @@ async saveLinkedAccount(userId, iptvData) {
       const data = await response.json();
       const bouquets = data.bouquets || data; // Handle both response formats
       
-      console.log(`✅ Loaded bouquets for selection:`, bouquets);
+      console.log(`? Loaded bouquets for selection:`, bouquets);
       
       const container = document.getElementById('bouquetSelectionContainer');
       if (!container) {
-        console.error('❌ Bouquet selection container not found');
+        console.error('? Bouquet selection container not found');
         return;
       }
       
@@ -2377,7 +2258,7 @@ async saveLinkedAccount(userId, iptvData) {
       });
       
     } catch (error) {
-      console.error('❌ Failed to load bouquets for selection:', error);
+      console.error('? Failed to load bouquets for selection:', error);
       const container = document.getElementById('bouquetSelectionContainer');
       if (container) {
         container.innerHTML = '<div style="text-align: center; color: #f44336; padding: 20px;">Failed to load bouquets</div>';
@@ -2472,7 +2353,7 @@ async saveLinkedAccount(userId, iptvData) {
         return;
       }
       
-      console.log(`💾 ${isEditing ? 'Updating' : 'Creating'} channel group:`, { 
+      console.log(`?? ${isEditing ? 'Updating' : 'Creating'} channel group:`, { 
         name, 
         description, 
         bouquet_count: bouquetIds.length,
@@ -2500,7 +2381,7 @@ async saveLinkedAccount(userId, iptvData) {
       }
       
       const result = await response.json();
-      console.log(`✅ Channel group ${isEditing ? 'updated' : 'created'}:`, result);
+      console.log(`? Channel group ${isEditing ? 'updated' : 'created'}:`, result);
       
       if (window.Utils && window.Utils.showNotification) {
         window.Utils.showNotification(`Channel group "${name}" ${isEditing ? 'updated' : 'created'} with ${bouquetIds.length} bouquets!`, 'success');
@@ -2522,7 +2403,7 @@ async saveLinkedAccount(userId, iptvData) {
       }
       
     } catch (error) {
-      console.error(`❌ Failed to ${editingId ? 'update' : 'create'} channel group:`, error);
+      console.error(`? Failed to ${editingId ? 'update' : 'create'} channel group:`, error);
       if (window.Utils && window.Utils.showNotification) {
         window.Utils.showNotification(`Failed to ${editingId ? 'update' : 'create'} channel group: ${error.message}`, 'error');
       } else if (window.showNotification) {
@@ -2559,7 +2440,7 @@ async saveLinkedAccount(userId, iptvData) {
       }
       
     } catch (error) {
-      console.error('❌ Failed to load default group settings:', error);
+      console.error('? Failed to load default group settings:', error);
     }
   },
 
@@ -2590,7 +2471,7 @@ async saveLinkedAccount(userId, iptvData) {
         await this.loadDefaultGroupSettings();
       }
     } catch (error) {
-      console.error('❌ Failed to populate default group dropdowns:', error);
+      console.error('? Failed to populate default group dropdowns:', error);
     }
   },
 
@@ -2599,7 +2480,7 @@ async saveLinkedAccount(userId, iptvData) {
    */
   async initChannelGroupsSection() {
     try {
-      console.log('📋 Initializing channel groups section...');
+      console.log('?? Initializing channel groups section...');
       
       // Load channel groups
       await this.loadChannelGroups();
@@ -2607,169 +2488,10 @@ async saveLinkedAccount(userId, iptvData) {
       // Populate default group dropdowns
       await this.populateDefaultGroupDropdowns();
       
-      console.log('✅ Channel groups section initialized');
+      console.log('? Channel groups section initialized');
       
     } catch (error) {
-      console.error('❌ Failed to initialize channel groups section:', error);
-    }
-  },
-  
-  /**
-   * Test IPTV Editor automation workflow - NEW METHOD
-   */
-     /**
-   * Test IPTV Editor automation workflow - NEW METHOD
-   */
-     /**
-   * Test IPTV Editor automation workflow - NEW METHOD
-   */
-     /**
-   * Test IPTV Editor automation workflow - NEW METHOD
-   */
-  async testIPTVEditorAutomation(userId) {
-    try {
-        console.log(`🧪 Testing IPTV Editor automation for user ${userId}...`);
-        
-        const requestData = {
-            user_id: parseInt(userId)
-        };
-        
-        console.log('📤 Sending test automation request:', requestData);
-        
-        // Make API request to test endpoint
-        const response = await fetch('/api/iptv/test-iptv-editor-automation', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(requestData)
-        });
-        
-        const result = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(result.message || `HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        if (!result.success) {
-            throw new Error(result.message || 'Test automation failed');
-        }
-        
-        console.log('✅ IPTV Editor automation test completed:', result);
-        
-        // Show detailed results
-        const userData = result.data.user_info;
-        const editorResults = result.data.iptv_editor_results;
-        
-        let statusMessage = `🧪 Test Results for ${userData.name} (${userData.iptv_username}):\n\n`;
-        
-        if (editorResults.iptv_editor_success) {
-            if (editorResults.iptv_editor_created) {
-                statusMessage += '✅ IPTV Editor user created successfully!\n';
-                statusMessage += `📝 IPTV Editor ID: ${editorResults.iptv_editor_data.iptv_editor_id}\n`;
-                if (editorResults.iptv_editor_data.m3u_url) {
-                    statusMessage += `🔗 M3U URL: ${editorResults.iptv_editor_data.m3u_url}\n`;
-                }
-                if (editorResults.iptv_editor_data.epg_url) {
-                    statusMessage += `📺 EPG URL: ${editorResults.iptv_editor_data.epg_url}\n`;
-                }
-            } else if (editorResults.iptv_editor_synced) {
-                statusMessage += '✅ IPTV Editor user found and synced successfully!\n';
-                statusMessage += `📝 IPTV Editor ID: ${editorResults.iptv_editor_data.iptv_editor_id}\n`;
-            }
-            
-            if (editorResults.iptv_editor_data.sync_status === 'synced') {
-                statusMessage += '🔄 Sync Status: Successfully synced\n';
-            }
-        } else {
-            statusMessage += '❌ IPTV Editor automation failed\n';
-            if (editorResults.iptv_editor_data?.error) {
-                statusMessage += `Error: ${editorResults.iptv_editor_data.error}\n`;
-            }
-        }
-        
-        statusMessage += `\n⏰ Test completed at: ${new Date().toLocaleString()}`;
-        
-        // Show notification
-if (window.Utils && window.Utils.showNotification) {
-  window.Utils.showNotification(statusMessage, editorResults.iptv_editor_success ? 'success' : 'error');
-} else {
-  alert(statusMessage);
-}
-        
-// Update UI if successful - Complete comprehensive reload
-if (editorResults.iptv_editor_success) {
-  console.log('🔄 Starting comprehensive user data reload after IPTV Editor success...');
-  
-  // Comprehensive reload function (from your working console command)
-  setTimeout(async () => {
-    const userId = this.getCurrentUserId();
-    console.log('🔄 Reloading all user data for:', userId);
-    
-    try {
-      // Reload IPTV status
-      await this.loadCurrentUserIPTVStatus();
-      
-      // Reload IPTV Editor status
-      const response = await fetch(`/api/iptv-editor/user/${userId}/status`);
-      const data = await response.json();
-      if (data.success && data.iptvUser) {
-        // Try to call IPTV Editor display function
-        if (typeof loadIPTVEditorStatus === 'function') {
-          loadIPTVEditorStatus(userId);
-        } else if (typeof displayIPTVEditorStatus === 'function') {
-          displayIPTVEditorStatus(data.iptvUser);
-        } else {
-          console.log('✅ IPTV Editor data loaded:', data.iptvUser);
-        }
-      }
-      
-      // Full user reload as backup
-      if (typeof loadAndPopulateUser === 'function') {
-        loadAndPopulateUser(userId);
-      }
-      
-      console.log('✅ Complete comprehensive reload finished');
-    } catch (error) {
-      console.error('❌ Comprehensive reload failed:', error);
-    }
-  }, 1000); // 1 second delay to allow API to complete
-}
-        
-        return result;
-        
-    } catch (error) {
-        console.error('❌ IPTV Editor automation test failed:', error);
-        
-        this.showNotification(
-            `❌ Test failed: ${error.message}`,
-            'error'
-        );
-        
-        throw error;
-    }
-  },
-
-  /**
-   * Event handler for test button - NEW METHOD
-   */
-  async handleTestIPTVEditorAutomation() {
-    try {
-        const userId = this.getCurrentUserId();
-        
-        if (!userId) {
-            if (window.Utils && window.Utils.showNotification) {
-  window.Utils.showNotification('Please select a user first', 'warning');
-} else {
-  alert('Please select a user first');
-}
-            return;
-        }
-        
-        await this.testIPTVEditorAutomation(userId);
-        
-    } catch (error) {
-        console.error('Test button error:', error);
+      console.error('? Failed to initialize channel groups section:', error);
     }
   }
 };
@@ -2785,7 +2507,7 @@ window.handleTrialUserChange = function() {
   if (window.IPTV && typeof window.IPTV.handleTrialUserChange === 'function') {
     return window.IPTV.handleTrialUserChange();
   } else {
-    console.error('❌ IPTV.handleTrialUserChange not available');
+    console.error('? IPTV.handleTrialUserChange not available');
   }
 };
 
@@ -2794,7 +2516,7 @@ window.syncIPTVCredits = function() {
   if (window.IPTV && typeof window.IPTV.syncCredits === 'function') {
     return window.IPTV.syncCredits();
   } else {
-    console.error('❌ IPTV.syncCredits not available');
+    console.error('? IPTV.syncCredits not available');
     alert('IPTV module not loaded properly. Please refresh the page.');
   }
 };
@@ -2806,7 +2528,7 @@ const UserFormIPTV = {
    */
   async loadCreditBalance() {
     try {
-      console.log('💳 Loading credit balance from database...');
+      console.log('?? Loading credit balance from database...');
       
       // Load settings from database (same as settings page)
       const response = await fetch('/api/settings');
@@ -2826,7 +2548,7 @@ const UserFormIPTV = {
             window.IPTV.creditBalance = parseInt(creditSetting.setting_value) || 0;
           }
           
-          console.log(`💳 Loaded credits from DB: ${creditSetting.setting_value}`);
+          console.log(`?? Loaded credits from DB: ${creditSetting.setting_value}`);
         } else {
           // Default to 0 if not found
           const creditElement = document.getElementById('currentCreditBalance');
@@ -2837,7 +2559,7 @@ const UserFormIPTV = {
       }
       
     } catch (error) {
-      console.error('❌ Failed to load credit balance from database:', error);
+      console.error('? Failed to load credit balance from database:', error);
       
       // Set default values if loading fails
       const creditElement = document.getElementById('currentCreditBalance');
@@ -2903,8 +2625,8 @@ $(document).ready(() => {
   }
 });
 
-console.log('📺 IPTV user module loaded cleanly');
-console.log('🔍 Available IPTV functions:', Object.keys(window.IPTV).filter(k => typeof window.IPTV[k] === 'function'));
+console.log('?? IPTV user module loaded cleanly');
+console.log('?? Available IPTV functions:', Object.keys(window.IPTV).filter(k => typeof window.IPTV[k] === 'function'));
 
 // Initialize form when page loads
 document.addEventListener('DOMContentLoaded', function() {

@@ -172,32 +172,6 @@
     </div>
 </div>
 
-<!-- IPTV EDITOR ACCESS CHECK -->
-<div class="iptv-access-check-simple" style="background: rgba(142, 36, 170, 0.1); border: 1px solid #8e24aa; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
-    <h6 style="color: #8e24aa; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-        <i class="fas fa-search"></i>
-        Check IPTV Editor Access
-    </h6>
-    <div style="display: flex; gap: 10px; align-items: center;">
-        <input type="text" 
-               id="existingIptvEditorUsername" 
-               placeholder="Enter IPTV username to check in Editor"
-               style="flex: 1; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #8e24aa; border-radius: 4px;"
-               maxlength="50">
-        <button type="button" 
-                id="checkEditorAccessBtn" 
-                class="btn"
-                style="background: linear-gradient(45deg, #8e24aa, #ab47bc); color: #fff; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold;"
-                onclick="checkIPTVEditorAccess()">
-            <i class="fas fa-search"></i> Check
-        </button>
-    </div>
-    <!-- Results area -->
-    <div id="editorAccessCheckResults" class="access-results" style="display: none; margin-top: 15px;">
-        <!-- Results will be populated here -->
-    </div>
-</div>
-
 <!-- Current IPTV Status Display -->
 <div class="iptv-status-container">
   <div id="iptvStatusDisplay" class="current-status-display">
@@ -242,49 +216,6 @@
                 </button>
             </div>
         </div>
-		
-		<!-- IPTV Editor Status Indicator - ADD THIS -->
-<div id="iptvEditorStatusSection" style="margin-top: 15px; padding: 10px; background: rgba(79, 195, 247, 0.1); border: 1px solid #4fc3f7; border-radius: 4px; display: none;">
-    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-        <div id="iptvEditorStatusDot" style="width: 12px; height: 12px; border-radius: 50%; background: #4fc3f7;"></div>
-        <span style="color: #4fc3f7; font-weight: bold;">IPTV Editor Account Active</span>
-        <button type="button" id="syncIptvEditorBtn" onclick="handleIPTVEditorSync()" 
-        style="background: #4fc3f7; color: #000; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.8rem;">
-    Sync
-</button>
-    </div>
-    <div id="iptvEditorDetails" style="font-size: 0.85rem; color: #ccc;">
-        <div>Username: <span id="iptvEditorUsername">-</span></div>
-        <div>Last Sync: <span id="iptvEditorLastSync">-</span></div>
-        <div>Status: <span id="iptvEditorSyncStatus">-</span></div>
-    </div>
-</div>
-
-<!-- IPTV Editor M3U Plus URL Section - ADD THIS -->
-<div id="iptvEditorM3USection" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #4fc3f7; display: none;">
-    <label style="color: #4fc3f7; font-size: 0.9rem; display: block; margin-bottom: 8px;">IPTV Editor M3U Plus URL:</label>
-    <div style="display: flex; gap: 10px; align-items: center;">
-        <input type="text" id="iptvEditorM3UUrl" readonly 
-               style="flex: 1; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px; font-size: 0.85rem;">
-        <button type="button" id="copyEditorM3UBtn" onclick="copyEditorM3UUrl()" 
-                style="background: linear-gradient(45deg, #4fc3f7, #29b6f6); color: #000; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">
-            Copy
-        </button>
-    </div>
-</div>
-
-<!-- Cleanup button for orphaned IPTV Editor accounts -->
-<div id="iptvEditorCleanupSection" style="margin-top: 10px; display: none;">
-    <div style="padding: 10px; background: rgba(255, 193, 7, 0.1); border: 1px solid #ffc107; border-radius: 5px;">
-        <p style="margin: 0 0 10px 0; color: #856404;">
-            <i class="fas fa-exclamation-triangle"></i> 
-            Orphaned IPTV Editor account detected. No regular IPTV subscription found.
-        </p>
-        <button type="button" id="cleanupIPTVEditorBtn" class="btn btn-warning btn-small" onclick="cleanupIPTVEditor(document.getElementById('userId').value)">
-            <i class="fas fa-broom"></i> Cleanup IPTV Editor Account
-        </button>
-    </div>
-</div>
 		
 		<!-- Delete Button Row (Bottom Right) -->
 <div style="display: flex; justify-content: flex-end; margin-top: 15px; padding-top: 10px; border-top: 1px solid #333;">
@@ -419,8 +350,8 @@
         </button>
     </div>
 </div>
-
         </div>
+
         <div class="form-group">
             <label>Subscription Information:</label>
             <div class="form-grid">
