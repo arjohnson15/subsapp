@@ -1210,20 +1210,26 @@ if (m3uUrl) {
     }
 }
     
-    // Update Status Indicator
-    const statusDot = document.getElementById('iptvStatusDot');
-    const statusText = document.getElementById('iptvStatusText');
-    const trialIndicator = document.getElementById('iptvTrialIndicator');
-    
-    if (statusDot && statusText) {
-        if (data.enabled === false) {
-            statusDot.style.background = '#f44336';
-            statusText.textContent = 'Disabled';
-        } else if (data.iptv_line_id || data.line_id) {
-            const now = new Date();
-            const expiration = data.iptv_expiration ? new Date(data.iptv_expiration) : null;
+// Update Status Indicator - FIXED VERSION
+const statusDot = document.getElementById('iptvStatusDot');
+const statusText = document.getElementById('iptvStatusText');
+const trialIndicator = document.getElementById('iptvTrialIndicator');
+
+if (statusDot && statusText) {
+    if (data.enabled === false) {
+        statusDot.style.background = '#f44336';
+        statusText.textContent = 'Disabled';
+    } else if (data.iptv_line_id || data.line_id) {
+        if (data.iptv_expiration && data.iptv_expiration !== 'FREE') {
+            // FIXED: Use same timezone-safe logic as the Days Left calculation
+            const expirationDateStr = data.iptv_expiration.split('T')[0]; // Get just YYYY-MM-DD
+            const today = new Date();
             
-            if (expiration && expiration < now) {
+            // Create dates at midnight local time to avoid timezone issues
+            const expiration = new Date(expirationDateStr + 'T00:00:00');
+            const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            
+            if (expiration < todayMidnight) {
                 statusDot.style.background = '#f44336';
                 statusText.textContent = 'Expired';
             } else {
@@ -1231,10 +1237,14 @@ if (m3uUrl) {
                 statusText.textContent = 'Active';
             }
         } else {
-            statusDot.style.background = '#f44336';
-            statusText.textContent = 'Inactive';
+            statusDot.style.background = '#4caf50';
+            statusText.textContent = 'Active';
         }
+    } else {
+        statusDot.style.background = '#f44336';
+        statusText.textContent = 'Inactive';
     }
+}
     
     // Show/hide trial indicator
     if (trialIndicator) {
