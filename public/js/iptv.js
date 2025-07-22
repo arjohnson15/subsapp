@@ -898,100 +898,100 @@ if (result.data) {
     
     // CRITICAL FIX: Populate form fields with retrieved data
     this.populateFormFieldsAfterCreation(result.data);
-	
-// IPTV EDITOR SUCCESS HANDLING - Show notifications only
-if (result.data.iptv_editor_success || result.data.iptv_editor_created || result.data.iptv_editor_synced) {
-    console.log('🎯 IPTV Editor integration completed:', result.data.iptv_editor_data);
     
-    // Show IPTV Editor success notification
-    let editorMessage = '';
-    if (result.data.iptv_editor_created) {
-        editorMessage = '✅ IPTV Editor user created successfully!';
-    } else if (result.data.iptv_editor_synced) {
-        editorMessage = '✅ IPTV Editor user found and synced successfully!';
-    }
-    
-    if (editorMessage) {
-        if (window.Utils && window.Utils.showNotification) {
-            setTimeout(() => {
-                window.Utils.showNotification(editorMessage, 'success');
-            }, 1500);
+    // IPTV EDITOR SUCCESS HANDLING - Show notifications only
+    if (result.data.iptv_editor_success || result.data.iptv_editor_created || result.data.iptv_editor_synced) {
+        console.log('🎯 IPTV Editor integration completed:', result.data.iptv_editor_data);
+        
+        // Show IPTV Editor success notification
+        let editorMessage = '';
+        if (result.data.iptv_editor_created) {
+            editorMessage = '✅ IPTV Editor user created successfully!';
+        } else if (result.data.iptv_editor_synced) {
+            editorMessage = '✅ IPTV Editor user found and synced successfully!';
         }
-        console.log('🎯 ' + editorMessage);
-        console.log('🎯 IPTV Editor Data:', result.data.iptv_editor_data);
+        
+        if (editorMessage) {
+            if (window.Utils && window.Utils.showNotification) {
+                setTimeout(() => {
+                    window.Utils.showNotification(editorMessage, 'success');
+                }, 1500);
+            }
+            console.log('🎯 ' + editorMessage);
+            console.log('🎯 IPTV Editor Data:', result.data.iptv_editor_data);
+        }
     }
-}
 
 // ALWAYS USE YOUR EXACT WORKING CONSOLE COMMAND after ANY successful subscription
-console.log('🔄 Starting comprehensive user data reload after subscription success...');
-setTimeout(async () => {
-    const userId = this.getCurrentUserId();
+setTimeout(async function() {
+    const userId = window.IPTV.getCurrentUserId();
     console.log('🔄 Reloading all user data for:', userId);
     try {
-        // STEP 1: Reload basic IPTV status first
-        console.log('🔄 Step 1: Loading current user IPTV status...');
-        await this.loadCurrentUserIPTVStatus();
+        // Step 1: Reload IPTV status
+        console.log('📊 Step 1: Loading current user IPTV status...');
+        await window.IPTV.loadCurrentUserIPTVStatus();
+        console.log('✅ Step 1 completed');
         
-        // STEP 2: Try to load IPTV Editor status with retry logic
-        console.log('🔄 Step 2: Loading IPTV Editor status...');
-        let retryCount = 0;
-        const maxRetries = 3;
-        let iptvEditorLoaded = false;
+        // Step 2: Try IPTV Editor status with retries (since it might need time after creation)
+        console.log('📊 Step 2: Fetching IPTV Editor status with retries...');
+        let iptvEditorFound = false;
+        const maxEditorRetries = 5;
         
-        while (retryCount < maxRetries && !iptvEditorLoaded) {
+        for (let attempt = 1; attempt <= maxEditorRetries; attempt++) {
+            console.log(`📊 Step 2.${attempt}: IPTV Editor fetch attempt ${attempt}/${maxEditorRetries}...`);
+            
             try {
                 const response = await fetch(`/api/iptv-editor/user/${userId}/status`);
                 const data = await response.json();
-                console.log(`📊 IPTV Editor status response (attempt ${retryCount + 1}):`, data);
+                console.log(`📊 Step 2.${attempt}b: IPTV Editor status:`, data);
                 
                 if (data.success && data.iptvUser) {
-                    console.log('✅ IPTV Editor data found, calling display functions...');
+                    console.log('📊 IPTV Editor data found! Calling display functions...');
                     
                     if (typeof loadIPTVEditorStatus === 'function') {
                         loadIPTVEditorStatus(userId);
-                        iptvEditorLoaded = true;
                     } else if (typeof displayIPTVEditorStatus === 'function') {
                         displayIPTVEditorStatus(data.iptvUser);
-                        iptvEditorLoaded = true;
                     } else {
-                        console.log('⚠️ No IPTV Editor display functions found');
+                        console.log('✅ IPTV Editor data loaded:', data.iptvUser);
                     }
+                    
+                    iptvEditorFound = true;
                     break;
                 } else {
-                    console.log(`⚠️ IPTV Editor data not ready (attempt ${retryCount + 1})`);
+                    console.log(`📊 Step 2.${attempt}c: IPTV Editor data not ready yet...`);
+                    if (attempt < maxEditorRetries) {
+                        console.log(`⏳ Waiting 3 seconds before retry ${attempt + 1}...`);
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+                    }
                 }
             } catch (editorError) {
-                console.error(`❌ IPTV Editor load error (attempt ${retryCount + 1}):`, editorError);
-            }
-            
-            retryCount++;
-            if (retryCount < maxRetries) {
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                console.error(`❌ IPTV Editor fetch attempt ${attempt} failed:`, editorError);
+                if (attempt < maxEditorRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                }
             }
         }
         
-        // STEP 3: Full user reload
-        console.log('🔄 Step 3: Full user reload...');
+        if (!iptvEditorFound) {
+            console.log('⚠️ IPTV Editor data not found after all retries');
+        }
+        
+        // Step 3: Full user reload
+        console.log('📊 Step 3: Calling full user reload...');
         if (typeof loadAndPopulateUser === 'function') {
             loadAndPopulateUser(userId);
         }
         
-        // STEP 4: Force another IPTV status refresh (this is key!)
-        console.log('🔄 Step 4: Final IPTV status refresh...');
-        setTimeout(async () => {
-            try {
-                await this.loadCurrentUserIPTVStatus();
-                console.log('✅ Final IPTV status refresh completed');
-            } catch (finalError) {
-                console.error('❌ Final refresh failed:', finalError);
-            }
-        }, 1000);
+        // Step 4: Final IPTV status refresh (your working method)
+        console.log('📊 Step 4: Final IPTV status refresh...');
+        await window.IPTV.loadCurrentUserIPTVStatus();
         
-        console.log('✅ Complete comprehensive reload finished');
+        console.log('✅ Complete reload finished');
     } catch (error) {
-        console.error('❌ Comprehensive reload failed:', error);
+        console.error('❌ Reload failed:', error);
     }
-}, 2000);
+}, 3000); // Increased to 3 seconds initial delay
     
     // Update interface state
     this.userHasExistingIPTVData = true;
@@ -1019,29 +1019,6 @@ setTimeout(async () => {
     } else {
         alert(successMessage);
     }
-    
-// Refresh user status to ensure everything is current
-setTimeout(() => {
-    this.loadCurrentUserIPTVStatus();
-    
-    // *** ALSO LOAD IPTV EDITOR STATUS ***
-    setTimeout(() => {
-        console.log('🔄 Refreshing IPTV Editor status...');
-        fetch(`/api/iptv-editor/user/${userId}/status`)
-            .then(r => r.json())
-            .then(data => {
-                console.log('📊 IPTV Editor status loaded:', data);
-                if (data.success && data.iptvUser) {
-                    if (typeof loadIPTVEditorStatus === 'function') {
-                        loadIPTVEditorStatus(userId);
-                    } else if (typeof displayIPTVEditorStatus === 'function') {
-                        displayIPTVEditorStatus(data.iptvUser);
-                    }
-                }
-            })
-            .catch(err => console.log('⚠️ IPTV Editor status load failed:', err));
-    }, 500);
-}, 1000);
     
 } else {
     // Show success without enhanced data

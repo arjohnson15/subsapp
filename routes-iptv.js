@@ -20,8 +20,8 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 async function forceSyncWithRetry(syncData, operation, user_id) {
-    const MAX_RETRIES = 2; // Try up to 3 times total (1 initial + 2 retries)
-    const RETRY_DELAY = 3000; // 3 seconds between retries
+    const MAX_RETRIES = 5; 
+    const RETRY_DELAY = 5000; // 3 seconds between retries
     
     for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
         try {
