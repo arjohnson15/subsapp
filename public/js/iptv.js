@@ -899,7 +899,7 @@ if (result.data) {
     // CRITICAL FIX: Populate form fields with retrieved data
     this.populateFormFieldsAfterCreation(result.data);
 	
-	// IPTV EDITOR SUCCESS HANDLING - ADD THIS SECTION
+// IPTV EDITOR SUCCESS HANDLING - USE YOUR WORKING CONSOLE COMMAND
 if (result.data.iptv_editor_success || result.data.iptv_editor_created || result.data.iptv_editor_synced) {
     console.log('🎯 IPTV Editor integration completed:', result.data.iptv_editor_data);
     
@@ -924,32 +924,35 @@ if (result.data.iptv_editor_success || result.data.iptv_editor_created || result
         console.log('🎯 IPTV Editor Data:', result.data.iptv_editor_data);
     }
     
-    // Force reload the user data to show IPTV Editor section
-    if (this.currentUser) {
-// *** FIXED: Refresh user status with proper delay but NO page reload ***
-setTimeout(() => {
-    console.log('🔄 Refreshing IPTV status...');
-    this.loadCurrentUserIPTVStatus();
-    
-    // *** ALSO LOAD IPTV EDITOR STATUS ***
-    setTimeout(() => {
-        console.log('🔄 Refreshing IPTV Editor status...');
-        fetch(`/api/iptv-editor/user/${userId}/status`)
-            .then(r => r.json())
-            .then(data => {
-                console.log('📊 IPTV Editor status loaded:', data);
-                if (data.success && data.iptvUser) {
-                    if (typeof loadIPTVEditorStatus === 'function') {
-                        loadIPTVEditorStatus(userId);
-                    } else if (typeof displayIPTVEditorStatus === 'function') {
-                        displayIPTVEditorStatus(data.iptvUser);
-                    }
+    // *** USE YOUR EXACT WORKING CONSOLE COMMAND ***
+    setTimeout(async () => {
+        const userId = window.IPTV.getCurrentUserId();
+        console.log('🔄 Reloading all user data for:', userId);
+        try {
+            // Reload IPTV status
+            await window.IPTV.loadCurrentUserIPTVStatus();
+            // Reload IPTV Editor status
+            const response = await fetch(`/api/iptv-editor/user/${userId}/status`);
+            const data = await response.json();
+            if (data.success && data.iptvUser) {
+                // Try to call IPTV Editor display function
+                if (typeof loadIPTVEditorStatus === 'function') {
+                    loadIPTVEditorStatus(userId);
+                } else if (typeof displayIPTVEditorStatus === 'function') {
+                    displayIPTVEditorStatus(data.iptvUser);
+                } else {
+                    console.log('✅ IPTV Editor data loaded:', data.iptvUser);
                 }
-            })
-            .catch(err => console.log('⚠️ IPTV Editor status load failed:', err));
-    }, 500); // Load IPTV Editor status 500ms after main status
-}, 2000); // Give time for notifications to show
-    }
+            }
+            // Full user reload as backup
+            if (typeof loadAndPopulateUser === 'function') {
+                loadAndPopulateUser(userId);
+            }
+            console.log('✅ Complete reload finished');
+        } catch (error) {
+            console.error('❌ Reload failed:', error);
+        }
+    }, 1000); // 1 second delay to allow API to complete
 }
     
     // Update interface state
@@ -1091,34 +1094,49 @@ updateIPTVStatus(data) {
         connectionsElement.textContent = max > 0 ? `${current}/${max}` : '0/0';
     }
     
-    // Calculate and Update Days Until Expiration
-    const daysLeftElement = document.getElementById('iptvDaysLeft');
-    if (daysLeftElement) {
-        if (data.iptv_expiration) {
-            const now = new Date();
-            const expiration = new Date(data.iptv_expiration);
-            
-            // Calculate days difference
-            const timeDiff = expiration.getTime() - now.getTime();
-            const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-            
-            if (daysDiff > 0) {
-                daysLeftElement.textContent = `${daysDiff} days`;
-                daysLeftElement.style.color = daysDiff > 7 ? '#4caf50' : '#ff9800';
-            } else if (daysDiff === 0) {
-                daysLeftElement.textContent = 'Expires today';
-                daysLeftElement.style.color = '#ff9800';
-            } else {
-                daysLeftElement.textContent = 'Expired';
-                daysLeftElement.style.color = '#f44336';
-            }
-            
-            console.log(`📅 Calculated days until expiration: ${daysDiff}`);
+// Calculate and Update Days Until Expiration - FIXED VERSION
+const daysLeftElement = document.getElementById('iptvDaysLeft');
+if (daysLeftElement) {
+    if (data.iptv_expiration) {
+        // FIXED: Proper timezone-safe date calculation
+        const expirationDateStr = data.iptv_expiration.split('T')[0]; // Get just YYYY-MM-DD
+        const today = new Date();
+        
+        // Create dates at midnight local time to avoid timezone issues
+        const expiration = new Date(expirationDateStr + 'T00:00:00');
+        const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        
+        // Calculate days difference
+        const timeDiff = expiration.getTime() - todayMidnight.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        
+        console.log('📅 Days calculation debug:', {
+            expirationInput: data.iptv_expiration,
+            expirationDateStr: expirationDateStr,
+            expirationParsed: expiration,
+            todayMidnight: todayMidnight,
+            timeDiff: timeDiff,
+            daysDiff: daysDiff
+        });
+        
+        if (daysDiff > 1) {
+            daysLeftElement.textContent = `${daysDiff} days`;
+            daysLeftElement.style.color = daysDiff > 7 ? '#4CAF50' : (daysDiff > 3 ? '#FF9800' : '#F44336');
+        } else if (daysDiff === 1) {
+            daysLeftElement.textContent = 'Tomorrow';
+            daysLeftElement.style.color = '#F44336';
+        } else if (daysDiff === 0) {
+            daysLeftElement.textContent = 'Expires today';
+            daysLeftElement.style.color = '#F44336';
         } else {
-            daysLeftElement.textContent = 'None';
-            daysLeftElement.style.color = '#fff';
+            daysLeftElement.textContent = 'Expired';
+            daysLeftElement.style.color = '#F44336';
         }
+    } else {
+        daysLeftElement.textContent = 'N/A';
+        daysLeftElement.style.color = '#666';
     }
+}
     
 const expirationElement = document.getElementById('iptvExpiration');
 if (expirationElement) {
