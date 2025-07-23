@@ -1641,26 +1641,33 @@ router.use((error, req, res, next) => {
     });
 });
 
-// POST /api/auto-updater/run-auto-updater - Manual playlist sync
-router.post('/run-auto-updater', async (req, res) => {
+// Auto-updater endpoint - Manual playlist sync
+router.post('/auto-updater/run', async (req, res) => {
     try {
-        console.log('🔄 Starting auto-updater playlist sync...');
+        console.log('🔄 Starting manual auto-updater...');
         
-        await iptvEditorService.initialize();
+        // Check if all required settings are configured
         const settings = await iptvEditorService.getAllSettings();
+        const requiredSettings = [
+            'bearer_token', 
+            'default_playlist_id',
+            'provider_base_url',
+            'provider_username', 
+            'provider_password'
+        ];
         
-        const required = ['bearer_token', 'default_playlist_id', 'provider_base_url', 'provider_username', 'provider_password'];
-        const missing = required.filter(key => !settings[key] || settings[key].trim() === '');
+        const missingSettings = requiredSettings.filter(setting => !settings[setting]);
         
-        if (missing.length > 0) {
+        if (missingSettings.length > 0) {
             return res.status(400).json({
                 success: false,
-                message: `Missing required settings: ${missing.join(', ')}. Please configure IPTV Editor settings first.`
+                message: `Missing required settings: ${missingSettings.join(', ')}. Please configure IPTV Editor settings first.`
             });
         }
         
         console.log('✅ All required settings found, proceeding with sync...');
         
+        // Run the auto-updater
         const result = await iptvEditorService.runAutoUpdater();
         
         res.json({

@@ -1047,6 +1047,156 @@ async testConnection() {
             throw error;
         }
     }
+	
+	// =============================================================================
+    // AUTO-UPDATER METHODS - ADD THESE BEFORE module.exports
+    // =============================================================================
+    
+    // Method to run the complete auto-updater process
+    async runAutoUpdater() {
+        const startTime = Date.now();
+        
+        try {
+            console.log('🚀 Starting auto-updater process...');
+            
+            // Get settings
+            const settings = await this.getAllSettings();
+            const baseUrl = settings.provider_base_url;
+            const username = settings.provider_username;
+            const password = settings.provider_password;
+            
+            // Validate required settings
+            if (!baseUrl || !username || !password) {
+                throw new Error('Missing required provider settings. Please configure provider URL, username, and password.');
+            }
+            
+            if (!settings.bearer_token || !settings.default_playlist_id) {
+                throw new Error('Missing required IPTV Editor settings. Please configure bearer token and default playlist.');
+            }
+            
+            // Phase 1: Collect all provider data (8 API calls)
+            console.log('📥 Phase 1: Collecting provider data...');
+            const datasets = await this.collectProviderData(baseUrl, username, password);
+            
+            // Phase 2: Submit to IPTV Editor auto-updater
+            console.log('📤 Phase 2: Submitting to IPTV Editor...');
+            const response = await this.submitToAutoUpdater(baseUrl, datasets);
+            
+            // Phase 3: Log success and update settings
+            const duration = Date.now() - startTime;
+            await this.logSync('playlist_sync', null, 'success', 
+                { playlist: settings.default_playlist_id }, response.data, null, duration);
+                
+            // Update last sync time
+            await this.setSetting('last_auto_updater_run', new Date().toISOString());
+            
+            console.log(`✅ Auto-updater completed in ${Math.round(duration/1000)}s`);
+            
+            return {
+                ...response.data,
+                duration: `${Math.round(duration/1000)} seconds`
+            };
+            
+        } catch (error) {
+            const duration = Date.now() - startTime;
+            await this.logSync('playlist_sync', null, 'error', 
+                { playlist: settings.default_playlist_id || 'unknown' }, null, error.message, duration);
+            throw error;
+        }
+    }
+
+    // Helper method to collect all provider data
+    async collectProviderData(baseUrl, username, password) {
+        console.log('🔍 Collecting provider data from 8 endpoints...');
+        
+        const endpoints = [
+            `player_api.php?username=${username}&password=${password}`,                                    // Basic info
+            `player_api.php?username=${username}&password=${password}&action=get_live_streams`,           // Live streams
+            `player_api.php?username=${username}&password=${password}&action=get_live_categories`,        // Live categories
+            `player_api.php?username=${username}&password=${password}&action=get_vod_streams`,            // VOD streams
+            `player_api.php?username=${username}&password=${password}&action=get_vod_categories`,         // VOD categories
+            `player_api.php?username=${username}&password=${password}&action=get_series`,                 // Series
+            `player_api.php?username=${username}&password=${password}&action=get_series_categories`,      // Series categories
+            `get.php?username=${username}&password=${password}&type=m3u_plus&output=ts`                   // M3U playlist
+        ];
+        
+        const datasets = [];
+        
+        for (let i = 0; i < endpoints.length; i++) {
+            const url = `${baseUrl.replace(/\/$/, '')}/${endpoints[i]}`;
+            console.log(`📡 Fetching ${i + 1}/8: ${endpoints[i].split('?')[0]}`);
+            
+            try {
+                const response = await axios.get(url, {
+                    timeout: 60000, // 60 second timeout per request
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    }
+                });
+                
+                // For M3U endpoint, we get text, for others we get JSON
+                const data = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+                datasets.push(data);
+                
+                console.log(`✅ Fetched ${i + 1}/8 successfully (${data.length} chars)`);
+                
+            } catch (error) {
+                console.error(`❌ Failed to fetch ${i + 1}/8:`, error.message);
+                throw new Error(`Failed to fetch data from provider endpoint ${i + 1}: ${error.message}`);
+            }
+            
+            // Small delay between requests to be nice to the provider
+            if (i < endpoints.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+        
+        console.log('✅ All provider data collected successfully');
+        return datasets;
+    }
+
+    // Helper method to submit data to IPTV Editor auto-updater
+    async submitToAutoUpdater(baseUrl, datasets) {
+        console.log('🚀 Submitting to IPTV Editor auto-updater...');
+        
+        // Create FormData object
+        const FormData = require('form-data');
+        const formData = new FormData();
+        
+        formData.append('url', baseUrl);
+        formData.append('info', datasets[0]);                  // Basic info
+        formData.append('get_live_streams', datasets[1]);      // Live streams
+        formData.append('get_live_categories', datasets[2]);   // Live categories  
+        formData.append('get_vod_streams', datasets[3]);       // VOD streams
+        formData.append('get_vod_categories', datasets[4]);    // VOD categories
+        formData.append('get_series', datasets[5]);            // Series
+        formData.append('get_series_categories', datasets[6]); // Series categories
+        formData.append('m3u', datasets[7]);                   // M3U playlist
+        
+        try {
+            const response = await axios.post('https://editor.iptveditor.com/api/auto-updater/run-auto-updater', formData, {
+                headers: {
+                    ...formData.getHeaders(),
+                    'Authorization': `Bearer ${this.bearerToken}`,
+                    'Origin': 'https://cloud.iptveditor.com'
+                },
+                timeout: 600000 // 10 minutes timeout - this is a long operation
+            });
+            
+            console.log('✅ Auto-updater submission completed');
+            return { data: response.data };
+            
+        } catch (error) {
+            console.error('❌ Auto-updater submission failed:', error);
+            throw new Error(`IPTV Editor API error: ${error.response?.status} ${error.response?.statusText || error.message}`);
+        }
+    }
+
+    // Helper method to set a setting
+    async setSetting(key, value, type = 'string') {
+        const IPTVEditorSettings = require('./iptv-editor-settings');
+        await IPTVEditorSettings.set(key, value, type);
+    }
 }
 
 // Export singleton instance
