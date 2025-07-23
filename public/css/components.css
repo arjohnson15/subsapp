@@ -3027,3 +3027,40 @@ table tbody td:last-child .btn-small:nth-child(4) {
         padding: 6px;
     }
 }
+
+/* Auto-updater specific styling */
+.provider-settings-group,
+.auto-updater-settings-group {
+    border-top: 1px solid #4fc3f7;
+    padding-top: 20px;
+    margin-top: 20px;
+}
+
+.provider-settings-group h4,
+.auto-updater-settings-group h4 {
+    color: #4fc3f7;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+}
+
+.provider-settings-group input[readonly] {
+    background-color: rgba(255,255,255,0.1) !important;
+    cursor: not-allowed;
+    color: #ccc;
+}
+
+#updatePlaylistBtn {
+    background: linear-gradient(45deg, #8e24aa, #ba68c8);
+    border: none;
+    padding: 12px 20px;
+    margin-bottom: 10px;
+}
+
+#updatePlaylistBtn:hover {
+    background: linear-gradient(45deg, #7b1fa2, #ab47bc);
+}
+
+#updatePlaylistBtn:disabled {
+    background: #666;
+    cursor: not-allowed;
+}

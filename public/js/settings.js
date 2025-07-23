@@ -2094,92 +2094,211 @@ async saveDefaultGroups() {
 },
 
 // =============================================================================
-// IPTV EDITOR SETTINGS MANAGEMENT - SIMPLIFIED AND FIXED
+// FIXES AND ADDITIONS NEEDED FOR YOUR EXISTING IPTV EDITOR SECTION
 // =============================================================================
 
-// Save IPTV Editor Bearer Token
-async saveIPTVEditorToken(token) {
+// 1. FIX: Update the handleUpdatePlaylistNow function (REPLACE YOUR EXISTING ONE)
+async handleUpdatePlaylistNow() {
     try {
-        const response = await fetch('/api/iptv-editor/settings', {
+        const updateBtn = document.getElementById('updatePlaylistBtn');
+        const originalText = updateBtn.innerHTML;
+        
+        updateBtn.disabled = true;
+        updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating... <small style="display: block;">This may take several minutes</small>';
+        
+        console.log('🚀 Starting manual playlist update...');
+        Utils.showNotification('Starting playlist update - this may take several minutes...', 'info');
+        
+        // FIXED: Use the correct endpoint path
+        const response = await fetch('/api/iptv-editor/auto-updater/run', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                bearer_token: token
-            })
+            headers: { 'Content-Type': 'application/json' }
         });
         
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            Utils.showNotification(`Playlist updated successfully! Duration: ${result.duration}`, 'success');
+            
+            // Show stats if available
+            if (result.stats) {
+                const statsMsg = `Updated: ${result.stats.channels_updated || 0} channels, Added: ${result.stats.channels_added || 0} channels`;
+                Utils.showNotification(statsMsg, 'info');
+            }
+            
+            // Update last run display
+            await this.updateLastRunDisplay();
+            
+            console.log('✅ Manual update completed:', result);
+        } else {
+            throw new Error(result.message || 'Update failed');
         }
+    } catch (error) {
+        console.error('❌ Manual update failed:', error);
+        Utils.showNotification(`Update failed: ${error.message}`, 'error');
+    } finally {
+        const updateBtn = document.getElementById('updatePlaylistBtn');
+        updateBtn.disabled = false;
+        updateBtn.innerHTML = 'Update Playlist Now <small style="display: block; font-weight: normal;">Force sync playlist content with IPTV panel (this may take several minutes)</small>';
+    }
+},
+
+// 2. ADD: New function to load provider settings from database
+async loadProviderSettings() {
+    try {
+        const response = await fetch('/api/iptv-editor/settings');
+        const result = await response.json();
+        
+        if (result.success && result.settings) {
+            // Populate provider fields from saved settings
+            const providerBaseUrl = document.getElementById('providerBaseUrl');
+            const providerUsername = document.getElementById('providerUsername'); 
+            const providerPassword = document.getElementById('providerPassword');
+            
+            if (providerBaseUrl) providerBaseUrl.value = result.settings.provider_base_url || '';
+            if (providerUsername) providerUsername.value = result.settings.provider_username || '';
+            if (providerPassword) providerPassword.value = result.settings.provider_password || '';
+            
+            // Set auto-updater settings if they exist
+            const scheduleSelect = document.getElementById('autoUpdaterSchedule');
+            if (scheduleSelect && result.settings.auto_updater_schedule_hours) {
+                scheduleSelect.value = result.settings.auto_updater_schedule_hours;
+            }
+            
+            const enabledCheckbox = document.getElementById('autoUpdaterEnabled');
+            if (enabledCheckbox && result.settings.auto_updater_enabled !== undefined) {
+                enabledCheckbox.checked = result.settings.auto_updater_enabled === 'true' || result.settings.auto_updater_enabled === true;
+            }
+            
+            // Update last run display
+            await this.updateLastRunDisplay();
+            
+            console.log('✅ Provider settings loaded from database');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error loading provider settings:', error);
+    }
+},
+
+// 3. ADD: New function to update last run display
+async updateLastRunDisplay() {
+    try {
+        const response = await fetch('/api/iptv-editor/settings');
+        const result = await response.json();
+        
+        const lastUpdateDisplay = document.getElementById('lastUpdateDisplay');
+        if (lastUpdateDisplay && result.success && result.settings) {
+            const lastRun = result.settings.last_auto_updater_run;
+            if (lastRun) {
+                const date = new Date(lastRun);
+                lastUpdateDisplay.textContent = date.toLocaleString();
+            } else {
+                lastUpdateDisplay.textContent = 'Never';
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error updating last run display:', error);
+    }
+},
+
+// 4. ADD: New function to save auto-updater settings
+async saveAutoUpdaterSettings() {
+    try {
+        const scheduleSelect = document.getElementById('autoUpdaterSchedule');
+        const enabledCheckbox = document.getElementById('autoUpdaterEnabled');
+        
+        const settings = {};
+        
+        if (scheduleSelect) {
+            settings.auto_updater_schedule_hours = scheduleSelect.value;
+        }
+        
+        if (enabledCheckbox) {
+            settings.auto_updater_enabled = enabledCheckbox.checked;
+        }
+        
+        const response = await fetch('/api/iptv-editor/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
         
         const result = await response.json();
         if (!result.success) {
-            throw new Error(result.message);
+            throw new Error(result.message || 'Failed to save auto-updater settings');
         }
         
-        return true;
+        console.log('✅ Auto-updater settings saved');
         
     } catch (error) {
-        console.error('❌ Failed to save IPTV Editor token:', error);
+        console.error('❌ Failed to save auto-updater settings:', error);
         throw error;
     }
 },
 
-// Sync IPTV Editor Playlists
-async syncIPTVEditorPlaylists() {
-    const syncButton = document.querySelector('[onclick="syncIPTVEditorPlaylists()"]');
-    const playlistSelect = document.getElementById('iptvPlaylistSelect');
-    
+// 5. UPDATE: Enhanced onPlaylistChange function (REPLACE YOUR EXISTING ONE)
+async onPlaylistChange(playlistId) {
     try {
-        if (syncButton) {
-            syncButton.disabled = true;
-            syncButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+        const providerBaseUrl = document.getElementById('providerBaseUrl');
+        const providerUsername = document.getElementById('providerUsername'); 
+        const providerPassword = document.getElementById('providerPassword');
+        
+        if (!playlistId) {
+            // Clear provider fields if no playlist selected
+            if (providerBaseUrl) providerBaseUrl.value = '';
+            if (providerUsername) providerUsername.value = '';
+            if (providerPassword) providerPassword.value = '';
+            
+            await this.saveProviderSettings({
+                provider_base_url: '',
+                provider_username: '',
+                provider_password: ''
+            });
+            return;
         }
+
+        console.log('🔄 Playlist changed, extracting provider settings...');
         
-        // First test connection
-        const connectionOk = await Settings.testIPTVEditorConnection();
-        if (!connectionOk) {
-            throw new Error('Connection test failed - cannot sync playlists');
-        }
-        
-        // Sync playlists (this will store them in database)
-        const response = await fetch('/api/iptv-editor/sync-playlists', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
+        const response = await fetch('/api/iptv-editor/playlists');
         const result = await response.json();
-        console.log('🔍 Sync result:', result);
         
-        if (result.success) {
-            Utils.showNotification(`Synced ${result.count} playlists successfully`, 'success');
+        if (result.success && result.data) {
+            const selectedPlaylist = result.data.find(p => p.playlist_id === playlistId);
             
-            // Reload the dropdown with newly stored playlists
-            await Settings.loadStoredPlaylists();
-            
+            if (selectedPlaylist && selectedPlaylist.patterns && selectedPlaylist.patterns[0]) {
+                const pattern = selectedPlaylist.patterns[0];
+                
+                console.log('✅ Found provider settings:', pattern);
+                
+                // Auto-populate provider fields
+                if (providerBaseUrl) providerBaseUrl.value = pattern.url || '';
+                if (providerUsername) providerUsername.value = pattern.param1 || '';
+                if (providerPassword) providerPassword.value = pattern.param2 || '';
+                
+                await this.saveProviderSettings({
+                    provider_base_url: pattern.url,
+                    provider_username: pattern.param1,
+                    provider_password: pattern.param2
+                });
+                
+                Utils.showNotification('Provider settings extracted and saved automatically', 'success');
+                console.log('✅ Provider settings auto-populated and saved');
+            } else {
+                console.warn('⚠️ No provider patterns found in selected playlist');
+                Utils.showNotification('Selected playlist has no provider information', 'warning');
+            }
         } else {
-            throw new Error(result.message || 'Sync failed');
+            console.error('❌ Failed to load playlist data:', result.message);
+            Utils.showNotification('Failed to load playlist data', 'error');
         }
-        
     } catch (error) {
-        console.error('❌ Failed to sync IPTV Editor playlists:', error);
-        Utils.showNotification(`Failed to sync playlists: ${error.message}`, 'error');
-        
-    } finally {
-        if (syncButton) {
-            syncButton.disabled = false;
-            syncButton.innerHTML = '<i class="fas fa-sync"></i> Sync Playlists';
-        }
+        console.error('❌ Failed to extract provider settings:', error);
+        Utils.showNotification('Failed to extract provider settings', 'error');
     }
 },
 
-
-
-// Load IPTV Editor Settings
+// 6. UPDATE: Enhanced loadIPTVEditorSettings function (REPLACE YOUR EXISTING ONE)
 async loadIPTVEditorSettings() {
     console.log('🎬 Loading IPTV Editor settings...');
     try {
@@ -2210,9 +2329,13 @@ async loadIPTVEditorSettings() {
             if (playlistSelect && settings.default_playlist_id) {
                 playlistSelect.value = settings.default_playlist_id;
                 console.log('✅ Set default playlist');
+                
+                // Trigger playlist change to load provider settings
+                await this.onPlaylistChange(settings.default_playlist_id);
             }
             
-            // REMOVED: sync_enabled checkbox handling
+            // NEW: Load provider settings and auto-updater settings
+            await this.loadProviderSettings();
             
             console.log('✅ IPTV Editor settings loaded successfully');
             return true;
@@ -2235,7 +2358,50 @@ async loadIPTVEditorSettings() {
     }
 },
 
-// Load stored playlists into dropdown - NEW FUNCTION
+// 7. UPDATE: Enhanced saveIPTVEditorSettings function (REPLACE YOUR EXISTING ONE)
+async saveIPTVEditorSettings() {
+    try {
+        const bearerToken = document.getElementById('iptvBearerToken').value;
+        const playlistSelect = document.getElementById('iptvPlaylistSelect');
+        const defaultPlaylistId = playlistSelect ? playlistSelect.value : '';
+        const defaultPlaylistName = playlistSelect && playlistSelect.selectedOptions[0] ? 
+                                   playlistSelect.selectedOptions[0].textContent : '';
+        
+        const settings = {
+            bearer_token: bearerToken,
+            default_playlist_id: defaultPlaylistId,
+            default_playlist_name: defaultPlaylistName
+        };
+        
+        const response = await fetch('/api/iptv-editor/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(settings)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Also save auto-updater settings if they exist
+            try {
+                await this.saveAutoUpdaterSettings();
+            } catch (autoUpdaterError) {
+                console.warn('⚠️ Could not save auto-updater settings:', autoUpdaterError);
+            }
+            
+            Utils.showNotification('IPTV Editor settings saved successfully', 'success');
+        } else {
+            throw new Error(result.message || 'Save failed');
+        }
+        
+    } catch (error) {
+        console.error('❌ Failed to save IPTV Editor settings:', error);
+        Utils.showNotification(`Failed to save settings: ${error.message}`, 'error');
+    }
+},
+
 async loadStoredPlaylists() {
     try {
         const response = await fetch('/api/iptv-editor/playlists');
@@ -2254,7 +2420,7 @@ async loadStoredPlaylists() {
             result.data.forEach(playlist => {
                 const option = document.createElement('option');
                 option.value = playlist.playlist_id;
-                option.textContent = `${playlist.name} (${playlist.customer_count} users)`;
+                option.textContent = `${playlist.name} (${playlist.customer_count || playlist.customerCount || 0} users)`;
                 playlistSelect.appendChild(option);
             });
             
@@ -2272,74 +2438,35 @@ async loadStoredPlaylists() {
         
     } catch (error) {
         console.error('❌ Failed to load stored playlists:', error);
+        
+        // Show error in dropdown
+        const playlistSelect = document.getElementById('iptvPlaylistSelect');
+        if (playlistSelect) {
+            playlistSelect.innerHTML = '<option value="">Error loading playlists</option>';
+        }
     }
 },
 
-// Save IPTV Editor Settings (called by main save button)
-async saveIPTVEditorSettings() {
+// ADD THIS FUNCTION (around line 1250):
+async saveProviderSettings(settings) {
     try {
-        const bearerToken = document.getElementById('iptvBearerToken').value;
-        const playlistSelect = document.getElementById('iptvPlaylistSelect');
-        const defaultPlaylistId = playlistSelect ? playlistSelect.value : '';
-        const defaultPlaylistName = playlistSelect && playlistSelect.selectedOptions[0] ? 
-                                   playlistSelect.selectedOptions[0].textContent : '';
-        
-        // REMOVED: syncEnabled checkbox handling
-        
-        const settings = {
-            bearer_token: bearerToken,
-            default_playlist_id: defaultPlaylistId,
-            default_playlist_name: defaultPlaylistName
-            // REMOVED: sync_enabled
-        };
-        
         const response = await fetch('/api/iptv-editor/settings', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settings)
         });
         
         const result = await response.json();
-        
-        if (result.success) {
-            Utils.showNotification('IPTV Editor settings saved successfully', 'success');
-        } else {
-            throw new Error(result.message || 'Save failed');
+        if (!result.success) {
+            throw new Error(result.message || 'Failed to save provider settings');
         }
-        
     } catch (error) {
-        console.error('❌ Failed to save IPTV Editor settings:', error);
-        Utils.showNotification(`Failed to save settings: ${error.message}`, 'error');
+        console.error('❌ Failed to save provider settings:', error);
+        throw error;
     }
 },
 
-// Sync IPTV Editor Categories
-async syncIPTVEditorCategories() {
-    try {
-        const response = await fetch('/api/iptv-editor/sync-categories', {
-            method: 'POST'
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            Utils.showNotification(
-                `Categories synced: ${result.data.channels_synced} channels, ${result.data.vods_synced} VODs, ${result.data.series_synced} series`, 
-                'success'
-            );
-        } else {
-            Utils.showNotification('Failed to sync categories: ' + result.message, 'error');
-        }
-        
-    } catch (error) {
-        console.error('Error syncing categories:', error);
-        Utils.showNotification('Failed to sync categories', 'error');
-    }
-},
-
-// Test IPTV Editor Connection - EXISTING (keep as is)
+// ADD THIS FUNCTION (around line 1270):
 async testIPTVEditorConnection() {
     const testButton = document.querySelector('[onclick="testIPTVEditorConnection()"]');
     
@@ -2379,7 +2506,57 @@ async testIPTVEditorConnection() {
     }
 },
 
-// Sync IPTV Editor categories
+// ADD THIS FUNCTION (around line 1310):
+async syncIPTVEditorPlaylists() {
+    const syncButton = document.querySelector('[onclick="syncIPTVEditorPlaylists()"]');
+    const playlistSelect = document.getElementById('iptvPlaylistSelect');
+    
+    try {
+        if (syncButton) {
+            syncButton.disabled = true;
+            syncButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+        }
+        
+        // First test connection
+        const connectionOk = await this.testIPTVEditorConnection();
+        if (!connectionOk) {
+            throw new Error('Connection test failed - cannot sync playlists');
+        }
+        
+        // Sync playlists (this will store them in database)
+        const response = await fetch('/api/iptv-editor/sync-playlists', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        console.log('🔍 Sync result:', result);
+        
+        if (result.success) {
+            Utils.showNotification(`Synced ${result.count} playlists successfully`, 'success');
+            
+            // Reload the dropdown with newly stored playlists
+            await this.loadStoredPlaylists();
+            
+        } else {
+            throw new Error(result.message || 'Sync failed');
+        }
+        
+    } catch (error) {
+        console.error('❌ Failed to sync IPTV Editor playlists:', error);
+        Utils.showNotification(`Failed to sync playlists: ${error.message}`, 'error');
+        
+    } finally {
+        if (syncButton) {
+            syncButton.disabled = false;
+            syncButton.innerHTML = '<i class="fas fa-sync"></i> Sync Playlists';
+        }
+    }
+},
+
+// ADD THIS FUNCTION (around line 1360):
 async syncIPTVEditorCategories() {
     try {
         const syncBtn = document.getElementById('syncCategoriesBtn');
@@ -2413,101 +2590,6 @@ async syncIPTVEditorCategories() {
             syncBtn.innerHTML = '<i class="fas fa-sync"></i> Sync Categories';
             syncBtn.disabled = false;
         }
-    }
-},
-
-// NEW: Handle playlist selection change
-async onPlaylistChange(playlistId) {
-    try {
-        if (!playlistId) {
-            document.getElementById('providerBaseUrl').value = '';
-            document.getElementById('providerUsername').value = '';
-            document.getElementById('providerPassword').value = '';
-            return;
-        }
-
-        console.log('🔄 Playlist changed, extracting provider settings...');
-        
-        const response = await fetch('/api/iptv-editor/playlists');
-        const result = await response.json();
-        
-        if (result.success && result.data) {
-            const selectedPlaylist = result.data.find(p => p.playlist_id === playlistId);
-            
-            if (selectedPlaylist && selectedPlaylist.patterns && selectedPlaylist.patterns[0]) {
-                const pattern = selectedPlaylist.patterns[0];
-                
-                console.log('✅ Found provider settings:', pattern);
-                
-                document.getElementById('providerBaseUrl').value = pattern.url || '';
-                document.getElementById('providerUsername').value = pattern.param1 || '';
-                document.getElementById('providerPassword').value = pattern.param2 || '';
-                
-                await this.saveProviderSettings({
-                    provider_base_url: pattern.url,
-                    provider_username: pattern.param1,
-                    provider_password: pattern.param2
-                });
-                
-                console.log('✅ Provider settings auto-populated and saved');
-            }
-        }
-    } catch (error) {
-        console.error('❌ Failed to extract provider settings:', error);
-        Utils.showNotification('Failed to extract provider settings', 'error');
-    }
-},
-
-// NEW: Save provider settings
-async saveProviderSettings(settings) {
-    try {
-        const response = await fetch('/api/iptv-editor/settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(settings)
-        });
-        
-        const result = await response.json();
-        if (!result.success) {
-            throw new Error(result.message || 'Failed to save provider settings');
-        }
-    } catch (error) {
-        console.error('❌ Failed to save provider settings:', error);
-        throw error;
-    }
-},
-
-// NEW: Handle manual update button click
-async handleUpdatePlaylistNow() {
-    try {
-        const updateBtn = document.getElementById('updatePlaylistBtn');
-        const originalText = updateBtn.innerHTML;
-        
-        updateBtn.disabled = true;
-        updateBtn.innerHTML = 'Updating... <small style="display: block;">This may take several minutes</small>';
-        
-        console.log('🚀 Starting manual playlist update...');
-        
-        const response = await fetch('/api/auto-updater/run-auto-updater', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            Utils.showNotification('Playlist updated successfully!', 'success');
-            console.log('✅ Manual update completed:', result);
-        } else {
-            throw new Error(result.message || 'Update failed');
-        }
-    } catch (error) {
-        console.error('❌ Manual update failed:', error);
-        Utils.showNotification(`Update failed: ${error.message}`, 'error');
-    } finally {
-        const updateBtn = document.getElementById('updatePlaylistBtn');
-        updateBtn.disabled = false;
-        updateBtn.innerHTML = originalText;
     }
 }
 };

@@ -4,6 +4,7 @@
 
 const axios = require('axios');
 const db = require('./database-config');
+const FormData = require('form-data');
 
 class IPTVEditorService {
     constructor() {

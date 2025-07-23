@@ -360,18 +360,20 @@
         
         <!-- NEW: Manual Update Button -->
         <div class="form-group">
-            <button type="button" id="updatePlaylistBtn" class="btn btn-primary">
-                Update Playlist Now
-                <small style="display: block; font-weight: normal;">
-                    Force sync playlist content with IPTV panel (this may take several minutes)
-                </small>
+            <button type="button" id="updatePlaylistBtn" class="btn btn-primary" onclick="Settings.handleUpdatePlaylistNow()">
+                <i class="fas fa-sync-alt"></i> Update Playlist Now
             </button>
+            <small style="display: block; color: #4fc3f7; margin-top: 5px;">
+                Force sync playlist content with IPTV panel (this may take several minutes)
+            </small>
         </div>
 		<!-- Last Update Status -->
-<div class="form-group">
-    <label>Last Auto-Update:</label>
-    <span id="lastAutoUpdaterRun" style="color: #888;">Never</span>
-</div>
+        <div class="form-group">
+            <label>Last Auto-Update</label>
+            <div id="lastUpdateDisplay" style="padding: 8px; background-color: rgba(255,255,255,0.1); border-radius: 4px; color: #4fc3f7; border: 1px solid rgba(79, 195, 247, 0.3);">
+                Never
+            </div>
+        </div>
     </div>
 </div>
 
