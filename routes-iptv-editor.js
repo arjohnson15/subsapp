@@ -241,29 +241,30 @@ router.post('/sync-playlists', async (req, res) => {
         // Clear existing playlists and insert new ones
         await db.query('DELETE FROM iptv_editor_playlists');
         
-        // Insert each playlist into database
-        for (const playlist of result.playlist) {
-            await db.query(`
-                INSERT INTO iptv_editor_playlists (
-                    playlist_id, name, username, password, m3u_code, epg_code, 
-                    expiry_date, max_connections, customer_count, channel_count, 
-                    movie_count, series_count, last_synced
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-            `, [
-                playlist.id,
-                playlist.name,
-                playlist.username || null,
-                playlist.password || null,
-                playlist.m3u || null,
-                playlist.epg || null,
-                playlist.expiry ? new Date(playlist.expiry) : null,
-                playlist.max_connections || 1,
-                playlist.customerCount || 0,
-                playlist.channel || 0,
-                playlist.movie || 0,
-                playlist.series || 0
-            ]);
-        }
+// Insert each playlist into database
+for (const playlist of result.playlist) {
+    await db.query(`
+        INSERT INTO iptv_editor_playlists (
+            playlist_id, name, username, password, m3u_code, epg_code, 
+            expiry_date, max_connections, customer_count, channel_count, 
+            movie_count, series_count, patterns, last_synced
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    `, [
+        playlist.id,
+        playlist.name,
+        playlist.username || null,
+        playlist.password || null,
+        playlist.m3u || null,
+        playlist.epg || null,
+        playlist.expiry ? new Date(playlist.expiry) : null,
+        playlist.max_connections || 1,
+        playlist.customerCount || 0,
+        playlist.channel || 0,
+        playlist.movie || 0,
+        playlist.series || 0,
+        JSON.stringify(playlist.patterns || [])  // ADD THIS LINE
+    ]);
+}
         
         console.log(`✅ Stored ${result.playlist.length} playlists in database`);
         

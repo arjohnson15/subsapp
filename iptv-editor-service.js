@@ -153,30 +153,95 @@ async getAllSettings() {
     }
 }
 
+// FIXED: getStoredPlaylists - Handle malformed JSON patterns
 async getStoredPlaylists() {
     try {
         const playlists = await db.query(`
             SELECT playlist_id, name, customer_count, channel_count, 
                    movie_count, series_count, expiry_date, is_active, last_synced,
-                   patterns
+                   patterns, username, password, m3u_code, epg_code, max_connections
             FROM iptv_editor_playlists 
             WHERE is_active = TRUE
             ORDER BY name
         `);
         
-        return playlists;
+        // FIXED: Parse patterns JSON for each playlist with better error handling
+        const processedPlaylists = playlists.map(playlist => {
+            // Debug the raw patterns value
+            console.log(`🔍 DEBUG: Raw patterns for ${playlist.name}:`, playlist.patterns);
+            console.log(`🔍 DEBUG: Patterns type: ${typeof playlist.patterns}`);
+            
+            // Handle patterns parsing
+            if (playlist.patterns) {
+                // Check if it's already an object (shouldn't happen but let's be safe)
+                if (typeof playlist.patterns === 'object') {
+                    console.log(`✅ Patterns for ${playlist.name} is already an object`);
+                    playlist.patterns = Array.isArray(playlist.patterns) ? playlist.patterns : [playlist.patterns];
+                }
+                // Check if it's the malformed "[object Object]" string
+                else if (playlist.patterns === '[object Object]' || playlist.patterns.includes('[object Object]')) {
+                    console.warn(`⚠️ Found malformed patterns for ${playlist.name}, setting to empty array`);
+                    playlist.patterns = [];
+                }
+                // Try to parse as JSON
+                else {
+                    try {
+                        playlist.patterns = JSON.parse(playlist.patterns);
+                    } catch (e) {
+                        console.warn(`⚠️ Failed to parse patterns for playlist ${playlist.name}:`, e);
+                        console.warn(`⚠️ Raw patterns value:`, playlist.patterns);
+                        playlist.patterns = [];
+                    }
+                }
+            } else {
+                playlist.patterns = [];
+            }
+            
+            // Ensure patterns is always an array
+            if (!Array.isArray(playlist.patterns)) {
+                playlist.patterns = [playlist.patterns];
+            }
+            
+            return playlist;
+        });
+        
+        return processedPlaylists;
     } catch (error) {
         console.error('❌ Failed to get stored playlists:', error);
         throw error;
     }
 }
 
+// FIXED: storePlaylist - Better error handling and validation
 async storePlaylist(playlist) {
     try {
         console.log('🔍 DEBUG: Storing playlist:', playlist.name);
-        console.log('🔍 DEBUG: Raw playlist data:', JSON.stringify(playlist, null, 2));
-        console.log('🔍 DEBUG: Patterns field:', playlist.patterns);
-        console.log('🔍 DEBUG: Patterns JSON:', JSON.stringify(playlist.patterns || []));
+        
+        // Validate playlist data
+        if (!playlist.id) {
+            throw new Error('Playlist ID is required');
+        }
+        
+        if (!playlist.name) {
+            throw new Error('Playlist name is required');
+        }
+        
+        // FIXED: Ensure patterns is properly processed
+        let patternsJson = '[]'; // Default empty array
+        if (playlist.patterns && Array.isArray(playlist.patterns)) {
+            try {
+                patternsJson = JSON.stringify(playlist.patterns);
+                console.log('🔍 DEBUG: Patterns JSON being stored:', patternsJson);
+            } catch (e) {
+                console.warn('⚠️ Failed to stringify patterns, using empty array:', e);
+                patternsJson = '[]';
+            }
+        } else if (playlist.patterns) {
+            console.warn('⚠️ Patterns is not an array:', typeof playlist.patterns, playlist.patterns);
+            patternsJson = '[]';
+        }
+        
+        console.log('🔍 DEBUG: Final patterns value to store:', patternsJson);
         
         await db.query(`
             INSERT INTO iptv_editor_playlists (
@@ -212,9 +277,10 @@ async storePlaylist(playlist) {
             playlist.channel || 0,
             playlist.movie || 0,
             playlist.series || 0,
-            JSON.stringify(playlist.patterns || [])
+            patternsJson  // FIXED: Use properly processed JSON string
         ]);
         
+        console.log(`✅ Successfully stored playlist: ${playlist.name}`);
         return true;
     } catch (error) {
         console.error('❌ Failed to store playlist:', error);
