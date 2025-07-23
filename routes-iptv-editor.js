@@ -1688,4 +1688,19 @@ router.post('/auto-updater/run', async (req, res) => {
     }
 });
 
+// Debug endpoint - add this temporarily
+router.get('/debug/settings', async (req, res) => {
+    try {
+        const settings = await iptvEditorService.getAllSettings();
+        const playlists = await iptvEditorService.getStoredPlaylists();
+        
+        res.json({
+            settings: settings,
+            playlists: playlists
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;

@@ -39,33 +39,6 @@ class IPTVEditorService {
         }
     }
     
-    // =============================================================================
-    // INITIALIZATION & SETTINGS
-    // =============================================================================
-    
-async initialize() {
-    try {
-        const settings = await this.getAllSettings();
-        
-        // Update service configuration
-        if (settings.bearer_token) {
-            this.bearerToken = settings.bearer_token;
-        }
-        if (settings.base_url) {
-            this.baseUrl = settings.base_url;
-        }
-        if (settings.default_playlist_id) {
-            this.defaultPlaylistId = settings.default_playlist_id;
-        }
-        
-        console.log('✅ IPTV Editor service initialized with database settings');
-        return true;
-        
-    } catch (error) {
-        console.error('❌ Failed to initialize IPTV Editor service:', error);
-        throw error;
-    }
-}
     
     // Get setting from database
 async getSetting(key) {
@@ -184,7 +157,8 @@ async getStoredPlaylists() {
     try {
         const playlists = await db.query(`
             SELECT playlist_id, name, customer_count, channel_count, 
-                   movie_count, series_count, expiry_date, is_active, last_synced
+                   movie_count, series_count, expiry_date, is_active, last_synced,
+                   patterns
             FROM iptv_editor_playlists 
             WHERE is_active = TRUE
             ORDER BY name
@@ -199,12 +173,17 @@ async getStoredPlaylists() {
 
 async storePlaylist(playlist) {
     try {
+        console.log('🔍 DEBUG: Storing playlist:', playlist.name);
+        console.log('🔍 DEBUG: Raw playlist data:', JSON.stringify(playlist, null, 2));
+        console.log('🔍 DEBUG: Patterns field:', playlist.patterns);
+        console.log('🔍 DEBUG: Patterns JSON:', JSON.stringify(playlist.patterns || []));
+        
         await db.query(`
             INSERT INTO iptv_editor_playlists (
                 playlist_id, name, username, password, m3u_code, epg_code, 
                 expiry_date, max_connections, customer_count, channel_count, 
-                movie_count, series_count, last_synced
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                movie_count, series_count, patterns, last_synced
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ON DUPLICATE KEY UPDATE
             name = VALUES(name),
             username = VALUES(username),
@@ -217,6 +196,7 @@ async storePlaylist(playlist) {
             channel_count = VALUES(channel_count),
             movie_count = VALUES(movie_count),
             series_count = VALUES(series_count),
+            patterns = VALUES(patterns),
             last_synced = NOW(),
             updated_at = CURRENT_TIMESTAMP
         `, [
@@ -231,7 +211,8 @@ async storePlaylist(playlist) {
             playlist.customerCount || 0,
             playlist.channel || 0,
             playlist.movie || 0,
-            playlist.series || 0
+            playlist.series || 0,
+            JSON.stringify(playlist.patterns || [])
         ]);
         
         return true;
@@ -666,7 +647,7 @@ async updatePlaylists() {
         const existingPlaylists = await db.query(`
             SELECT playlist_id, name, customer_count, channel_count, 
                    movie_count, series_count, expiry_date, max_connections,
-                   username, password, m3u_code, epg_code
+                   username, password, m3u_code, epg_code, patterns
             FROM iptv_editor_playlists
         `);
         
@@ -695,8 +676,8 @@ async updatePlaylists() {
                     INSERT INTO iptv_editor_playlists (
                         playlist_id, name, username, password, m3u_code, epg_code, 
                         expiry_date, max_connections, customer_count, channel_count, 
-                        movie_count, series_count, last_synced, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW())
+                        movie_count, series_count, patterns, last_synced, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW())
                 `, [
                     apiPlaylist.id,
                     apiPlaylist.name,
@@ -709,7 +690,8 @@ async updatePlaylists() {
                     apiPlaylist.customerCount || 0,
                     apiPlaylist.channel || 0,
                     apiPlaylist.movie || 0,
-                    apiPlaylist.series || 0
+                    apiPlaylist.series || 0,
+                    JSON.stringify(apiPlaylist.patterns || [])
                 ]);
                 
                 insertCount++;
@@ -728,7 +710,8 @@ async updatePlaylists() {
                     existing.password !== (apiPlaylist.password || null) ||
                     existing.m3u_code !== (apiPlaylist.m3u || null) ||
                     existing.epg_code !== (apiPlaylist.epg || null) ||
-                    this.formatDate(existing.expiry_date) !== this.formatDate(apiPlaylist.expiry)
+                    this.formatDate(existing.expiry_date) !== this.formatDate(apiPlaylist.expiry) ||
+                    JSON.stringify(existing.patterns || []) !== JSON.stringify(apiPlaylist.patterns || [])
                 );
                 
                 if (hasChanges) {
@@ -738,7 +721,7 @@ async updatePlaylists() {
                             name = ?, username = ?, password = ?, m3u_code = ?, epg_code = ?,
                             expiry_date = ?, max_connections = ?, customer_count = ?,
                             channel_count = ?, movie_count = ?, series_count = ?,
-                            last_synced = NOW(), updated_at = NOW()
+                            patterns = ?, last_synced = NOW(), updated_at = NOW()
                         WHERE playlist_id = ?
                     `, [
                         apiPlaylist.name,
@@ -752,6 +735,7 @@ async updatePlaylists() {
                         apiPlaylist.channel || 0,
                         apiPlaylist.movie || 0,
                         apiPlaylist.series || 0,
+                        JSON.stringify(apiPlaylist.patterns || []),
                         apiPlaylist.id
                     ]);
                     
@@ -1193,11 +1177,6 @@ async testConnection() {
         }
     }
 
-    // Helper method to set a setting
-    async setSetting(key, value, type = 'string') {
-        const IPTVEditorSettings = require('./iptv-editor-settings');
-        await IPTVEditorSettings.set(key, value, type);
-    }
 }
 
 // Export singleton instance
