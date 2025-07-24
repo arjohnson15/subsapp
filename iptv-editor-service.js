@@ -1169,117 +1169,347 @@ async runAutoUpdater() {
     }
 }
 
-    // Helper method to collect all provider data
-    async collectProviderData(baseUrl, username, password) {
-        console.log('🔍 Collecting provider data from 8 endpoints...');
+// REPLACE the existing collectProviderData method in iptv-editor-service.js with this complete version:
+
+async collectProviderData(baseUrl, username, password) {
+    console.log('🔄 Making 8 sequential API calls to provider...');
+    console.log('🌐 Provider URL:', baseUrl);
+    console.log('👤 Provider Username:', username);
+    console.log('🔑 Provider Password:', password ? '***' : 'not set');
+    
+    const endpoints = [
+        '',                                     // 1. Basic info
+        '&action=get_live_streams',             // 2. Live streams
+        '&action=get_live_categories',          // 3. Live categories
+        '&action=get_vod_streams',              // 4. VOD streams
+        '&action=get_vod_categories',           // 5. VOD categories
+        '&action=get_series',                   // 6. Series
+        '&action=get_series_categories'         // 7. Series categories
+    ];
+    
+    const datasets = [];
+    
+    // First 7 calls to player_api.php (all return JSON)
+    for (let i = 0; i < endpoints.length; i++) {
+        const url = `${baseUrl}/player_api.php?username=${username}&password=${password}${endpoints[i]}`;
+        const callName = endpoints[i] ? endpoints[i].replace('&action=', '') : 'basic_info';
         
-        const endpoints = [
-            `player_api.php?username=${username}&password=${password}`,                                    // Basic info
-            `player_api.php?username=${username}&password=${password}&action=get_live_streams`,           // Live streams
-            `player_api.php?username=${username}&password=${password}&action=get_live_categories`,        // Live categories
-            `player_api.php?username=${username}&password=${password}&action=get_vod_streams`,            // VOD streams
-            `player_api.php?username=${username}&password=${password}&action=get_vod_categories`,         // VOD categories
-            `player_api.php?username=${username}&password=${password}&action=get_series`,                 // Series
-            `player_api.php?username=${username}&password=${password}&action=get_series_categories`,      // Series categories
-            `get.php?username=${username}&password=${password}&type=m3u_plus&output=ts`                   // M3U playlist
-        ];
+        console.log(`📡 API Call ${i + 1}/8: ${callName}`);
         
-        const datasets = [];
-        
-        for (let i = 0; i < endpoints.length; i++) {
-            const url = `${baseUrl.replace(/\/$/, '')}/${endpoints[i]}`;
-            console.log(`📡 Fetching ${i + 1}/8: ${endpoints[i].split('?')[0]}`);
+        try {
+            const response = await axios.get(url, { 
+                timeout: 30000,
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity
+            });
             
-            try {
-                const response = await axios.get(url, {
-                    timeout: 60000, // 60 second timeout per request
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                    }
-                });
-                
-                // For M3U endpoint, we get text, for others we get JSON
-                const data = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-                datasets.push(data);
-                
-                console.log(`✅ Fetched ${i + 1}/8 successfully (${data.length} chars)`);
-                
-            } catch (error) {
-                console.error(`❌ Failed to fetch ${i + 1}/8:`, error.message);
-                throw new Error(`Failed to fetch data from provider endpoint ${i + 1}: ${error.message}`);
+            // Convert response to JSON string for form submission
+            const dataString = JSON.stringify(response.data);
+            datasets.push(dataString);
+            
+            console.log(`✅ Call ${i + 1} completed - ${dataString.length} bytes`);
+            
+            // Log a preview of the data for debugging
+            if (typeof response.data === 'object') {
+                if (Array.isArray(response.data)) {
+                    console.log(`   📋 Response: Array with ${response.data.length} items`);
+                } else {
+                    console.log(`   📋 Response: Object with keys: ${Object.keys(response.data).slice(0, 5).join(', ')}`);
+                }
             }
             
-            // Small delay between requests to be nice to the provider
-            if (i < endpoints.length - 1) {
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
+        } catch (error) {
+            console.error(`❌ API Call ${i + 1} failed:`, error.message);
+            throw new Error(`Provider API call ${i + 1} (${callName}) failed: ${error.message}`);
         }
         
-        console.log('✅ All provider data collected successfully');
-        return datasets;
-    }
-
-// Helper method to submit data to IPTV Editor auto-updater
-async submitToAutoUpdater(baseUrl, datasets) {
-    console.log('🚀 Submitting to IPTV Editor auto-updater...');
-    
-    // Create FormData object
-    const FormData = require('form-data');
-    const formData = new FormData();
-    
-    // FIXED: Add playlist ID to the form data
-    const settings = await this.getAllSettings();
-    if (settings.default_playlist_id) {
-        formData.append('playlist', settings.default_playlist_id);
+        // Small delay between requests to be respectful to the provider
+        if (i < endpoints.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
     }
     
-    formData.append('url', baseUrl);
-    formData.append('info', datasets[0]);                  // Basic info
-    formData.append('get_live_streams', datasets[1]);      // Live streams
-    formData.append('get_live_categories', datasets[2]);   // Live categories  
-    formData.append('get_vod_streams', datasets[3]);       // VOD streams
-    formData.append('get_vod_categories', datasets[4]);    // VOD categories
-    formData.append('get_series', datasets[5]);            // Series
-    formData.append('get_series_categories', datasets[6]); // Series categories
-    formData.append('m3u', datasets[7]);                   // M3U playlist
-    
+    // 8th call to get.php for M3U playlist (returns plain text)
+    console.log('📡 API Call 8/8: M3U Playlist');
     try {
-        console.log('🔍 DEBUG: Form data fields:');
-        console.log('  - playlist:', settings.default_playlist_id);
-        console.log('  - url:', baseUrl);
-        console.log('  - info length:', datasets[0]?.length || 0);
-        console.log('  - live_streams length:', datasets[1]?.length || 0);
-        console.log('  - m3u length:', datasets[7]?.length || 0);
+        const m3uUrl = `${baseUrl}/get.php?username=${username}&password=${password}&type=m3u_plus&output=ts`;
+        console.log('🔗 M3U URL:', m3uUrl);
         
-        const response = await axios.post('https://editor.iptveditor.com/api/auto-updater/run-auto-updater', formData, {
-            headers: {
-                ...formData.getHeaders(),
-                'Authorization': `Bearer ${this.bearerToken}`,
-                'Origin': 'https://cloud.iptveditor.com',
-                'Referer': 'https://cloud.iptveditor.com/'  // ADDED: Some APIs require referer
-            },
-            timeout: 600000, // 10 minutes timeout - this is a long operation
+        const response = await axios.get(m3uUrl, { 
+            timeout: 30000,
             maxContentLength: Infinity,
             maxBodyLength: Infinity
         });
         
-        console.log('✅ Auto-updater submission completed');
-        console.log('📤 Response status:', response.status);
-        console.log('📤 Response data:', response.data);
+        // M3U response is plain text, not JSON
+        datasets.push(response.data);
+        console.log(`✅ Call 8 completed - ${response.data.length} bytes`);
+        console.log(`   📋 M3U Preview: ${response.data.substring(0, 100)}...`);
+        
+    } catch (error) {
+        console.error('❌ API Call 8 (M3U) failed:', error.message);
+        throw new Error(`M3U playlist retrieval failed: ${error.message}`);
+    }
+    
+    console.log('✅ All provider data collected successfully');
+    console.log('📊 Dataset summary:');
+    datasets.forEach((dataset, index) => {
+        const type = index < 7 ? 'JSON' : 'M3U';
+        console.log(`   ${index + 1}. ${type} - ${dataset.length} bytes`);
+    });
+    
+    return datasets;
+}
+
+
+async submitToAutoUpdater(baseUrl, datasets) {
+    console.log('🚀 Preparing FormData with WebKit boundary format...');
+    
+    const FormData = require('form-data');
+    
+    // Create FormData with custom boundary that matches WebKit format
+    const boundary = `----WebKitFormBoundary${Math.random().toString(16).substr(2, 16)}`;
+    const formData = new FormData();
+    
+    // Set the boundary manually to match browser behavior
+    formData._boundary = boundary;
+    
+    // Get settings
+    const settings = await this.getAllSettings();
+    
+    console.log('🔗 Using WebKit-style boundary:', boundary);
+    
+    // Add all fields with exact format from HAR
+    formData.append('url', baseUrl);
+    
+    // Add all data fields with blob metadata and octet-stream content type
+    formData.append('info', datasets[0], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    formData.append('get_live_streams', datasets[1], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    formData.append('get_live_categories', datasets[2], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    formData.append('get_vod_streams', datasets[3], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    formData.append('get_vod_categories', datasets[4], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    formData.append('get_series', datasets[5], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    formData.append('get_series_categories', datasets[6], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    formData.append('m3u', datasets[7], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    // Calculate total payload size
+    const totalSize = datasets.reduce((sum, dataset) => sum + (dataset?.length || 0), 0);
+    console.log('📊 Total payload size:', Math.round(totalSize / 1024 / 1024), 'MB');
+    
+    console.log('🔍 FormData prepared with WebKit boundary:');
+    console.log('  - boundary:', boundary);
+    console.log('  - url:', baseUrl);
+    console.log('  - 8 data fields with blob metadata');
+    
+    try {
+        console.log('📤 Submitting to IPTV Editor with WebKit-style FormData...');
+        
+        // Validate bearer token
+        if (!this.bearerToken || this.bearerToken.trim() === '') {
+            throw new Error('Bearer token is missing or empty');
+        }
+        
+        console.log('🔑 Bearer token length:', this.bearerToken.length);
+        console.log('🔑 Bearer token preview:', this.bearerToken.substring(0, 20) + '...');
+        
+        // Create headers that match browser exactly
+        const headers = {
+            ...formData.getHeaders(),
+            'Authorization': `Bearer ${this.bearerToken}`,
+            'Origin': 'https://cloud.iptveditor.com',
+            'Referer': 'https://cloud.iptveditor.com/',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin'
+        };
+        
+        // Log the Content-Type header to verify boundary
+        console.log('📋 Content-Type header:', headers['content-type']);
+        
+        const response = await axios.post('https://editor.iptveditor.com/api/auto-updater/run-auto-updater', formData, {
+            headers: headers,
+            timeout: 600000, // 10 minutes
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            responseType: 'json',
+            maxRedirects: 0,
+            // Add specific axios options that might help
+            withCredentials: false,
+            decompress: true
+        });
+        
+        console.log('✅ Auto-updater submission successful!');
+        console.log('📊 Response status:', response.status);
+        console.log('📊 Response headers:', JSON.stringify(response.headers, null, 2));
+        console.log('📊 Response data:', JSON.stringify(response.data, null, 2));
         
         return { data: response.data };
         
     } catch (error) {
-        console.error('❌ Auto-updater submission failed:', error);
+        console.error('❌ Auto-updater submission failed');
+        console.error('🔍 Error details:', error.message);
         
-        // Log more details about the error
         if (error.response) {
-            console.error('📄 Response status:', error.response.status);
-            console.error('📄 Response headers:', error.response.headers);
-            console.error('📄 Response data:', error.response.data);
+            const status = error.response.status;
+            const data = error.response.data;
+            
+            console.error('📄 HTTP Status:', status);
+            console.error('📄 Response headers:', JSON.stringify(error.response.headers, null, 2));
+            console.error('📄 Response data:', JSON.stringify(data, null, 2));
+            
+            // Let's try to get more specific about what's wrong
+            if (status === 400 && data?.title === 'Request not valid') {
+                // Log the boundary format for comparison
+                console.error('🔍 Our boundary format:', boundary);
+                console.error('🔍 Expected boundary format: ----WebKitFormBoundaryXXXXXXXXXXXXXXXX');
+                
+                throw new Error(`Invalid request format. The API is rejecting our FormData. This could be due to:\n1. Boundary format mismatch\n2. Missing required metadata\n3. Incorrect Content-Type headers\n4. Data encoding issues\n\nAPI Response: ${data?.body || 'Request not valid'}`);
+            } else if (status === 400) {
+                throw new Error(`Bad Request (400): ${data?.message || data?.body || JSON.stringify(data)}`);
+            } else if (status === 401) {
+                throw new Error('Authentication failed. Bearer token is invalid.');
+            } else if (status === 413) {
+                throw new Error(`Payload too large (${Math.round(totalSize / 1024 / 1024)}MB).`);
+            } else if (status >= 500) {
+                throw new Error(`IPTV Editor server error (${status}).`);
+            } else {
+                throw new Error(`HTTP ${status}: ${data?.message || data?.body || JSON.stringify(data)}`);
+            }
+        } else if (error.request) {
+            throw new Error('Network error: Could not reach IPTV Editor API.');
+        } else if (error.code === 'ECONNABORTED') {
+            throw new Error('Request timeout after 10 minutes.');
+        } else {
+            throw new Error(`Request setup error: ${error.message}`);
+        }
+    }
+}
+
+// ALTERNATIVE APPROACH: Raw HTTP request builder
+// Add this method to your iptv-editor-service.js as an alternative to submitToAutoUpdater
+
+async submitToAutoUpdaterRaw(baseUrl, datasets) {
+    console.log('🚀 Building raw HTTP request to match browser exactly...');
+    
+    const settings = await this.getAllSettings();
+    
+    // Generate a WebKit-style boundary
+    const boundary = `----WebKitFormBoundary${Math.random().toString(36).substring(2, 18)}`;
+    console.log('🔗 Generated boundary:', boundary);
+    
+    // Build the multipart body manually
+    let body = '';
+    
+    // Add URL field (no filename, no content-type)
+    body += `--${boundary}\r\n`;
+    body += `Content-Disposition: form-data; name="url"\r\n\r\n`;
+    body += `${baseUrl}\r\n`;
+    
+    // Add all data fields with exact HAR format
+    const fieldNames = [
+        'info',
+        'get_live_streams',
+        'get_live_categories',
+        'get_vod_streams',  
+        'get_vod_categories',
+        'get_series',
+        'get_series_categories',
+        'm3u'
+    ];
+    
+    for (let i = 0; i < fieldNames.length; i++) {
+        body += `--${boundary}\r\n`;
+        body += `Content-Disposition: form-data; name="${fieldNames[i]}"; filename="blob"\r\n`;
+        body += `Content-Type: application/octet-stream\r\n\r\n`;
+        body += datasets[i];
+        body += `\r\n`;
+    }
+    
+    // Close the boundary
+    body += `--${boundary}--\r\n`;
+    
+    const totalSize = Buffer.byteLength(body, 'utf8');
+    console.log('📊 Raw body size:', Math.round(totalSize / 1024 / 1024), 'MB');
+    
+    try {
+        console.log('📤 Sending raw HTTP request...');
+        
+        const response = await axios.post('https://editor.iptveditor.com/api/auto-updater/run-auto-updater', body, {
+            headers: {
+                'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                'Content-Length': totalSize.toString(),
+                'Authorization': `Bearer ${this.bearerToken}`,
+                'Origin': 'https://cloud.iptveditor.com',
+                'Referer': 'https://cloud.iptveditor.com/',
+                'Accept': '*/*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive'
+            },
+            timeout: 600000,
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            responseType: 'json'
+        });
+        
+        console.log('✅ Raw HTTP request successful!');
+        console.log('📊 Response:', response.data);
+        
+        return { data: response.data };
+        
+    } catch (error) {
+        console.error('❌ Raw HTTP request failed:', error.message);
+        
+        if (error.response) {
+            console.error('📄 Status:', error.response.status);
+            console.error('📄 Data:', error.response.data);
+            
+            // If this approach also fails with 400, then it's likely not a boundary issue
+            if (error.response.status === 400) {
+                throw new Error(`Even raw HTTP request failed with 400. This suggests the issue is not with FormData formatting but potentially with:\n1. Bearer token validity\n2. API rate limiting\n3. Data content validation\n4. Server-side processing limits\n\nResponse: ${JSON.stringify(error.response.data)}`);
+            }
         }
         
-        throw new Error(`IPTV Editor API error: ${error.response?.status} ${error.response?.statusText || error.message}`);
+        throw error;
     }
 }
 
