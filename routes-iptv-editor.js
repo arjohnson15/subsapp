@@ -1690,6 +1690,48 @@ router.post('/auto-updater/run', async (req, res) => {
 });
 
 // Debug endpoint - add this temporarily
+router.post('/debug-formdata', async (req, res) => {
+    try {
+        console.log('🔍 DEBUG: Inspecting FormData generation...');
+        
+        // Get settings and collect small amount of data
+        const settings = await iptvEditorService.getAllSettings();
+        
+        // Use small test datasets instead of full 80MB
+        const testDatasets = [
+            '{"user_info":{"username":"johnsonflixiptv","password":"08108672","auth":1}}', // info
+            '[{"test":"live_streams"}]', // live_streams
+            '[{"test":"live_categories"}]', // live_categories  
+            '[{"test":"vod_streams"}]', // vod_streams
+            '[{"test":"vod_categories"}]', // vod_categories
+            '[{"test":"series"}]', // series
+            '[{"test":"series_categories"}]', // series_categories
+            '#EXTM3U\n#EXTINF:-1,Test\nhttp://test.com' // m3u
+        ];
+        
+        // Debug our FormData structure
+        const debugInfo = await iptvEditorService.debugFormData(
+            settings.provider_base_url || 'https://pinkpony.lol',
+            testDatasets
+        );
+        
+        res.json({
+            success: true,
+            message: 'FormData debug completed',
+            debug: debugInfo
+        });
+        
+    } catch (error) {
+        console.error('❌ FormData debug failed:', error);
+        res.status(500).json({
+            success: false,
+            message: 'FormData debug failed',
+            error: error.message
+        });
+    }
+});
+
+// Debug endpoint - add this temporarily
 router.get('/debug/settings', async (req, res) => {
     try {
         const settings = await iptvEditorService.getAllSettings();

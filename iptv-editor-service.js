@@ -1261,28 +1261,24 @@ async collectProviderData(baseUrl, username, password) {
     return datasets;
 }
 
+// REPLACE submitToAutoUpdater method - Bearer token with exact HAR structure
 
 async submitToAutoUpdater(baseUrl, datasets) {
-    console.log('🚀 Preparing FormData with WebKit boundary format...');
+    console.log('🚀 Using Bearer token with EXACT HAR structure...');
+    console.log('💡 Theory: Browser sends Authorization header but HAR doesn\'t show it');
     
     const FormData = require('form-data');
-    
-    // Create FormData with custom boundary that matches WebKit format
-    const boundary = `----WebKitFormBoundary${Math.random().toString(16).substr(2, 16)}`;
     const formData = new FormData();
     
-    // Set the boundary manually to match browser behavior
+    // Use EXACT boundary from working request
+    const boundary = '----WebKitFormBoundaryKV3X8QsGeoJYX2qM';
     formData._boundary = boundary;
     
-    // Get settings
-    const settings = await this.getAllSettings();
+    console.log('🔗 Using EXACT boundary from working request:', boundary);
     
-    console.log('🔗 Using WebKit-style boundary:', boundary);
-    
-    // Add all fields with exact format from HAR
+    // Add all fields in EXACT order from working HAR
     formData.append('url', baseUrl);
     
-    // Add all data fields with blob metadata and octet-stream content type
     formData.append('info', datasets[0], {
         filename: 'blob',
         contentType: 'application/octet-stream'
@@ -1323,45 +1319,36 @@ async submitToAutoUpdater(baseUrl, datasets) {
         contentType: 'application/octet-stream'
     });
     
-    // Calculate total payload size
     const totalSize = datasets.reduce((sum, dataset) => sum + (dataset?.length || 0), 0);
     console.log('📊 Total payload size:', Math.round(totalSize / 1024 / 1024), 'MB');
     
-    console.log('🔍 FormData prepared with WebKit boundary:');
-    console.log('  - boundary:', boundary);
-    console.log('  - url:', baseUrl);
-    console.log('  - 8 data fields with blob metadata');
-    
     try {
-        console.log('📤 Submitting to IPTV Editor with WebKit-style FormData...');
+        console.log('📤 Submitting with Bearer token + exact HAR headers...');
         
-        // Validate bearer token
-        if (!this.bearerToken || this.bearerToken.trim() === '') {
-            throw new Error('Bearer token is missing or empty');
-        }
-        
-        console.log('🔑 Bearer token length:', this.bearerToken.length);
-        console.log('🔑 Bearer token preview:', this.bearerToken.substring(0, 20) + '...');
-        
-        // Create headers that match browser exactly
+        // Create headers that match working request exactly + Authorization
         const headers = {
-            ...formData.getHeaders(),
-            'Authorization': `Bearer ${this.bearerToken}`,
-            'Origin': 'https://cloud.iptveditor.com',
-            'Referer': 'https://cloud.iptveditor.com/',
-            'Accept': '*/*',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
-            'Sec-Fetch-Dest': 'empty',
-            'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Site': 'same-origin'
+            // Core request headers from HAR
+            'accept': 'application/json, text/plain, */*',
+            'accept-encoding': 'gzip, deflate, br, zstd',
+            'accept-language': 'en-GB,en;q=0.9,en-US;q=0.8',
+            'content-type': `multipart/form-data; boundary=${boundary}`,
+            'origin': 'https://cloud.iptveditor.com',
+            'priority': 'u=1, i',
+            'referer': 'https://cloud.iptveditor.com/',
+            'sec-ch-ua': '"Not)A;Brand";v="8", "Chromium";v="138", "Microsoft Edge";v="138"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-site',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0',
+            // Add Authorization (OPTIONS preflight requested it)
+            'authorization': `Bearer ${this.bearerToken}`
         };
         
-        // Log the Content-Type header to verify boundary
-        console.log('📋 Content-Type header:', headers['content-type']);
+        console.log('🔍 Headers prepared - exact HAR + Authorization');
+        console.log('🔑 Bearer token included');
+        console.log('🔗 Boundary:', boundary);
         
         const response = await axios.post('https://editor.iptveditor.com/api/auto-updater/run-auto-updater', formData, {
             headers: headers,
@@ -1369,21 +1356,22 @@ async submitToAutoUpdater(baseUrl, datasets) {
             maxContentLength: Infinity,
             maxBodyLength: Infinity,
             responseType: 'json',
-            maxRedirects: 0,
-            // Add specific axios options that might help
-            withCredentials: false,
-            decompress: true
+            maxRedirects: 0
         });
         
-        console.log('✅ Auto-updater submission successful!');
+        console.log('✅ SUCCESS! Auto-updater worked!');
         console.log('📊 Response status:', response.status);
-        console.log('📊 Response headers:', JSON.stringify(response.headers, null, 2));
         console.log('📊 Response data:', JSON.stringify(response.data, null, 2));
+        
+        if (response.data.job_id) {
+            console.log('🎉 Got job_id:', response.data.job_id);
+            console.log('🔍 Bearer token authentication successful!');
+        }
         
         return { data: response.data };
         
     } catch (error) {
-        console.error('❌ Auto-updater submission failed');
+        console.error('❌ Auto-updater failed');
         console.error('🔍 Error details:', error.message);
         
         if (error.response) {
@@ -1391,126 +1379,110 @@ async submitToAutoUpdater(baseUrl, datasets) {
             const data = error.response.data;
             
             console.error('📄 HTTP Status:', status);
-            console.error('📄 Response headers:', JSON.stringify(error.response.headers, null, 2));
             console.error('📄 Response data:', JSON.stringify(data, null, 2));
             
-            // Let's try to get more specific about what's wrong
+            // More detailed error analysis
             if (status === 400 && data?.title === 'Request not valid') {
-                // Log the boundary format for comparison
-                console.error('🔍 Our boundary format:', boundary);
-                console.error('🔍 Expected boundary format: ----WebKitFormBoundaryXXXXXXXXXXXXXXXX');
-                
-                throw new Error(`Invalid request format. The API is rejecting our FormData. This could be due to:\n1. Boundary format mismatch\n2. Missing required metadata\n3. Incorrect Content-Type headers\n4. Data encoding issues\n\nAPI Response: ${data?.body || 'Request not valid'}`);
-            } else if (status === 400) {
-                throw new Error(`Bad Request (400): ${data?.message || data?.body || JSON.stringify(data)}`);
+                // Let's check if it's a size issue
+                const sizeMB = Math.round(totalSize / 1024 / 1024);
+                if (sizeMB > 50) {
+                    throw new Error(`Request rejected - possibly due to large payload size (${sizeMB}MB). The working browser request was only 3MB. Try reducing data size.`);
+                } else {
+                    throw new Error(`Request format invalid: ${data?.body || 'Unknown validation error'}`);
+                }
             } else if (status === 401) {
-                throw new Error('Authentication failed. Bearer token is invalid.');
+                throw new Error('Authentication failed - Bearer token invalid or expired');
             } else if (status === 413) {
-                throw new Error(`Payload too large (${Math.round(totalSize / 1024 / 1024)}MB).`);
-            } else if (status >= 500) {
-                throw new Error(`IPTV Editor server error (${status}).`);
-            } else {
-                throw new Error(`HTTP ${status}: ${data?.message || data?.body || JSON.stringify(data)}`);
+                throw new Error(`Payload too large (${Math.round(totalSize / 1024 / 1024)}MB)`);
             }
-        } else if (error.request) {
-            throw new Error('Network error: Could not reach IPTV Editor API.');
-        } else if (error.code === 'ECONNABORTED') {
-            throw new Error('Request timeout after 10 minutes.');
-        } else {
-            throw new Error(`Request setup error: ${error.message}`);
-        }
-    }
-}
-
-// ALTERNATIVE APPROACH: Raw HTTP request builder
-// Add this method to your iptv-editor-service.js as an alternative to submitToAutoUpdater
-
-async submitToAutoUpdaterRaw(baseUrl, datasets) {
-    console.log('🚀 Building raw HTTP request to match browser exactly...');
-    
-    const settings = await this.getAllSettings();
-    
-    // Generate a WebKit-style boundary
-    const boundary = `----WebKitFormBoundary${Math.random().toString(36).substring(2, 18)}`;
-    console.log('🔗 Generated boundary:', boundary);
-    
-    // Build the multipart body manually
-    let body = '';
-    
-    // Add URL field (no filename, no content-type)
-    body += `--${boundary}\r\n`;
-    body += `Content-Disposition: form-data; name="url"\r\n\r\n`;
-    body += `${baseUrl}\r\n`;
-    
-    // Add all data fields with exact HAR format
-    const fieldNames = [
-        'info',
-        'get_live_streams',
-        'get_live_categories',
-        'get_vod_streams',  
-        'get_vod_categories',
-        'get_series',
-        'get_series_categories',
-        'm3u'
-    ];
-    
-    for (let i = 0; i < fieldNames.length; i++) {
-        body += `--${boundary}\r\n`;
-        body += `Content-Disposition: form-data; name="${fieldNames[i]}"; filename="blob"\r\n`;
-        body += `Content-Type: application/octet-stream\r\n\r\n`;
-        body += datasets[i];
-        body += `\r\n`;
-    }
-    
-    // Close the boundary
-    body += `--${boundary}--\r\n`;
-    
-    const totalSize = Buffer.byteLength(body, 'utf8');
-    console.log('📊 Raw body size:', Math.round(totalSize / 1024 / 1024), 'MB');
-    
-    try {
-        console.log('📤 Sending raw HTTP request...');
-        
-        const response = await axios.post('https://editor.iptveditor.com/api/auto-updater/run-auto-updater', body, {
-            headers: {
-                'Content-Type': `multipart/form-data; boundary=${boundary}`,
-                'Content-Length': totalSize.toString(),
-                'Authorization': `Bearer ${this.bearerToken}`,
-                'Origin': 'https://cloud.iptveditor.com',
-                'Referer': 'https://cloud.iptveditor.com/',
-                'Accept': '*/*',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                'Cache-Control': 'no-cache',
-                'Connection': 'keep-alive'
-            },
-            timeout: 600000,
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity,
-            responseType: 'json'
-        });
-        
-        console.log('✅ Raw HTTP request successful!');
-        console.log('📊 Response:', response.data);
-        
-        return { data: response.data };
-        
-    } catch (error) {
-        console.error('❌ Raw HTTP request failed:', error.message);
-        
-        if (error.response) {
-            console.error('📄 Status:', error.response.status);
-            console.error('📄 Data:', error.response.data);
             
-            // If this approach also fails with 400, then it's likely not a boundary issue
-            if (error.response.status === 400) {
-                throw new Error(`Even raw HTTP request failed with 400. This suggests the issue is not with FormData formatting but potentially with:\n1. Bearer token validity\n2. API rate limiting\n3. Data content validation\n4. Server-side processing limits\n\nResponse: ${JSON.stringify(error.response.data)}`);
-            }
+            throw new Error(`HTTP ${status}: ${data?.message || data?.body || JSON.stringify(data)}`);
         }
         
         throw error;
     }
+}
+
+async debugFormData(baseUrl, datasets) {
+    console.log('🔍 DEBUG: Inspecting FormData structure...');
+    
+    const FormData = require('form-data');
+    const formData = new FormData();
+    
+    // Add all fields exactly as we do in submitToAutoUpdater
+    formData.append('url', baseUrl);
+    
+    formData.append('info', datasets[0], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    formData.append('get_live_streams', datasets[1], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    formData.append('get_live_categories', datasets[2], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    formData.append('get_vod_streams', datasets[3], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    formData.append('get_vod_categories', datasets[4], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    formData.append('get_series', datasets[5], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    formData.append('get_series_categories', datasets[6], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    formData.append('m3u', datasets[7], {
+        filename: 'blob',
+        contentType: 'application/octet-stream'
+    });
+    
+    // Get the FormData headers
+    const headers = formData.getHeaders();
+    console.log('🔍 FormData headers:', headers);
+    
+    // Get the boundary
+    const boundary = formData.getBoundary();
+    console.log('🔍 FormData boundary:', boundary);
+    
+    // Try to get the raw FormData content (first 1000 characters)
+    return new Promise((resolve) => {
+        let chunks = [];
+        formData.on('data', (chunk) => {
+            chunks.push(chunk);
+        });
+        
+        formData.on('end', () => {
+            const fullBuffer = Buffer.concat(chunks);
+            const preview = fullBuffer.toString('utf8', 0, Math.min(1000, fullBuffer.length));
+            
+            console.log('🔍 FormData preview (first 1000 chars):');
+            console.log(preview);
+            console.log('🔍 FormData total size:', fullBuffer.length);
+            
+            resolve({
+                headers,
+                boundary,
+                preview,
+                totalSize: fullBuffer.length
+            });
+        });
+    });
 }
 
 }
