@@ -153,7 +153,7 @@ async getAllSettings() {
     }
 }
 
-// FIXED: getStoredPlaylists - Handle malformed JSON patterns
+// FIXED: getStoredPlaylists - Handle database patterns properly
 async getStoredPlaylists() {
     try {
         const playlists = await db.query(`
@@ -165,41 +165,44 @@ async getStoredPlaylists() {
             ORDER BY name
         `);
         
-        // FIXED: Parse patterns JSON for each playlist with better error handling
+        // FIXED: Handle patterns field properly
         const processedPlaylists = playlists.map(playlist => {
-            // Debug the raw patterns value
+            // Debug what we're getting from database
             console.log(`🔍 DEBUG: Raw patterns for ${playlist.name}:`, playlist.patterns);
             console.log(`🔍 DEBUG: Patterns type: ${typeof playlist.patterns}`);
             
-            // Handle patterns parsing
-            if (playlist.patterns) {
-                // Check if it's already an object (shouldn't happen but let's be safe)
-                if (typeof playlist.patterns === 'object') {
-                    console.log(`✅ Patterns for ${playlist.name} is already an object`);
-                    playlist.patterns = Array.isArray(playlist.patterns) ? playlist.patterns : [playlist.patterns];
-                }
-                // Check if it's the malformed "[object Object]" string
-                else if (playlist.patterns === '[object Object]' || playlist.patterns.includes('[object Object]')) {
+            // Handle different cases for patterns field
+            if (!playlist.patterns) {
+                // NULL or undefined
+                playlist.patterns = [];
+            } else if (typeof playlist.patterns === 'string') {
+                // String from database - try to parse
+                if (playlist.patterns === '' || playlist.patterns === 'null') {
+                    playlist.patterns = [];
+                } else if (playlist.patterns === '[object Object]') {
                     console.warn(`⚠️ Found malformed patterns for ${playlist.name}, setting to empty array`);
                     playlist.patterns = [];
-                }
-                // Try to parse as JSON
-                else {
+                } else {
                     try {
                         playlist.patterns = JSON.parse(playlist.patterns);
                     } catch (e) {
                         console.warn(`⚠️ Failed to parse patterns for playlist ${playlist.name}:`, e);
-                        console.warn(`⚠️ Raw patterns value:`, playlist.patterns);
+                        console.warn(`⚠️ Raw patterns value was:`, playlist.patterns);
                         playlist.patterns = [];
                     }
                 }
+            } else if (Array.isArray(playlist.patterns)) {
+                // Already an array - keep as is
+                console.log(`✅ Patterns for ${playlist.name} is already an array`);
             } else {
+                // Some other type - convert to array
+                console.warn(`⚠️ Unexpected patterns type for ${playlist.name}:`, typeof playlist.patterns);
                 playlist.patterns = [];
             }
             
-            // Ensure patterns is always an array
+            // Final safety check - ensure it's always an array
             if (!Array.isArray(playlist.patterns)) {
-                playlist.patterns = [playlist.patterns];
+                playlist.patterns = [];
             }
             
             return playlist;
@@ -1103,58 +1106,68 @@ async testConnection() {
     // AUTO-UPDATER METHODS - ADD THESE BEFORE module.exports
     // =============================================================================
     
-    // Method to run the complete auto-updater process
-    async runAutoUpdater() {
-        const startTime = Date.now();
+// Method to run the complete auto-updater process
+async runAutoUpdater() {
+    const startTime = Date.now();
+    
+    try {
+        console.log('🚀 Starting auto-updater process...');
         
-        try {
-            console.log('🚀 Starting auto-updater process...');
-            
-            // Get settings
-            const settings = await this.getAllSettings();
-            const baseUrl = settings.provider_base_url;
-            const username = settings.provider_username;
-            const password = settings.provider_password;
-            
-            // Validate required settings
-            if (!baseUrl || !username || !password) {
-                throw new Error('Missing required provider settings. Please configure provider URL, username, and password.');
-            }
-            
-            if (!settings.bearer_token || !settings.default_playlist_id) {
-                throw new Error('Missing required IPTV Editor settings. Please configure bearer token and default playlist.');
-            }
-            
-            // Phase 1: Collect all provider data (8 API calls)
-            console.log('📥 Phase 1: Collecting provider data...');
-            const datasets = await this.collectProviderData(baseUrl, username, password);
-            
-            // Phase 2: Submit to IPTV Editor auto-updater
-            console.log('📤 Phase 2: Submitting to IPTV Editor...');
-            const response = await this.submitToAutoUpdater(baseUrl, datasets);
-            
-            // Phase 3: Log success and update settings
-            const duration = Date.now() - startTime;
-            await this.logSync('playlist_sync', null, 'success', 
-                { playlist: settings.default_playlist_id }, response.data, null, duration);
-                
-            // Update last sync time
-            await this.setSetting('last_auto_updater_run', new Date().toISOString());
-            
-            console.log(`✅ Auto-updater completed in ${Math.round(duration/1000)}s`);
-            
-            return {
-                ...response.data,
-                duration: `${Math.round(duration/1000)} seconds`
-            };
-            
-        } catch (error) {
-            const duration = Date.now() - startTime;
-            await this.logSync('playlist_sync', null, 'error', 
-                { playlist: settings.default_playlist_id || 'unknown' }, null, error.message, duration);
-            throw error;
+        // Get settings
+        const settings = await this.getAllSettings();
+        const baseUrl = settings.provider_base_url;
+        const username = settings.provider_username;
+        const password = settings.provider_password;
+        
+        // Validate required settings
+        if (!baseUrl || !username || !password) {
+            throw new Error('Missing required provider settings. Please configure provider URL, username, and password.');
         }
+        
+        if (!settings.bearer_token || !settings.default_playlist_id) {
+            throw new Error('Missing required IPTV Editor settings. Please configure bearer token and default playlist.');
+        }
+        
+        // Phase 1: Collect all provider data (8 API calls)
+        console.log('📥 Phase 1: Collecting provider data...');
+        const datasets = await this.collectProviderData(baseUrl, username, password);
+        
+        // Phase 2: Submit to IPTV Editor auto-updater
+        console.log('📤 Phase 2: Submitting to IPTV Editor...');
+        const response = await this.submitToAutoUpdater(baseUrl, datasets);
+        
+        // Phase 3: Log success and update settings
+        const duration = Date.now() - startTime;
+        await this.logSync('playlist_sync', null, 'success', 
+            { playlist: settings.default_playlist_id }, response.data, null, duration);
+            
+        // Update last sync time
+        await this.setSetting('last_auto_updater_run', new Date().toISOString());
+        
+        console.log(`✅ Auto-updater completed in ${Math.round(duration/1000)}s`);
+        
+        return {
+            ...response.data,
+            duration: `${Math.round(duration/1000)} seconds`
+        };
+        
+    } catch (error) {
+        const duration = Date.now() - startTime;
+        
+        // FIXED: Get settings here since it might not be defined if error happened early
+        let playlistId = 'unknown';
+        try {
+            const errorSettings = await this.getAllSettings();
+            playlistId = errorSettings.default_playlist_id || 'unknown';
+        } catch (e) {
+            // Ignore settings fetch error during error handling
+        }
+        
+        await this.logSync('playlist_sync', null, 'error', 
+            { playlist: playlistId }, null, error.message, duration);
+        throw error;
     }
+}
 
     // Helper method to collect all provider data
     async collectProviderData(baseUrl, username, password) {
@@ -1206,42 +1219,69 @@ async testConnection() {
         return datasets;
     }
 
-    // Helper method to submit data to IPTV Editor auto-updater
-    async submitToAutoUpdater(baseUrl, datasets) {
-        console.log('🚀 Submitting to IPTV Editor auto-updater...');
-        
-        // Create FormData object
-        const FormData = require('form-data');
-        const formData = new FormData();
-        
-        formData.append('url', baseUrl);
-        formData.append('info', datasets[0]);                  // Basic info
-        formData.append('get_live_streams', datasets[1]);      // Live streams
-        formData.append('get_live_categories', datasets[2]);   // Live categories  
-        formData.append('get_vod_streams', datasets[3]);       // VOD streams
-        formData.append('get_vod_categories', datasets[4]);    // VOD categories
-        formData.append('get_series', datasets[5]);            // Series
-        formData.append('get_series_categories', datasets[6]); // Series categories
-        formData.append('m3u', datasets[7]);                   // M3U playlist
-        
-        try {
-            const response = await axios.post('https://editor.iptveditor.com/api/auto-updater/run-auto-updater', formData, {
-                headers: {
-                    ...formData.getHeaders(),
-                    'Authorization': `Bearer ${this.bearerToken}`,
-                    'Origin': 'https://cloud.iptveditor.com'
-                },
-                timeout: 600000 // 10 minutes timeout - this is a long operation
-            });
-            
-            console.log('✅ Auto-updater submission completed');
-            return { data: response.data };
-            
-        } catch (error) {
-            console.error('❌ Auto-updater submission failed:', error);
-            throw new Error(`IPTV Editor API error: ${error.response?.status} ${error.response?.statusText || error.message}`);
-        }
+// Helper method to submit data to IPTV Editor auto-updater
+async submitToAutoUpdater(baseUrl, datasets) {
+    console.log('🚀 Submitting to IPTV Editor auto-updater...');
+    
+    // Create FormData object
+    const FormData = require('form-data');
+    const formData = new FormData();
+    
+    // FIXED: Add playlist ID to the form data
+    const settings = await this.getAllSettings();
+    if (settings.default_playlist_id) {
+        formData.append('playlist', settings.default_playlist_id);
     }
+    
+    formData.append('url', baseUrl);
+    formData.append('info', datasets[0]);                  // Basic info
+    formData.append('get_live_streams', datasets[1]);      // Live streams
+    formData.append('get_live_categories', datasets[2]);   // Live categories  
+    formData.append('get_vod_streams', datasets[3]);       // VOD streams
+    formData.append('get_vod_categories', datasets[4]);    // VOD categories
+    formData.append('get_series', datasets[5]);            // Series
+    formData.append('get_series_categories', datasets[6]); // Series categories
+    formData.append('m3u', datasets[7]);                   // M3U playlist
+    
+    try {
+        console.log('🔍 DEBUG: Form data fields:');
+        console.log('  - playlist:', settings.default_playlist_id);
+        console.log('  - url:', baseUrl);
+        console.log('  - info length:', datasets[0]?.length || 0);
+        console.log('  - live_streams length:', datasets[1]?.length || 0);
+        console.log('  - m3u length:', datasets[7]?.length || 0);
+        
+        const response = await axios.post('https://editor.iptveditor.com/api/auto-updater/run-auto-updater', formData, {
+            headers: {
+                ...formData.getHeaders(),
+                'Authorization': `Bearer ${this.bearerToken}`,
+                'Origin': 'https://cloud.iptveditor.com',
+                'Referer': 'https://cloud.iptveditor.com/'  // ADDED: Some APIs require referer
+            },
+            timeout: 600000, // 10 minutes timeout - this is a long operation
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity
+        });
+        
+        console.log('✅ Auto-updater submission completed');
+        console.log('📤 Response status:', response.status);
+        console.log('📤 Response data:', response.data);
+        
+        return { data: response.data };
+        
+    } catch (error) {
+        console.error('❌ Auto-updater submission failed:', error);
+        
+        // Log more details about the error
+        if (error.response) {
+            console.error('📄 Response status:', error.response.status);
+            console.error('📄 Response headers:', error.response.headers);
+            console.error('📄 Response data:', error.response.data);
+        }
+        
+        throw new Error(`IPTV Editor API error: ${error.response?.status} ${error.response?.statusText || error.message}`);
+    }
+}
 
 }
 
