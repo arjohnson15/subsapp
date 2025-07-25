@@ -640,163 +640,111 @@ try {
     }
   }
 
-  // Sync all libraries and store in database (enhanced to include pending invites sync)
-  async syncAllLibraries() {
-    try {
-      console.log('?? Syncing Plex libraries using Plex.tv API...');
-      
-      const serverConfigs = this.getServerConfig();
-      
-      for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
-        console.log(`?? Syncing group: ${groupName}`);
-        
-        // Sync regular server libraries
-        const regularLibs = await this.getServerLibraries(groupConfig.regular);
-        await this.updateLibrariesInDatabase(groupName, 'regular', regularLibs);
-        console.log(`? Synced ${regularLibs.length} regular libraries for ${groupName}`);
-        
-        // Use hardcoded 4K libraries
-        const fourkLibs = groupConfig.fourk.libraries || [];
-        await this.updateLibrariesInDatabase(groupName, 'fourk', fourkLibs);
-        console.log(`? Using ${fourkLibs.length} hardcoded 4K libraries for ${groupName}`);
-      }
-      
-      // Sync user access to match current state
-      console.log('\n?? Syncing user library access...');
-      await this.syncUserLibraryAccess();
-      
-      // NEW: Sync pending invites for all users
-      console.log('\n?? Syncing pending invites...');
-      await this.syncPendingInvites();
-      
-      // Update the last sync timestamp
-      await this.updateSyncTimestamp();
-      
-      console.log('\n? Complete Plex sync finished successfully!');
-      
-      return {
-        success: true,
-        timestamp: new Date().toISOString(),
-        message: 'All Plex libraries and user access synced successfully'
-      };
-      
-    } catch (error) {
-      console.error('? Error syncing all libraries:', error);
-      return {
-        success: false,
-        error: error.message,
-        timestamp: new Date().toISOString()
-      };
+// FIXED: Sync user library access while preserving non-Plex tags
+async syncUserLibraryAccess() {
+  try {
+    console.log('🔄 Syncing user library access with all Plex servers...');
+    
+    // Get all users with any Plex configuration
+    const users = await db.query(`
+      SELECT id, name, email, plex_email, tags
+      FROM users 
+      WHERE plex_email IS NOT NULL AND plex_email != ''
+      ORDER BY name
+    `);
+    
+    if (users.length === 0) {
+      console.log('ℹ️ No users with Plex emails found');
+      return;
     }
-  }
-
-  // Sync user library access (enhanced version)
-  async syncUserLibraryAccess() {
-    try {
-      console.log('\n?? Syncing user library access...');
+    
+    console.log(`📋 Checking ${users.length} users against Plex servers...`);
+    
+    // Get all Plex users from all servers
+    const allPlexUsers = await this.getAllPlexUsers();
+    
+    let updatedUsers = 0;
+    let usersWithAccess = 0;
+    let usersWithoutAccess = 0;
+    
+    for (const dbUser of users) {
+      const emailsToCheck = [dbUser.plex_email, dbUser.email].filter(e => e);
       
-      // Get all users from database who have Plex access
-      const users = await db.query(`
-        SELECT id, name, email, plex_email, tags, plex_libraries
-        FROM users 
-        WHERE plex_email IS NOT NULL AND plex_email != ''
-      `);
-      
-      console.log(`?? Found ${users.length} users with Plex access to sync`);
-      
-      // Get all Plex users from all servers
-      const serverConfigs = this.getServerConfig();
-      const allPlexUsers = new Map();
-      
-      for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
-        console.log(`?? Getting shared users from ${groupName}...`);
-        
-        // Get users from regular server
-        const regularUsers = await this.getAllSharedUsersFromServer(groupConfig.regular);
-        for (const user of regularUsers) {
-          const email = user.email.toLowerCase();
-          if (!allPlexUsers.has(email)) {
-            allPlexUsers.set(email, { groups: {} });
-          }
-          allPlexUsers.get(email).groups[groupName] = allPlexUsers.get(email).groups[groupName] || {};
-          allPlexUsers.get(email).groups[groupName].regular = user.libraries;
-        }
-        
-        // Get users from 4K server
-        const fourkUsers = await this.getAllSharedUsersFromServer(groupConfig.fourk);
-        for (const user of fourkUsers) {
-          const email = user.email.toLowerCase();
-          if (!allPlexUsers.has(email)) {
-            allPlexUsers.set(email, { groups: {} });
-          }
-          allPlexUsers.get(email).groups[groupName] = allPlexUsers.get(email).groups[groupName] || {};
-          allPlexUsers.get(email).groups[groupName].fourk = user.libraries;
-        }
+      // Find if this user exists in any Plex server
+      let foundPlexUser = null;
+      for (const email of emailsToCheck) {
+        foundPlexUser = allPlexUsers.get(email.toLowerCase());
+        if (foundPlexUser) break;
       }
       
-      let updatedUsers = 0;
-      let usersWithAccess = 0;
-      let usersWithoutAccess = 0;
-      
-      // Update each database user
-      for (const dbUser of users) {
-        const emailsToCheck = [dbUser.plex_email, dbUser.email].filter(Boolean);
-        
-        let foundPlexUser = null;
-        for (const email of emailsToCheck) {
-          foundPlexUser = allPlexUsers.get(email.toLowerCase());
-          if (foundPlexUser) break;
-        }
-        
-        if (foundPlexUser) {
-          console.log(`? FOUND: ${dbUser.name} (${emailsToCheck.join(', ')}) in Plex servers`);
-          
-          // Build library access object
-          const libraryAccess = foundPlexUser.groups;
-          
-          // Determine tags based on their access
-          const uniqueTags = new Set();
-          for (const [groupName, groupAccess] of Object.entries(libraryAccess)) {
-            if (groupAccess.regular && groupAccess.regular.length > 0) {
-              uniqueTags.add(`Plex ${groupName.slice(-1)}`); // "Plex 1" or "Plex 2"
-            }
-          }
-          
-          // Update database
-          await db.query(`
-            UPDATE users 
-            SET plex_libraries = ?, tags = ?, updated_at = NOW()
-            WHERE id = ?
-          `, [JSON.stringify(libraryAccess), JSON.stringify(Array.from(uniqueTags)), dbUser.id]);
-          
-          usersWithAccess++;
-        } else {
-          console.log(`? NO ACCESS: ${dbUser.name} (${emailsToCheck.join(', ')}) - not found in Plex`);
-          
-          // Clear their library access
-          await db.query(`
-            UPDATE users 
-            SET plex_libraries = ?
-            WHERE id = ?
-          `, ['{}', dbUser.id]);
-          
-          usersWithoutAccess++;
-        }
-        
-        updatedUsers++;
+      // Parse existing tags and preserve non-Plex tags
+      let existingTags = [];
+      try {
+        existingTags = dbUser.tags ? JSON.parse(dbUser.tags) : [];
+      } catch (e) {
+        console.log(`⚠️ Could not parse tags for ${dbUser.name}, using empty array`);
+        existingTags = [];
       }
       
-      console.log(`\n?? SYNC SUMMARY:`);
-      console.log(`?? Database users updated: ${updatedUsers}`);
-      console.log(`? Users with Plex access: ${usersWithAccess}`);
-      console.log(`? Users without Plex access: ${usersWithoutAccess}`);
-      console.log(`?? Total unique Plex users found: ${allPlexUsers.size}`);
+      // Preserve all non-Plex tags (IPTV, etc.)
+      const nonPlexTags = existingTags.filter(tag => !tag.startsWith('Plex '));
       
-} catch (error) {
-      console.error('? Error syncing user library access:', error);
-      throw error;
+      if (foundPlexUser) {
+        console.log(`✅ FOUND: ${dbUser.name} (${emailsToCheck.join(', ')}) in Plex servers`);
+        
+        // Build library access object
+        const libraryAccess = foundPlexUser.groups;
+        
+        // Determine NEW Plex tags based on their access
+        const newPlexTags = [];
+        for (const [groupName, groupAccess] of Object.entries(libraryAccess)) {
+          if (groupAccess.regular && groupAccess.regular.length > 0) {
+            newPlexTags.push(`Plex ${groupName.slice(-1)}`); // "Plex 1" or "Plex 2"
+          }
+        }
+        
+        // CRITICAL FIX: Combine preserved non-Plex tags with new Plex tags
+        const finalTags = [...nonPlexTags, ...newPlexTags];
+        
+        // Update database with preserved tags
+        await db.query(`
+          UPDATE users 
+          SET plex_libraries = ?, tags = ?, updated_at = NOW()
+          WHERE id = ?
+        `, [JSON.stringify(libraryAccess), JSON.stringify(finalTags), dbUser.id]);
+        
+        console.log(`📝 Updated ${dbUser.name}: Preserved tags [${nonPlexTags.join(', ')}], Added Plex tags [${newPlexTags.join(', ')}]`);
+        
+        usersWithAccess++;
+      } else {
+        console.log(`❌ NO ACCESS: ${dbUser.name} (${emailsToCheck.join(', ')}) - not found in Plex`);
+        
+        // Clear their library access but keep non-Plex tags
+        await db.query(`
+          UPDATE users 
+          SET plex_libraries = ?, tags = ?, updated_at = NOW()
+          WHERE id = ?
+        `, ['{}', JSON.stringify(nonPlexTags), dbUser.id]);
+        
+        console.log(`📝 Cleared Plex access for ${dbUser.name} but preserved tags: [${nonPlexTags.join(', ')}]`);
+        
+        usersWithoutAccess++;
+      }
+      
+      updatedUsers++;
     }
+    
+    console.log(`\n📊 SYNC SUMMARY:`);
+    console.log(`📊 Database users updated: ${updatedUsers}`);
+    console.log(`✅ Users with Plex access: ${usersWithAccess}`);
+    console.log(`❌ Users without Plex access: ${usersWithoutAccess}`);
+    console.log(`🎯 Total unique Plex users found: ${allPlexUsers.size}`);
+    
+  } catch (error) {
+    console.error('❌ Error syncing user library access:', error);
+    throw error;
   }
+}
 
   // FIXED: updateUserLibraryAccess - This should be called when editing a user
   async updateUserLibraryAccess(userEmail) {

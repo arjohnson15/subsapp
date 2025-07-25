@@ -1054,8 +1054,6 @@ userHasPendingInvites(user) {
 },
     
 
-// REPLACE ONLY THE saveUser FUNCTION - find this in your users.js and replace just this function:
-
 async saveUser(event) {
     event.preventDefault();
     console.log('🎯 Form submission triggered - starting save process');
@@ -1211,15 +1209,36 @@ async saveUser(event) {
             const originalPlexTags = this.originalTagsBaseline.filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
             const plexTagsChanged = !this.deepEqual(currentPlexTags, originalPlexTags);
             
-            console.log('🔍 Detailed change analysis:', {
-                librarySelectionsChanged: librarySelectionsChanged,
-                plexEmailChanged: plexEmailChanged,
-                plexTagsChanged: plexTagsChanged,
-                normalizedCurrent: normalizedCurrent,
-                normalizedOriginal: normalizedOriginal,
-                currentPlexTags: currentPlexTags,
-                originalPlexTags: originalPlexTags
-            });
+console.log('🔍 ENHANCED DETAILED CHANGE ANALYSIS:');
+console.log('📚 Raw current libraries:', JSON.stringify(currentPlexLibraries, null, 2));
+console.log('📚 Raw original baseline:', JSON.stringify(this.originalLibraryBaseline, null, 2));
+console.log('📚 Normalized current:', JSON.stringify(normalizedCurrent, null, 2));
+console.log('📚 Normalized original:', JSON.stringify(normalizedOriginal, null, 2));
+console.log('🔍 Library comparison result:', librarySelectionsChanged);
+console.log('📧 Plex email comparison:', {
+    current: userData.plex_email,
+    original: originalUserData.plex_email || '',
+    changed: plexEmailChanged
+});
+console.log('🏷️ Plex tags comparison:', {
+    current: currentPlexTags,
+    original: originalPlexTags,
+    changed: plexTagsChanged
+});
+
+// CRITICAL: Let's also see what deepEqual is comparing
+console.log('🔍 DEEP EQUAL DEBUG:');
+console.log('Current keys:', Object.keys(normalizedCurrent));
+console.log('Original keys:', Object.keys(normalizedOriginal));
+for (const key of Object.keys(normalizedCurrent)) {
+    if (normalizedOriginal[key]) {
+        console.log(`🔍 ${key} comparison:`, {
+            current: normalizedCurrent[key],
+            original: normalizedOriginal[key],
+            equal: this.deepEqual(normalizedCurrent[key], normalizedOriginal[key])
+        });
+    }
+}
             
             // Only trigger API calls for actual Plex access changes
             if (librarySelectionsChanged || plexEmailChanged || plexTagsChanged) {
@@ -1267,12 +1286,6 @@ async saveUser(event) {
         // Show immediate success message
         Utils.showNotification(isEditing ? 'User updated successfully' : 'User created successfully', 'success');
 
-        // Clear baselines after successful save
-        if (isEditing) {
-            this.originalLibraryBaseline = null;
-            this.originalTagsBaseline = null;
-        }
-
         // CRITICAL: Navigate away IMMEDIATELY after database save - before Plex operations
         console.log('🚀 Navigating back to users page immediately...');
         setTimeout(async () => {
@@ -1299,6 +1312,12 @@ async saveUser(event) {
             
         } else if (!shouldUpdatePlexAccess && isEditing) {
             console.log('⏭️ Skipping Plex API calls - no Plex access changes detected');
+        }
+		
+		        // Clear baselines after successful save
+        if (isEditing) {
+            this.originalLibraryBaseline = null;
+            this.originalTagsBaseline = null;
         }
         
     } catch (error) {
@@ -1998,20 +2017,39 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
         return true;
     },
 	
-    // Normalize library objects for comparison - ensures consistent sorting
-    normalizeLibrariesForComparison(libraries) {
-        if (!libraries) return {};
-        const normalized = {};
-        for (const [serverGroup, access] of Object.entries(libraries)) {
-            if (access) {
-                normalized[serverGroup] = {
-                    regular: (access.regular || []).slice().sort(),
-                    fourk: (access.fourk || []).slice().sort()
-                };
-            }
+// FIXED: Normalize library objects for comparison - ensures consistent format
+normalizeLibrariesForComparison(libraries) {
+    if (!libraries) return {};
+    const normalized = {};
+    
+    for (const [serverGroup, access] of Object.entries(libraries)) {
+        if (access) {
+            normalized[serverGroup] = {
+                regular: this.extractLibraryIds(access.regular || []).sort(),
+                fourk: this.extractLibraryIds(access.fourk || []).sort()
+            };
         }
-        return normalized;
-    },
+    }
+    return normalized;
+},
+
+// NEW: Helper function to extract IDs from either strings or objects
+extractLibraryIds(libraryArray) {
+    if (!Array.isArray(libraryArray)) return [];
+    
+    return libraryArray.map(item => {
+        // If it's already a string ID, return it
+        if (typeof item === 'string') {
+            return item;
+        }
+        // If it's an object with an id property, extract the id
+        if (typeof item === 'object' && item.id) {
+            return item.id.toString();
+        }
+        // Fallback - convert whatever it is to string
+        return item.toString();
+    });
+},
 
     // Enhanced collectPlexLibrarySelections function that only includes selected libraries and sorts arrays
     collectPlexLibrarySelections() {

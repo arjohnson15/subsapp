@@ -408,7 +408,7 @@ if (iptv_subscription && iptv_subscription !== 'remove' && iptv_expiration) {
 // Update user - FIXED subscription validation and transaction handling
 router.put('/:id', [
   body('name').notEmpty().trim().escape(),
-  body('email').isEmail().normalizeEmail(),
+  body('email').isEmail(),
   body('owner_id').optional({ nullable: true, checkFalsy: true }).isInt(),
   body('tags').optional().isArray(),
   body('plex_email').optional().isEmail(),
