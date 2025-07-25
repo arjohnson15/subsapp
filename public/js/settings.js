@@ -2466,7 +2466,6 @@ async saveProviderSettings(settings) {
     }
 },
 
-// ADD THIS FUNCTION (around line 1270):
 async testIPTVEditorConnection() {
     const testButton = document.querySelector('[onclick="testIPTVEditorConnection()"]');
     
@@ -2506,7 +2505,6 @@ async testIPTVEditorConnection() {
     }
 },
 
-// ADD THIS FUNCTION (around line 1310):
 async syncIPTVEditorPlaylists() {
     const syncButton = document.querySelector('[onclick="syncIPTVEditorPlaylists()"]');
     const playlistSelect = document.getElementById('iptvPlaylistSelect');
@@ -2556,7 +2554,6 @@ async syncIPTVEditorPlaylists() {
     }
 },
 
-// ADD THIS FUNCTION (around line 1360):
 async syncIPTVEditorCategories() {
     try {
         const syncBtn = document.getElementById('syncCategoriesBtn');

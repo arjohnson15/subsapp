@@ -473,6 +473,21 @@ const {
       const currentTags = safeJsonParse(currentUser.tags, []);
       finalTags = processTagsForUpdate(plex_libraries, currentTags);
     }
+	
+	// CRITICAL DEBUG: Log emails before database save
+console.log('🔍 BEFORE DATABASE SAVE:');
+console.log('Main email:', email);
+console.log('Plex email:', plex_email);
+console.log('Main email length:', email.length);
+console.log('Plex email length:', plex_email ? plex_email.length : 'null');
+console.log('Main email chars:', email.split(''));
+console.log('Plex email chars:', plex_email ? plex_email.split('') : 'null');
+
+// Test the actual UPDATE query with both emails
+console.log('🔍 SQL UPDATE with both emails:', {
+  email: email,
+  plex_email: plex_email
+});
 
     // Update user information
 await db.query(`
@@ -490,9 +505,15 @@ await db.query(`
   req.params.id
 ]);
 
+// CRITICAL DEBUG: Check what was actually saved
+const [savedUser] = await db.query('SELECT email, plex_email FROM users WHERE id = ?', [req.params.id]);
+console.log('🔍 AFTER DATABASE SAVE:');
+console.log('Saved main email:', savedUser.email);
+console.log('Saved plex email:', savedUser.plex_email);
+
     console.log('✅ Updated user basic info for ID:', req.params.id);
 
-// BULLETPROOF SUBSCRIPTION HANDLING - REPLACE ENTIRE SECTION
+
 
 // Handle subscription updates if provided
 try {
