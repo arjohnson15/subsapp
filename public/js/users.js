@@ -282,9 +282,10 @@ renderUsersTableBasic() {
         
         const filteredUsers = window.AppState.allUsers.filter(user => {
             // Search filter (name or email)
-            const matchesSearch = !searchTerm || 
-                user.name.toLowerCase().includes(searchTerm) ||
-                user.email.toLowerCase().includes(searchTerm);
+const matchesSearch = !searchTerm || 
+    user.name.toLowerCase().includes(searchTerm) ||
+    user.email.toLowerCase().includes(searchTerm) ||
+    (user.plex_username && user.plex_username.toLowerCase().includes(searchTerm));
             
             // Owner filter
             const matchesOwner = !ownerFilter || 
@@ -477,6 +478,13 @@ showUserModal(user) {
                         </div>
                         <div class="info-value email">${user.plex_email || 'N/A'}</div>
                     </div>
+					<div class="info-item">
+    <div class="info-label">
+        <i class="fas fa-user"></i>
+        Plex Username
+    </div>
+    <div class="info-value">${user.plex_username || 'Not found'}</div>
+</div>
                     <div class="info-item">
                         <div class="info-label">
                             <i class="fas fa-tv"></i>

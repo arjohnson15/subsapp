@@ -396,6 +396,96 @@ def share_libraries_with_user_on_server(server_config, user_email, library_ids):
             "error": str(e)[:200] + "..." if len(str(e)) > 200 else str(e),
             "server": server_config['name']
         }
+        
+def get_all_pending_invites_by_account():
+    """Get ALL pending invites from both Plex accounts in just 2 API calls"""
+    try:
+        log_info("Getting ALL pending invites from both Plex accounts...")
+        
+        results = {}
+        total_invites = 0
+        api_calls = 0
+        
+        # Process each server group (each has its own account)
+        for server_group_name, server_group in PLEX_SERVERS.items():
+            log_info(f"Getting pending invites for {server_group_name} account...")
+            
+            # Use the regular server token for this account
+            account_token = server_group['regular']["token"]
+            account_name = server_group['regular']["name"]
+            
+            try:
+                signal.alarm(60)
+                account = MyPlexAccount(token=account_token)
+                
+                # ONE API CALL per account - gets ALL invites for this account
+                invitations = account.pendingInvites(includeSent=True, includeReceived=False)
+                signal.alarm(0)
+                api_calls += 1
+                
+                invite_list = []
+                for invite in invitations:
+                    try:
+                        invite_id = getattr(invite, 'id', None)
+                        if invite_id is None or str(invite_id) == 'nan':
+                            invite_id = None
+                        
+                        # Handle datetime conversion properly
+                        created_at = getattr(invite, 'createdAt', None)
+                        if created_at and hasattr(created_at, 'isoformat'):
+                            created_at = created_at.isoformat()
+                        elif created_at:
+                            created_at = str(created_at)
+                        
+                        invite_data = {
+                            "email": invite.email,
+                            "invite_id": invite_id,
+                            "created_at": created_at,
+                            "server_group": server_group_name,
+                            "account_name": account_name
+                        }
+                        invite_list.append(invite_data)
+                        
+                    except Exception as e:
+                        log_error(f"Error processing invite: {str(e)}")
+                        continue
+                
+                results[server_group_name] = {
+                    "success": True,
+                    "invites": invite_list,
+                    "count": len(invite_list),
+                    "account_name": account_name
+                }
+                
+                total_invites += len(invite_list)
+                log_info(f"Found {len(invite_list)} pending invites for {server_group_name} account")
+                
+            except Exception as e:
+                signal.alarm(0)
+                log_error(f"Error getting invites for {server_group_name}: {str(e)}")
+                results[server_group_name] = {
+                    "success": False,
+                    "error": str(e),
+                    "invites": [],
+                    "account_name": account_name
+                }
+        
+        return {
+            "success": True,
+            "accounts": results,
+            "total_invites": total_invites,
+            "api_calls": api_calls
+        }
+        
+    except Exception as e:
+        signal.alarm(0)
+        return {
+            "success": False,
+            "error": str(e),
+            "accounts": {},
+            "total_invites": 0,
+            "api_calls": 0
+        }
 
 def share_libraries_with_user(user_email, server_group, library_selection):
     """
@@ -1071,6 +1161,10 @@ def main():
             user_email = sys.argv[2]
             
             result = check_invite_status_all_servers(user_email)
+            print(json.dumps(result, indent=2))
+            
+        elif command == "get_all_pending_invites_batch":
+            result = get_all_pending_invites_by_account()
             print(json.dumps(result, indent=2))
             
         elif command == "remove_user_completely" and len(sys.argv) >= 4:

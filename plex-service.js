@@ -613,16 +613,17 @@ async getAllPlexUsers() {
       console.log(`📡 Getting users from ${groupName}...`);
       
       // Get users from regular server
-      const regularUsers = await this.getAllSharedUsersFromServer(groupConfig.regular);
-      for (const user of regularUsers) {
-        const email = user.email.toLowerCase();
-        if (!allUsers.has(email)) {
-          allUsers.set(email, { 
-            email: user.email,
-            groups: {},
-            servers: []
-          });
-        }
+const regularUsers = await this.getAllSharedUsersFromServer(groupConfig.regular);
+for (const user of regularUsers) {
+  const email = user.email.toLowerCase();
+  if (!allUsers.has(email)) {
+    allUsers.set(email, { 
+      email: user.email,
+      username: user.username,
+      groups: {},
+      servers: []
+    });
+  }
         allUsers.get(email).groups[groupName] = allUsers.get(email).groups[groupName] || {};
         allUsers.get(email).groups[groupName].regular = user.libraries;
         allUsers.get(email).servers.push({
@@ -633,16 +634,17 @@ async getAllPlexUsers() {
       }
       
       // Get users from 4K server
-      const fourkUsers = await this.getAllSharedUsersFromServer(groupConfig.fourk);
-      for (const user of fourkUsers) {
-        const email = user.email.toLowerCase();
-        if (!allUsers.has(email)) {
-          allUsers.set(email, { 
-            email: user.email,
-            groups: {},
-            servers: []
-          });
-        }
+const fourkUsers = await this.getAllSharedUsersFromServer(groupConfig.fourk);
+for (const user of fourkUsers) {
+  const email = user.email.toLowerCase();
+  if (!allUsers.has(email)) {
+    allUsers.set(email, { 
+      email: user.email,
+      username: user.username,  // ADD THIS LINE
+      groups: {},
+      servers: []
+    });
+  }
         allUsers.get(email).groups[groupName] = allUsers.get(email).groups[groupName] || {};
         allUsers.get(email).groups[groupName].fourk = user.libraries;
         allUsers.get(email).servers.push({
@@ -689,7 +691,7 @@ async syncAllLibraries() {
     
     // NEW: Sync pending invites for all users
     console.log('\n🔄 Syncing pending invites...');
-    await this.syncPendingInvites();
+    await this.syncPendingInvitesUltraFast();
     
     // Update the last sync timestamp
     await this.updateSyncTimestamp();
@@ -905,13 +907,11 @@ async syncUserLibraryAccess() {
         const finalTags = [...nonPlexTags, ...newPlexTags];
         console.log(`🏁 FINAL tags for ${dbUser.name}:`, finalTags);
         
-        // Update database with both library access AND properly managed tags
-        // CRITICAL: Store as JSON array, not string
-        await db.query(`
-          UPDATE users 
-          SET plex_libraries = ?, tags = ?, updated_at = NOW()
-          WHERE id = ?
-        `, [JSON.stringify(foundPlexUser.groups), JSON.stringify(finalTags), dbUser.id]);
+await db.query(`
+  UPDATE users 
+  SET plex_libraries = ?, tags = ?, plex_username = ?, updated_at = NOW()
+  WHERE id = ?
+`, [JSON.stringify(foundPlexUser.groups), JSON.stringify(finalTags), foundPlexUser.username || null, dbUser.id]);
         
         console.log(`💾 UPDATED ${dbUser.name}: Preserved [${nonPlexTags.join(', ')}] + Added Plex [${newPlexTags.join(', ')}]`);
         updatedUsers++;
@@ -955,11 +955,11 @@ async syncUserLibraryAccess() {
           console.log(`🏁 FINAL tags for ${dbUser.name} (Plex removed):`, finalTags);
           
           // CRITICAL: Store as JSON array, not string
-          await db.query(`
-            UPDATE users 
-            SET plex_libraries = ?, tags = ?, updated_at = NOW()
-            WHERE id = ?
-          `, ['{}', JSON.stringify(finalTags), dbUser.id]);
+await db.query(`
+  UPDATE users 
+  SET plex_libraries = ?, tags = ?, plex_username = ?, updated_at = NOW()
+  WHERE id = ?
+`, ['{}', JSON.stringify(finalTags), null, dbUser.id]);
           
           console.log(`💾 UPDATED ${dbUser.name}: Removed Plex tags, preserved [${finalTags.join(', ')}]`);
           updatedUsers++;
@@ -1120,6 +1120,103 @@ try {
     } catch (error) {
       console.error(`❌ Error refreshing user data:`, error);
       return { success: false, error: error.message };
+    }
+  }
+  
+ async syncPendingInvitesUltraFast() {
+    try {
+      console.log('\n🚀 ULTRA-FAST: Getting all pending invites from both accounts...');
+      
+      const users = await db.query(`
+        SELECT id, name, email, plex_email 
+        FROM users 
+        WHERE plex_email IS NOT NULL AND plex_email != ''
+      `);
+      
+      console.log(`📧 Checking pending invites for ${users.length} users...`);
+      
+      // Get ALL pending invites in just 2 API calls
+      const batchResult = await pythonPlexService.getAllPendingInvitesBatch();
+      
+      if (!batchResult.success) {
+        throw new Error(`Failed to get batch pending invites: ${batchResult.error}`);
+      }
+      
+      console.log(`📊 Retrieved ${batchResult.total_invites} total pending invites from ${batchResult.api_calls} accounts`);
+      
+      // Create fast lookup map
+      const pendingInvitesByEmail = new Map();
+      
+      for (const [serverGroup, accountData] of Object.entries(batchResult.accounts)) {
+        if (accountData.success && accountData.invites) {
+          for (const invite of accountData.invites) {
+            const email = invite.email.toLowerCase();
+            
+            if (!pendingInvitesByEmail.has(email)) {
+              pendingInvitesByEmail.set(email, {});
+            }
+            
+            pendingInvitesByEmail.get(email)[serverGroup] = {
+              regular: { status: 'pending', server: `${serverGroup} Regular` },
+              fourk: { status: 'pending', server: `${serverGroup} 4K` }
+            };
+          }
+        }
+      }
+      
+      // Process users with fast lookups
+      let usersWithPending = 0;
+      let usersWithoutPending = 0;
+      const updatePromises = [];
+      
+      for (const user of users) {
+        const userEmail = (user.plex_email || user.email).toLowerCase();
+        const userPendingInvites = pendingInvitesByEmail.get(userEmail) || {};
+        
+        const hasPending = Object.keys(userPendingInvites).length > 0;
+        
+        if (hasPending) {
+          console.log(`📧 ${user.name}: Found pending invites for ${Object.keys(userPendingInvites).join(', ')}`);
+          usersWithPending++;
+        } else {
+          console.log(`✅ ${user.name}: No pending invites`);
+          usersWithoutPending++;
+        }
+        
+        // Queue database update
+        const updatePromise = db.query(`
+          UPDATE users 
+          SET pending_plex_invites = ?, updated_at = NOW()
+          WHERE id = ?
+        `, [hasPending ? JSON.stringify(userPendingInvites) : null, user.id]);
+        
+        updatePromises.push(updatePromise);
+      }
+      
+      // Execute all database updates in parallel
+      console.log(`💾 Updating ${updatePromises.length} user records...`);
+      await Promise.all(updatePromises);
+      
+      console.log(`\n📊 ULTRA-FAST PENDING INVITES SUMMARY:`);
+      console.log(`✅ Users with pending invites: ${usersWithPending}`);
+      console.log(`❌ Users without pending invites: ${usersWithoutPending}`);
+      console.log(`🎯 Total pending invites found: ${batchResult.total_invites}`);
+      console.log(`⚡ PERFORMANCE: Used ${batchResult.api_calls} API calls instead of ${users.length} calls`);
+      console.log(`🚀 SPEED IMPROVEMENT: ~${Math.round((users.length / batchResult.api_calls) * 100)}% faster`);
+      
+      return {
+        success: true,
+        usersChecked: users.length,
+        usersWithPending,
+        usersWithoutPending,
+        totalInvites: batchResult.total_invites,
+        apiCalls: batchResult.api_calls,
+        speedImprovement: `${Math.round((users.length / batchResult.api_calls) * 100)}% faster`
+      };
+      
+    } catch (error) {
+      console.error('❌ Error in ultra-fast pending invites sync:', error);
+      throw error;
     }
   }
 }

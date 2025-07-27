@@ -264,6 +264,29 @@ this.pythonExecutable = process.env.NODE_ENV === 'production'
       };
     }
   }
+  
+  async getAllPendingInvitesBatch() {
+    try {
+      console.log(`🚀 Getting ALL pending invites from both Plex accounts...`);
+      
+      const args = ['get_all_pending_invites_batch'];
+      
+      const result = await this.executePythonCommand(args);
+      
+      console.log(`📧 Retrieved ${result.total_invites || 0} total pending invites from ${result.api_calls || 0} accounts`);
+      return result;
+      
+    } catch (error) {
+      console.error(`❌ Error getting batch pending invites:`, error);
+      return {
+        success: false,
+        error: error.message,
+        accounts: {},
+        total_invites: 0,
+        api_calls: 0
+      };
+    }
+  }
 }
 
 module.exports = new PythonPlexService();
