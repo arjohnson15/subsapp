@@ -801,25 +801,51 @@ async syncUserLibraryAccess() {
       let existingTags = [];
       let plexLibraries = {};
       
-      // CRITICAL FIX: Handle both string JSON and already-parsed arrays
+      // CRITICAL FIX: Handle tags that may be stored as strings instead of JSON arrays
       try {
-        if (Array.isArray(dbUser.tags)) {
+        if (dbUser.tags === null || dbUser.tags === undefined) {
+          existingTags = [];
+          console.log(`🏷️ ORIGINAL tags for ${dbUser.name} (null/undefined):`, existingTags);
+        } else if (Array.isArray(dbUser.tags)) {
           // Already parsed by MySQL driver
           existingTags = dbUser.tags;
-          console.log(`🏷️ ORIGINAL tags for ${dbUser.name} (pre-parsed):`, existingTags);
+          console.log(`🏷️ ORIGINAL tags for ${dbUser.name} (pre-parsed array):`, existingTags);
         } else if (typeof dbUser.tags === 'string') {
-          // String JSON that needs parsing
-          existingTags = dbUser.tags ? JSON.parse(dbUser.tags) : [];
-          console.log(`🏷️ ORIGINAL tags for ${dbUser.name} (parsed):`, existingTags);
+          // Check if it's a JSON string or a plain string
+          if (dbUser.tags.startsWith('[') && dbUser.tags.endsWith(']')) {
+            // It's a JSON array string
+            existingTags = JSON.parse(dbUser.tags);
+            console.log(`🏷️ ORIGINAL tags for ${dbUser.name} (JSON string):`, existingTags);
+          } else if (dbUser.tags.startsWith('{') && dbUser.tags.endsWith('}')) {
+            // It's a JSON object string (shouldn't happen for tags, but handle it)
+            existingTags = [];
+            console.log(`🏷️ ORIGINAL tags for ${dbUser.name} (invalid JSON object, using empty):`, existingTags);
+          } else {
+            // It's a plain string - convert to array
+            const trimmedTag = dbUser.tags.trim();
+            if (trimmedTag) {
+              existingTags = [trimmedTag];
+              console.log(`🏷️ ORIGINAL tags for ${dbUser.name} (plain string converted):`, existingTags);
+            } else {
+              existingTags = [];
+              console.log(`🏷️ ORIGINAL tags for ${dbUser.name} (empty string):`, existingTags);
+            }
+          }
         } else {
-          // Fallback for other types
+          // Unknown type
           existingTags = [];
-          console.log(`🏷️ ORIGINAL tags for ${dbUser.name} (fallback):`, existingTags);
+          console.log(`🏷️ ORIGINAL tags for ${dbUser.name} (unknown type, using empty):`, existingTags);
         }
       } catch (e) {
         console.log(`⚠️ Could not parse tags for ${dbUser.name}:`, e.message);
         console.log(`🔍 RAW TAGS: ${typeof dbUser.tags} = ${dbUser.tags}`);
-        existingTags = [];
+        // If it's a plain string that failed JSON parsing, try to use it as a single tag
+        if (typeof dbUser.tags === 'string' && dbUser.tags.trim()) {
+          existingTags = [dbUser.tags.trim()];
+          console.log(`🔧 FALLBACK: Using as single tag:`, existingTags);
+        } else {
+          existingTags = [];
+        }
       }
       
       // CRITICAL FIX: Handle plex_libraries the same way
@@ -840,9 +866,10 @@ async syncUserLibraryAccess() {
       
       // CRITICAL FIX: Preserve ALL non-Plex tags (especially IPTV)
       const nonPlexTags = existingTags.filter(tag => {
-        const tagStr = String(tag);
+        const tagStr = String(tag).toLowerCase();
         // Remove ONLY exact Plex server tags, keep everything else
-        return tagStr !== 'Plex 1' && tagStr !== 'Plex 2';
+        return !tagStr.includes('plex 1') && !tagStr.includes('plex 2') && 
+               !tagStr.includes('plex1') && !tagStr.includes('plex2');
       });
       
       console.log(`🔒 PROTECTED non-Plex tags for ${dbUser.name}:`, nonPlexTags);
@@ -879,6 +906,7 @@ async syncUserLibraryAccess() {
         console.log(`🏁 FINAL tags for ${dbUser.name}:`, finalTags);
         
         // Update database with both library access AND properly managed tags
+        // CRITICAL: Store as JSON array, not string
         await db.query(`
           UPDATE users 
           SET plex_libraries = ?, tags = ?, updated_at = NOW()
@@ -926,6 +954,7 @@ async syncUserLibraryAccess() {
           const finalTags = nonPlexTags;
           console.log(`🏁 FINAL tags for ${dbUser.name} (Plex removed):`, finalTags);
           
+          // CRITICAL: Store as JSON array, not string
           await db.query(`
             UPDATE users 
             SET plex_libraries = ?, tags = ?, updated_at = NOW()
