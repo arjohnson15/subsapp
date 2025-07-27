@@ -12,21 +12,25 @@ class PlexService {
     }, 5000); // Wait 5 seconds for app to fully start
   }
 
-  // Initialize periodic library sync
-  initializeSync() {
-    console.log('Starting Plex library sync service...');
+// Initialize periodic library sync
+initializeSync() {
+  console.log('Starting Plex library sync service...');
+ 
+  
+  // Set up DAILY sync at 3 AM (instead of hourly)
+  setInterval(() => {
+    const now = new Date();
+    const hour = now.getHours();
     
-    // FIXED: Don't sync immediately on startup - too risky
-    // this.syncAllLibraries();
-    
-    // Set up hourly sync
-    setInterval(() => {
-      console.log('Running scheduled Plex library sync...');
+    // Only run sync at 3 AM (to avoid peak usage times)
+    if (hour === 3) {
+      console.log('Running scheduled DAILY Plex library sync...');
       this.syncAllLibrariesSafely(); // Use safe version
-    }, 60 * 60 * 1000); // 1 hour
-    
-    console.log('? Plex sync scheduled - will run every hour');
-  }
+    }
+  }, 60 * 60 * 1000); // Still check every hour, but only sync at 3 AM
+  
+  console.log('📅 Plex sync scheduled - will run daily at 3 AM');
+}
 
   // FIXED: Safe version that won't crash the app
   async syncAllLibrariesSafely() {
@@ -598,6 +602,116 @@ console.log(`?? Python sharing detailed results:`, result);
       console.error('? Error updating sync timestamp:', error);
     }
   }
+  
+ // Helper method to get all Plex users across all servers
+async getAllPlexUsers() {
+  try {
+    const serverConfigs = this.getServerConfig();
+    const allUsers = new Map(); // Use email as key
+    
+    for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
+      console.log(`📡 Getting users from ${groupName}...`);
+      
+      // Get users from regular server
+      const regularUsers = await this.getAllSharedUsersFromServer(groupConfig.regular);
+      for (const user of regularUsers) {
+        const email = user.email.toLowerCase();
+        if (!allUsers.has(email)) {
+          allUsers.set(email, { 
+            email: user.email,
+            groups: {},
+            servers: []
+          });
+        }
+        allUsers.get(email).groups[groupName] = allUsers.get(email).groups[groupName] || {};
+        allUsers.get(email).groups[groupName].regular = user.libraries;
+        allUsers.get(email).servers.push({
+          group: groupName,
+          type: 'regular',
+          server: groupConfig.regular.name
+        });
+      }
+      
+      // Get users from 4K server
+      const fourkUsers = await this.getAllSharedUsersFromServer(groupConfig.fourk);
+      for (const user of fourkUsers) {
+        const email = user.email.toLowerCase();
+        if (!allUsers.has(email)) {
+          allUsers.set(email, { 
+            email: user.email,
+            groups: {},
+            servers: []
+          });
+        }
+        allUsers.get(email).groups[groupName] = allUsers.get(email).groups[groupName] || {};
+        allUsers.get(email).groups[groupName].fourk = user.libraries;
+        allUsers.get(email).servers.push({
+          group: groupName,
+          type: 'fourk',
+          server: groupConfig.fourk.name
+        });
+      }
+    }
+    
+    console.log(`📊 Found ${allUsers.size} unique users across all Plex servers`);
+    return allUsers;
+    
+  } catch (error) {
+    console.error('❌ Error getting all Plex users:', error);
+    return new Map();
+  }
+}
+
+// Sync all libraries and store in database (enhanced to include pending invites sync)
+async syncAllLibraries() {
+  try {
+    console.log('🔄 Syncing Plex libraries using Plex.tv API...');
+    
+    const serverConfigs = this.getServerConfig();
+    
+    for (const [groupName, groupConfig] of Object.entries(serverConfigs)) {
+      console.log(`🔄 Syncing group: ${groupName}`);
+      
+      // Sync regular server libraries
+      const regularLibs = await this.getServerLibraries(groupConfig.regular);
+      await this.updateLibrariesInDatabase(groupName, 'regular', regularLibs);
+      console.log(`✅ Synced ${regularLibs.length} regular libraries for ${groupName}`);
+      
+      // Use hardcoded 4K libraries
+      const fourkLibs = groupConfig.fourk.libraries || [];
+      await this.updateLibrariesInDatabase(groupName, 'fourk', fourkLibs);
+      console.log(`✅ Using ${fourkLibs.length} hardcoded 4K libraries for ${groupName}`);
+    }
+    
+    // Sync user access to match current state
+    console.log('\n🔄 Syncing user library access...');
+    await this.syncUserLibraryAccess();
+    
+    // NEW: Sync pending invites for all users
+    console.log('\n🔄 Syncing pending invites...');
+    await this.syncPendingInvites();
+    
+    // Update the last sync timestamp
+    await this.updateSyncTimestamp();
+    
+    console.log('\n✅ Complete Plex sync finished successfully!');
+    
+    return {
+      success: true,
+      timestamp: new Date().toISOString(),
+      message: 'All Plex libraries and user access synced successfully'
+    };
+    
+  } catch (error) {
+    console.error('❌ Error syncing all libraries:', error);
+    return {
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+  
 
   // Remove user from Plex using Python
   async removeUserFromPlex(userEmail, serverGroup) {
@@ -640,14 +754,39 @@ try {
     }
   }
 
-// FIXED: Sync user library access while preserving non-Plex tags
 async syncUserLibraryAccess() {
   try {
-    console.log('🔄 Syncing user library access with all Plex servers...');
+    console.log('🔄 OPTIMIZED: Syncing user library access with batched API calls...');
+    
+    // 🚨 CRITICAL DEBUGGING: Check database state IMMEDIATELY
+    console.log('\n🔍 CRITICAL DEBUG: Checking database state at sync start...');
+    
+    const debugUsers = await db.query(`
+      SELECT id, name, tags, plex_libraries
+      FROM users 
+      WHERE name IN ('Ashley Henderson', 'Scott Ertle') 
+      AND plex_email IS NOT NULL
+    `);
+    
+    debugUsers.forEach(user => {
+      console.log(`📊 RAW DATABASE DATA for ${user.name}:`);
+      console.log(`   Tags (raw): ${typeof user.tags} = "${user.tags}"`);
+      console.log(`   Tags length: ${user.tags ? user.tags.length : 'null'}`);
+      
+      // Try parsing manually
+      try {
+        const parsedTags = user.tags ? JSON.parse(user.tags) : [];
+        console.log(`   Tags (parsed): `, parsedTags);
+      } catch (e) {
+        console.log(`   ❌ Tags parsing error: ${e.message}`);
+      }
+    });
+    
+    console.log('🔍 END CRITICAL DEBUG\n');
     
     // Get all users with any Plex configuration
     const users = await db.query(`
-      SELECT id, name, email, plex_email, tags
+      SELECT id, name, email, plex_email, tags, plex_libraries
       FROM users 
       WHERE plex_email IS NOT NULL AND plex_email != ''
       ORDER BY name
@@ -659,15 +798,26 @@ async syncUserLibraryAccess() {
     }
     
     console.log(`📋 Checking ${users.length} users against Plex servers...`);
+    console.log('🚀 PERFORMANCE: Making batched API calls instead of per-user calls');
     
-    // Get all Plex users from all servers
+    // OPTIMIZED: Get ALL users from ALL servers in one batch (instead of per-user calls)
     const allPlexUsers = await this.getAllPlexUsers();
+    console.log(`📊 Retrieved ${allPlexUsers.size} total Plex users in batch`);
     
     let updatedUsers = 0;
     let usersWithAccess = 0;
     let usersWithoutAccess = 0;
+    let usersReGranted = 0;
+    let iptvTagsPreserved = 0;
+    let iptvTagsRemoved = 0;
+    let totalTagChanges = 0;
+    
+    // Track detailed tag changes for logging
+    const tagChangeLog = [];
     
     for (const dbUser of users) {
+      console.log(`\n🔍 PROCESSING: ${dbUser.name} (ID: ${dbUser.id})`);
+      
       const emailsToCheck = [dbUser.plex_email, dbUser.email].filter(e => e);
       
       // Find if this user exists in any Plex server
@@ -677,68 +827,214 @@ async syncUserLibraryAccess() {
         if (foundPlexUser) break;
       }
       
-      // Parse existing tags and preserve non-Plex tags
+      // Parse existing tags and library assignments
       let existingTags = [];
+      let plexLibraries = {};
+      
       try {
         existingTags = dbUser.tags ? JSON.parse(dbUser.tags) : [];
+        console.log(`🏷️ ORIGINAL tags for ${dbUser.name}:`, existingTags);
       } catch (e) {
         console.log(`⚠️ Could not parse tags for ${dbUser.name}, using empty array`);
+        console.log(`🔍 RAW TAGS DATA: ${typeof dbUser.tags} = "${dbUser.tags}"`);
         existingTags = [];
       }
       
-      // Preserve all non-Plex tags (IPTV, etc.)
-      const nonPlexTags = existingTags.filter(tag => !tag.startsWith('Plex '));
+      try {
+        plexLibraries = dbUser.plex_libraries ? JSON.parse(dbUser.plex_libraries) : {};
+      } catch (e) {
+        console.log(`⚠️ Could not parse plex_libraries for ${dbUser.name}, using empty object`);
+        plexLibraries = {};
+      }
+      
+      // Check for IPTV tags in original
+      const originalHasIPTV = existingTags.some(tag => String(tag).toLowerCase().includes('iptv'));
+      console.log(`📺 ${dbUser.name} originally has IPTV tag:`, originalHasIPTV);
+      
+      // DETAILED LOGGING: Show the filtering process
+      if (existingTags.length > 0) {
+        console.log(`🔍 FILTERING tags for ${dbUser.name}:`);
+        existingTags.forEach((tag, index) => {
+          const tagStr = String(tag).toLowerCase();
+          const isPlexTag = tagStr.includes('plex 1') || tagStr.includes('plex 2') || tagStr.includes('plex1') || tagStr.includes('plex2');
+          console.log(`   Tag ${index + 1}: "${tag}" -> ${isPlexTag ? 'REMOVE (Plex tag)' : 'KEEP (Non-Plex tag)'}`);
+        });
+      }
+      
+      // FIXED: More precise non-Plex tag preservation
+      const nonPlexTags = existingTags.filter(tag => {
+        const tagStr = String(tag).toLowerCase();
+        // Keep ALL tags that are NOT specifically Plex server tags
+        return !tagStr.includes('plex 1') && !tagStr.includes('plex 2') && !tagStr.includes('plex1') && !tagStr.includes('plex2');
+      });
+      
+      console.log(`✅ FILTERED non-Plex tags for ${dbUser.name}:`, nonPlexTags);
+      
+      // Check if IPTV tag survived filtering
+      const filteredHasIPTV = nonPlexTags.some(tag => String(tag).toLowerCase().includes('iptv'));
+      console.log(`📺 ${dbUser.name} IPTV tag after filtering:`, filteredHasIPTV);
+      
+      if (originalHasIPTV && filteredHasIPTV) {
+        iptvTagsPreserved++;
+        console.log(`✅ IPTV tag PRESERVED for ${dbUser.name}`);
+      } else if (originalHasIPTV && !filteredHasIPTV) {
+        iptvTagsRemoved++;
+        console.log(`❌ IPTV tag REMOVED for ${dbUser.name}`);
+      }
+      
+      // Check if user SHOULD have Plex access based on their library assignments
+      const shouldHaveAccess = Object.keys(plexLibraries).some(group => {
+        const access = plexLibraries[group];
+        return access && (access.regular?.length > 0 || access.fourk?.length > 0);
+      });
       
       if (foundPlexUser) {
+        // User HAS access on servers
         console.log(`✅ FOUND: ${dbUser.name} (${emailsToCheck.join(', ')}) in Plex servers`);
+        usersWithAccess++;
         
-        // Build library access object
-        const libraryAccess = foundPlexUser.groups;
-        
-        // Determine NEW Plex tags based on their access
+        // Update their tags to reflect current server access
         const newPlexTags = [];
-        for (const [groupName, groupAccess] of Object.entries(libraryAccess)) {
+        for (const [groupName, groupAccess] of Object.entries(foundPlexUser.groups)) {
           if (groupAccess.regular && groupAccess.regular.length > 0) {
             newPlexTags.push(`Plex ${groupName.slice(-1)}`); // "Plex 1" or "Plex 2"
           }
         }
         
-        // CRITICAL FIX: Combine preserved non-Plex tags with new Plex tags
+        console.log(`🆕 NEW Plex tags for ${dbUser.name}:`, newPlexTags);
+        
+        // FIXED: Combine preserved non-Plex tags with current Plex tags
         const finalTags = [...nonPlexTags, ...newPlexTags];
+        console.log(`🏁 FINAL tags for ${dbUser.name}:`, finalTags);
         
-        // Update database with preserved tags
+        // Check if final tags still have IPTV
+        const finalHasIPTV = finalTags.some(tag => String(tag).toLowerCase().includes('iptv'));
+        console.log(`📺 ${dbUser.name} IPTV tag in final result:`, finalHasIPTV);
+        
+        // Track the change
+        tagChangeLog.push({
+          user: dbUser.name,
+          original: existingTags,
+          final: finalTags,
+          iptvBefore: originalHasIPTV,
+          iptvAfter: finalHasIPTV,
+          action: 'updated_with_plex_access'
+        });
+        
+        // Update database with actual server access
         await db.query(`
           UPDATE users 
           SET plex_libraries = ?, tags = ?, updated_at = NOW()
           WHERE id = ?
-        `, [JSON.stringify(libraryAccess), JSON.stringify(finalTags), dbUser.id]);
+        `, [JSON.stringify(foundPlexUser.groups), JSON.stringify(finalTags), dbUser.id]);
         
-        console.log(`📝 Updated ${dbUser.name}: Preserved tags [${nonPlexTags.join(', ')}], Added Plex tags [${newPlexTags.join(', ')}]`);
+        console.log(`💾 DATABASE UPDATED for ${dbUser.name}: [${existingTags.join(', ')}] → [${finalTags.join(', ')}]`);
+        updatedUsers++;
+        totalTagChanges++;
         
-        usersWithAccess++;
       } else {
+        // User DOES NOT have access on servers
         console.log(`❌ NO ACCESS: ${dbUser.name} (${emailsToCheck.join(', ')}) - not found in Plex`);
-        
-        // Clear their library access but keep non-Plex tags
-        await db.query(`
-          UPDATE users 
-          SET plex_libraries = ?, tags = ?, updated_at = NOW()
-          WHERE id = ?
-        `, ['{}', JSON.stringify(nonPlexTags), dbUser.id]);
-        
-        console.log(`📝 Cleared Plex access for ${dbUser.name} but preserved tags: [${nonPlexTags.join(', ')}]`);
-        
         usersWithoutAccess++;
+        
+        if (shouldHaveAccess) {
+          // CRITICAL FIX: User should have access but doesn't - TRY TO RE-GRANT instead of removing
+          console.log(`🔄 ${dbUser.name} should have Plex access but doesn't - attempting to re-grant...`);
+          
+          try {
+            // Try to re-grant access based on their library assignments
+            for (const serverGroup of Object.keys(plexLibraries)) {
+              const access = plexLibraries[serverGroup];
+              if (access && (access.regular?.length > 0 || access.fourk?.length > 0)) {
+                console.log(`🔄 Re-granting ${serverGroup} access for ${dbUser.name}...`);
+                await this.shareLibrariesWithUser(dbUser.plex_email, serverGroup, access);
+              }
+            }
+            
+            console.log(`✅ Re-granted access for ${dbUser.name}`);
+            usersReGranted++;
+            
+            // KEEP their existing tags including IPTV - don't change anything
+            console.log(`🔒 PRESERVING all existing tags for ${dbUser.name}: [${existingTags.join(', ')}]`);
+            
+            // Track that we preserved everything
+            tagChangeLog.push({
+              user: dbUser.name,
+              original: existingTags,
+              final: existingTags,
+              iptvBefore: originalHasIPTV,
+              iptvAfter: originalHasIPTV,
+              action: 'preserved_all_tags_during_regrant'
+            });
+            
+          } catch (error) {
+            console.log(`❌ Failed to re-grant access for ${dbUser.name}: ${error.message}`);
+            console.log(`⚠️ KEEPING ${dbUser.name}'s library assignments AND tags - manual intervention may be needed`);
+            
+            // Track that we preserved everything due to error
+            tagChangeLog.push({
+              user: dbUser.name,
+              original: existingTags,
+              final: existingTags,
+              iptvBefore: originalHasIPTV,
+              iptvAfter: originalHasIPTV,
+              action: 'preserved_all_tags_due_to_error'
+            });
+          }
+          
+        } else {
+          // User doesn't have access and shouldn't have access - clear Plex data but keep IPTV tags
+          console.log(`🗑️ ${dbUser.name} has no library assignments - clearing Plex data but preserving other tags`);
+          
+          const finalHasIPTV = nonPlexTags.some(tag => String(tag).toLowerCase().includes('iptv'));
+          console.log(`📺 ${dbUser.name} IPTV tag will be preserved:`, finalHasIPTV);
+          
+          // Track the change
+          tagChangeLog.push({
+            user: dbUser.name,
+            original: existingTags,
+            final: nonPlexTags,
+            iptvBefore: originalHasIPTV,
+            iptvAfter: finalHasIPTV,
+            action: 'cleared_plex_kept_others'
+          });
+          
+          await db.query(`
+            UPDATE users 
+            SET plex_libraries = ?, tags = ?, updated_at = NOW()
+            WHERE id = ?
+          `, ['{}', JSON.stringify(nonPlexTags), dbUser.id]);
+          
+          console.log(`💾 DATABASE UPDATED for ${dbUser.name}: [${existingTags.join(', ')}] → [${nonPlexTags.join(', ')}]`);
+          updatedUsers++;
+          totalTagChanges++;
+        }
       }
-      
-      updatedUsers++;
     }
     
-    console.log(`\n📊 SYNC SUMMARY:`);
-    console.log(`📊 Database users updated: ${updatedUsers}`);
-    console.log(`✅ Users with Plex access: ${usersWithAccess}`);
-    console.log(`❌ Users without Plex access: ${usersWithoutAccess}`);
+    console.log(`\n📊 DETAILED SYNC SUMMARY:`);
+    console.log(`📊 Database users processed: ${updatedUsers}`);
+    console.log(`✅ Users with server access: ${usersWithAccess}`);
+    console.log(`❌ Users without server access: ${usersWithoutAccess}`);
+    console.log(`🔄 Users access re-granted: ${usersReGranted}`);
+    console.log(`🏷️ IPTV tags preserved: ${iptvTagsPreserved}`);
+    console.log(`🗑️ IPTV tags removed: ${iptvTagsRemoved}`);
+    console.log(`🔄 Total tag changes made: ${totalTagChanges}`);
     console.log(`🎯 Total unique Plex users found: ${allPlexUsers.size}`);
+    console.log(`🚀 PERFORMANCE: Used batched API calls instead of ${users.length} individual calls`);
+    
+    // DETAILED TAG CHANGE LOG
+    console.log(`\n📋 DETAILED TAG CHANGES:`);
+    tagChangeLog.forEach(change => {
+      const iptvStatus = change.iptvBefore === change.iptvAfter ? 
+        (change.iptvBefore ? '📺✅ IPTV PRESERVED' : '📺⭕ NO IPTV') : 
+        (change.iptvBefore ? '📺❌ IPTV REMOVED' : '📺🆕 IPTV ADDED');
+      
+      console.log(`   ${change.user}: ${change.action}`);
+      console.log(`      Before: [${change.original.join(', ')}]`);
+      console.log(`      After:  [${change.final.join(', ')}]`);
+      console.log(`      ${iptvStatus}`);
+    });
     
   } catch (error) {
     console.error('❌ Error syncing user library access:', error);

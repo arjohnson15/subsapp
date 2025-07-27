@@ -72,6 +72,45 @@ app.use('/api/email-schedules', emailScheduleRoutes);
 app.use('/api/iptv', iptvRoutes);
 app.use('/api/iptv-editor', iptvEditorRoutes); // NEW - IPTV Editor routes
 
+// ===== GUIDE ROUTES - RESTORED =====
+// Serve guide static files first (CSS, JS, images, etc.)
+app.use('/guide', express.static(path.join(__dirname, 'Guides')));
+
+// Dynamic guide route - serve any HTML file from Guides folder
+app.get('/guide/:filename', (req, res) => {
+  const filename = req.params.filename;
+  
+  // Add .html extension if not provided
+  const htmlFile = filename.endsWith('.html') ? filename : `${filename}.html`;
+  
+  const filePath = path.join(__dirname, 'Guides', htmlFile);
+  
+  // Check if file exists and serve it
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      console.log(`Guide file not found: ${htmlFile}`);
+      res.status(404).send('Guide not found');
+    }
+  });
+});
+
+// Fallback route for /guide (serve index if it exists, otherwise guide.html)
+app.get('/guide', (req, res) => {
+  const indexPath = path.join(__dirname, 'Guides', 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      // If no index.html, serve guide.html
+      const guidePath = path.join(__dirname, 'Guides', 'guide.html');
+      res.sendFile(guidePath, (err) => {
+        if (err) {
+          res.status(404).send('No guide available');
+        }
+      });
+    }
+  });
+});
+// ===== END GUIDE ROUTES =====
+
 // Initialize IPTV Editor service
 async function initializeIPTVEditorService() {
     try {
@@ -240,6 +279,7 @@ async function initializeApp() {
     app.listen(PORT, () => {
       console.log(`JohnsonFlix Manager running on port ${PORT}`);
       console.log(`Access the application at http://localhost:${PORT}`);
+      console.log(`📚 Guides available at http://localhost:${PORT}/guide/guide`); // NEW - Guide info
     });
 
     // Test email service immediately on startup

@@ -1015,7 +1015,7 @@ renderPlexStatus(user) {
     
     // Show simple pending indicator
     if (pendingInvites && Object.keys(pendingInvites).length > 0) {
-        return `<br><span class="pending-invite-simple" title="User has pending Plex invites">⏳ Pending Plex Invite</span>`;
+        return `<br><span class="pending-invite-simple" title="User has pending Plex invites">Pending Plex Invite</span>`;
     }
     
     return '';
