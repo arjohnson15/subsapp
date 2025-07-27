@@ -756,33 +756,7 @@ try {
 
 async syncUserLibraryAccess() {
   try {
-    console.log('🔄 OPTIMIZED: Syncing user library access with batched API calls...');
-    
-    // 🚨 CRITICAL DEBUGGING: Check database state IMMEDIATELY
-    console.log('\n🔍 CRITICAL DEBUG: Checking database state at sync start...');
-    
-    const debugUsers = await db.query(`
-      SELECT id, name, tags, plex_libraries
-      FROM users 
-      WHERE name IN ('Ashley Henderson', 'Scott Ertle') 
-      AND plex_email IS NOT NULL
-    `);
-    
-    debugUsers.forEach(user => {
-      console.log(`📊 RAW DATABASE DATA for ${user.name}:`);
-      console.log(`   Tags (raw): ${typeof user.tags} = "${user.tags}"`);
-      console.log(`   Tags length: ${user.tags ? user.tags.length : 'null'}`);
-      
-      // Try parsing manually
-      try {
-        const parsedTags = user.tags ? JSON.parse(user.tags) : [];
-        console.log(`   Tags (parsed): `, parsedTags);
-      } catch (e) {
-        console.log(`   ❌ Tags parsing error: ${e.message}`);
-      }
-    });
-    
-    console.log('🔍 END CRITICAL DEBUG\n');
+    console.log('🔄 OPTIMIZED: Syncing user library access with IPTV tag protection...');
     
     // Get all users with any Plex configuration
     const users = await db.query(`
@@ -799,8 +773,9 @@ async syncUserLibraryAccess() {
     
     console.log(`📋 Checking ${users.length} users against Plex servers...`);
     console.log('🚀 PERFORMANCE: Making batched API calls instead of per-user calls');
+    console.log('🔒 PROTECTION: Will preserve IPTV tags while managing Plex tags');
     
-    // OPTIMIZED: Get ALL users from ALL servers in one batch (instead of per-user calls)
+    // OPTIMIZED: Get ALL users from ALL servers in one batch
     const allPlexUsers = await this.getAllPlexUsers();
     console.log(`📊 Retrieved ${allPlexUsers.size} total Plex users in batch`);
     
@@ -809,11 +784,6 @@ async syncUserLibraryAccess() {
     let usersWithoutAccess = 0;
     let usersReGranted = 0;
     let iptvTagsPreserved = 0;
-    let iptvTagsRemoved = 0;
-    let totalTagChanges = 0;
-    
-    // Track detailed tag changes for logging
-    const tagChangeLog = [];
     
     for (const dbUser of users) {
       console.log(`\n🔍 PROCESSING: ${dbUser.name} (ID: ${dbUser.id})`);
@@ -831,55 +801,56 @@ async syncUserLibraryAccess() {
       let existingTags = [];
       let plexLibraries = {};
       
+      // CRITICAL FIX: Handle both string JSON and already-parsed arrays
       try {
-        existingTags = dbUser.tags ? JSON.parse(dbUser.tags) : [];
-        console.log(`🏷️ ORIGINAL tags for ${dbUser.name}:`, existingTags);
+        if (Array.isArray(dbUser.tags)) {
+          // Already parsed by MySQL driver
+          existingTags = dbUser.tags;
+          console.log(`🏷️ ORIGINAL tags for ${dbUser.name} (pre-parsed):`, existingTags);
+        } else if (typeof dbUser.tags === 'string') {
+          // String JSON that needs parsing
+          existingTags = dbUser.tags ? JSON.parse(dbUser.tags) : [];
+          console.log(`🏷️ ORIGINAL tags for ${dbUser.name} (parsed):`, existingTags);
+        } else {
+          // Fallback for other types
+          existingTags = [];
+          console.log(`🏷️ ORIGINAL tags for ${dbUser.name} (fallback):`, existingTags);
+        }
       } catch (e) {
-        console.log(`⚠️ Could not parse tags for ${dbUser.name}, using empty array`);
-        console.log(`🔍 RAW TAGS DATA: ${typeof dbUser.tags} = "${dbUser.tags}"`);
+        console.log(`⚠️ Could not parse tags for ${dbUser.name}:`, e.message);
+        console.log(`🔍 RAW TAGS: ${typeof dbUser.tags} = ${dbUser.tags}`);
         existingTags = [];
       }
       
+      // CRITICAL FIX: Handle plex_libraries the same way
       try {
-        plexLibraries = dbUser.plex_libraries ? JSON.parse(dbUser.plex_libraries) : {};
+        if (typeof dbUser.plex_libraries === 'object' && dbUser.plex_libraries !== null) {
+          // Already parsed by MySQL driver
+          plexLibraries = dbUser.plex_libraries;
+        } else if (typeof dbUser.plex_libraries === 'string') {
+          // String JSON that needs parsing
+          plexLibraries = dbUser.plex_libraries ? JSON.parse(dbUser.plex_libraries) : {};
+        } else {
+          plexLibraries = {};
+        }
       } catch (e) {
         console.log(`⚠️ Could not parse plex_libraries for ${dbUser.name}, using empty object`);
         plexLibraries = {};
       }
       
-      // Check for IPTV tags in original
-      const originalHasIPTV = existingTags.some(tag => String(tag).toLowerCase().includes('iptv'));
-      console.log(`📺 ${dbUser.name} originally has IPTV tag:`, originalHasIPTV);
-      
-      // DETAILED LOGGING: Show the filtering process
-      if (existingTags.length > 0) {
-        console.log(`🔍 FILTERING tags for ${dbUser.name}:`);
-        existingTags.forEach((tag, index) => {
-          const tagStr = String(tag).toLowerCase();
-          const isPlexTag = tagStr.includes('plex 1') || tagStr.includes('plex 2') || tagStr.includes('plex1') || tagStr.includes('plex2');
-          console.log(`   Tag ${index + 1}: "${tag}" -> ${isPlexTag ? 'REMOVE (Plex tag)' : 'KEEP (Non-Plex tag)'}`);
-        });
-      }
-      
-      // FIXED: More precise non-Plex tag preservation
+      // CRITICAL FIX: Preserve ALL non-Plex tags (especially IPTV)
       const nonPlexTags = existingTags.filter(tag => {
-        const tagStr = String(tag).toLowerCase();
-        // Keep ALL tags that are NOT specifically Plex server tags
-        return !tagStr.includes('plex 1') && !tagStr.includes('plex 2') && !tagStr.includes('plex1') && !tagStr.includes('plex2');
+        const tagStr = String(tag);
+        // Remove ONLY exact Plex server tags, keep everything else
+        return tagStr !== 'Plex 1' && tagStr !== 'Plex 2';
       });
       
-      console.log(`✅ FILTERED non-Plex tags for ${dbUser.name}:`, nonPlexTags);
+      console.log(`🔒 PROTECTED non-Plex tags for ${dbUser.name}:`, nonPlexTags);
       
-      // Check if IPTV tag survived filtering
-      const filteredHasIPTV = nonPlexTags.some(tag => String(tag).toLowerCase().includes('iptv'));
-      console.log(`📺 ${dbUser.name} IPTV tag after filtering:`, filteredHasIPTV);
-      
-      if (originalHasIPTV && filteredHasIPTV) {
+      // Count IPTV tags being preserved
+      if (nonPlexTags.some(tag => String(tag).toLowerCase().includes('iptv'))) {
         iptvTagsPreserved++;
-        console.log(`✅ IPTV tag PRESERVED for ${dbUser.name}`);
-      } else if (originalHasIPTV && !filteredHasIPTV) {
-        iptvTagsRemoved++;
-        console.log(`❌ IPTV tag REMOVED for ${dbUser.name}`);
+        console.log(`✅ IPTV tag preserved for ${dbUser.name}`);
       }
       
       // Check if user SHOULD have Plex access based on their library assignments
@@ -893,7 +864,7 @@ async syncUserLibraryAccess() {
         console.log(`✅ FOUND: ${dbUser.name} (${emailsToCheck.join(', ')}) in Plex servers`);
         usersWithAccess++;
         
-        // Update their tags to reflect current server access
+        // Build NEW Plex tags based on actual server access
         const newPlexTags = [];
         for (const [groupName, groupAccess] of Object.entries(foundPlexUser.groups)) {
           if (groupAccess.regular && groupAccess.regular.length > 0) {
@@ -903,34 +874,19 @@ async syncUserLibraryAccess() {
         
         console.log(`🆕 NEW Plex tags for ${dbUser.name}:`, newPlexTags);
         
-        // FIXED: Combine preserved non-Plex tags with current Plex tags
+        // PROPER FIX: Combine preserved non-Plex tags with new Plex tags
         const finalTags = [...nonPlexTags, ...newPlexTags];
         console.log(`🏁 FINAL tags for ${dbUser.name}:`, finalTags);
         
-        // Check if final tags still have IPTV
-        const finalHasIPTV = finalTags.some(tag => String(tag).toLowerCase().includes('iptv'));
-        console.log(`📺 ${dbUser.name} IPTV tag in final result:`, finalHasIPTV);
-        
-        // Track the change
-        tagChangeLog.push({
-          user: dbUser.name,
-          original: existingTags,
-          final: finalTags,
-          iptvBefore: originalHasIPTV,
-          iptvAfter: finalHasIPTV,
-          action: 'updated_with_plex_access'
-        });
-        
-        // Update database with actual server access
+        // Update database with both library access AND properly managed tags
         await db.query(`
           UPDATE users 
           SET plex_libraries = ?, tags = ?, updated_at = NOW()
           WHERE id = ?
         `, [JSON.stringify(foundPlexUser.groups), JSON.stringify(finalTags), dbUser.id]);
         
-        console.log(`💾 DATABASE UPDATED for ${dbUser.name}: [${existingTags.join(', ')}] → [${finalTags.join(', ')}]`);
+        console.log(`💾 UPDATED ${dbUser.name}: Preserved [${nonPlexTags.join(', ')}] + Added Plex [${newPlexTags.join(', ')}]`);
         updatedUsers++;
-        totalTagChanges++;
         
       } else {
         // User DOES NOT have access on servers
@@ -938,7 +894,7 @@ async syncUserLibraryAccess() {
         usersWithoutAccess++;
         
         if (shouldHaveAccess) {
-          // CRITICAL FIX: User should have access but doesn't - TRY TO RE-GRANT instead of removing
+          // User should have access but doesn't - try to re-grant
           console.log(`🔄 ${dbUser.name} should have Plex access but doesn't - attempting to re-grant...`);
           
           try {
@@ -954,93 +910,50 @@ async syncUserLibraryAccess() {
             console.log(`✅ Re-granted access for ${dbUser.name}`);
             usersReGranted++;
             
-            // KEEP their existing tags including IPTV - don't change anything
-            console.log(`🔒 PRESERVING all existing tags for ${dbUser.name}: [${existingTags.join(', ')}]`);
-            
-            // Track that we preserved everything
-            tagChangeLog.push({
-              user: dbUser.name,
-              original: existingTags,
-              final: existingTags,
-              iptvBefore: originalHasIPTV,
-              iptvAfter: originalHasIPTV,
-              action: 'preserved_all_tags_during_regrant'
-            });
+            // Keep their existing tags unchanged during re-grant
+            console.log(`🔒 PRESERVING all existing tags during re-grant for ${dbUser.name}: [${existingTags.join(', ')}]`);
             
           } catch (error) {
             console.log(`❌ Failed to re-grant access for ${dbUser.name}: ${error.message}`);
-            console.log(`⚠️ KEEPING ${dbUser.name}'s library assignments AND tags - manual intervention may be needed`);
-            
-            // Track that we preserved everything due to error
-            tagChangeLog.push({
-              user: dbUser.name,
-              original: existingTags,
-              final: existingTags,
-              iptvBefore: originalHasIPTV,
-              iptvAfter: originalHasIPTV,
-              action: 'preserved_all_tags_due_to_error'
-            });
+            console.log(`🔒 PRESERVING all existing tags due to error for ${dbUser.name}: [${existingTags.join(', ')}]`);
           }
           
         } else {
-          // User doesn't have access and shouldn't have access - clear Plex data but keep IPTV tags
-          console.log(`🗑️ ${dbUser.name} has no library assignments - clearing Plex data but preserving other tags`);
+          // User doesn't have access and shouldn't have access - remove Plex tags but keep others
+          console.log(`🗑️ ${dbUser.name} has no library assignments - removing Plex tags but preserving others`);
           
-          const finalHasIPTV = nonPlexTags.some(tag => String(tag).toLowerCase().includes('iptv'));
-          console.log(`📺 ${dbUser.name} IPTV tag will be preserved:`, finalHasIPTV);
-          
-          // Track the change
-          tagChangeLog.push({
-            user: dbUser.name,
-            original: existingTags,
-            final: nonPlexTags,
-            iptvBefore: originalHasIPTV,
-            iptvAfter: finalHasIPTV,
-            action: 'cleared_plex_kept_others'
-          });
+          // PROPER FIX: Keep non-Plex tags (like IPTV), remove only Plex tags
+          const finalTags = nonPlexTags;
+          console.log(`🏁 FINAL tags for ${dbUser.name} (Plex removed):`, finalTags);
           
           await db.query(`
             UPDATE users 
             SET plex_libraries = ?, tags = ?, updated_at = NOW()
             WHERE id = ?
-          `, ['{}', JSON.stringify(nonPlexTags), dbUser.id]);
+          `, ['{}', JSON.stringify(finalTags), dbUser.id]);
           
-          console.log(`💾 DATABASE UPDATED for ${dbUser.name}: [${existingTags.join(', ')}] → [${nonPlexTags.join(', ')}]`);
+          console.log(`💾 UPDATED ${dbUser.name}: Removed Plex tags, preserved [${finalTags.join(', ')}]`);
           updatedUsers++;
-          totalTagChanges++;
         }
       }
     }
     
-    console.log(`\n📊 DETAILED SYNC SUMMARY:`);
+    console.log(`\n📊 PROTECTED SYNC SUMMARY:`);
     console.log(`📊 Database users processed: ${updatedUsers}`);
     console.log(`✅ Users with server access: ${usersWithAccess}`);
     console.log(`❌ Users without server access: ${usersWithoutAccess}`);
     console.log(`🔄 Users access re-granted: ${usersReGranted}`);
-    console.log(`🏷️ IPTV tags preserved: ${iptvTagsPreserved}`);
-    console.log(`🗑️ IPTV tags removed: ${iptvTagsRemoved}`);
-    console.log(`🔄 Total tag changes made: ${totalTagChanges}`);
+    console.log(`🔒 IPTV tags preserved: ${iptvTagsPreserved}`);
+    console.log(`🏷️ Plex tags managed correctly while preserving IPTV tags`);
     console.log(`🎯 Total unique Plex users found: ${allPlexUsers.size}`);
     console.log(`🚀 PERFORMANCE: Used batched API calls instead of ${users.length} individual calls`);
-    
-    // DETAILED TAG CHANGE LOG
-    console.log(`\n📋 DETAILED TAG CHANGES:`);
-    tagChangeLog.forEach(change => {
-      const iptvStatus = change.iptvBefore === change.iptvAfter ? 
-        (change.iptvBefore ? '📺✅ IPTV PRESERVED' : '📺⭕ NO IPTV') : 
-        (change.iptvBefore ? '📺❌ IPTV REMOVED' : '📺🆕 IPTV ADDED');
-      
-      console.log(`   ${change.user}: ${change.action}`);
-      console.log(`      Before: [${change.original.join(', ')}]`);
-      console.log(`      After:  [${change.final.join(', ')}]`);
-      console.log(`      ${iptvStatus}`);
-    });
     
   } catch (error) {
     console.error('❌ Error syncing user library access:', error);
     throw error;
   }
 }
+
 
   // FIXED: updateUserLibraryAccess - This should be called when editing a user
   async updateUserLibraryAccess(userEmail) {
