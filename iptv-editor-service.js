@@ -1173,6 +1173,40 @@ async runAutoUpdater() {
     }
 }
 
+// ADD this method to handle Phase 0
+async getPlaylistConfiguration(playlistId) {
+    console.log('📋 Getting playlist configuration for:', playlistId);
+    
+    try {
+        const response = await fetch('https://editor.iptveditor.com/api/auto-updater/get-data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.bearerToken}`,
+                'Origin': 'https://cloud.iptveditor.com'
+            },
+            body: JSON.stringify({
+                playlist: playlistId
+            })
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Phase 0 failed: ${response.status} ${response.statusText}. ${errorText}`);
+        }
+        
+        const configData = await response.json();
+        console.log('✅ Phase 0 completed - playlist configuration retrieved');
+        console.log('📊 Configuration size:', JSON.stringify(configData).length, 'bytes');
+        
+        return configData;
+        
+    } catch (error) {
+        console.error('❌ Phase 0 failed:', error);
+        throw error;
+    }
+}
+
 // REPLACE the existing collectProviderData method in iptv-editor-service.js with this complete version:
 
 async collectProviderData(baseUrl, username, password) {
@@ -1268,21 +1302,24 @@ async collectProviderData(baseUrl, username, password) {
 // REPLACE submitToAutoUpdater method - Bearer token with exact HAR structure
 
 async submitToAutoUpdater(baseUrl, datasets) {
-    console.log('🚀 Using Bearer token with EXACT HAR structure...');
-    console.log('💡 Theory: Browser sends Authorization header but HAR doesn\'t show it');
+    console.log('🚀 Starting auto-updater submission with corrected FormData...');
+    
+    // Validate bearer token
+    if (!this.bearerToken) {
+        throw new Error('Bearer token not configured');
+    }
+    
+    console.log('🔑 Bearer token available, length:', this.bearerToken.length);
     
     const FormData = require('form-data');
     const formData = new FormData();
     
-    // Use EXACT boundary from working request
-    const boundary = '----WebKitFormBoundaryKV3X8QsGeoJYX2qM';
-    formData._boundary = boundary;
+    console.log('📦 Creating FormData with all datasets...');
     
-    console.log('🔗 Using EXACT boundary from working request:', boundary);
-    
-    // Add all fields in EXACT order from working HAR
+    // Add all fields in the correct order (matching working HAR)
     formData.append('url', baseUrl);
     
+    // CRITICAL: Add each dataset as binary blob data
     formData.append('info', datasets[0], {
         filename: 'blob',
         contentType: 'application/octet-stream'
@@ -1324,86 +1361,130 @@ async submitToAutoUpdater(baseUrl, datasets) {
     });
     
     const totalSize = datasets.reduce((sum, dataset) => sum + (dataset?.length || 0), 0);
-    console.log('📊 Total payload size:', Math.round(totalSize / 1024 / 1024), 'MB');
+    const sizeMB = Math.round(totalSize / 1024 / 1024);
+    
+    console.log('📊 FormData prepared:');
+    console.log(`   - Total size: ${sizeMB}MB`);
+    console.log(`   - Number of fields: 9 (url + 8 datasets)`);
+    console.log(`   - Base URL: ${baseUrl}`);
     
     try {
-        console.log('📤 Submitting with Bearer token + exact HAR headers...');
+        console.log('📤 Submitting FormData to auto-updater...');
         
-        // Create headers that match working request exactly + Authorization
+        // CRITICAL FIX: Let FormData generate the Content-Type header with boundary
+        // Don't manually set content-type!
         const headers = {
-            // Core request headers from HAR
-            'accept': 'application/json, text/plain, */*',
-            'accept-encoding': 'gzip, deflate, br, zstd',
-            'accept-language': 'en-GB,en;q=0.9,en-US;q=0.8',
-            'content-type': `multipart/form-data; boundary=${boundary}`,
+            // Include FormData's own headers (content-type with boundary)
+            ...formData.getHeaders(),
+            
+            // Add authentication and origin
+            'authorization': `Bearer ${this.bearerToken}`,
             'origin': 'https://cloud.iptveditor.com',
-            'priority': 'u=1, i',
-            'referer': 'https://cloud.iptveditor.com/',
-            'sec-ch-ua': '"Not)A;Brand";v="8", "Chromium";v="138", "Microsoft Edge";v="138"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': '"Windows"',
+            
+            // Add other browser-like headers that don't conflict
+            'accept': 'application/json, text/plain, */*',
+            'accept-language': 'en-GB,en;q=0.9,en-US;q=0.8',
             'sec-fetch-dest': 'empty',
             'sec-fetch-mode': 'cors',
             'sec-fetch-site': 'same-site',
-            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0',
-            // Add Authorization (OPTIONS preflight requested it)
-            'authorization': `Bearer ${this.bearerToken}`
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0'
         };
         
-        console.log('🔍 Headers prepared - exact HAR + Authorization');
-        console.log('🔑 Bearer token included');
-        console.log('🔗 Boundary:', boundary);
+        console.log('🔍 Headers prepared:');
+        console.log('   ✅ FormData headers (with boundary) included');
+        console.log('   ✅ Authorization header added');
+        console.log('   ✅ Origin set to cloud.iptveditor.com');
+        console.log('   🔍 Content-Type:', headers['content-type']?.substring(0, 50) + '...');
         
-        const response = await axios.post('https://editor.iptveditor.com/api/auto-updater/run-auto-updater', formData, {
-            headers: headers,
-            timeout: 600000, // 10 minutes
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity,
-            responseType: 'json',
-            maxRedirects: 0
-        });
+        const response = await axios.post(
+            'https://editor.iptveditor.com/api/auto-updater/run-auto-updater', 
+            formData, 
+            {
+                headers: headers,
+                timeout: 600000, // 10 minutes
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity,
+                validateStatus: (status) => status < 500 // Don't throw on 4xx, we'll handle them
+            }
+        );
         
-        console.log('✅ SUCCESS! Auto-updater worked!');
-        console.log('📊 Response status:', response.status);
-        console.log('📊 Response data:', JSON.stringify(response.data, null, 2));
+        console.log('✅ Request completed!');
+        console.log('📊 Status:', response.status);
+        console.log('📊 Status Text:', response.statusText);
+        console.log('📊 Response size:', response.data ? JSON.stringify(response.data).length : 0, 'bytes');
         
-        if (response.data.job_id) {
-            console.log('🎉 Got job_id:', response.data.job_id);
-            console.log('🔍 Bearer token authentication successful!');
+        if (response.status === 200) {
+            console.log('🎉 SUCCESS! Auto-updater accepted the submission');
+            console.log('📊 Response data:', JSON.stringify(response.data, null, 2));
+            
+            // Check for job_id or success indicators
+            if (response.data && typeof response.data === 'object') {
+                if (response.data.job_id) {
+                    console.log('🎉 Auto-updater job started with ID:', response.data.job_id);
+                } else {
+                    console.log('🎉 Auto-updater response received:', response.data);
+                }
+            }
+            
+            return { 
+                success: true,
+                data: response.data,
+                status: response.status,
+                message: 'Auto-updater submission successful'
+            };
+        } else {
+            // Handle non-200 responses
+            const errorMsg = response.data?.message || response.data?.title || response.statusText;
+            throw new Error(`Auto-updater returned ${response.status}: ${errorMsg}`);
         }
         
-        return { data: response.data };
-        
     } catch (error) {
-        console.error('❌ Auto-updater failed');
-        console.error('🔍 Error details:', error.message);
+        console.error('❌ Auto-updater submission failed');
+        console.error('🔍 Error type:', error.name);
+        console.error('🔍 Error message:', error.message);
         
         if (error.response) {
             const status = error.response.status;
             const data = error.response.data;
             
             console.error('📄 HTTP Status:', status);
-            console.error('📄 Response data:', JSON.stringify(data, null, 2));
+            console.error('📄 Response Headers:', Object.keys(error.response.headers));
+            console.error('📄 Response Data:', JSON.stringify(data, null, 2));
             
-            // More detailed error analysis
-            if (status === 400 && data?.title === 'Request not valid') {
-                // Let's check if it's a size issue
-                const sizeMB = Math.round(totalSize / 1024 / 1024);
-                if (sizeMB > 50) {
-                    throw new Error(`Request rejected - possibly due to large payload size (${sizeMB}MB). The working browser request was only 3MB. Try reducing data size.`);
+            // Specific error handling based on status codes
+            if (status === 401) {
+                const errorDetail = data?.title || data?.message || 'Authentication failed';
+                if (errorDetail.toLowerCase().includes('session') || errorDetail.toLowerCase().includes('expired')) {
+                    throw new Error('IPTV Editor session expired. Your Bearer token needs to be refreshed. Please login to https://cloud.iptveditor.com and get a new token.');
                 } else {
-                    throw new Error(`Request format invalid: ${data?.body || 'Unknown validation error'}`);
+                    throw new Error(`IPTV Editor authentication failed: ${errorDetail}. Please check your Bearer token.`);
                 }
-            } else if (status === 401) {
-                throw new Error('Authentication failed - Bearer token invalid or expired');
+            } else if (status === 400) {
+                if (data?.title === 'Request not valid') {
+                    // This might be our FormData structure issue
+                    throw new Error(`IPTV Editor rejected the request format. Possible issues: invalid FormData structure, wrong field names, or data format. Payload size: ${sizeMB}MB`);
+                } else {
+                    throw new Error(`Bad request (400): ${data?.message || data?.title || 'Invalid request format'}`);
+                }
             } else if (status === 413) {
-                throw new Error(`Payload too large (${Math.round(totalSize / 1024 / 1024)}MB)`);
+                throw new Error(`Payload too large (${sizeMB}MB). Try reducing the data size or check IPTV Editor's size limits.`);
+            } else if (status === 403) {
+                throw new Error('Access forbidden. Your account may not have auto-updater permissions.');
+            } else if (status === 429) {
+                throw new Error('Rate limit exceeded. Please wait before trying again.');
+            } else if (status >= 500) {
+                throw new Error(`IPTV Editor server error (${status}). Please try again later.`);
+            } else {
+                throw new Error(`HTTP ${status}: ${data?.message || data?.title || error.response.statusText}`);
             }
-            
-            throw new Error(`HTTP ${status}: ${data?.message || data?.body || JSON.stringify(data)}`);
+        } else if (error.request) {
+            console.error('📄 No response received');
+            console.error('📄 Request timeout or network error');
+            throw new Error('No response from IPTV Editor. Check your internet connection or try again later.');
+        } else {
+            console.error('📄 Error setting up request:', error.message);
+            throw new Error(`Request setup error: ${error.message}`);
         }
-        
-        throw error;
     }
 }
 
