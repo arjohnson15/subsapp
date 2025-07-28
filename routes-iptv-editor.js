@@ -84,6 +84,11 @@ router.post('/settings', [
     body('default_playlist_name').optional().isString().withMessage('Playlist name must be a string'),
     body('sync_enabled').optional().isBoolean().withMessage('Sync enabled must be a boolean'),
     body('sync_schedule_hours').optional().isInt({ min: 1, max: 168 }).withMessage('Sync schedule must be between 1 and 168 hours'),
+    body('auto_updater_enabled').optional().isBoolean().withMessage('Auto updater enabled must be a boolean'),
+    body('auto_updater_schedule_hours').optional().isInt({ min: 6, max: 168 }).withMessage('Auto updater schedule must be between 6 and 168 hours'),
+    body('provider_base_url').optional().isString().withMessage('Provider base URL must be a string'),
+    body('provider_username').optional().isString().withMessage('Provider username must be a string'),
+    body('provider_password').optional().isString().withMessage('Provider password must be a string'),
     handleValidationErrors
 ], async (req, res) => {
     try {
@@ -99,6 +104,10 @@ router.post('/settings', [
             });
         }
         
+        // Track if auto updater settings changed
+        const autoUpdaterChanged = updates.auto_updater_enabled !== undefined || 
+                                  updates.auto_updater_schedule_hours !== undefined;
+        
         // Update each setting
         for (const [key, value] of Object.entries(updates)) {
             let type = 'string';
@@ -111,6 +120,121 @@ router.post('/settings', [
         
         // Re-initialize service with new settings
         await iptvEditorService.initialize();
+        
+        // CRITICAL: Update scheduler if auto updater settings changed
+        if (autoUpdaterChanged) {
+            try {
+                console.log('🔄 Auto updater settings changed, triggering scheduler update...');
+                
+                // Use node-cron to handle scheduling
+                const cron = require('node-cron');
+                
+                // Stop any existing auto updater task (stored globally)
+                if (global.autoUpdaterTask) {
+                    global.autoUpdaterTask.stop();
+                    global.autoUpdaterTask = null;
+                    console.log('🛑 Stopped existing auto updater task');
+                }
+                
+                // If enabled, create new scheduled task
+                if (updates.auto_updater_enabled === true || updates.auto_updater_enabled === 'true') {
+                    const hours = updates.auto_updater_schedule_hours || 24;
+                    
+                    // Convert hours to cron expression
+                    let cronExpression;
+                    switch(parseInt(hours)) {
+                        case 6: cronExpression = '0 */6 * * *'; break;
+                        case 12: cronExpression = '0 */12 * * *'; break;
+                        case 24: cronExpression = '0 2 * * *'; break;
+                        case 48: cronExpression = '0 2 */2 * *'; break;
+                        case 168: cronExpression = '0 2 * * 0'; break;
+                        default: cronExpression = '0 2 * * *'; break;
+                    }
+                    
+                    console.log(`📅 Scheduling auto updater every ${hours} hours (${cronExpression})`);
+                    
+                    // Create and start the scheduled task
+                    global.autoUpdaterTask = cron.schedule(cronExpression, async () => {
+                        console.log('🔄 Running scheduled auto updater...');
+                        
+                        try {
+                            // Call the auto updater function directly
+                            const settings = await iptvEditorService.getAllSettings();
+                            const playlistId = settings.default_playlist_id;
+                            
+                            if (!playlistId) {
+                                console.error('❌ No default playlist selected for scheduled update');
+                                return;
+                            }
+                            
+                            console.log('🚀 Starting scheduled auto updater for playlist:', playlistId);
+                            
+                            // Get updater config (fresh token)
+                            const configResponse = await iptvEditorService.getAutoUpdaterConfig(playlistId);
+                            const freshToken = configResponse.token;
+                            
+                            if (!freshToken) {
+                                console.error('❌ Failed to get auto-updater token for scheduled update');
+                                return;
+                            }
+                            
+                            // Collect provider data
+                            const providerData = await iptvEditorService.collectProviderData(
+                                settings.provider_base_url,
+                                settings.provider_username,
+                                settings.provider_password
+                            );
+                            
+                            // Prepare FormData
+                            const FormData = require('form-data');
+                            const formData = new FormData();
+                            formData.append('url', settings.provider_base_url);
+                            formData.append('info', providerData[0]);
+                            formData.append('get_live_streams', providerData[1]);
+                            formData.append('get_live_categories', providerData[2]);
+                            formData.append('get_vod_streams', providerData[3]);
+                            formData.append('get_vod_categories', providerData[4]);
+                            formData.append('get_series', providerData[5]);
+                            formData.append('get_series_categories', providerData[6]);
+                            formData.append('m3u', providerData[7]);
+                            
+                            // Submit to IPTV Editor
+                            const axios = require('axios');
+                            const submitResponse = await axios.post(
+                                'https://editor.iptveditor.com/api/auto-updater/run-auto-updater',
+                                formData,
+                                {
+                                    headers: {
+                                        ...formData.getHeaders(),
+                                        'Authorization': `Bearer ${freshToken}`,
+                                        'Origin': 'https://cloud.iptveditor.com'
+                                    },
+                                    timeout: 600000 // 10 minutes
+                                }
+                            );
+                            
+                            // Save last run time
+                            await iptvEditorService.setSetting('last_auto_updater_run', new Date().toISOString(), 'string');
+                            
+                            console.log('✅ Scheduled auto updater completed successfully');
+                            
+                        } catch (error) {
+                            console.error('❌ Scheduled auto updater failed:', error.message);
+                        }
+                    });
+                    
+                    global.autoUpdaterTask.start();
+                    console.log('✅ Auto updater scheduled successfully');
+                } else {
+                    console.log('ℹ️ Auto updater disabled');
+                }
+                
+            } catch (schedulerError) {
+                console.error('❌ Failed to update auto updater scheduler:', schedulerError);
+                // Don't fail the whole request if scheduler update fails
+                console.warn('⚠️ Settings saved but scheduler update failed');
+            }
+        }
         
         // Return updated settings
         const updatedSettings = await iptvEditorService.getAllSettings();

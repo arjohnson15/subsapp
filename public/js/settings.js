@@ -2971,4 +2971,43 @@ document.addEventListener('DOMContentLoaded', function() {
             Settings.handleUpdatePlaylistNow();
         });
     }
+	
+	// NEW: Add auto updater schedule change listener
+    const scheduleSelect = document.getElementById('autoUpdaterSchedule');
+    if (scheduleSelect) {
+        scheduleSelect.addEventListener('change', async function() {
+            console.log('📅 Auto updater schedule changed to:', this.value);
+            try {
+                await Settings.saveAutoUpdaterSettings();
+                Utils.showNotification('Auto updater schedule updated', 'success');
+            } catch (error) {
+                console.error('❌ Failed to save schedule change:', error);
+                Utils.showNotification('Failed to update schedule', 'error');
+            }
+        });
+    }
+    
+    // NEW: Add auto updater enable/disable listener
+    const enabledCheckbox = document.getElementById('autoUpdaterEnabled');
+    if (enabledCheckbox) {
+        enabledCheckbox.addEventListener('change', async function() {
+            console.log('🔄 Auto updater enabled changed to:', this.checked);
+            try {
+                await Settings.saveAutoUpdaterSettings();
+                if (this.checked) {
+                    Utils.showNotification('Auto updater enabled successfully', 'success');
+                } else {
+                    Utils.showNotification('Auto updater disabled', 'info');
+                }
+            } catch (error) {
+                console.error('❌ Failed to save enabled state:', error);
+                Utils.showNotification('Failed to update auto updater state', 'error');
+            }
+        });
+    }
+    
+    // Load initial auto updater settings
+    if (typeof Settings !== 'undefined' && Settings.loadAutoUpdaterSettings) {
+        Settings.loadAutoUpdaterSettings();
+    }
 });
