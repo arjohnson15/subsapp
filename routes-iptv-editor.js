@@ -1642,49 +1642,85 @@ router.use((error, req, res, next) => {
     });
 });
 
-// Auto-updater endpoint - Manual playlist sync
-router.post('/auto-updater/run', async (req, res) => {
+// Auto-updater route - needs token handling
+router.post('/run-auto-updater', checkIPTVEditorEnabled, async (req, res) => {
     try {
-        console.log('🔄 Starting manual auto-updater...');
+        console.log('🚀 Starting IPTV Editor Auto-Updater');
         
-        // Check if all required settings are configured
+        // Get playlist ID and settings
         const settings = await iptvEditorService.getAllSettings();
-        const requiredSettings = [
-            'bearer_token', 
-            'default_playlist_id',
-            'provider_base_url',
-            'provider_username', 
-            'provider_password'
-        ];
+        const playlistId = settings.default_playlist_id;
         
-        const missingSettings = requiredSettings.filter(setting => !settings[setting]);
-        
-        if (missingSettings.length > 0) {
+        if (!playlistId) {
             return res.status(400).json({
                 success: false,
-                message: `Missing required settings: ${missingSettings.join(', ')}. Please configure IPTV Editor settings first.`
+                message: 'No default playlist selected'
             });
         }
+
+        // STEP 1: Get updater config first (this returns the fresh token)
+        const configResponse = await iptvEditorService.makeAPICall('/api/auto-updater/get-data', {
+            playlist: playlistId
+        });
         
-        console.log('✅ All required settings found, proceeding with sync...');
+        // STEP 2: Extract the fresh token from response
+        const freshToken = configResponse.token; // This is the key!
         
-        // Run the auto-updater
-        const result = await iptvEditorService.runAutoUpdater();
+        if (!freshToken) {
+            return res.status(400).json({
+                success: false,
+                message: 'Failed to get auto-updater token'
+            });
+        }
+
+        console.log('✅ Got fresh auto-updater token');
+
+        // STEP 3: Collect provider data using settings from config
+        const providerData = await collectProviderData(settings);
         
+        // STEP 4: Prepare FormData for submission
+        const formData = new FormData();
+        formData.append('url', settings.provider_base_url);
+        formData.append('info', providerData.info);
+        formData.append('get_live_streams', providerData.live_streams);
+        formData.append('get_live_categories', providerData.live_categories);
+        formData.append('get_vod_streams', providerData.vod_streams);
+        formData.append('get_vod_categories', providerData.vod_categories);
+        formData.append('get_series', providerData.series);
+        formData.append('get_series_categories', providerData.series_categories);
+        formData.append('m3u', providerData.m3u);
+
+        // STEP 5: Submit with the FRESH token (not original bearer token)
+        const submitResponse = await axios.post(
+            'https://editor.iptveditor.com/api/auto-updater/run-auto-updater',
+            formData,
+            {
+                headers: {
+                    'Authorization': `Bearer ${freshToken}`, // Use fresh token here!
+                    'Origin': 'https://cloud.iptveditor.com'
+                },
+                timeout: 600000 // 10 minutes
+            }
+        );
+
+        console.log('✅ Auto-updater submission successful');
+        
+        // STEP 6: Reload playlist to get updated stats
+        await iptvEditorService.makeAPICall('/api/playlist/reload-playlist', {
+            playlist: playlistId
+        });
+
         res.json({
             success: true,
             message: 'Auto-updater completed successfully',
-            data: result,
-            stats: result.stats || {},
-            duration: result.duration || 'Unknown'
+            data: submitResponse.data
         });
-        
+
     } catch (error) {
         console.error('❌ Auto-updater failed:', error);
         res.status(500).json({
             success: false,
-            message: 'Auto-updater failed',
-            error: error.message
+            message: 'Auto-updater failed: ' + error.message
         });
     }
 });
