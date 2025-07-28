@@ -1485,6 +1485,110 @@ async debugFormData(baseUrl, datasets) {
     });
 }
 
+// ADD this method to your existing iptv-editor-service.js file
+async collectProviderData(baseUrl, username, password) {
+    console.log('🔄 Making 8 sequential API calls to provider...');
+    console.log('🌐 Provider URL:', baseUrl);
+    console.log('👤 Provider Username:', username);
+    console.log('🔑 Provider Password:', password ? '***' : 'not set');
+    
+    const endpoints = [
+        '',                                     // 1. Basic info
+        '&action=get_live_streams',             // 2. Live streams
+        '&action=get_live_categories',          // 3. Live categories
+        '&action=get_vod_streams',              // 4. VOD streams
+        '&action=get_vod_categories',           // 5. VOD categories
+        '&action=get_series',                   // 6. Series
+        '&action=get_series_categories'         // 7. Series categories
+    ];
+    
+    const datasets = [];
+    
+    // First 7 calls to player_api.php
+    for (let i = 0; i < endpoints.length; i++) {
+        const url = `${baseUrl}/player_api.php?username=${username}&password=${password}${endpoints[i]}`;
+        const callName = endpoints[i] ? endpoints[i].replace('&action=', '') : 'basic_info';
+        
+        console.log(`📡 API Call ${i + 1}/8: ${callName}`);
+        
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`Provider API call ${i + 1} failed: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.text();
+        datasets.push(data);
+        
+        console.log(`✅ Call ${i + 1} completed: ${Math.round(data.length / 1024)}KB`);
+        
+        // Small delay between requests
+        if (i < endpoints.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+    }
+    
+    // 8th call: M3U playlist (different endpoint)
+    console.log('📡 API Call 8/8: m3u_playlist');
+    const m3uUrl = `${baseUrl}/get.php?username=${username}&password=${password}&type=m3u_plus&output=ts`;
+    const m3uResponse = await fetch(m3uUrl);
+    
+    if (!m3uResponse.ok) {
+        throw new Error(`M3U playlist call failed: ${m3uResponse.status} ${m3uResponse.statusText}`);
+    }
+    
+    const m3uData = await m3uResponse.text();
+    datasets.push(m3uData);
+    
+    console.log(`✅ Call 8 completed: ${Math.round(m3uData.length / 1024)}KB`);
+    console.log('✅ All provider data collected successfully');
+    
+    return datasets;
+}
+
+// ADD this method to your existing iptv-editor-service.js file
+async submitToAutoUpdater(baseUrl, datasets) {
+    console.log('🚀 Submitting to IPTV Editor auto-updater...');
+    
+    const FormData = require('form-data');
+    const formData = new FormData();
+    formData.append('url', baseUrl);
+    formData.append('info', datasets[0]);                  // Basic info
+    formData.append('get_live_streams', datasets[1]);      // Live streams
+    formData.append('get_live_categories', datasets[2]);   // Live categories  
+    formData.append('get_vod_streams', datasets[3]);       // VOD streams
+    formData.append('get_vod_categories', datasets[4]);    // VOD categories
+    formData.append('get_series', datasets[5]);            // Series
+    formData.append('get_series_categories', datasets[6]); // Series categories
+    formData.append('m3u', datasets[7]);                   // M3U playlist
+    
+    try {
+        const response = await fetch(`${this.baseUrl}/api/auto-updater/run-auto-updater`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${this.bearerToken}`,
+                'Origin': 'https://cloud.iptveditor.com'
+            },
+            body: formData,
+            timeout: 600000 // 10 minutes timeout
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`IPTV Editor API error: ${response.status} ${response.statusText}. ${errorText}`);
+        }
+        
+        const result = await response.json();
+        console.log('✅ Auto-updater submission completed successfully');
+        
+        return { data: result };
+        
+    } catch (error) {
+        console.error('❌ Auto-updater submission failed:', error);
+        throw error;
+    }
+}
+
 }
 
 // Export singleton instance
