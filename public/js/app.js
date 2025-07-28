@@ -1380,44 +1380,15 @@ window.AccessibilityUtils = {
             if (btn.textContent.includes('Delete')) btn.setAttribute('aria-label', 'Delete user');
         });
         
-        // Add skip links for keyboard navigation
-        this.addSkipLinks();
+        // Skip links disabled - they were causing unwanted popups
+        // this.addSkipLinks();
     },
     
-    // Add skip navigation links
+    // Add skip navigation links - DISABLED
     addSkipLinks() {
-        const skipLink = document.createElement('a');
-        skipLink.href = '#main-content';
-        skipLink.textContent = 'Skip to main content';
-        skipLink.style.cssText = `
-            position: absolute;
-            top: -40px;
-            left: 6px;
-            background: var(--primary-color);
-            color: white;
-            padding: 8px;
-            text-decoration: none;
-            border-radius: 4px;
-            z-index: 1000;
-            transition: top 0.2s ease;
-        `;
-        
-        skipLink.addEventListener('focus', () => {
-            skipLink.style.top = '6px';
-        });
-        
-        skipLink.addEventListener('blur', () => {
-            skipLink.style.top = '-40px';
-        });
-        
-        document.body.insertBefore(skipLink, document.body.firstChild);
-        
-        // Add main content role without changing ID
-        const pageContent = document.getElementById('pageContent');
-        if (pageContent) {
-            pageContent.setAttribute('role', 'main');
-            // Don't change the ID - keep it as 'pageContent' for compatibility
-        }
+        // Function disabled to prevent "Skip to main content" popup
+        // The popup was appearing when users focused on keyboard navigation
+        return;
     },
     
     // Focus management for modals
