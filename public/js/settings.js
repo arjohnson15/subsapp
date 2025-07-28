@@ -2110,7 +2110,7 @@ async handleUpdatePlaylistNow() {
         Utils.showNotification('Starting playlist update - this may take several minutes...', 'info');
         
         // FIXED: Use the correct endpoint path
-        const response = await fetch('/api/iptv-editor/auto-updater/run', {
+        const response = await fetch('/api/iptv-editor/run-auto-updater', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });

@@ -70,7 +70,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/owners', ownerRoutes);
 app.use('/api/email-schedules', emailScheduleRoutes);
 app.use('/api/iptv', iptvRoutes);
-app.use('/api/iptv-editor', iptvEditorRoutes); // NEW - IPTV Editor routes
+app.use('/api/iptv-editor', iptvEditorRoutes); 
 
 // ===== GUIDE ROUTES - RESTORED =====
 // Serve guide static files first (CSS, JS, images, etc.)
