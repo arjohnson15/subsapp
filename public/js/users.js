@@ -632,7 +632,7 @@ showUserModal(user) {
                         </div>
                         <div class="iptv-credential-item">
                             <div class="iptv-credential-label">Max Connections:</div>
-                            <div class="iptv-credential-value">${user.device_count || '1'}</div>
+                            <div class="iptv-credential-value">${user.iptv_connections || 'N/A'}</div>
                         </div>
                         <div class="iptv-credential-item">
                             <div class="iptv-credential-label">Days Left:</div>
@@ -700,14 +700,16 @@ showUserModal(user) {
                                         ${user.iptv_editor_enabled ? 'Enabled' : 'Disabled'}
                                     </div>
                                 </div>
-                                <div class="iptv-credential-item">
-                                    <div class="iptv-credential-label">IPTV Editor M3U URL:</div>
-                                    <div class="iptv-credential-value">
-                                        <span style="color: #9e9e9e; font-style: italic;">
-                                            ${user.iptv_editor_enabled ? 'Available in user management' : 'Not configured'}
-                                        </span>
-                                    </div>
-                                </div>
+<div class="iptv-url-item">
+    <div class="iptv-credential-label">IPTV Editor M3U URL:</div>
+    <div class="iptv-url-value">
+        ${(() => {
+            if (!user.iptv_editor_enabled || !user.iptv_editor_m3u_code) return 'N/A';
+            const editorM3uUrl = `https://xtream.johnsonflix.tv/${user.iptv_editor_m3u_code}`;
+            return `<input type="text" value="${editorM3uUrl}" readonly onclick="this.select()" style="width: 100%; background: rgba(0,0,0,0.7); color: #4fc3f7; border: 1px solid #4fc3f7; padding: 5px; border-radius: 3px; font-size: 12px; font-family: 'Courier New', monospace;">`;
+        })()}
+    </div>
+</div>
                             </div>
                         </div>
                     ` : ''}
