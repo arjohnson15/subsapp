@@ -143,12 +143,13 @@ router.post('/settings', [
                     // Convert hours to cron expression
                     let cronExpression;
                     switch(parseInt(hours)) {
-                        case 6: cronExpression = '0 */6 * * *'; break;
-                        case 12: cronExpression = '0 */12 * * *'; break;
-                        case 24: cronExpression = '0 2 * * *'; break;
-                        case 48: cronExpression = '0 2 */2 * *'; break;
-                        case 168: cronExpression = '0 2 * * 0'; break;
-                        default: cronExpression = '0 2 * * *'; break;
+                        case 1: cronExpression = '0 * * * *'; break;        // Every hour at minute 0
+                        case 2: cronExpression = '0 */2 * * *'; break;      // Every 2 hours at minute 0
+                        case 4: cronExpression = '0 */4 * * *'; break;      // Every 4 hours at minute 0
+                        case 6: cronExpression = '0 */6 * * *'; break;      // Every 6 hours at minute 0
+                        case 12: cronExpression = '0 */12 * * *'; break;    // Every 12 hours at minute 0
+                        case 24: cronExpression = '0 2 * * *'; break;       // Daily at 2:00 AM
+                        default: cronExpression = '0 2 * * *'; break;       // Default to daily at 2:00 AM
                     }
                     
                     console.log(`📅 Scheduling auto updater every ${hours} hours (${cronExpression})`);
@@ -1771,6 +1772,11 @@ router.post('/run-auto-updater', checkIPTVEditorEnabled, async (req, res) => {
     try {
         console.log('🚀 Starting IPTV Editor Auto-Updater');
         
+        // CRITICAL: Update timestamp immediately when manual run starts
+        const manualStartTime = new Date();
+        await iptvEditorService.setSetting('last_auto_updater_run', manualStartTime.toISOString(), 'string');
+        console.log('📅 Manual run - Updated timestamp at start:', manualStartTime.toISOString());
+        
         // Get playlist ID and settings
         const settings = await iptvEditorService.getAllSettings();
         const playlistId = settings.default_playlist_id;
@@ -1781,7 +1787,7 @@ router.post('/run-auto-updater', checkIPTVEditorEnabled, async (req, res) => {
                 message: 'No default playlist selected'
             });
         }
-
+        
         // STEP 1: Get updater config first (this returns the fresh token)
         const configResponse = await iptvEditorService.getAutoUpdaterConfig(playlistId);
         
@@ -1794,9 +1800,8 @@ router.post('/run-auto-updater', checkIPTVEditorEnabled, async (req, res) => {
                 message: 'Failed to get auto-updater token'
             });
         }
-
         console.log('✅ Got fresh auto-updater token');
-
+        
         // STEP 3: Collect provider data using settings
         const providerData = await iptvEditorService.collectProviderData(
             settings.provider_base_url,
@@ -1816,7 +1821,7 @@ router.post('/run-auto-updater', checkIPTVEditorEnabled, async (req, res) => {
         formData.append('get_series', providerData[5]);            // Series
         formData.append('get_series_categories', providerData[6]); // Series categories
         formData.append('m3u', providerData[7]);                   // M3U playlist
-
+        
         // STEP 5: Submit with the FRESH token (not original bearer token)
         const axios = require('axios');
         const submitResponse = await axios.post(
@@ -1831,7 +1836,6 @@ router.post('/run-auto-updater', checkIPTVEditorEnabled, async (req, res) => {
                 timeout: 600000 // 10 minutes
             }
         );
-
         console.log('✅ Auto-updater submission successful');
         
         // STEP 6: Reload playlist to get updated stats (using makeAPICall now that it exists)
@@ -1842,18 +1846,35 @@ router.post('/run-auto-updater', checkIPTVEditorEnabled, async (req, res) => {
         } catch (reloadError) {
             console.warn('⚠️ Playlist reload failed (non-critical):', reloadError.message);
         }
-
+        
+        // CRITICAL: Update timestamp after successful manual completion
+        const manualEndTime = new Date();
+        await iptvEditorService.setSetting('last_auto_updater_run', manualEndTime.toISOString(), 'string');
+        console.log('🏁 Manual run completed successfully. Final timestamp:', manualEndTime.toISOString());
+        
         res.json({
             success: true,
             message: 'Auto-updater completed successfully',
-            data: submitResponse.data
+            data: submitResponse.data,
+            last_run: manualEndTime.toISOString() // Send back the timestamp to frontend
         });
-
+        
     } catch (error) {
         console.error('❌ Auto-updater failed:', error);
+        
+        // CRITICAL: Update timestamp even on manual failure
+        const manualFailTime = new Date();
+        try {
+            await iptvEditorService.setSetting('last_auto_updater_run', manualFailTime.toISOString(), 'string');
+            console.log('💀 Manual run failed. Updated timestamp:', manualFailTime.toISOString());
+        } catch (timestampError) {
+            console.error('❌ Failed to update timestamp after manual failure:', timestampError);
+        }
+        
         res.status(500).json({
             success: false,
-            message: 'Auto-updater failed: ' + error.message
+            message: 'Auto-updater failed: ' + error.message,
+            last_run: manualFailTime.toISOString()
         });
     }
 });

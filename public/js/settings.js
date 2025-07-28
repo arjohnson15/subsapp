@@ -2099,47 +2099,45 @@ async saveDefaultGroups() {
 
 // 1. FIX: Update the handleUpdatePlaylistNow function (REPLACE YOUR EXISTING ONE)
 async handleUpdatePlaylistNow() {
+    const updateBtn = document.getElementById('updatePlaylistBtn');
+    const originalText = updateBtn.innerHTML;
+    
     try {
-        const updateBtn = document.getElementById('updatePlaylistBtn');
-        const originalText = updateBtn.innerHTML;
-        
+        // Show loading state
         updateBtn.disabled = true;
-        updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating... <small style="display: block;">This may take several minutes</small>';
+        updateBtn.innerHTML = 'Updating... <small style="display: block;">This may take several minutes</small>';
         
         console.log('🚀 Starting manual playlist update...');
-        Utils.showNotification('Starting playlist update - this may take several minutes...', 'info');
         
-        // FIXED: Use the correct endpoint path
+        // FIXED: Correct endpoint path
         const response = await fetch('/api/iptv-editor/run-auto-updater', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
         
         const result = await response.json();
         
         if (result.success) {
-            Utils.showNotification(`Playlist updated successfully! Duration: ${result.duration}`, 'success');
+            Utils.showNotification('Playlist updated successfully!', 'success');
+            console.log('✅ Manual update completed:', result);
             
-            // Show stats if available
-            if (result.stats) {
-                const statsMsg = `Updated: ${result.stats.channels_updated || 0} channels, Added: ${result.stats.channels_added || 0} channels`;
-                Utils.showNotification(statsMsg, 'info');
-            }
-            
-            // Update last run display
+            // IMPORTANT: Update the last run display immediately after success
             await this.updateLastRunDisplay();
             
-            console.log('✅ Manual update completed:', result);
         } else {
             throw new Error(result.message || 'Update failed');
         }
+        
     } catch (error) {
         console.error('❌ Manual update failed:', error);
         Utils.showNotification(`Update failed: ${error.message}`, 'error');
+        
     } finally {
-        const updateBtn = document.getElementById('updatePlaylistBtn');
+        // FIXED: Restore button (originalText is now in scope)
         updateBtn.disabled = false;
-        updateBtn.innerHTML = 'Update Playlist Now <small style="display: block; font-weight: normal;">Force sync playlist content with IPTV panel (this may take several minutes)</small>';
+        updateBtn.innerHTML = originalText;
     }
 },
 
@@ -2190,15 +2188,24 @@ async updateLastRunDisplay() {
         const lastUpdateDisplay = document.getElementById('lastUpdateDisplay');
         if (lastUpdateDisplay && result.success && result.settings) {
             const lastRun = result.settings.last_auto_updater_run;
-            if (lastRun) {
+            if (lastRun && lastRun !== '') {
                 const date = new Date(lastRun);
-                lastUpdateDisplay.textContent = date.toLocaleString();
+                // Ensure the date is valid
+                if (!isNaN(date.getTime())) {
+                    lastUpdateDisplay.textContent = date.toLocaleString();
+                } else {
+                    lastUpdateDisplay.textContent = 'Never';
+                }
             } else {
                 lastUpdateDisplay.textContent = 'Never';
             }
         }
     } catch (error) {
         console.error('❌ Error updating last run display:', error);
+        const lastUpdateDisplay = document.getElementById('lastUpdateDisplay');
+        if (lastUpdateDisplay) {
+            lastUpdateDisplay.textContent = 'Error loading';
+        }
     }
 },
 
@@ -2282,8 +2289,10 @@ async onPlaylistChange(playlistId) {
                     provider_password: pattern.param2
                 });
                 
-                Utils.showNotification('Provider settings extracted and saved automatically', 'success');
-                console.log('✅ Provider settings auto-populated and saved');
+                // REMOVED: The notification message that was annoying you
+                // Utils.showNotification('Provider settings extracted and saved automatically', 'success');
+                console.log('✅ Provider settings auto-populated and saved silently');
+                
             } else {
                 console.warn('⚠️ No provider patterns found in selected playlist');
                 Utils.showNotification('Selected playlist has no provider information', 'warning');
@@ -2962,6 +2971,14 @@ document.addEventListener('DOMContentLoaded', function() {
         playlistSelect.addEventListener('change', function() {
             Settings.onPlaylistChange(this.value);
         });
+    }
+	
+	    // Update last run display when settings page loads
+    if (typeof Settings !== 'undefined' && Settings.updateLastRunDisplay) {
+        // Small delay to ensure elements are rendered
+        setTimeout(() => {
+            Settings.updateLastRunDisplay();
+        }, 500);
     }
     
     // NEW: Add manual update button listener

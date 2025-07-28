@@ -1189,6 +1189,11 @@ async runAutoUpdater() {
     try {
         console.log('🚀 Starting auto-updater process...');
         
+        // CRITICAL: Update timestamp immediately when process starts
+        const processStartTime = new Date();
+        await this.setSetting('last_auto_updater_run', processStartTime.toISOString(), 'string');
+        console.log('📅 Service method - Updated timestamp at start:', processStartTime.toISOString());
+        
         // Get settings
         const settings = await this.getAllSettings();
         const baseUrl = settings.provider_base_url;
@@ -1203,6 +1208,12 @@ async runAutoUpdater() {
         if (!settings.bearer_token || !settings.default_playlist_id) {
             throw new Error('Missing required IPTV Editor settings. Please configure bearer token and default playlist.');
         }
+        
+        console.log('🔧 Using provider settings:', {
+            baseUrl: baseUrl ? baseUrl.substring(0, 20) + '...' : 'MISSING',
+            username: username ? username.substring(0, 5) + '...' : 'MISSING',
+            password: password ? '***' : 'MISSING'
+        });
 		
         // Phase 0: Get playlist configuration from IPTV Editor
         console.log('📋 Phase 0: Getting playlist configuration from IPTV Editor...');
@@ -1216,35 +1227,51 @@ async runAutoUpdater() {
         console.log('📤 Phase 2: Submitting to IPTV Editor...');
         const response = await this.submitToAutoUpdater(baseUrl, datasets);
         
-        // Phase 3: Log success and update settings
+        // Phase 3: Log success and calculate duration
         const duration = Date.now() - startTime;
+        
+        // Log the sync operation
         await this.logSync('playlist_sync', null, 'success', 
             { playlist: settings.default_playlist_id }, response.data, null, duration);
-            
-        // Update last sync time
-        await this.setSetting('last_auto_updater_run', new Date().toISOString());
+        
+        // CRITICAL: Update timestamp after successful completion with current time
+        const processEndTime = new Date();
+        await this.setSetting('last_auto_updater_run', processEndTime.toISOString(), 'string');
+        console.log('🏁 Service method - Final timestamp after completion:', processEndTime.toISOString());
         
         console.log(`✅ Auto-updater completed in ${Math.round(duration/1000)}s`);
         
         return {
             ...response.data,
-            duration: `${Math.round(duration/1000)} seconds`
+            duration: `${Math.round(duration/1000)} seconds`,
+            last_run: processEndTime.toISOString(),
+            success: true
         };
         
     } catch (error) {
+        console.error('❌ Auto-updater process failed:', error);
+        
         const duration = Date.now() - startTime;
         
-        // FIXED: Get settings here since it might not be defined if error happened early
-        let playlistId = 'unknown';
+        // Log the failed sync operation
         try {
-            const errorSettings = await this.getAllSettings();
-            playlistId = errorSettings.default_playlist_id || 'unknown';
-        } catch (e) {
-            // Ignore settings fetch error during error handling
+            const settings = await this.getAllSettings();
+            await this.logSync('playlist_sync', null, 'error', 
+                { playlist: settings.default_playlist_id }, null, error.message, duration);
+        } catch (logError) {
+            console.error('❌ Failed to log sync error:', logError);
         }
         
-        await this.logSync('playlist_sync', null, 'error', 
-            { playlist: playlistId }, null, error.message, duration);
+        // CRITICAL: Update timestamp even on failure so user knows when last attempt was
+        const processFailTime = new Date();
+        try {
+            await this.setSetting('last_auto_updater_run', processFailTime.toISOString(), 'string');
+            console.log('💀 Service method - Updated timestamp after failure:', processFailTime.toISOString());
+        } catch (timestampError) {
+            console.error('❌ Failed to update timestamp after service failure:', timestampError);
+        }
+        
+        // Re-throw the error so the route handler can catch it
         throw error;
     }
 }
