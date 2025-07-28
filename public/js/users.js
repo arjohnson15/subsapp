@@ -613,6 +613,106 @@ showUserModal(user) {
                     </div>
                 </div>
             </div>
+			
+			<!-- IPTV Status Section -->
+            <div class="iptv-status-section">
+                <div class="section-title">
+                    <i class="fas fa-tv"></i>
+                    Current IPTV Status
+                </div>
+                <div class="iptv-info-grid">
+                    ${user.iptv_username ? `
+                        <div class="iptv-credential-item">
+                            <div class="iptv-credential-label">IPTV Username:</div>
+                            <div class="iptv-credential-value">${user.iptv_username}</div>
+                        </div>
+                        <div class="iptv-credential-item">
+                            <div class="iptv-credential-label">IPTV Password:</div>
+                            <div class="iptv-credential-value">${user.iptv_password || 'N/A'}</div>
+                        </div>
+                        <div class="iptv-credential-item">
+                            <div class="iptv-credential-label">Max Connections:</div>
+                            <div class="iptv-credential-value">${user.device_count || '1'}</div>
+                        </div>
+                        <div class="iptv-credential-item">
+                            <div class="iptv-credential-label">Days Left:</div>
+                            <div class="iptv-credential-value ${(() => {
+                                if (!user.iptv_expiration) return '';
+                                const expDate = new Date(user.iptv_expiration);
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                const daysLeft = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
+                                if (expDate < today) return 'expired';
+                                if (daysLeft <= 7) return 'warning';
+                                return 'good';
+                            })()}">
+                                ${(() => {
+                                    if (!user.iptv_expiration) return 'N/A';
+                                    const expDate = new Date(user.iptv_expiration);
+                                    const today = new Date();
+                                    today.setHours(0, 0, 0, 0);
+                                    const daysLeft = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
+                                    if (expDate < today) return 'EXPIRED';
+                                    return `${daysLeft} days`;
+                                })()}
+                            </div>
+                        </div>
+                        <div class="iptv-credential-item">
+                            <div class="iptv-credential-label">Expiration:</div>
+                            <div class="iptv-credential-value ${(() => {
+                                if (!user.iptv_expiration) return '';
+                                const expDate = new Date(user.iptv_expiration);
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                return expDate < today ? 'expired' : '';
+                            })()}">
+                                ${formatDate(user.iptv_expiration)}
+                            </div>
+                        </div>
+                        <div class="iptv-url-item">
+                            <div class="iptv-credential-label">M3U Plus URL:</div>
+                            <div class="iptv-url-value">
+                                ${(() => {
+                                    if (!user.iptv_username || !user.iptv_password) return 'N/A';
+                                    const baseUrl = 'https://pinkpony.lol:443';
+                                    const m3uUrl = `${baseUrl}/get.php?username=${user.iptv_username}&password=${user.iptv_password}&type=m3u_plus&output=ts`;
+                                    return `<input type="text" value="${m3uUrl}" readonly onclick="this.select()" style="width: 100%; background: rgba(0,0,0,0.7); color: #4fc3f7; border: 1px solid #4fc3f7; padding: 5px; border-radius: 3px; font-size: 12px; font-family: 'Courier New', monospace;">`;
+                                })()}
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="no-iptv-access">
+                            <i class="fas fa-ban" style="font-size: 2rem; margin-bottom: 10px; opacity: 0.5;"></i>
+                            <div>No IPTV access configured</div>
+                        </div>
+                    `}
+                    
+                    ${user.include_in_iptv_editor ? `
+                        <div class="iptv-editor-section">
+                            <div class="iptv-editor-header">
+                                <i class="fas fa-edit"></i>
+                                IPTV Editor Integration
+                            </div>
+                            <div class="iptv-editor-status">
+                                <div class="iptv-credential-item">
+                                    <div class="iptv-credential-label">IPTV Editor Status:</div>
+                                    <div class="iptv-credential-value ${user.iptv_editor_enabled ? 'enabled' : 'disabled'}">
+                                        ${user.iptv_editor_enabled ? 'Enabled' : 'Disabled'}
+                                    </div>
+                                </div>
+                                <div class="iptv-credential-item">
+                                    <div class="iptv-credential-label">IPTV Editor M3U URL:</div>
+                                    <div class="iptv-credential-value">
+                                        <span style="color: #9e9e9e; font-style: italic;">
+                                            ${user.iptv_editor_enabled ? 'Available in user management' : 'Not configured'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
 
             <!-- Library Access Section -->
             <div class="library-access-section">
