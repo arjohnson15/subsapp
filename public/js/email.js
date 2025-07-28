@@ -370,25 +370,11 @@ if (plexSubscription) {
         .replace(/\{\{venmo_link\}\}/g, 'https://venmo.com/johnsonflix')
         .replace(/\{\{cashapp_link\}\}/g, 'https://cash.app/$johnsonflix');
     
-if (previewContent.trim()) {
-    // Clean up the content for proper preview display
-    let cleanContent = previewContent;
-    
-    // Force all tables to be responsive
-    cleanContent = cleanContent.replace(/<table/g, '<table style="width: 100%; max-width: 100%; table-layout: fixed; border-collapse: collapse; word-wrap: break-word;"');
-    
-    // Force all td/th to wrap content
-    cleanContent = cleanContent.replace(/<td/g, '<td style="word-wrap: break-word; overflow-wrap: break-word; max-width: 200px; padding: 8px;"');
-    cleanContent = cleanContent.replace(/<th/g, '<th style="word-wrap: break-word; overflow-wrap: break-word; max-width: 200px; padding: 8px;"');
-    
-    // Force all divs to stay within bounds
-    cleanContent = cleanContent.replace(/<div/g, '<div style="max-width: 100%; word-wrap: break-word; box-sizing: border-box;"');
-    
-    // Wrap the entire content in a container that enforces boundaries
-    preview.innerHTML = `<div style="max-width: 100%; overflow-x: hidden; word-wrap: break-word; font-family: Arial, sans-serif; color: #333;">${cleanContent}</div>`;
-} else {
-    preview.innerHTML = '<p style="color: #666; text-align: center; padding: 40px; font-family: Arial, sans-serif;">Start typing in the email body above to see the preview...</p>';
-}
+    if (previewContent.trim()) {
+        preview.innerHTML = previewContent;
+    } else {
+        preview.innerHTML = '<p style="color: #666; text-align: center; padding: 40px;">Start typing in the email body below to see the preview...</p>';
+    }
 },
 
 
