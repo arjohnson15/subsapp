@@ -153,6 +153,82 @@ async getAllSettings() {
     }
 }
 
+// ADD this method to the IPTVEditorService class in iptv-editor-service.js
+async makeAPICall(endpoint, data = {}, method = 'POST') {
+    try {
+        console.log(`🌐 Making IPTV Editor API call: ${method} ${endpoint}`);
+        
+        if (!this.bearerToken) {
+            throw new Error('Bearer token not configured');
+        }
+        
+        const url = `${this.baseURL}${endpoint}`;
+        const options = {
+            method: method,
+            headers: {
+                'Authorization': `Bearer ${this.bearerToken}`,
+                'Content-Type': 'application/json',
+                'Origin': 'https://cloud.iptveditor.com',
+                'Referer': 'https://cloud.iptveditor.com/'
+            }
+        };
+        
+        // Add body for POST/PUT requests
+        if (method !== 'GET' && Object.keys(data).length > 0) {
+            options.body = JSON.stringify(data);
+        }
+        
+        const response = await fetch(url, options);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`API call failed: ${response.status} ${response.statusText}. ${errorText}`);
+        }
+        
+        const result = await response.json();
+        console.log(`✅ API call completed: ${endpoint}`);
+        
+        return result;
+        
+    } catch (error) {
+        console.error(`❌ API call failed for ${endpoint}:`, error);
+        throw error;
+    }
+}
+
+// ADD this method to the IPTVEditorService class in iptv-editor-service.js
+async getAutoUpdaterConfig(playlistId) {
+    try {
+        console.log('🔄 Phase 0: Getting auto-updater configuration...');
+        
+        const response = await fetch(`${this.baseURL}/api/auto-updater/get-data`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${this.bearerToken}`,
+                'Content-Type': 'application/json',
+                'Origin': 'https://cloud.iptveditor.com',
+                'Referer': 'https://cloud.iptveditor.com/'
+            },
+            body: JSON.stringify({ playlist: playlistId })
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Phase 0 failed: ${response.status} ${response.statusText}. ${errorText}`);
+        }
+        
+        const configData = await response.json();
+        console.log('✅ Phase 0 completed - playlist configuration retrieved');
+        console.log('📊 Configuration size:', JSON.stringify(configData).length, 'bytes');
+        
+        return configData;
+        
+    } catch (error) {
+        console.error('❌ Phase 0 failed:', error);
+        throw error;
+    }
+}
+
 // FIXED: getStoredPlaylists - Handle database patterns properly
 async getStoredPlaylists() {
     try {

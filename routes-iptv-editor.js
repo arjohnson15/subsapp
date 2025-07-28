@@ -1642,7 +1642,7 @@ router.use((error, req, res, next) => {
     });
 });
 
-// Auto-updater route - needs token handling
+// Auto-updater route - needs token handling  
 router.post('/run-auto-updater', checkIPTVEditorEnabled, async (req, res) => {
     try {
         console.log('🚀 Starting IPTV Editor Auto-Updater');
@@ -1659,9 +1659,7 @@ router.post('/run-auto-updater', checkIPTVEditorEnabled, async (req, res) => {
         }
 
         // STEP 1: Get updater config first (this returns the fresh token)
-        const configResponse = await iptvEditorService.makeAPICall('/api/auto-updater/get-data', {
-            playlist: playlistId
-        });
+        const configResponse = await iptvEditorService.getAutoUpdaterConfig(playlistId);
         
         // STEP 2: Extract the fresh token from response
         const freshToken = configResponse.token; // This is the key!
@@ -1675,27 +1673,34 @@ router.post('/run-auto-updater', checkIPTVEditorEnabled, async (req, res) => {
 
         console.log('✅ Got fresh auto-updater token');
 
-        // STEP 3: Collect provider data using settings from config
-        const providerData = await collectProviderData(settings);
+        // STEP 3: Collect provider data using settings
+        const providerData = await iptvEditorService.collectProviderData(
+            settings.provider_base_url,
+            settings.provider_username,
+            settings.provider_password
+        );
         
         // STEP 4: Prepare FormData for submission
+        const FormData = require('form-data');
         const formData = new FormData();
         formData.append('url', settings.provider_base_url);
-        formData.append('info', providerData.info);
-        formData.append('get_live_streams', providerData.live_streams);
-        formData.append('get_live_categories', providerData.live_categories);
-        formData.append('get_vod_streams', providerData.vod_streams);
-        formData.append('get_vod_categories', providerData.vod_categories);
-        formData.append('get_series', providerData.series);
-        formData.append('get_series_categories', providerData.series_categories);
-        formData.append('m3u', providerData.m3u);
+        formData.append('info', providerData[0]);                  // Basic info
+        formData.append('get_live_streams', providerData[1]);      // Live streams
+        formData.append('get_live_categories', providerData[2]);   // Live categories  
+        formData.append('get_vod_streams', providerData[3]);       // VOD streams
+        formData.append('get_vod_categories', providerData[4]);    // VOD categories
+        formData.append('get_series', providerData[5]);            // Series
+        formData.append('get_series_categories', providerData[6]); // Series categories
+        formData.append('m3u', providerData[7]);                   // M3U playlist
 
         // STEP 5: Submit with the FRESH token (not original bearer token)
+        const axios = require('axios');
         const submitResponse = await axios.post(
             'https://editor.iptveditor.com/api/auto-updater/run-auto-updater',
             formData,
             {
                 headers: {
+                    ...formData.getHeaders(),
                     'Authorization': `Bearer ${freshToken}`, // Use fresh token here!
                     'Origin': 'https://cloud.iptveditor.com'
                 },
@@ -1705,10 +1710,14 @@ router.post('/run-auto-updater', checkIPTVEditorEnabled, async (req, res) => {
 
         console.log('✅ Auto-updater submission successful');
         
-        // STEP 6: Reload playlist to get updated stats
-        await iptvEditorService.makeAPICall('/api/playlist/reload-playlist', {
-            playlist: playlistId
-        });
+        // STEP 6: Reload playlist to get updated stats (using makeAPICall now that it exists)
+        try {
+            await iptvEditorService.makeAPICall('/api/playlist/reload-playlist', {
+                playlist: playlistId
+            });
+        } catch (reloadError) {
+            console.warn('⚠️ Playlist reload failed (non-critical):', reloadError.message);
+        }
 
         res.json({
             success: true,
