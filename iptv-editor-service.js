@@ -8,7 +8,7 @@ const FormData = require('form-data');
 
 class IPTVEditorService {
     constructor() {
-        this.baseURL = 'https://editor.iptveditor.com'; // FIXED: Consistent naming
+        this.baseURL = 'https://editor.iptveditor.com'; 
         this.bearerToken = null;
         this.defaultPlaylistId = null;
         this.initialized = false;
@@ -1127,6 +1127,10 @@ async runAutoUpdater() {
         if (!settings.bearer_token || !settings.default_playlist_id) {
             throw new Error('Missing required IPTV Editor settings. Please configure bearer token and default playlist.');
         }
+		
+        // Phase 0: Get playlist configuration from IPTV Editor
+        console.log('📋 Phase 0: Getting playlist configuration from IPTV Editor...');
+        await this.getPlaylistConfiguration(settings.default_playlist_id);		
         
         // Phase 1: Collect all provider data (8 API calls)
         console.log('📥 Phase 1: Collecting provider data...');
@@ -1563,7 +1567,7 @@ async submitToAutoUpdater(baseUrl, datasets) {
     formData.append('m3u', datasets[7]);                   // M3U playlist
     
     try {
-        const response = await fetch(`${this.baseUrl}/api/auto-updater/run-auto-updater`, {
+        const response = await fetch(`https://editor.iptveditor.com/api/auto-updater/run-auto-updater`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${this.bearerToken}`,
