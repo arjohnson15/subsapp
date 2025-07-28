@@ -85,7 +85,7 @@ router.post('/settings', [
     body('sync_enabled').optional().isBoolean().withMessage('Sync enabled must be a boolean'),
     body('sync_schedule_hours').optional().isInt({ min: 1, max: 168 }).withMessage('Sync schedule must be between 1 and 168 hours'),
     body('auto_updater_enabled').optional().isBoolean().withMessage('Auto updater enabled must be a boolean'),
-    body('auto_updater_schedule_hours').optional().isInt({ min: 6, max: 168 }).withMessage('Auto updater schedule must be between 6 and 168 hours'),
+    body('auto_updater_schedule_hours').optional().isInt({ min: 1, max: 24 }).withMessage('Auto updater schedule must be between 1 and 24 hours'),
     body('provider_base_url').optional().isString().withMessage('Provider base URL must be a string'),
     body('provider_username').optional().isString().withMessage('Provider username must be a string'),
     body('provider_password').optional().isString().withMessage('Provider password must be a string'),
