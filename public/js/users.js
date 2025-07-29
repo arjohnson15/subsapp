@@ -1152,9 +1152,15 @@ async regenerateM3UUrl(userId) {
         const result = await response.json();
         
         if (result.success) {
+            // UPDATE THE FIELD IMMEDIATELY
+            const urlField = document.getElementById('iptvEditorM3UUrl');
+            if (urlField) {
+                urlField.value = result.m3uUrl;
+                urlField.style.fontStyle = 'normal';
+                urlField.style.color = '#fff';
+            }
+            
             Utils.showNotification('M3U URL regenerated successfully!', 'success');
-            // Reload the user list to show updated URL
-            this.loadUsers();
         } else {
             Utils.showNotification(result.message || 'Failed to regenerate M3U URL', 'error');
         }
@@ -2668,12 +2674,23 @@ function populateIPTVEditorM3UUrl(userData) {
     const urlField = document.getElementById('iptvEditorM3UUrl');
     const m3uSection = document.getElementById('iptvEditorM3USection');
     
-    if (userData.iptv_editor_enabled && userData.iptv_editor_m3u_url) {
-        if (urlField) {
-            urlField.value = userData.iptv_editor_m3u_url;
-        }
+    if (userData.iptv_editor_enabled) {
         if (m3uSection) {
             m3uSection.style.display = 'block';
+        }
+        
+        if (userData.iptv_editor_m3u_url) {
+            // Has URL - show it
+            if (urlField) {
+                urlField.value = userData.iptv_editor_m3u_url;
+            }
+        } else {
+            // No URL - show placeholder and enable regenerate
+            if (urlField) {
+                urlField.value = 'Click Regenerate to generate M3U URL';
+                urlField.style.fontStyle = 'italic';
+                urlField.style.color = '#ff9800';
+            }
         }
     } else {
         if (m3uSection) {
