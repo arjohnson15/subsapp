@@ -193,18 +193,14 @@ return {
 // Get specific user by ID
 router.get('/:id', async (req, res) => {
   try {
-const [user] = await db.query(`
-  SELECT u.*, 
-    o.name as owner_name,
-    o.email as owner_email,
-    ie.iptv_editor_id, ie.iptv_editor_username, ie.iptv_editor_password,
-    ie.m3u_code, ie.epg_code, ie.sync_status, ie.last_sync_time,
-    ie.max_connections as iptv_editor_max_connections
-  FROM users u
-  LEFT JOIN owners o ON u.owner_id = o.id
-  LEFT JOIN iptv_editor_users ie ON u.id = ie.user_id
-  WHERE u.id = ?
-`, [req.params.id]);
+    const [user] = await db.query(`
+      SELECT u.*, 
+        o.name as owner_name,
+        o.email as owner_email
+      FROM users u
+      LEFT JOIN owners o ON u.owner_id = o.id
+      WHERE u.id = ?
+    `, [req.params.id]);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });

@@ -1777,40 +1777,6 @@ async submitToAutoUpdater(baseUrl, datasets) {
     }
 }
 
-/**
- * Generate IPTV Editor M3U URL
- */
-generateIPTVEditorM3UUrl(username, password) {
-    if (!username || !password) {
-        return null;
-    }
-    return `https://xtream.johnsonflix.tv/get.php?username=${username}&password=${password}&type=m3u_plus`;
-}
-
-/**
- * Update user's IPTV Editor M3U URL in main users table
- */
-async updateUserM3UUrl(userId, username, password) {
-    try {
-        const m3uUrl = this.generateIPTVEditorM3UUrl(username, password);
-        
-        if (m3uUrl) {
-            await db.query(
-                'UPDATE users SET iptv_editor_m3u_url = ? WHERE id = ?',
-                [m3uUrl, userId]
-            );
-            
-            console.log(`✅ Updated M3U URL for user ${userId}: ${m3uUrl}`);
-            return m3uUrl;
-        }
-        
-        return null;
-    } catch (error) {
-        console.error(`❌ Error updating M3U URL for user ${userId}:`, error);
-        throw error;
-    }
-}
-
 }
 
 // Export singleton instance

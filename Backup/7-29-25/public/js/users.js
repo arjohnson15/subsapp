@@ -614,7 +614,7 @@ showUserModal(user) {
                 </div>
             </div>
 			
-<!-- IPTV Status Section -->
+			<!-- IPTV Status Section -->
             <div class="iptv-status-section">
                 <div class="section-title">
                     <i class="fas fa-tv"></i>
@@ -653,7 +653,7 @@ showUserModal(user) {
                                     today.setHours(0, 0, 0, 0);
                                     const daysLeft = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
                                     if (expDate < today) return 'EXPIRED';
-                                    return daysLeft + ' days';
+                                    return `${daysLeft} days`;
                                 })()}
                             </div>
                         </div>
@@ -675,8 +675,8 @@ showUserModal(user) {
                                 ${(() => {
                                     if (!user.iptv_username || !user.iptv_password) return 'N/A';
                                     const baseUrl = 'https://pinkpony.lol:443';
-                                    const m3uUrl = baseUrl + '/get.php?username=' + user.iptv_username + '&password=' + user.iptv_password + '&type=m3u_plus&output=ts';
-                                    return '<input type="text" value="' + m3uUrl + '" readonly onclick="this.select()" style="width: 100%; background: rgba(0,0,0,0.7); color: #4fc3f7; border: 1px solid #4fc3f7; padding: 5px; border-radius: 3px; font-size: 12px; font-family: \'Courier New\', monospace;">';
+                                    const m3uUrl = `${baseUrl}/get.php?username=${user.iptv_username}&password=${user.iptv_password}&type=m3u_plus&output=ts`;
+                                    return `<input type="text" value="${m3uUrl}" readonly onclick="this.select()" style="width: 100%; background: rgba(0,0,0,0.7); color: #4fc3f7; border: 1px solid #4fc3f7; padding: 5px; border-radius: 3px; font-size: 12px; font-family: 'Courier New', monospace;">`;
                                 })()}
                             </div>
                         </div>
@@ -700,15 +700,16 @@ showUserModal(user) {
                                         ${user.iptv_editor_enabled ? 'Enabled' : 'Disabled'}
                                     </div>
                                 </div>
-                                <div class="iptv-url-item">
-                                    <div class="iptv-credential-label">IPTV Editor M3U URL:</div>
-                                    <div class="iptv-url-value">
-                                        ${(() => {
-                                            if (!user.iptv_editor_enabled || !user.iptv_editor_m3u_url) return 'N/A';
-                                            return '<input type="text" value="' + user.iptv_editor_m3u_url + '" readonly onclick="this.select()" style="width: 100%; background: rgba(0,0,0,0.7); color: #4fc3f7; border: 1px solid #4fc3f7; padding: 5px; border-radius: 3px; font-size: 12px; font-family: \'Courier New\', monospace;">';
-                                        })()}
-                                    </div>
-                                </div>
+<div class="iptv-url-item">
+    <div class="iptv-credential-label">IPTV Editor M3U URL:</div>
+    <div class="iptv-url-value">
+        ${(() => {
+            if (!user.iptv_editor_enabled || !user.iptv_editor_m3u_code) return 'N/A';
+            const editorM3uUrl = `https://xtream.johnsonflix.tv/${user.iptv_editor_m3u_code}`;
+            return `<input type="text" value="${editorM3uUrl}" readonly onclick="this.select()" style="width: 100%; background: rgba(0,0,0,0.7); color: #4fc3f7; border: 1px solid #4fc3f7; padding: 5px; border-radius: 3px; font-size: 12px; font-family: 'Courier New', monospace;">`;
+        })()}
+    </div>
+</div>
                             </div>
                         </div>
                     ` : ''}
@@ -1117,52 +1118,6 @@ emailUser(userName, userEmail) {
             Utils.handleError(error, 'Deleting user');
         }
     },
-	
-/**
- * Copy IPTV Editor M3U URL to clipboard
- */
-async copyEditorM3UUrl() {
-    const urlField = document.getElementById('iptvEditorM3UUrl');
-    if (urlField && urlField.value && urlField.value.includes('xtream.johnsonflix.tv')) {
-        urlField.select();
-        document.execCommand('copy');
-        Utils.showNotification('IPTV Editor M3U URL copied to clipboard!', 'success');
-    } else {
-        Utils.showNotification('No M3U URL available to copy', 'error');
-    }
-},
-
-/**
- * Regenerate IPTV Editor M3U URL
- */
-async regenerateM3UUrl(userId) {
-    if (!userId) {
-        Utils.showNotification('User ID not found', 'error');
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/iptv-editor/regenerate-m3u/${userId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            Utils.showNotification('M3U URL regenerated successfully!', 'success');
-            // Reload the user list to show updated URL
-            this.loadUsers();
-        } else {
-            Utils.showNotification(result.message || 'Failed to regenerate M3U URL', 'error');
-        }
-    } catch (error) {
-        console.error('Error regenerating M3U URL:', error);
-        Utils.showNotification('Error regenerating M3U URL', 'error');
-    }
-},
 	
 // Enhanced Plex status rendering with better pending invite indicators
 renderPlexStatus(user) {
@@ -2573,8 +2528,6 @@ window.populateFormForEditing = async function(user) {
             console.log(`📝 Set ${fieldId} = ${fieldMappings[fieldId]}`);
         }
     });
-	
-	populateIPTVEditorM3UUrl(user);
     
 // Handle BCC checkbox
 const bccCheckbox = document.getElementById('bccOwnerRenewal');
@@ -2661,29 +2614,8 @@ document.getElementById('excludeAutomatedEmails').checked = user.exclude_automat
     
     console.log(`✅ Form population completed for ${user.name}`);
 	
+	checkForOrphanedIPTVEditor(user);
 };
-
-// ADD this function right after window.populateFormForEditing
-function populateIPTVEditorM3UUrl(userData) {
-    const urlField = document.getElementById('iptvEditorM3UUrl');
-    const m3uSection = document.getElementById('iptvEditorM3USection');
-    
-    if (userData.iptv_editor_enabled && userData.iptv_editor_m3u_url) {
-        if (urlField) {
-            urlField.value = userData.iptv_editor_m3u_url;
-        }
-        if (m3uSection) {
-            m3uSection.style.display = 'block';
-        }
-    } else {
-        if (m3uSection) {
-            m3uSection.style.display = 'none';
-        }
-    }
-    
-    // Store current user ID for regeneration
-    window.currentUserId = userData.id;
-}
 
 // Show Plex libraries and pre-select user's current access - FIXED MODULE REFERENCE
 window.showPlexLibrariesAndPreSelect = function(serverGroup, user) {
@@ -3383,12 +3315,12 @@ function displayIPTVEditorStatus(iptvUser) {
         }
     }
     
-
-// Show M3U Plus URL if available
-if (m3uSection && iptvUser.iptv_editor_m3u_url) {
-    m3uSection.style.display = 'block';
-    document.getElementById('iptvEditorM3UUrl').value = iptvUser.iptv_editor_m3u_url;
-}
+    // Show M3U Plus URL if available
+    if (m3uSection && iptvUser.m3u_code) {
+        m3uSection.style.display = 'block';
+        const m3uUrl = `https://xtream.johnsonflix.tv/${iptvUser.m3u_code}`;
+        document.getElementById('iptvEditorM3UUrl').value = m3uUrl;
+    }
     
     // Show indicator
     if (indicator) {
@@ -3817,6 +3749,3 @@ window.updatePlexAccessCheckVisibility = function() {
         }
     }
 };
-
-window.regenerateM3UUrl = window.Users.regenerateM3UUrl.bind(window.Users);
-window.copyEditorM3UUrl = window.Users.copyEditorM3UUrl.bind(window.Users);

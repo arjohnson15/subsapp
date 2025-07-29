@@ -3,7 +3,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { body, param, validationResult } = require('express-validator');
+const { body, validationResult } = require('express-validator');
 const axios = require('axios');
 const db = require('./database-config');
 const iptvEditorService = require('./iptv-editor-service');
@@ -711,14 +711,8 @@ router.post('/users', [
         
         const result = await iptvEditorService.createUser(userData);
         
-// Generate and store M3U URL
-const m3uUrl = iptvEditorService.generateIPTVEditorM3UUrl(
-    username, 
-    password
-);
-
-// Enable IPTV Editor for this user and store M3U URL
-await db.query('UPDATE users SET iptv_editor_enabled = TRUE, iptv_editor_m3u_url = ? WHERE id = ?', [m3uUrl, user_id]);
+        // Enable IPTV Editor for this user
+        await db.query('UPDATE users SET iptv_editor_enabled = TRUE WHERE id = ?', [user_id]);
         
         res.json({ 
             success: true, 
@@ -751,8 +745,8 @@ router.delete('/users/:id', checkIPTVEditorEnabled, async (req, res) => {
         
         const result = await iptvEditorService.deleteUser(userId);
         
-// Disable IPTV Editor for this user and clear M3U URL
-await db.query('UPDATE users SET iptv_editor_enabled = FALSE, iptv_editor_m3u_url = NULL WHERE id = ?', [userId]);
+        // Disable IPTV Editor for this user
+        await db.query('UPDATE users SET iptv_editor_enabled = FALSE WHERE id = ?', [userId]);
         
         res.json({ 
             success: true, 
@@ -1881,64 +1875,6 @@ router.post('/run-auto-updater', checkIPTVEditorEnabled, async (req, res) => {
             success: false,
             message: 'Auto-updater failed: ' + error.message,
             last_run: manualFailTime.toISOString()
-        });
-    }
-});
-
-// POST /api/iptv-editor/regenerate-m3u/:userId - Regenerate M3U URL for user
-router.post('/regenerate-m3u/:userId', [
-    param('userId').isInt().withMessage('Valid user ID is required'),
-    handleValidationErrors
-], async (req, res) => {
-    try {
-        const userId = req.params.userId;
-        
-        // Get IPTV Editor user data
-        const iptvUser = await db.query(
-            'SELECT * FROM iptv_editor_users WHERE user_id = ?',
-            [userId]
-        );
-        
-        if (iptvUser.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'IPTV Editor user not found'
-            });
-        }
-        
-        const iptvUserData = iptvUser[0];
-        
-        // Generate new M3U URL
-        const m3uUrl = iptvEditorService.generateIPTVEditorM3UUrl(
-            iptvUserData.iptv_editor_username,
-            iptvUserData.iptv_editor_password
-        );
-        
-        if (!m3uUrl) {
-            return res.status(400).json({
-                success: false,
-                message: 'Unable to generate M3U URL - missing credentials'
-            });
-        }
-        
-        // Update users table with new M3U URL
-        await db.query(
-            'UPDATE users SET iptv_editor_m3u_url = ? WHERE id = ?',
-            [m3uUrl, userId]
-        );
-        
-        res.json({
-            success: true,
-            message: 'M3U URL regenerated successfully',
-            m3uUrl: m3uUrl
-        });
-        
-    } catch (error) {
-        console.error('Error regenerating M3U URL:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to regenerate M3U URL',
-            error: error.message
         });
     }
 });
