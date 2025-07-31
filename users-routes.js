@@ -365,6 +365,20 @@ if (iptv_subscription && iptv_subscription !== 'remove' && iptv_expiration) {
   `, [userId, parseInt(iptv_subscription), iptv_expiration]);
   console.log('✅ Created paid IPTV subscription for user:', userId, 'type:', iptv_subscription);
 
+  // NEW: Enable IPTV Editor and generate M3U URL when IPTV subscription is created
+  if (iptv_username && iptv_password) {
+    try {
+      const m3uUrl = iptvEditorService.generateIPTVEditorM3UUrl(iptv_username, iptv_password);
+      if (m3uUrl) {
+        await db.query('UPDATE users SET include_in_iptv_editor = TRUE, iptv_editor_m3u_url = ? WHERE id = ?', [m3uUrl, userId]);
+        console.log(`✅ Enabled IPTV Editor and generated M3U URL for user ${userId}: ${m3uUrl}`);
+      }
+    } catch (m3uError) {
+      console.error(`⚠️ Could not generate IPTV Editor M3U URL for user ${userId}:`, m3uError.message);
+    }
+  }
+}
+
   // NEW: Check if user should be included in IPTV Editor and create M3U URL
   const userForEditor = await db.query('SELECT include_in_iptv_editor, iptv_username, iptv_password FROM users WHERE id = ?', [userId]);
   if (userForEditor.length > 0 && userForEditor[0].include_in_iptv_editor && userForEditor[0].iptv_username && userForEditor[0].iptv_password) {
