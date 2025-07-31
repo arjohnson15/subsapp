@@ -2613,6 +2613,7 @@ async saveLinkedAccount(userId, iptvData) {
       console.error('❌ Failed to initialize channel groups section:', error);
     }
   },
+ 
   
   /**
    * Test IPTV Editor automation workflow - NEW METHOD

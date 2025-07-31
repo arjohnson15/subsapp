@@ -1098,6 +1098,30 @@ let syncSuccess = false;
   // 🔄 SIMPLE: Just emit a console log that frontend can detect
 console.log(`FRONTEND_REFRESH_TRIGGER:${user_id}`);
 
+// Generate M3U URL if IPTV Editor automation was successful
+  if (iptvEditorResults.iptv_editor_success) {
+    try {
+      console.log('🔄 Generating IPTV Editor M3U URL from IPTV credentials...');
+      
+      const m3uUrl = iptvEditorService.generateIPTVEditorM3UUrl(finalUsername, actualPassword);
+      
+      if (m3uUrl) {
+        // Update users table with M3U URL
+        await db.query('UPDATE users SET iptv_editor_m3u_url = ? WHERE id = ?', [m3uUrl, user_id]);
+        
+        console.log('✅ IPTV Editor M3U URL generated and saved:', m3uUrl);
+        iptvEditorResults.m3u_url = m3uUrl;
+      } else {
+        console.warn('⚠️ Failed to generate M3U URL - missing credentials');
+      }
+    } catch (m3uError) {
+      console.error('❌ Failed to generate IPTV Editor M3U URL:', m3uError);
+    }
+  }
+  
+  // 🔄 SIMPLE: Just emit a console log that frontend can detect
+console.log(`FRONTEND_REFRESH_TRIGGER:${user_id}`);
+
 });
 	
   } catch (error) {

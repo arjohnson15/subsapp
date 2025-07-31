@@ -22,27 +22,34 @@ window.Users = {
         }
     },
 	
-    populateOwnerFilter(users) {
-        const ownerFilter = document.getElementById('ownerFilter');
-        if (!ownerFilter) return;
-        
-        // Get unique owners
-        const owners = [...new Set(users
-            .filter(user => user.owner_name)
-            .map(user => ({ id: user.owner_id, name: user.owner_name }))
-        )];
-        
-        // Clear existing options except "All Owners"
-        ownerFilter.innerHTML = '<option value="">All Owners</option>';
-        
-        // Add owner options
-        owners.forEach(owner => {
-            const option = document.createElement('option');
-            option.value = owner.id;
-            option.textContent = owner.name;
-            ownerFilter.appendChild(option);
+populateOwnerFilter(users) {
+    const ownerFilter = document.getElementById('ownerFilter');
+    if (!ownerFilter) return;
+    
+    // Get unique owners - FIXED: Use Map to properly deduplicate by owner_id
+    const ownerMap = new Map();
+    users
+        .filter(user => user.owner_name && user.owner_id)
+        .forEach(user => {
+            ownerMap.set(user.owner_id, user.owner_name);
         });
-    },
+    
+    // Convert Map to array of owners
+    const owners = Array.from(ownerMap.entries()).map(([id, name]) => ({ id, name }));
+    
+    // Clear existing options and add "All Owners"
+    ownerFilter.innerHTML = '<option value="">All Owners</option>';
+    
+    // Add unique owner options
+    owners.forEach(owner => {
+        const option = document.createElement('option');
+        option.value = owner.id;
+        option.textContent = owner.name;
+        ownerFilter.appendChild(option);
+    });
+    
+    console.log(`✅ Populated owner filter with ${owners.length} unique owners:`, owners);
+},
     
     // Background task monitoring system
     startBackgroundTaskMonitor() {

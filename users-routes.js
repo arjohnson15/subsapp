@@ -377,7 +377,7 @@ if (iptv_subscription && iptv_subscription !== 'remove' && iptv_expiration) {
       console.error(`⚠️ Could not generate IPTV Editor M3U URL for user ${userId}:`, m3uError.message);
     }
   }
-}
+
 
   // NEW: Check if user should be included in IPTV Editor and create M3U URL
   const userForEditor = await db.query('SELECT include_in_iptv_editor, iptv_username, iptv_password FROM users WHERE id = ?', [userId]);
@@ -422,15 +422,14 @@ if (iptv_subscription && iptv_subscription !== 'remove' && iptv_expiration) {
 
       res.status(201).json({ message: 'User created successfully', id: userId });
 
-    } catch (subscriptionError) {
-      console.error('Error creating subscriptions:', subscriptionError);
-      res.status(201).json({ 
-        message: 'User created successfully, but there was an issue creating subscriptions. Please edit the user to add subscriptions.', 
-        id: userId,
-        warning: 'Subscription creation failed'
-      });
-    }
-
+} catch (subscriptionError) {
+  console.error('Error creating subscriptions:', subscriptionError);
+  res.status(201).json({ 
+    message: 'User created successfully, but there was an issue creating subscriptions. Please edit the user to add subscriptions.', 
+    id: userId,
+    warning: 'Subscription creation failed'
+  });
+}
 
   } catch (error) {
     console.error('Error creating user:', error);
