@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const db = require('./database-config');
 const plexService = require('./plex-service');
 const iptvService = require('./iptv-service');
+const iptvEditorService = require('./iptv-editor-service'); 
 const router = express.Router();
 
 router.post('/:id/check-pending-invites', async (req, res) => {
@@ -363,6 +364,24 @@ if (iptv_subscription && iptv_subscription !== 'remove' && iptv_expiration) {
     VALUES (?, ?, CURDATE(), ?, 'active')
   `, [userId, parseInt(iptv_subscription), iptv_expiration]);
   console.log('✅ Created paid IPTV subscription for user:', userId, 'type:', iptv_subscription);
+
+  // NEW: Check if user should be included in IPTV Editor and create M3U URL
+  const userForEditor = await db.query('SELECT include_in_iptv_editor, iptv_username, iptv_password FROM users WHERE id = ?', [userId]);
+  if (userForEditor.length > 0 && userForEditor[0].include_in_iptv_editor && userForEditor[0].iptv_username && userForEditor[0].iptv_password) {
+    try {
+      const m3uUrl = iptvEditorService.generateIPTVEditorM3UUrl(
+        userForEditor[0].iptv_username, 
+        userForEditor[0].iptv_password
+      );
+      
+      if (m3uUrl) {
+        await db.query('UPDATE users SET iptv_editor_m3u_url = ? WHERE id = ?', [m3uUrl, userId]);
+        console.log(`✅ Created IPTV Editor M3U URL for user ${userId}: ${m3uUrl}`);
+      }
+    } catch (m3uError) {
+      console.error(`⚠️ Could not create IPTV Editor M3U URL for user ${userId}:`, m3uError.message);
+    }
+  }
 }
 
 	  
@@ -700,17 +719,37 @@ try {
         }
       }
       
-      // Step 4: Create new IPTV subscription with final expiration date
-      try {
-        await db.query(`
-          INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
-          VALUES (?, ?, CURDATE(), ?, 'active')
-        `, [userId, parseInt(iptv_subscription), finalExpirationDate]);
-        console.log(`✅ CREATED IPTV subscription for user ${userId}, expires: ${finalExpirationDate}`);
-      } catch (insertError) {
-        console.error(`❌ Error creating IPTV subscription:`, insertError);
-        throw new Error(`Failed to create IPTV subscription: ${insertError.message}`);
+// Step 4: Create new IPTV subscription with final expiration date
+try {
+  await db.query(`
+    INSERT INTO subscriptions (user_id, subscription_type_id, start_date, expiration_date, status)
+    VALUES (?, ?, CURDATE(), ?, 'active')
+  `, [userId, parseInt(iptv_subscription), finalExpirationDate]);
+  console.log(`✅ CREATED IPTV subscription for user ${userId}, expires: ${finalExpirationDate}`);
+
+  // NEW: Check if user should be included in IPTV Editor and create M3U URL
+  const userForEditor = await db.query('SELECT include_in_iptv_editor, iptv_username, iptv_password FROM users WHERE id = ?', [userId]);
+  if (userForEditor.length > 0 && userForEditor[0].include_in_iptv_editor && userForEditor[0].iptv_username && userForEditor[0].iptv_password) {
+    try {
+      // Generate and store M3U URL
+      const m3uUrl = iptvEditorService.generateIPTVEditorM3UUrl(
+        userForEditor[0].iptv_username, 
+        userForEditor[0].iptv_password
+      );
+      
+      if (m3uUrl) {
+        await db.query('UPDATE users SET iptv_editor_m3u_url = ? WHERE id = ?', [m3uUrl, userId]);
+        console.log(`✅ Created IPTV Editor M3U URL for user ${userId}: ${m3uUrl}`);
       }
+    } catch (m3uError) {
+      console.error(`⚠️ Could not create IPTV Editor M3U URL for user ${userId}:`, m3uError.message);
+      // Don't fail the whole request if M3U URL creation fails
+    }
+  }
+} catch (insertError) {
+  console.error(`❌ Error creating IPTV subscription:`, insertError);
+  throw new Error(`Failed to create IPTV subscription: ${insertError.message}`);
+}
     } else {
       console.log(`ℹ️ Keeping current IPTV subscription for user ${userId} (no change)`);
     }
@@ -737,6 +776,28 @@ try {
   }
 
   console.log(`✅ Subscription processing completed for user ${userId}`);
+  
+// NEW: Update IPTV Editor M3U URL if credentials changed
+if ((iptv_username || iptv_password) && include_in_iptv_editor !== false) {
+  try {
+    const currentUser = await db.query('SELECT iptv_username, iptv_password, include_in_iptv_editor FROM users WHERE id = ?', [userId]);
+    if (currentUser.length > 0 && currentUser[0].include_in_iptv_editor) {
+      const finalUsername = iptv_username || currentUser[0].iptv_username;
+      const finalPassword = iptv_password || currentUser[0].iptv_password;
+      
+      if (finalUsername && finalPassword) {
+        const m3uUrl = iptvEditorService.generateIPTVEditorM3UUrl(finalUsername, finalPassword);
+        if (m3uUrl) {
+          await db.query('UPDATE users SET iptv_editor_m3u_url = ? WHERE id = ?', [m3uUrl, userId]);
+          console.log(`✅ Updated IPTV Editor M3U URL for user ${userId}: ${m3uUrl}`);
+        }
+      }
+    }
+  } catch (m3uError) {
+    console.error(`⚠️ Could not update IPTV Editor M3U URL for user ${userId}:`, m3uError.message);
+    // Don't fail the whole request if M3U URL update fails
+  }
+}
   
   // Handle IPTV tag changes
 if (tags !== undefined) {

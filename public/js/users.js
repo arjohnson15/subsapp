@@ -1447,6 +1447,16 @@ for (const key of Object.keys(normalizedCurrent)) {
         // Show immediate success message
         Utils.showNotification(isEditing ? 'User updated successfully' : 'User created successfully', 'success');
 
+// NEW: Refresh M3U URL display if editing before navigation
+        if (isEditing && window.AppState?.editingUserId) {
+            try {
+                const freshUser = await API.User.getById(window.AppState.editingUserId);
+                populateIPTVEditorM3UUrl(freshUser);
+            } catch (error) {
+                console.error('Error refreshing M3U URL after save:', error);
+            }
+        }
+
         // CRITICAL: Navigate away IMMEDIATELY after database save - before Plex operations
         console.log('🚀 Navigating back to users page immediately...');
         setTimeout(async () => {
@@ -1572,6 +1582,16 @@ updateFormToEditMode(userId) {
     if (form) {
         form.setAttribute('data-user-id', userId);
     }
+    
+    // NEW: Refresh user data to get any newly created M3U URLs
+    setTimeout(async () => {
+        try {
+            const freshUser = await API.User.getById(userId);
+            populateIPTVEditorM3UUrl(freshUser);
+        } catch (error) {
+            console.error('Error loading fresh user data after save:', error);
+        }
+    }, 500);
     
     console.log(`✅ Form updated to edit mode with user ID: ${userId}`);
 },
@@ -2674,7 +2694,16 @@ function populateIPTVEditorM3UUrl(userData) {
     const urlField = document.getElementById('iptvEditorM3UUrl');
     const m3uSection = document.getElementById('iptvEditorM3USection');
     
-    if (userData.iptv_editor_enabled) {
+    console.log('🔍 Checking IPTV Editor M3U data:', {
+        iptv_editor_enabled: userData.iptv_editor_enabled,
+        iptv_editor_m3u_url: userData.iptv_editor_m3u_url,
+        include_in_iptv_editor: userData.include_in_iptv_editor,
+        iptv_username: userData.iptv_username,
+        iptv_password: !!userData.iptv_password
+    });
+    
+    // Show section if user has IPTV credentials and is included in IPTV Editor
+    if (userData.iptv_username && userData.iptv_password && userData.include_in_iptv_editor !== false) {
         if (m3uSection) {
             m3uSection.style.display = 'block';
         }
@@ -2683,19 +2712,25 @@ function populateIPTVEditorM3UUrl(userData) {
             // Has URL - show it
             if (urlField) {
                 urlField.value = userData.iptv_editor_m3u_url;
+                urlField.style.fontStyle = 'normal';
+                urlField.style.color = '#fff';
             }
+            console.log('✅ Populated IPTV Editor M3U URL:', userData.iptv_editor_m3u_url);
         } else {
-            // No URL - show placeholder and enable regenerate
+            // No URL but should have one - show regenerate option
             if (urlField) {
                 urlField.value = 'Click Regenerate to generate M3U URL';
                 urlField.style.fontStyle = 'italic';
                 urlField.style.color = '#ff9800';
             }
+            console.log('⚠️ IPTV Editor enabled but M3U URL missing - showing regenerate option');
         }
     } else {
+        // Hide the section
         if (m3uSection) {
             m3uSection.style.display = 'none';
         }
+        console.log('ℹ️ IPTV Editor M3U section hidden - no credentials or not enabled');
     }
     
     // Store current user ID for regeneration
