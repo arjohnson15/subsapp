@@ -3229,3 +3229,144 @@ table tbody td:last-child .btn-small:nth-child(4) {
         font-size: 11px !important;
     }
 }
+
+/* Content Libraries Section */
+.content-section {
+    margin: 30px 0;
+}
+
+.content-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.content-library-card {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 15px;
+    padding: 25px;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.content-library-card:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(79, 195, 247, 0.4);
+    transform: translateY(-2px);
+}
+
+.library-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.library-icon {
+    width: 60px;
+    height: 60px;
+    background: rgba(79, 195, 247, 0.2);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+    font-size: 24px;
+}
+
+.library-title {
+    flex: 1;
+}
+
+.library-name {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #ffffff;
+    margin: 0;
+}
+
+.library-subtitle {
+    font-size: 0.9rem;
+    color: #b0b0b0;
+    margin: 5px 0 0 0;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.library-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 15px;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #ffffff;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: #b0b0b0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* IPTV specific styling */
+.iptv-card {
+    border-color: rgba(255, 107, 107, 0.3);
+}
+
+.iptv-card:hover {
+    border-color: rgba(255, 107, 107, 0.6);
+}
+
+.iptv-card .library-icon {
+    background: rgba(255, 107, 107, 0.2);
+    color: #ff6b6b;
+}
+
+.iptv-card .stat-value {
+    color: #ff6b6b;
+}
+
+/* Plex specific styling */
+.plex-card {
+    border-color: rgba(78, 205, 196, 0.3);
+}
+
+.plex-card:hover {
+    border-color: rgba(78, 205, 196, 0.6);
+}
+
+.plex-card .library-icon {
+    background: rgba(78, 205, 196, 0.2);
+    color: #4ecdc4;
+}
+
+.plex-card .stat-value {
+    color: #4ecdc4;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .content-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .library-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

@@ -5,6 +5,8 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const cron = require('node-cron');
+const axios = require('axios');
+const EPGService = require('./epg-service'); // NEW - EPG Service
 require('dotenv').config();
 
 const db = require('./database-config');
@@ -20,8 +22,11 @@ const multer = require('multer');
 const plexService = require('./plex-service');
 const emailService = require('./email-service');
 const iptvRoutes = require('./routes-iptv');
-const iptvEditorRoutes = require('./routes-iptv-editor'); // NEW
-const iptvEditorService = require('./iptv-editor-service'); // NEW
+const iptvEditorRoutes = require('./routes-iptv-editor');
+const iptvEditorService = require('./iptv-editor-service');
+
+// NEW - Create EPG Service instance
+const epgService = new EPGService();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -72,7 +77,190 @@ app.use('/api/email-schedules', emailScheduleRoutes);
 app.use('/api/iptv', iptvRoutes);
 app.use('/api/iptv-editor', iptvEditorRoutes); 
 
-// ===== GUIDE ROUTES - RESTORED =====
+// ===== CLEAN EPG ROUTES =====
+// Fast EPG data endpoint
+app.get('/api/epg', (req, res) => {
+    try {
+        const data = epgService.getData();
+        
+        if (!data) {
+            return res.status(503).json({ 
+                error: 'EPG data not available yet', 
+                message: 'Please wait while we load the guide data' 
+            });
+        }
+
+        // Send only category summary - NOT the full data
+        const summary = {
+            categories: data.categories.map(categoryName => ({
+                name: categoryName,
+                channelCount: data.data[categoryName]?.length || 0
+            })),
+            totalChannels: data.totalChannels,
+            totalPrograms: data.totalPrograms,
+            lastUpdated: data.lastUpdated,
+            cacheTime: data.cacheTime
+        };
+
+        res.json(summary);
+        console.log(`✅ Served EPG summary (${JSON.stringify(summary).length} bytes)`);
+        
+    } catch (error) {
+        console.error('❌ Error serving EPG summary:', error);
+        res.status(500).json({ error: 'Failed to serve EPG summary' });
+    }
+});
+
+// Get channels for specific category (paginated)
+app.get('/api/epg/category/:categoryName', (req, res) => {
+    try {
+        const data = epgService.getData();
+        const categoryName = decodeURIComponent(req.params.categoryName);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50; // Only 50 channels per page
+        
+        if (!data || !data.data[categoryName]) {
+            return res.status(404).json({ error: 'Category not found' });
+        }
+
+        const channels = data.data[categoryName];
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const paginatedChannels = channels.slice(startIndex, endIndex);
+
+        // Send minimal data - only current program, not full program list
+        const minimalChannels = paginatedChannels.map(channel => ({
+            id: channel.id,
+            name: channel.name,
+            category: channel.category,
+            currentProgram: channel.currentProgram,
+            nextProgram: channel.nextProgram,
+            programCount: channel.programs.length
+        }));
+
+        const response = {
+            category: categoryName,
+            channels: minimalChannels,
+            pagination: {
+                page: page,
+                limit: limit,
+                total: channels.length,
+                pages: Math.ceil(channels.length / limit),
+                hasNext: endIndex < channels.length,
+                hasPrev: page > 1
+            }
+        };
+
+        res.json(response);
+        console.log(`✅ Served ${categoryName} page ${page} (${minimalChannels.length} channels)`);
+        
+    } catch (error) {
+        console.error('❌ Error serving category:', error);
+        res.status(500).json({ error: 'Failed to serve category data' });
+    }
+});
+
+// Get full program schedule for specific channel
+app.get('/api/epg/channel/:channelId/programs', (req, res) => {
+    try {
+        const data = epgService.getData();
+        const channelId = req.params.channelId;
+        
+        if (!data) {
+            return res.status(503).json({ error: 'EPG data not available' });
+        }
+
+        // Find channel across all categories
+        let channel = null;
+        for (const categoryName in data.data) {
+            channel = data.data[categoryName].find(ch => ch.id === channelId);
+            if (channel) break;
+        }
+
+        if (!channel) {
+            return res.status(404).json({ error: 'Channel not found' });
+        }
+
+        res.json({
+            channelId: channel.id,
+            channelName: channel.name,
+            programs: channel.programs || []
+        });
+
+        console.log(`✅ Served programs for ${channel.name} (${channel.programs?.length || 0} programs)`);
+        
+    } catch (error) {
+        console.error('❌ Error serving channel programs:', error);
+        res.status(500).json({ error: 'Failed to serve channel programs' });
+    }
+});
+
+// Search channels (limited results)
+app.get('/api/epg/search', (req, res) => {
+    try {
+        const data = epgService.getData();
+        const query = req.query.q?.toLowerCase() || '';
+        const limit = parseInt(req.query.limit) || 20; // Max 20 results
+        
+        if (!data || !query) {
+            return res.json({ results: [] });
+        }
+
+        const results = [];
+        
+        // Search across all categories
+        for (const categoryName in data.data) {
+            const channels = data.data[categoryName];
+            for (const channel of channels) {
+                if (results.length >= limit) break;
+                
+                if (channel.name.toLowerCase().includes(query) ||
+                    channel.currentProgram?.title.toLowerCase().includes(query) ||
+                    channel.nextProgram?.title.toLowerCase().includes(query)) {
+                    
+                    results.push({
+                        id: channel.id,
+                        name: channel.name,
+                        category: channel.category,
+                        currentProgram: channel.currentProgram,
+                        nextProgram: channel.nextProgram
+                    });
+                }
+            }
+            if (results.length >= limit) break;
+        }
+
+        res.json({ results: results });
+        console.log(`✅ Search for "${query}" returned ${results.length} results`);
+        
+    } catch (error) {
+        console.error('❌ Error in search:', error);
+        res.status(500).json({ error: 'Search failed' });
+    }
+});
+
+// EPG status endpoint (unchanged)
+app.get('/api/epg/status', (req, res) => {
+    const status = epgService.getStatus();
+    res.json({
+        ...status,
+        updateInterval: '1 hour',
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Manual refresh endpoint (unchanged)
+app.post('/api/epg/refresh', async (req, res) => {
+    try {
+        epgService.forceUpdate();
+        res.json({ message: 'EPG refresh started' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to start EPG refresh' });
+    }
+});
+// ===== END EPG ROUTES =====
+
+// ===== GUIDE ROUTES =====
 // Serve guide static files first (CSS, JS, images, etc.)
 app.use('/guide', express.static(path.join(__dirname, 'Guides')));
 
@@ -110,16 +298,6 @@ app.get('/guide', (req, res) => {
   });
 });
 // ===== END GUIDE ROUTES =====
-
-// Initialize IPTV Editor service
-async function initializeIPTVEditorService() {
-    try {
-        await iptvEditorService.initialize();
-        console.log('✅ IPTV Editor service initialized');
-    } catch (error) {
-        console.warn('⚠️ IPTV Editor service initialization failed:', error.message);
-    }
-}
 
 // Serve main application
 app.get('/', (req, res) => {
@@ -233,12 +411,10 @@ cron.schedule('0 3 * * *', async () => {
  }
 });
 
-
-
 // Initialize IPTV service on startup
 iptvService.initialize().catch(console.error);
 
-// NEW - Initialize IPTV Editor service on startup
+// Initialize IPTV Editor service on startup
 (async () => {
   try {
     const initialized = await iptvEditorService.initialize();
@@ -279,7 +455,8 @@ async function initializeApp() {
     app.listen(PORT, () => {
       console.log(`JohnsonFlix Manager running on port ${PORT}`);
       console.log(`Access the application at http://localhost:${PORT}`);
-      console.log(`📚 Guides available at http://localhost:${PORT}/guide/guide`); // NEW - Guide info
+      console.log(`📚 Guides available at http://localhost:${PORT}/guide/guide`);
+      console.log(`📺 EPG Guide available at http://localhost:${PORT}/guide/guide`);
     });
 
     // Test email service immediately on startup
@@ -295,8 +472,6 @@ async function initializeApp() {
         console.error('❌ Email service test error:', error);
       }
     }, 3000);
-	
-
 
     // ===== AUTOMATED EMAIL SCHEDULING =====
     
@@ -345,7 +520,6 @@ async function initializeApp() {
           await emailService.initializeTransporter();
         }
 
-
         // Process custom expiration reminder schedules
         await emailService.processExpirationReminders();
         
@@ -359,7 +533,7 @@ async function initializeApp() {
         console.log('');
       }
     });
-    console.log('✅ Daily renewal reminder scheduler activated (4 PM)');
+    console.log('✅ Daily renewal reminder scheduler activated (12 PM UTC)');
 
     // Every 5 minutes check for immediate scheduled emails (for testing and urgent emails)
     cron.schedule('*/5 * * * *', async () => {
@@ -385,6 +559,13 @@ async function initializeApp() {
       }
     });
     console.log('✅ 5-minute urgent email checker activated');
+
+    // NEW - Initialize EPG Service after everything else
+    setTimeout(() => {
+        epgService.initialize().catch(error => {
+            console.error('❌ EPG Service failed to start:', error);
+        });
+    }, 5000); // Start 5 seconds after server starts
 
   } catch (error) {
     console.error('Failed to start application:', error);

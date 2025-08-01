@@ -791,7 +791,7 @@ try {
   console.log(`✅ Subscription processing completed for user ${userId}`);
   
 // NEW: Update IPTV Editor M3U URL if credentials changed
-if ((iptv_username || iptv_password) && include_in_iptv_editor !== false) {
+if (iptv_username || iptv_password) {
   try {
     const currentUser = await db.query('SELECT iptv_username, iptv_password, include_in_iptv_editor FROM users WHERE id = ?', [userId]);
     if (currentUser.length > 0 && currentUser[0].include_in_iptv_editor) {

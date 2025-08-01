@@ -1370,7 +1370,7 @@ populateBasicUserFields(userData) {
 },
 
 /**
- * Load IPTV status for current user - ENHANCED VERSION WITH BETTER FIELD POPULATION
+ * Load IPTV status for current user - ENHANCED VERSION WITH IPTV EDITOR M3U URL
  */
 async loadCurrentUserIPTVStatus() {
     try {
@@ -1436,38 +1436,92 @@ async loadCurrentUserIPTVStatus() {
                 console.warn('⚠️ No password value found to populate');
             }
 
-// Update IPTV Expiration field in subscription section - FIXED: NO CONVERSION  
-if (result.user.iptv_expiration) {
-    const iptvExpirationFields = [
-        'iptvExpiration',        // Basic subscription field
-        'iptv_expiration'        // Alternative field name
-    ];
-    
-    // FIXED: Use date as-is from database, no timezone conversion
-    let dateValue = result.user.iptv_expiration;
-    
-    // Only extract date part if it's a full datetime string
-    if (typeof dateValue === 'string') {
-        if (dateValue.includes('T')) {
-            dateValue = dateValue.split('T')[0];
-        } else if (dateValue.includes(' ')) {
-            dateValue = dateValue.split(' ')[0];  
-        }
-    }
-    
-    console.log(`📅 Using IPTV expiration as-is (no conversion): ${result.user.iptv_expiration} → ${dateValue}`);
-    
-    if (dateValue) {
-        for (const fieldId of iptvExpirationFields) {
-            const field = document.getElementById(fieldId);
-            if (field) {
-                field.value = dateValue;
-                console.log(`✅ Set IPTV expiration field ${fieldId}: ${dateValue}`);
+            // Update IPTV Expiration field in subscription section - FIXED: NO CONVERSION  
+            if (result.user.iptv_expiration) {
+                const iptvExpirationFields = [
+                    'iptvExpiration',        // Basic subscription field
+                    'iptv_expiration'        // Alternative field name
+                ];
+                
+                // FIXED: Use date as-is from database, no timezone conversion
+                let dateValue = result.user.iptv_expiration;
+                
+                // Only extract date part if it's a full datetime string
+                if (typeof dateValue === 'string') {
+                    if (dateValue.includes('T')) {
+                        dateValue = dateValue.split('T')[0];
+                    } else if (dateValue.includes(' ')) {
+                        dateValue = dateValue.split(' ')[0];  
+                    }
+                }
+                
+                console.log(`📅 Using IPTV expiration as-is (no conversion): ${result.user.iptv_expiration} → ${dateValue}`);
+                
+                if (dateValue) {
+                    for (const fieldId of iptvExpirationFields) {
+                        const field = document.getElementById(fieldId);
+                        if (field) {
+                            field.value = dateValue;
+                            console.log(`✅ Set IPTV expiration field ${fieldId}: ${dateValue}`);
+                        }
+                    }
+                }
+            } else {
+                console.log('📅 No IPTV expiration date found to populate');
             }
+
+// NEW: Load IPTV Editor M3U URL with enhanced logging
+try {
+    console.log('🔄 Fetching user data for IPTV Editor M3U URL...');
+    const userResponse = await fetch(`/api/users/${userId}`);
+    const userData = await userResponse.json();
+    
+    console.log('📊 User data response:', {
+        hasIPTVEditorM3U: !!userData.iptv_editor_m3u_url,
+        iptvEditorEnabled: userData.iptv_editor_enabled,
+        m3uUrl: userData.iptv_editor_m3u_url ? userData.iptv_editor_m3u_url.substring(0, 50) + '...' : null
+    });
+    
+    if (userData.iptv_editor_m3u_url) {
+        console.log('✅ Found IPTV Editor M3U URL, updating field...');
+        
+        // Update the IPTV Editor M3U URL field
+        const m3uField = document.getElementById('iptvEditorM3UUrl');
+        if (m3uField) {
+            m3uField.value = userData.iptv_editor_m3u_url;
+            m3uField.style.fontStyle = 'normal';
+            m3uField.style.color = '#fff';
+            console.log('✅ Updated IPTV Editor M3U URL field successfully');
+        } else {
+            console.warn('⚠️ iptvEditorM3UUrl field not found in DOM');
         }
+        
+        // Show the IPTV Editor M3U section
+        const m3uSection = document.getElementById('iptvEditorM3USection');
+        if (m3uSection) {
+            m3uSection.style.display = 'block';
+            console.log('✅ Showed IPTV Editor M3U section successfully');
+        } else {
+            console.warn('⚠️ iptvEditorM3USection element not found in DOM');
+        }
+        
+        // Also show the IPTV Editor status section if it exists
+        const statusSection = document.getElementById('iptvEditorStatusSection');
+        if (statusSection) {
+            statusSection.style.display = 'block';
+            console.log('✅ Showed IPTV Editor status section');
+        }
+    } else {
+        console.log('📋 No IPTV Editor M3U URL found for user');
+        
+        // Hide the sections if no URL
+        const m3uSection = document.getElementById('iptvEditorM3USection');
+        const statusSection = document.getElementById('iptvEditorStatusSection');
+        if (m3uSection) m3uSection.style.display = 'none';
+        if (statusSection) statusSection.style.display = 'none';
     }
-} else {
-    console.log('📅 No IPTV expiration date found to populate');
+} catch (m3uError) {
+    console.error('❌ Failed to load IPTV Editor M3U URL:', m3uError);
 }
             
             // Update interface state

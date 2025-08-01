@@ -24,25 +24,68 @@
         <div class="stat-number" id="iptvUsers">0</div>
         <p>Active IPTV subscriptions</p>
     </div>
-    <div class="card">
-        <h3>Reserved</h3>
-        <div class="stat-number" id="reserved">-</div>
-        <p>Future stats will go here</p>
-    </div>
 </div>
 
-<div class="coming-soon-actions">
-    <div class="coming-soon-card">
-        <h4>Live Stats</h4>
-        <p>Coming Soon</p>
-    </div>
-    <div class="coming-soon-card">
-        <h4>Analytics</h4>
-        <p>Coming Soon</p>
-    </div>
-    <div class="coming-soon-card">
-        <h4>Reports</h4>
-        <p>Coming Soon</p>
+<!-- Content Libraries Section -->
+<div class="content-section">
+    <div class="content-row">
+        <!-- IPTV Content Library -->
+        <div class="content-library-card iptv-card">
+            <div class="library-header">
+        <div class="library-icon">
+            <i class="fas fa-tv"></i>
+        </div>
+                <div class="library-title">
+                    <h3 class="library-name">IPTV Live Service</h3>
+                    <p class="library-subtitle">Live Channels / Movies / Series</p>
+                </div>
+            </div>
+            <div class="library-stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="iptvChannels">-</div>
+                    <div class="stat-label">Live Channels</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="iptvMovies">-</div>
+                    <div class="stat-label">VOD Movies</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="iptvSeries">-</div>
+                    <div class="stat-label">TV Series</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plex Content Library -->
+        <div class="content-library-card plex-card">
+            <div class="library-header">
+        <div class="library-icon">
+            <i class="fas fa-film"></i>
+        </div>
+                <div class="library-title">
+                    <h3 class="library-name">Plex Content</h3>
+                    <p class="library-subtitle">Movies / TV Shows / Audio Books</p>
+                </div>
+            </div>
+            <div class="library-stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="plexHDMovies">-</div>
+                    <div class="stat-label">HD Movies</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="plex4KMovies">-</div>
+                    <div class="stat-label">4K Movies</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="plexTVShows">-</div>
+                    <div class="stat-label">TV Shows</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="plexAudioBooks">-</div>
+                    <div class="stat-label">Audio Books</div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 

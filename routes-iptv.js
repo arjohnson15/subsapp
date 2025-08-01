@@ -1095,9 +1095,6 @@ let syncSuccess = false;
     error: iptvEditorResults.iptv_editor_error
   });
   
-  // 🔄 SIMPLE: Just emit a console log that frontend can detect
-console.log(`FRONTEND_REFRESH_TRIGGER:${user_id}`);
-
 // Generate M3U URL if IPTV Editor automation was successful
   if (iptvEditorResults.iptv_editor_success) {
     try {
@@ -1119,7 +1116,7 @@ console.log(`FRONTEND_REFRESH_TRIGGER:${user_id}`);
     }
   }
   
-  // 🔄 SIMPLE: Just emit a console log that frontend can detect
+  // 🔄 TRIGGER FRONTEND REFRESH AFTER M3U URL IS GENERATED
 console.log(`FRONTEND_REFRESH_TRIGGER:${user_id}`);
 
 });

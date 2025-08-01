@@ -921,10 +921,12 @@ function handleHashChange() {
 }
 
 
-// Dashboard functionality
+// Enhanced Dashboard functionality with content library stats
 window.Dashboard = {
     async init() {
-        // FIXED: Load users first if they're not already loaded
+        console.log('📊 Initializing enhanced dashboard...');
+        
+        // Load users first if they're not already loaded
         if (!window.AppState.users || window.AppState.users.length === 0) {
             console.log('📊 Dashboard: Loading users for stats...');
             try {
@@ -939,6 +941,7 @@ window.Dashboard = {
         }
         
         await this.loadStats();
+        await this.loadContentStats();
         await this.loadExpiringUsers();
     },
     
@@ -985,6 +988,123 @@ window.Dashboard = {
         }
     },
     
+    async loadContentStats() {
+        console.log('📊 Loading content library statistics...');
+        
+        // Set loading state for content stats
+        this.setContentStatsLoading();
+        
+        try {
+            // Load IPTV content stats
+            await this.loadIPTVContentStats();
+            
+            // Load Plex content stats
+            await this.loadPlexContentStats();
+            
+        } catch (error) {
+            console.error('Error loading content stats:', error);
+            this.setContentStatsError();
+        }
+    },
+    
+    async loadIPTVContentStats() {
+        try {
+            console.log('📺 Loading IPTV content statistics...');
+            
+            // TODO: Replace this with actual API call when backend is ready
+            // For now, show placeholder values
+            const iptvElements = {
+                channels: document.getElementById('iptvChannels'),
+                movies: document.getElementById('iptvMovies'),
+                series: document.getElementById('iptvSeries')
+            };
+            
+            // Placeholder data - will be replaced with real API calls
+            setTimeout(() => {
+                if (iptvElements.channels) iptvElements.channels.textContent = 'Loading...';
+                if (iptvElements.movies) iptvElements.movies.textContent = 'Loading...';
+                if (iptvElements.series) iptvElements.series.textContent = 'Loading...';
+            }, 500);
+            
+            // TODO: Implement this API call:
+            // const response = await fetch('/api/dashboard/iptv-stats');
+            // const iptvStats = await response.json();
+            // if (iptvElements.channels) iptvElements.channels.textContent = this.formatNumber(iptvStats.channels);
+            // if (iptvElements.movies) iptvElements.movies.textContent = this.formatNumber(iptvStats.movies);
+            // if (iptvElements.series) iptvElements.series.textContent = this.formatNumber(iptvStats.series);
+            
+        } catch (error) {
+            console.error('Error loading IPTV content stats:', error);
+        }
+    },
+    
+    async loadPlexContentStats() {
+        try {
+            console.log('🎬 Loading Plex content statistics...');
+            
+            const plexElements = {
+                hdMovies: document.getElementById('plexHDMovies'),
+                fourkMovies: document.getElementById('plex4KMovies'),
+                tvShows: document.getElementById('plexTVShows'),
+                audioBooks: document.getElementById('plexAudioBooks')
+            };
+            
+            // Placeholder data - will be replaced with real API calls
+            setTimeout(() => {
+                if (plexElements.hdMovies) plexElements.hdMovies.textContent = 'Loading...';
+                if (plexElements.fourkMovies) plexElements.fourkMovies.textContent = 'Loading...';
+                if (plexElements.tvShows) plexElements.tvShows.textContent = 'Loading...';
+                if (plexElements.audioBooks) plexElements.audioBooks.textContent = 'Loading...';
+            }, 1000);
+            
+            // TODO: Implement this API call:
+            // const response = await fetch('/api/dashboard/plex-stats');
+            // const plexStats = await response.json();
+            // if (plexElements.hdMovies) plexElements.hdMovies.textContent = this.formatNumber(plexStats.hdMovies);
+            // if (plexElements.fourkMovies) plexElements.fourkMovies.textContent = this.formatNumber(plexStats.fourkMovies);
+            // if (plexElements.tvShows) plexElements.tvShows.textContent = this.formatNumber(plexStats.tvShows);
+            // if (plexElements.audioBooks) plexElements.audioBooks.textContent = this.formatNumber(plexStats.audioBooks);
+            
+        } catch (error) {
+            console.error('Error loading Plex content stats:', error);
+        }
+    },
+    
+    setContentStatsLoading() {
+        const elements = [
+            'iptvChannels', 'iptvMovies', 'iptvSeries',
+            'plexHDMovies', 'plex4KMovies', 'plexTVShows', 'plexAudioBooks'
+        ];
+        
+        elements.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.textContent = '-';
+                el.parentElement?.classList.add('loading');
+            }
+        });
+    },
+    
+    setContentStatsError() {
+        const elements = [
+            'iptvChannels', 'iptvMovies', 'iptvSeries',
+            'plexHDMovies', 'plex4KMovies', 'plexTVShows', 'plexAudioBooks'
+        ];
+        
+        elements.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.textContent = 'Error';
+                el.parentElement?.classList.remove('loading');
+            }
+        });
+    },
+    
+    formatNumber(num) {
+        if (num === 0 || num === null || num === undefined) return '0';
+        return new Intl.NumberFormat().format(num);
+    },
+    
     async loadExpiringUsers() {
         try {
             const expiringUsers = await API.User.getExpiring(7);
@@ -1003,6 +1123,8 @@ window.Dashboard = {
             
         } catch (error) {
             console.error('Error loading expiring users:', error);
+            document.getElementById('expiringUsers').innerHTML = 
+                '<p style="color: #f44336;">Error loading expiring users</p>';
         }
     }
 };
