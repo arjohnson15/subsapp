@@ -1007,36 +1007,57 @@ window.Dashboard = {
         }
     },
     
-    async loadIPTVContentStats() {
-        try {
-            console.log('📺 Loading IPTV content statistics...');
-            
-            // TODO: Replace this with actual API call when backend is ready
-            // For now, show placeholder values
-            const iptvElements = {
-                channels: document.getElementById('iptvChannels'),
-                movies: document.getElementById('iptvMovies'),
-                series: document.getElementById('iptvSeries')
-            };
-            
-            // Placeholder data - will be replaced with real API calls
-            setTimeout(() => {
-                if (iptvElements.channels) iptvElements.channels.textContent = 'Loading...';
-                if (iptvElements.movies) iptvElements.movies.textContent = 'Loading...';
-                if (iptvElements.series) iptvElements.series.textContent = 'Loading...';
-            }, 500);
-            
-            // TODO: Implement this API call:
-            // const response = await fetch('/api/dashboard/iptv-stats');
-            // const iptvStats = await response.json();
-            // if (iptvElements.channels) iptvElements.channels.textContent = this.formatNumber(iptvStats.channels);
-            // if (iptvElements.movies) iptvElements.movies.textContent = this.formatNumber(iptvStats.movies);
-            // if (iptvElements.series) iptvElements.series.textContent = this.formatNumber(iptvStats.series);
-            
-        } catch (error) {
-            console.error('Error loading IPTV content stats:', error);
+async loadIPTVContentStats() {
+    try {
+        console.log('📺 Loading IPTV content statistics from existing data...');
+        
+        // Call your existing IPTV Editor route for dashboard stats
+        const response = await fetch('/api/iptv-editor/dashboard-stats');
+        const iptvStats = await response.json();
+        
+        console.log('📺 IPTV stats loaded:', iptvStats);
+        
+        // Update the UI elements
+        const iptvElements = {
+            channels: document.getElementById('iptvChannels'),
+            movies: document.getElementById('iptvMovies'),
+            series: document.getElementById('iptvSeries')
+        };
+        
+        // Update the numbers with formatting
+        if (iptvElements.channels) {
+            iptvElements.channels.textContent = this.formatNumber(iptvStats.channels);
         }
-    },
+        if (iptvElements.movies) {
+            iptvElements.movies.textContent = this.formatNumber(iptvStats.movies);
+        }
+        if (iptvElements.series) {
+            iptvElements.series.textContent = this.formatNumber(iptvStats.series);
+        }
+        
+        // Update last update timestamp if element exists
+        const lastUpdateEl = document.querySelector('.iptv-last-update');
+        if (lastUpdateEl && iptvStats.lastUpdate) {
+            lastUpdateEl.textContent = `Last updated: ${iptvStats.lastUpdate}`;
+        }
+        
+        console.log('✅ IPTV dashboard stats updated successfully');
+        
+    } catch (error) {
+        console.error('❌ Error loading IPTV content stats:', error);
+        
+        // Show error state
+        const iptvElements = {
+            channels: document.getElementById('iptvChannels'),
+            movies: document.getElementById('iptvMovies'),
+            series: document.getElementById('iptvSeries')
+        };
+        
+        Object.values(iptvElements).forEach(el => {
+            if (el) el.textContent = 'Error';
+        });
+    }
+},
     
     async loadPlexContentStats() {
         try {

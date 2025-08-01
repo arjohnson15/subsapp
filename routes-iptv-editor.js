@@ -1943,5 +1943,76 @@ router.post('/regenerate-m3u/:userId', [
     }
 });
 
+// GET /api/iptv-editor/dashboard-stats - Get IPTV stats for dashboard
+router.get('/dashboard-stats', async (req, res) => {
+    try {
+        console.log('📊 Getting IPTV dashboard stats from stored data...');
+        
+        // Get the default playlist from IPTV Editor settings table
+        const [defaultPlaylistSetting] = await db.query(
+            'SELECT setting_value FROM iptv_editor_settings WHERE setting_key = ?',
+            ['default_playlist_id']
+        );
+        
+        if (!defaultPlaylistSetting || !defaultPlaylistSetting.setting_value) {
+            console.log('⚠️ No default playlist configured in iptv_editor_settings');
+            return res.json({
+                channels: 0,
+                movies: 0,
+                series: 0,
+                lastUpdate: 'No default playlist configured'
+            });
+        }
+        
+        const defaultPlaylistId = defaultPlaylistSetting.setting_value;
+        console.log('🔍 Using default playlist ID:', defaultPlaylistId);
+        
+        // Get the stored playlist data
+        const playlist = await db.query(`
+            SELECT channel_count, movie_count, series_count, last_synced, name
+            FROM iptv_editor_playlists 
+            WHERE playlist_id = ?
+        `, [defaultPlaylistId]);
+        
+        console.log('🔍 Database query result:', playlist);
+        console.log('🔍 Playlist array length:', playlist ? playlist.length : 'undefined');
+        
+        if (!playlist || playlist.length === 0) {
+            console.log('⚠️ No playlist found with ID:', defaultPlaylistId);
+            
+            // Let's also check what playlists exist
+            const allPlaylists = await db.query('SELECT playlist_id, name FROM iptv_editor_playlists LIMIT 5');
+            console.log('🔍 Available playlists in database:', allPlaylists);
+            
+            return res.json({
+                channels: 0,
+                movies: 0,
+                series: 0,
+                lastUpdate: 'Playlist data not found'
+            });
+        }
+        
+        const data = playlist[0]; // Get first row
+        
+        console.log(`✅ IPTV stats from ${data.name}: ${data.channel_count} channels, ${data.movie_count} movies, ${data.series_count} series`);
+        
+        res.json({
+            channels: data.channel_count || 0,
+            movies: data.movie_count || 0,
+            series: data.series_count || 0,
+            lastUpdate: data.last_synced ? new Date(data.last_synced).toLocaleDateString() : 'Unknown'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error getting IPTV dashboard stats:', error);
+        res.json({
+            channels: 0,
+            movies: 0,
+            series: 0,
+            lastUpdate: 'Error loading'
+        });
+    }
+});
+
 
 module.exports = router;
