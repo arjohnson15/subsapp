@@ -693,6 +693,15 @@ async syncAllLibraries() {
     console.log('\n🔄 Syncing pending invites...');
     await this.syncPendingInvitesUltraFast();
     
+    // NEW: Refresh Plex statistics cache
+    console.log('\n📊 Refreshing Plex statistics cache...');
+    try {
+      await this.refreshPlexStatsCache();
+      console.log('✅ Plex statistics cache refreshed successfully');
+    } catch (statsError) {
+      console.warn('⚠️ Failed to refresh Plex stats cache during sync:', statsError.message);
+    }
+    
     // Update the last sync timestamp
     await this.updateSyncTimestamp();
     
@@ -701,7 +710,7 @@ async syncAllLibraries() {
     return {
       success: true,
       timestamp: new Date().toISOString(),
-      message: 'All Plex libraries and user access synced successfully'
+      message: 'All Plex libraries, user access, and statistics synced successfully'
     };
     
   } catch (error) {
@@ -712,6 +721,74 @@ async syncAllLibraries() {
       timestamp: new Date().toISOString()
     };
   }
+}
+
+// Add this new method to plex-service.js
+async refreshPlexStatsCache() {
+  const { spawn } = require('child_process');
+  const db = require('./database-config');
+  
+  return new Promise((resolve, reject) => {
+    const python = spawn('python3', ['plex_statistics.py'], {
+      cwd: __dirname,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    let dataString = '';
+    let errorString = '';
+    
+    python.stdout.on('data', (data) => {
+      dataString += data.toString();
+    });
+    
+    python.stderr.on('data', (data) => {
+      errorString += data.toString();
+    });
+    
+    python.on('close', async (code) => {
+      if (code !== 0) {
+        console.error('❌ Python stats script failed:', errorString);
+        reject(new Error(`Python script failed: ${errorString}`));
+        return;
+      }
+      
+      try {
+        const rawStats = JSON.parse(dataString);
+        const plex1Regular = rawStats.plex1?.regular?.stats || {};
+        const plex1Fourk = rawStats.plex1?.fourk?.stats || {};
+        
+        // Update database cache
+        const statsToStore = [
+          ['hd_movies', plex1Regular.hd_movies || 0],
+          ['anime_movies', plex1Regular.anime_movies || 0],
+          ['fourk_movies', plex1Fourk.hd_movies || 0],
+          ['tv_shows', plex1Regular.total_shows || 0],
+          ['tv_seasons', plex1Regular.total_seasons || 0],
+          ['tv_episodes', plex1Regular.total_episodes || 0],
+          ['audiobooks', plex1Regular.audio_albums || 0]
+        ];
+        
+        await db.query('DELETE FROM plex_statistics WHERE stat_key IN (?, ?, ?, ?, ?, ?, ?)', 
+          ['hd_movies', 'anime_movies', 'fourk_movies', 'tv_shows', 'tv_seasons', 'tv_episodes', 'audiobooks']);
+        
+        for (const [key, value] of statsToStore) {
+          await db.query(
+            `INSERT INTO plex_statistics (stat_key, stat_value, last_updated) VALUES (?, ?, NOW())`,
+            [key, value]
+          );
+        }
+        
+        resolve();
+        
+      } catch (parseError) {
+        reject(parseError);
+      }
+    });
+    
+    python.on('error', (err) => {
+      reject(err);
+    });
+  });
 }
   
 

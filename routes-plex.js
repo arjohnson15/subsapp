@@ -2,6 +2,7 @@ const express = require('express');
 const plexService = require('./plex-service');
 const db = require('./database-config');
 const router = express.Router();
+const { spawn } = require('child_process');
 
 // Get libraries for a server group (plex1 or plex2) - FIXED
 router.get('/libraries/:serverGroup', async (req, res) => {
@@ -495,5 +496,212 @@ router.post('/refresh-user-data', async (req, res) => {
     res.status(500).json({ error: 'Failed to refresh user data' });
   }
 });
+
+// GET /api/plex/dashboard-stats - Get cached Plex statistics for dashboard
+router.get('/dashboard-stats', async (req, res) => {
+  try {
+    console.log('📊 Getting Plex dashboard statistics...');
+    
+    // Check if we have recent cached data
+    const [cachedStats] = await db.query(`
+      SELECT stat_key, stat_value, last_updated 
+      FROM plex_statistics 
+      WHERE stat_key IN ('hd_movies', 'anime_movies', 'fourk_movies', 'tv_shows', 'tv_seasons', 'tv_episodes', 'audiobooks')
+      ORDER BY last_updated DESC
+    `);
+    
+    // FIX: Check if cachedStats array is empty or undefined
+    if (!cachedStats || cachedStats.length === 0) {
+      console.log('📊 No cached stats found, generating fresh stats...');
+      await refreshPlexStats();
+      
+      // Get the fresh stats
+      const [freshStats] = await db.query(`
+        SELECT stat_key, stat_value 
+        FROM plex_statistics 
+        WHERE stat_key IN ('hd_movies', 'anime_movies', 'fourk_movies', 'tv_shows', 'tv_seasons', 'tv_episodes', 'audiobooks')
+      `);
+      
+      const stats = buildStatsResponse(freshStats || []);
+      return res.json(stats);
+    }
+    
+    // FIX: Check if first result exists before accessing last_updated
+    const lastUpdate = cachedStats[0] && cachedStats[0].last_updated ? 
+                       new Date(cachedStats[0].last_updated) : 
+                       new Date(0); // Very old date to force refresh
+    const fourHoursAgo = new Date(Date.now() - (4 * 60 * 60 * 1000));
+    
+    if (lastUpdate < fourHoursAgo) {
+      console.log('📊 Cache is stale, refreshing in background...');
+      // Refresh in background, don't wait
+      refreshPlexStats().catch(err => console.error('Background refresh failed:', err));
+    }
+    
+    const stats = buildStatsResponse(cachedStats);
+    res.json(stats);
+    
+  } catch (error) {
+    console.error('❌ Error getting Plex dashboard stats:', error);
+    res.json({
+      hdMovies: 0,
+      animeMovies: 0,
+      fourkMovies: 0,
+      tvShows: 0,
+      tvSeasons: 0,
+      tvEpisodes: 0,
+      audioBooks: 0,
+      lastUpdate: 'Error'
+    });
+  }
+});
+
+// POST /api/plex/refresh-stats - Force refresh Plex statistics
+router.post('/refresh-stats', async (req, res) => {
+  try {
+    console.log('🔄 Force refreshing Plex statistics...');
+    await refreshPlexStats();
+    
+    // Get the fresh stats
+    const [freshStats] = await db.query(`
+      SELECT stat_key, stat_value 
+      FROM plex_statistics 
+      WHERE stat_key IN ('hd_movies', 'anime_movies', 'fourk_movies', 'tv_shows', 'tv_seasons', 'tv_episodes', 'audiobooks')
+    `);
+    
+    const stats = buildStatsResponse(freshStats);
+    
+    res.json({
+      success: true,
+      message: 'Plex statistics refreshed successfully',
+      stats: stats,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Error refreshing Plex stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to refresh Plex statistics',
+      message: error.message
+    });
+  }
+});
+
+// Helper function to refresh Plex statistics
+async function refreshPlexStats() {
+  return new Promise((resolve, reject) => {
+    console.log('🔄 Executing Python script for fresh Plex stats...');
+    
+    const python = spawn('python3', ['plex_statistics.py'], {
+      cwd: __dirname,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    let dataString = '';
+    let errorString = '';
+    
+    python.stdout.on('data', (data) => {
+      dataString += data.toString();
+    });
+    
+    python.stderr.on('data', (data) => {
+      errorString += data.toString();
+    });
+    
+    python.on('close', async (code) => {
+      if (code !== 0) {
+        console.error('❌ Python script failed:', errorString);
+        reject(new Error(`Python script failed: ${errorString}`));
+        return;
+      }
+      
+      try {
+        const rawStats = JSON.parse(dataString);
+        console.log('📊 Raw stats from Python:', rawStats);
+        
+        // Extract stats from Plex 1 servers only
+        const plex1Regular = rawStats.plex1?.regular?.stats || {};
+        const plex1Fourk = rawStats.plex1?.fourk?.stats || {};
+        
+        // Store in database
+        const statsToStore = [
+          ['hd_movies', plex1Regular.hd_movies || 0],
+          ['anime_movies', plex1Regular.anime_movies || 0],
+          ['fourk_movies', plex1Fourk.hd_movies || 0], // 4K movies from 4K server
+          ['tv_shows', plex1Regular.total_shows || 0],
+          ['tv_seasons', plex1Regular.total_seasons || 0],
+          ['tv_episodes', plex1Regular.total_episodes || 0],
+          ['audiobooks', plex1Regular.audio_albums || 0] // Use albums count for audiobooks
+        ];
+        
+        // Clear old stats and insert new ones
+        await db.query('DELETE FROM plex_statistics WHERE stat_key IN (?, ?, ?, ?, ?, ?, ?)', 
+          ['hd_movies', 'anime_movies', 'fourk_movies', 'tv_shows', 'tv_seasons', 'tv_episodes', 'audiobooks']);
+        
+        for (const [key, value] of statsToStore) {
+          await db.query(
+            `INSERT INTO plex_statistics (stat_key, stat_value, last_updated) VALUES (?, ?, NOW())`,
+            [key, value]
+          );
+        }
+        
+        console.log('✅ Plex statistics cached in database');
+        resolve();
+        
+      } catch (parseError) {
+        console.error('❌ Error parsing Python output:', parseError);
+        reject(parseError);
+      }
+    });
+    
+    python.on('error', (err) => {
+      console.error('❌ Failed to spawn Python process:', err);
+      reject(err);
+    });
+  });
+}
+
+// Helper function to build stats response
+function buildStatsResponse(dbRows) {
+  const stats = {
+    hdMovies: 0,
+    animeMovies: 0,
+    fourkMovies: 0,
+    tvShows: 0,
+    tvSeasons: 0,
+    tvEpisodes: 0,
+    audioBooks: 0,
+    lastUpdate: new Date().toLocaleDateString()
+  };
+  
+  for (const row of dbRows) {
+    switch (row.stat_key) {
+      case 'hd_movies':
+        stats.hdMovies = parseInt(row.stat_value);
+        break;
+      case 'anime_movies':
+        stats.animeMovies = parseInt(row.stat_value);
+        break;
+      case 'fourk_movies':
+        stats.fourkMovies = parseInt(row.stat_value);
+        break;
+      case 'tv_shows':
+        stats.tvShows = parseInt(row.stat_value);
+        break;
+      case 'tv_seasons':
+        stats.tvSeasons = parseInt(row.stat_value);
+        break;
+      case 'tv_episodes':
+        stats.tvEpisodes = parseInt(row.stat_value);
+        break;
+      case 'audiobooks':
+        stats.audioBooks = parseInt(row.stat_value);
+        break;
+    }
+  }
+  
+  return stats;
+}
 
 module.exports = router;

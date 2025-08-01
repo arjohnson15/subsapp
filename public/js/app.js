@@ -926,64 +926,27 @@ window.Dashboard = {
     async init() {
         console.log('📊 Initializing enhanced dashboard...');
         
-        // Use new backend API for user stats
+        // Load users first if they're not already loaded
+        if (!window.AppState.users || window.AppState.users.length === 0) {
+            console.log('📊 Dashboard: Loading users for stats...');
+            try {
+                const users = await API.User.getAll();
+                window.AppState.users = users;
+                window.AppState.allUsers = users;
+                console.log(`📊 Dashboard: Loaded ${users.length} users for stats`);
+            } catch (error) {
+                console.error('📊 Dashboard: Error loading users:', error);
+                window.AppState.users = []; // Fallback to empty array
+            }
+        }
+        
         await this.loadStats();
         await this.loadContentStats();
         await this.loadExpiringUsers();
     },
     
-    // NEW: Use backend API for user statistics instead of loading users manually
     async loadStats() {
         try {
-            console.log('📊 Loading user statistics from backend API...');
-            
-            const response = await fetch('/api/dashboard/user-stats');
-            const userStats = await response.json();
-            
-            console.log('📊 User stats loaded from backend:', userStats);
-            
-            // Update total users count
-            const totalUsersEl = document.getElementById('totalUsers');
-            if (totalUsersEl) totalUsersEl.textContent = userStats.total;
-            
-            // Update individual Plex counts in the split layout
-            const plex1CountEl = document.getElementById('plex1Count');
-            const plex2CountEl = document.getElementById('plex2Count');
-            if (plex1CountEl) plex1CountEl.textContent = userStats.plex1;
-            if (plex2CountEl) plex2CountEl.textContent = userStats.plex2;
-            
-            // Update IPTV users
-            const iptvUsersEl = document.getElementById('iptvUsers');
-            if (iptvUsersEl) iptvUsersEl.textContent = userStats.iptv;
-            
-            console.log('📊 Dashboard user stats updated:', userStats);
-            
-        } catch (error) {
-            console.error('❌ Error loading user stats from backend:', error);
-            
-            // Fallback to old method if backend fails
-            console.log('📊 Falling back to client-side user calculation...');
-            await this.loadStatsClientSide();
-        }
-    },
-    
-    // FALLBACK: Keep the old client-side method as backup
-    async loadStatsClientSide() {
-        try {
-            // Load users first if they're not already loaded
-            if (!window.AppState.users || window.AppState.users.length === 0) {
-                console.log('📊 Dashboard: Loading users for stats...');
-                try {
-                    const users = await API.User.getAll();
-                    window.AppState.users = users;
-                    window.AppState.allUsers = users;
-                    console.log(`📊 Dashboard: Loaded ${users.length} users for stats`);
-                } catch (error) {
-                    console.error('📊 Dashboard: Error loading users:', error);
-                    window.AppState.users = []; // Fallback to empty array
-                }
-            }
-            
             const users = window.AppState.users || [];
             console.log('📊 Dashboard: Calculating stats for', users.length, 'users');
             
@@ -1012,7 +975,7 @@ window.Dashboard = {
             const iptvUsersEl = document.getElementById('iptvUsers');
             if (iptvUsersEl) iptvUsersEl.textContent = iptvUsers.length;
             
-            console.log('📊 Dashboard stats updated (client-side):', {
+            console.log('📊 Dashboard stats updated:', {
                 totalUnique: uniqueUsers.length,
                 plex1: plex1Users.length,
                 plex2: plex2Users.length,
@@ -1021,7 +984,7 @@ window.Dashboard = {
             });
             
         } catch (error) {
-            console.error('Error loading stats (client-side fallback):', error);
+            console.error('Error loading stats:', error);
         }
     },
     
@@ -1032,10 +995,10 @@ window.Dashboard = {
         this.setContentStatsLoading();
         
         try {
-            // KEEP YOUR WORKING IPTV STATS - DON'T CHANGE
+            // Load IPTV content stats
             await this.loadIPTVContentStats();
             
-            // NEW: Load Plex content stats from backend
+            // Load Plex content stats
             await this.loadPlexContentStats();
             
         } catch (error) {
@@ -1044,7 +1007,6 @@ window.Dashboard = {
         }
     },
     
-    // UNCHANGED: Keep your working IPTV stats exactly as they are
     async loadIPTVContentStats() {
         try {
             console.log('📺 Loading IPTV content statistics from existing data...');
@@ -1097,59 +1059,52 @@ window.Dashboard = {
         }
     },
     
-    // NEW: Real Plex content stats from backend
     async loadPlexContentStats() {
         try {
-            console.log('🎬 Loading Plex content statistics from backend...');
+            console.log('🎬 Loading Plex content statistics from cache...');
             
-            const response = await fetch('/api/dashboard/plex-stats');
+            const response = await fetch('/api/plex/dashboard-stats');
             const plexStats = await response.json();
             
-            console.log('🎬 Plex stats loaded from backend:', plexStats);
+            console.log('🎬 Plex stats loaded from cache:', plexStats);
             
             const plexElements = {
                 hdMovies: document.getElementById('plexHDMovies'),
+                animeMovies: document.getElementById('plexAnimeMovies'),
                 fourkMovies: document.getElementById('plex4KMovies'),
                 tvShows: document.getElementById('plexTVShows'),
+                tvSeasons: document.getElementById('plexTVSeasons'),
+                tvEpisodes: document.getElementById('plexTVEpisodes'),
                 audioBooks: document.getElementById('plexAudioBooks')
             };
             
-            // Calculate combined totals
-            const totalHDMovies = (plexStats.plex1.movies || 0) + (plexStats.plex2.movies || 0);
-            const total4KMovies = (plexStats.plex1.fourkMovies || 0) + (plexStats.plex2.fourkMovies || 0);
-            const totalTVShows = (plexStats.plex1.shows || 0) + (plexStats.plex2.shows || 0);
-            
-            // Update UI with real data
-            if (plexElements.hdMovies) plexElements.hdMovies.textContent = this.formatNumber(totalHDMovies);
-            if (plexElements.fourkMovies) plexElements.fourkMovies.textContent = this.formatNumber(total4KMovies);
-            if (plexElements.tvShows) plexElements.tvShows.textContent = this.formatNumber(totalTVShows);
+            // Update UI with cached data (fast!)
+            if (plexElements.hdMovies) plexElements.hdMovies.textContent = this.formatNumber(plexStats.hdMovies);
+            if (plexElements.animeMovies) plexElements.animeMovies.textContent = this.formatNumber(plexStats.animeMovies);
+            if (plexElements.fourkMovies) plexElements.fourkMovies.textContent = this.formatNumber(plexStats.fourkMovies);
+            if (plexElements.tvShows) plexElements.tvShows.textContent = this.formatNumber(plexStats.tvShows);
+            if (plexElements.tvSeasons) plexElements.tvSeasons.textContent = this.formatNumber(plexStats.tvSeasons);
+            if (plexElements.tvEpisodes) plexElements.tvEpisodes.textContent = this.formatNumber(plexStats.tvEpisodes);
             if (plexElements.audioBooks) plexElements.audioBooks.textContent = this.formatNumber(plexStats.audioBooks);
             
-            console.log('✅ Plex dashboard stats updated:', {
-                hdMovies: totalHDMovies,
-                fourkMovies: total4KMovies,
-                tvShows: totalTVShows,
-                audioBooks: plexStats.audioBooks
-            });
+            console.log('✅ Plex dashboard stats updated from cache');
             
         } catch (error) {
-            console.error('❌ Error loading Plex content stats from backend:', error);
+            console.error('❌ Error loading Plex content stats:', error);
             
             // Show error state
-            const plexElements = {
-                hdMovies: document.getElementById('plexHDMovies'),
-                fourkMovies: document.getElementById('plex4KMovies'),
-                tvShows: document.getElementById('plexTVShows'),
-                audioBooks: document.getElementById('plexAudioBooks')
-            };
+            const plexElements = [
+                'plexHDMovies', 'plexAnimeMovies', 'plex4KMovies',
+                'plexTVShows', 'plexTVSeasons', 'plexTVEpisodes', 'plexAudioBooks'
+            ];
             
-            Object.values(plexElements).forEach(el => {
+            plexElements.forEach(id => {
+                const el = document.getElementById(id);
                 if (el) el.textContent = 'Error';
             });
         }
     },
     
-    // UNCHANGED: Keep your existing helper methods
     setContentStatsLoading() {
         const elements = [
             'iptvChannels', 'iptvMovies', 'iptvSeries',
@@ -1180,13 +1135,11 @@ window.Dashboard = {
         });
     },
     
-    // UNCHANGED: Keep your existing formatNumber method
     formatNumber(num) {
         if (num === 0 || num === null || num === undefined) return '0';
         return new Intl.NumberFormat().format(num);
     },
     
-    // UNCHANGED: Keep your existing loadExpiringUsers method
     async loadExpiringUsers() {
         try {
             const expiringUsers = await API.User.getExpiring(7);

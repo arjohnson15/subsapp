@@ -2413,14 +2413,15 @@ async saveIPTVEditorSettings() {
 
 async loadStoredPlaylists() {
     try {
-        const response = await fetch('/api/iptv-editor/playlists');
-        const result = await response.json();
-        
+        // MOVE THIS CHECK TO THE VERY BEGINNING
         const playlistSelect = document.getElementById('iptvPlaylistSelect');
         if (!playlistSelect) {
-            console.warn('Playlist select element not found');
+            // We're not on the settings page, skip entirely
             return;
         }
+        
+        const response = await fetch('/api/iptv-editor/playlists');
+        const result = await response.json();
         
         // Clear existing options
         playlistSelect.innerHTML = '<option value="">Select a playlist...</option>';

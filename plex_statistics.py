@@ -9,7 +9,7 @@ import sys
 import os
 from plexapi.server import PlexServer
 
-# Plex server configurations - matches plex-config.js
+# Plex server configurations - ONLY PLEX 1 SERVERS (no doubling)
 PLEX_SERVERS = {
     'plex1': {
         'regular': {
@@ -24,68 +24,103 @@ PLEX_SERVERS = {
             'token': 'sxuautpKvoH2aZKG-j95',
             'url': 'http://192.168.10.92:32400'
         }
-    },
-    'plex2': {
-        'regular': {
-            'name': 'Plex 2',
-            'serverId': '3ad72e19d4509a15d9f8253666a03efa78baac44',
-            'token': 'B1QhFRA-Q2pSm15uxmMA',
-            'url': 'http://192.168.10.94:32400'
-        },
-        'fourk': {
-            'name': 'Plex 2 4K',
-            'serverId': 'c6448117a95874f18274f31495ff5118fd291089',
-            'token': 'B1QhFRA-Q2pSm15uxmMA',
-            'url': 'http://192.168.10.92:32700'
-        }
     }
+    # REMOVED plex2 to avoid doubling counts
 }
 
 def get_library_stats(server_config):
-    """Get content statistics from a Plex server"""
+    """Get detailed content statistics from a Plex server with proper library combining"""
     try:
         plex = PlexServer(server_config['url'], server_config['token'], timeout=10)
         stats = {
-            'movies': 0,
-            'shows': 0, 
-            'episodes': 0,
-            'artists': 0,  # Audio books count as artists
-            'albums': 0,
-            'tracks': 0
+            'hd_movies': 0,      # All non-anime movies
+            'anime_movies': 0,   # Only anime movies
+            'total_shows': 0,    # All TV show libraries combined
+            'total_seasons': 0,  # All seasons across all show libraries
+            'total_episodes': 0, # All episodes across all show libraries
+            'audio_artists': 0,  # Artists (audiobooks)
+            'audio_albums': 0,   # Albums
+            'audio_tracks': 0,   # Tracks
+            'library_breakdown': {}
         }
+        
+        print(f"🔍 Connecting to {server_config['name']}...", file=sys.stderr)
         
         # Get all library sections
         for section in plex.library.sections():
             section_type = section.type
+            section_title = section.title
+            
+            print(f"  📚 Processing: {section_title} ({section_type})", file=sys.stderr)
             
             if section_type == 'movie':
                 movie_count = len(section.all())
-                stats['movies'] += movie_count
-                print(f"  📽️ {section.title}: {movie_count} movies", file=sys.stderr)
+                stats['library_breakdown'][section_title] = {
+                    'type': 'movie',
+                    'count': movie_count
+                }
+                
+                # Check if this is anime movies
+                if 'anime' in section_title.lower():
+                    stats['anime_movies'] += movie_count
+                    print(f"  🎌 {section_title}: {movie_count} anime movies", file=sys.stderr)
+                else:
+                    stats['hd_movies'] += movie_count
+                    print(f"  📽️ {section_title}: {movie_count} HD movies", file=sys.stderr)
                 
             elif section_type == 'show':
                 shows = section.all()
-                stats['shows'] += len(shows)
-                # Count total episodes across all shows
-                episode_count = 0
+                show_count = len(shows)
+                
+                # Count seasons and episodes for this library
+                library_seasons = 0
+                library_episodes = 0
+                
                 for show in shows:
-                    episode_count += show.leafCount
-                stats['episodes'] += episode_count
-                print(f"  📺 {section.title}: {len(shows)} shows, {episode_count} episodes", file=sys.stderr)
+                    library_seasons += show.childCount    # Seasons in this show
+                    library_episodes += show.leafCount    # Episodes in this show
+                
+                # Add to totals
+                stats['total_shows'] += show_count
+                stats['total_seasons'] += library_seasons
+                stats['total_episodes'] += library_episodes
+                
+                stats['library_breakdown'][section_title] = {
+                    'type': 'show',
+                    'shows': show_count,
+                    'seasons': library_seasons, 
+                    'episodes': library_episodes
+                }
+                
+                print(f"  📺 {section_title}: {show_count} shows, {library_seasons} seasons, {library_episodes} episodes", file=sys.stderr)
                 
             elif section_type == 'artist':
                 artists = section.all()
-                stats['artists'] += len(artists)
-                album_count = 0
-                track_count = 0
+                artist_count = len(artists)
+                stats['audio_artists'] += artist_count
+                
+                library_albums = 0
+                library_tracks = 0
+                
                 for artist in artists:
                     albums = artist.albums()
-                    album_count += len(albums)
+                    library_albums += len(albums)
                     for album in albums:
-                        track_count += len(album.tracks())
-                stats['albums'] += album_count
-                stats['tracks'] += track_count
-                print(f"  🎵 {section.title}: {len(artists)} artists, {album_count} albums, {track_count} tracks", file=sys.stderr)
+                        library_tracks += len(album.tracks())
+                        
+                stats['audio_albums'] += library_albums
+                stats['audio_tracks'] += library_tracks
+                
+                stats['library_breakdown'][section_title] = {
+                    'type': 'artist',
+                    'artists': artist_count,
+                    'albums': library_albums,
+                    'tracks': library_tracks
+                }
+                
+                print(f"  🎵 {section_title}: {artist_count} artists, {library_albums} albums, {library_tracks} tracks", file=sys.stderr)
+        
+        print(f"✅ {server_config['name']} totals: Movies({stats['hd_movies']}+{stats['anime_movies']}), Shows({stats['total_shows']}/{stats['total_seasons']}/{stats['total_episodes']}), Audio({stats['audio_artists']}/{stats['audio_albums']})", file=sys.stderr)
         
         return {
             'success': True,
