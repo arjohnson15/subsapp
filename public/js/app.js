@@ -1059,51 +1059,53 @@ window.Dashboard = {
         }
     },
     
-    async loadPlexContentStats() {
-        try {
-            console.log('🎬 Loading Plex content statistics from cache...');
-            
-            const response = await fetch('/api/dashboard/plex-stats');
-            const plexStats = await response.json();
-            
-            console.log('🎬 Plex stats loaded from cache:', plexStats);
-            
-            const plexElements = {
-                hdMovies: document.getElementById('plexHDMovies'),
-                animeMovies: document.getElementById('plexAnimeMovies'),
-                fourkMovies: document.getElementById('plex4KMovies'),
-                tvShows: document.getElementById('plexTVShows'),
-                tvSeasons: document.getElementById('plexTVSeasons'),
-                tvEpisodes: document.getElementById('plexTVEpisodes'),
-                audioBooks: document.getElementById('plexAudioBooks')
-            };
-            
-            // Update UI with cached data (fast!)
-            if (plexElements.hdMovies) plexElements.hdMovies.textContent = this.formatNumber(plexStats.hdMovies);
-            if (plexElements.animeMovies) plexElements.animeMovies.textContent = this.formatNumber(plexStats.animeMovies);
-            if (plexElements.fourkMovies) plexElements.fourkMovies.textContent = this.formatNumber(plexStats.fourkMovies);
-            if (plexElements.tvShows) plexElements.tvShows.textContent = this.formatNumber(plexStats.tvShows);
-            if (plexElements.tvSeasons) plexElements.tvSeasons.textContent = this.formatNumber(plexStats.tvSeasons);
-            if (plexElements.tvEpisodes) plexElements.tvEpisodes.textContent = this.formatNumber(plexStats.tvEpisodes);
-            if (plexElements.audioBooks) plexElements.audioBooks.textContent = this.formatNumber(plexStats.audioBooks);
-            
-            console.log('✅ Plex dashboard stats updated from cache');
-            
-        } catch (error) {
-            console.error('❌ Error loading Plex content stats:', error);
-            
-            // Show error state
-            const plexElements = [
-                'plexHDMovies', 'plexAnimeMovies', 'plex4KMovies',
-                'plexTVShows', 'plexTVSeasons', 'plexTVEpisodes', 'plexAudioBooks'
-            ];
-            
-            plexElements.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.textContent = 'Error';
-            });
-        }
-    },
+async loadPlexContentStats() {
+    try {
+        console.log('🎬 Loading Plex content statistics from cache...');
+        
+        const response = await fetch('/api/dashboard/plex-stats');
+        const plexStats = await response.json();
+        
+        console.log('🎬 Plex stats loaded from cache:', plexStats);
+        
+        const plexElements = {
+            hdMovies: document.getElementById('plexHDMovies'),
+            animeMovies: document.getElementById('plexAnimeMovies'),
+            fourkMovies: document.getElementById('plex4KMovies'),
+            tvShows: document.getElementById('plexTVShows'),
+            animeShows: document.getElementById('plexAnimeShows'), // ADD THIS LINE
+            tvSeasons: document.getElementById('plexTVSeasons'),
+            tvEpisodes: document.getElementById('plexTVEpisodes'),
+            audioBooks: document.getElementById('plexAudioBooks')
+        };
+        
+        // Update UI with cached data (fast!)
+        if (plexElements.hdMovies) plexElements.hdMovies.textContent = this.formatNumber(plexStats.hdMovies);
+        if (plexElements.animeMovies) plexElements.animeMovies.textContent = this.formatNumber(plexStats.animeMovies);
+        if (plexElements.fourkMovies) plexElements.fourkMovies.textContent = this.formatNumber(plexStats.fourkMovies);
+        if (plexElements.tvShows) plexElements.tvShows.textContent = this.formatNumber(plexStats.tvShows);
+        if (plexElements.animeShows) plexElements.animeShows.textContent = this.formatNumber(plexStats.animeTVShows); // ADD THIS LINE
+        if (plexElements.tvSeasons) plexElements.tvSeasons.textContent = this.formatNumber(plexStats.tvSeasons);
+        if (plexElements.tvEpisodes) plexElements.tvEpisodes.textContent = this.formatNumber(plexStats.tvEpisodes);
+        if (plexElements.audioBooks) plexElements.audioBooks.textContent = this.formatNumber(plexStats.audioBooks);
+        
+        console.log('✅ Plex dashboard stats updated from cache');
+        
+    } catch (error) {
+        console.error('❌ Error loading Plex content stats:', error);
+        
+        // Show error state
+        const plexElements = [
+            'plexHDMovies', 'plexAnimeMovies', 'plex4KMovies',
+            'plexTVShows', 'plexAnimeShows', 'plexTVSeasons', 'plexTVEpisodes', 'plexAudioBooks' // ADD plexAnimeShows HERE TOO
+        ];
+        
+        plexElements.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = 'Error';
+        });
+    }
+},
     
     setContentStatsLoading() {
         const elements = [
