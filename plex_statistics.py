@@ -133,9 +133,19 @@ def get_library_stats(server_config):
                     'albums': library_albums
                 }
                 
-                print(f"  🎵 {section_title}: {artist_count} artists, {library_albums} albums", file=sys.stderr)
-        
         print(f"✅ {server_config['name']} totals: HD({stats['hd_movies']}) + Anime({stats['anime_movies']}) movies, TV({stats['regular_tv_shows']}) + AnimeTV({stats['anime_tv_shows']}) + Kids({stats['kids_tv_shows']}) + Fitness({stats['fitness_tv_shows']}) shows, {stats['total_seasons']} seasons, {stats['total_episodes']} episodes, {stats['audio_albums']} albums", file=sys.stderr)
+        
+        # DEBUG: Print all the stats we found (PROPERLY INDENTED)
+        print(f"🔍 DEBUG STATS for {server_config['name']}:", file=sys.stderr)
+        print(f"  hd_movies: {stats['hd_movies']}", file=sys.stderr)
+        print(f"  anime_movies: {stats['anime_movies']}", file=sys.stderr)
+        print(f"  regular_tv_shows: {stats['regular_tv_shows']}", file=sys.stderr)
+        print(f"  anime_tv_shows: {stats['anime_tv_shows']}", file=sys.stderr)
+        print(f"  kids_tv_shows: {stats['kids_tv_shows']}", file=sys.stderr)
+        print(f"  fitness_tv_shows: {stats['fitness_tv_shows']}", file=sys.stderr)
+        print(f"  total_seasons: {stats['total_seasons']}", file=sys.stderr)
+        print(f"  total_episodes: {stats['total_episodes']}", file=sys.stderr)
+        print(f"  audio_albums: {stats['audio_albums']}", file=sys.stderr)
         
         return {
             'success': True,

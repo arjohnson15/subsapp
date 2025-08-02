@@ -225,14 +225,19 @@ async function getPlexStats() {
   try {
     console.log('📊 Getting Plex content statistics...');
     
-    // Check if we have recent cached data from plex_statistics table
-    const [cachedStats] = await db.query(`
+    // FIX: Remove the array destructuring - get the full result
+    const cachedStats = await db.query(`
       SELECT stat_key, stat_value, last_updated 
       FROM plex_statistics 
       WHERE stat_key IN ('hd_movies', 'anime_movies', 'fourk_movies', 'tv_shows', 'anime_tv_shows', 'tv_seasons', 'tv_episodes', 'audiobooks')
       ORDER BY last_updated DESC
     `);
-    
+
+    // DEBUG: Log what we actually got from database
+    console.log('🔍 DEBUG: Raw database result:', cachedStats);
+    console.log('🔍 DEBUG: cachedStats type:', typeof cachedStats);
+    console.log('🔍 DEBUG: cachedStats length:', cachedStats ? cachedStats.length : 'undefined');
+
     // FIX: Check if cachedStats exists and has data
     if (!cachedStats || !Array.isArray(cachedStats) || cachedStats.length === 0) {
       console.log('📊 No cached Plex stats found');
