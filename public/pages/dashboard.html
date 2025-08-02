@@ -1,89 +1,105 @@
-<div class="dashboard-grid">
-    <div class="card">
-        <h3>Total Users</h3>
-        <div class="stat-number" id="totalUsers">0</div>
-        <p>Active subscribers across all services</p>
-    </div>
-    <div class="card">
-        <h3>Plex Users</h3>
-        <div class="plex-split-container">
-            <div class="plex-split-left">
-                <div class="plex-split-label">Plex 1</div>
-                <div class="plex-split-number" id="plex1Count">0</div>
+<!-- Combined User Stats Section -->
+<div class="content-section">
+    <div class="content-library-card" style="border: 1px solid rgba(255, 255, 255, 0.2); margin-bottom: 20px; padding: 15px;">
+        <div class="library-header" style="margin-bottom: 10px;">
+            <div class="library-icon" style="background: rgba(79, 195, 247, 0.2); color: #4fc3f7; width: 40px; height: 40px;">
+                <i class="fas fa-users"></i>
             </div>
-            <div class="plex-split-divider"></div>
-            <div class="plex-split-right">
-                <div class="plex-split-label">Plex 2</div>
-                <div class="plex-split-number" id="plex2Count">0</div>
+            <div class="library-title">
+                <h3 class="library-name" style="font-size: 1rem;">User Statistics</h3>
+                <p class="library-subtitle" style="font-size: 0.75rem;">Active Subscribers Across All Services</p>
             </div>
         </div>
-        <p>Active Plex subscriptions</p>
-    </div>
-    <div class="card">
-        <h3>IPTV Users</h3>
-        <div class="stat-number" id="iptvUsers">0</div>
-        <p>Active IPTV subscriptions</p>
+        <div class="library-stats" style="gap: 10px;">
+            <div class="stat-item" style="padding: 8px;">
+                <div class="stat-value" id="totalUsers" style="color: #4fc3f7; font-size: 1.3rem;">14</div>
+                <div class="stat-label" style="font-size: 0.7rem;">Total Users</div>
+            </div>
+            <div class="stat-item" style="padding: 8px;">
+                <div class="stat-value" id="plex1Count" style="color: #4fc3f7; font-size: 1.3rem;">9</div>
+                <div class="stat-label" style="font-size: 0.7rem;">Plex 1 Users</div>
+            </div>
+            <div class="stat-item" style="padding: 8px;">
+                <div class="stat-value" id="plex2Count" style="color: #4fc3f7; font-size: 1.3rem;">3</div>
+                <div class="stat-label" style="font-size: 0.7rem;">Plex 2 Users</div>
+            </div>
+            <div class="stat-item" style="padding: 8px;">
+                <div class="stat-value" id="iptvUsers" style="color: #4fc3f7; font-size: 1.3rem;">12</div>
+                <div class="stat-label" style="font-size: 0.7rem;">IPTV Users</div>
+            </div>
+        </div>
     </div>
 </div>
 
-<!-- Content Libraries Section -->
+<!-- Combined Content Library Section -->
 <div class="content-section">
-    <div class="content-row">
-        <!-- IPTV Content Library -->
-        <div class="content-library-card iptv-card">
-            <div class="library-header">
-        <div class="library-icon">
-            <i class="fas fa-tv"></i>
-        </div>
-                <div class="library-title">
-                    <h3 class="library-name">IPTV Live Service</h3>
-                    <p class="library-subtitle">Live Channels / Movies / Series</p>
-                </div>
+    <div class="content-library-card" style="border: 1px solid rgba(255, 255, 255, 0.2);">
+        <!-- IPTV Section -->
+        <div class="library-header">
+            <div class="library-icon" style="background: rgba(255, 107, 107, 0.2); color: #ff6b6b;">
+                <i class="fas fa-tv"></i>
             </div>
-            <div class="library-stats">
-                <div class="stat-item">
-                    <div class="stat-value" id="iptvChannels">-</div>
-                    <div class="stat-label">Live Channels</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="iptvMovies">-</div>
-                    <div class="stat-label">VOD Movies</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="iptvSeries">-</div>
-                    <div class="stat-label">TV Series</div>
-                </div>
+            <div class="library-title">
+                <h3 class="library-name">IPTV Live Service</h3>
+                <p class="library-subtitle">Live Channels / Movies / Series</p>
+            </div>
+        </div>
+        <div class="library-stats" style="margin-bottom: 30px;">
+            <div class="stat-item">
+                <div class="stat-value" id="iptvChannels" style="color: #ff6b6b;">5,690</div>
+                <div class="stat-label">Live Channels</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="iptvMovies" style="color: #ff6b6b;">19,776</div>
+                <div class="stat-label">VOD Movies</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="iptvSeries" style="color: #ff6b6b;">7,395</div>
+                <div class="stat-label">TV Series</div>
             </div>
         </div>
 
-        <!-- Plex Content Library -->
-        <div class="content-library-card plex-card">
-            <div class="library-header">
-        <div class="library-icon">
-            <i class="fas fa-film"></i>
-        </div>
-                <div class="library-title">
-                    <h3 class="library-name">Plex Content</h3>
-                    <p class="library-subtitle">Movies / TV Shows / Audio Books</p>
-                </div>
+        <!-- Divider -->
+        <div style="height: 1px; background: rgba(255, 255, 255, 0.1); margin: 20px 0;"></div>
+
+        <!-- Plex Section -->
+        <div class="library-header">
+            <div class="library-icon" style="background: rgba(78, 205, 196, 0.2); color: #4ecdc4;">
+                <i class="fas fa-film"></i>
             </div>
-            <div class="library-stats">
-                <div class="stat-item">
-                    <div class="stat-value" id="plexHDMovies">-</div>
-                    <div class="stat-label">HD Movies</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="plex4KMovies">-</div>
-                    <div class="stat-label">4K Movies</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="plexTVShows">-</div>
-                    <div class="stat-label">TV Shows</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="plexAudioBooks">-</div>
-                    <div class="stat-label">Audio Books</div>
-                </div>
+            <div class="library-title">
+                <h3 class="library-name">Plex Content</h3>
+                <p class="library-subtitle">Movies / TV Shows / Anime / Audio Books</p>
+            </div>
+        </div>
+        <div class="library-stats">
+            <div class="stat-item">
+                <div class="stat-value" id="plexHDMovies" style="color: #4ecdc4;">5,111</div>
+                <div class="stat-label">HD Movies</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="plex4KMovies" style="color: #4ecdc4;">241</div>
+                <div class="stat-label">4K Movies</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="plexTVShows" style="color: #4ecdc4;">1,453</div>
+                <div class="stat-label">TV Shows</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="plexTVEpisodes" style="color: #4ecdc4;">85,907</div>
+                <div class="stat-label">TV Episodes</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="plexAnimeShows" style="color: #4ecdc4;">-</div>
+                <div class="stat-label">Anime Shows</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="plexAnimeMovies" style="color: #4ecdc4;">113</div>
+                <div class="stat-label">Anime Movies</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="plexAudioBooks" style="color: #4ecdc4;">47</div>
+                <div class="stat-label">Audio Books</div>
             </div>
         </div>
     </div>
