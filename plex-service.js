@@ -723,12 +723,13 @@ async syncAllLibraries() {
   }
 }
 
-// Add this new method to plex-service.js
 async refreshPlexStatsCache() {
   const { spawn } = require('child_process');
   const db = require('./database-config');
   
   return new Promise((resolve, reject) => {
+    console.log('🔄 Executing Python script for fresh Plex stats...');
+    
     const python = spawn('python3', ['plex_statistics.py'], {
       cwd: __dirname,
       stdio: ['pipe', 'pipe', 'pipe']
@@ -743,6 +744,8 @@ async refreshPlexStatsCache() {
     
     python.stderr.on('data', (data) => {
       errorString += data.toString();
+      // ADD: Show Python debug output in real-time
+      console.log('🐍 Python debug:', data.toString().trim());
     });
     
     python.on('close', async (code) => {
@@ -752,24 +755,34 @@ async refreshPlexStatsCache() {
         return;
       }
       
+      // ADD: Show all Python stderr output
+      if (errorString) {
+        console.log('🐍 Python stderr output:', errorString);
+      }
+      
       try {
         const rawStats = JSON.parse(dataString);
+        console.log('📊 Raw stats from Python:', JSON.stringify(rawStats, null, 2));
+        
         const plex1Regular = rawStats.plex1?.regular?.stats || {};
         const plex1Fourk = rawStats.plex1?.fourk?.stats || {};
         
-        // Update database cache
+        // Updated mapping to match your Python script
         const statsToStore = [
           ['hd_movies', plex1Regular.hd_movies || 0],
           ['anime_movies', plex1Regular.anime_movies || 0],
           ['fourk_movies', plex1Fourk.hd_movies || 0],
-          ['tv_shows', plex1Regular.total_shows || 0],
+          ['tv_shows', (plex1Regular.regular_tv_shows || 0) + (plex1Regular.kids_tv_shows || 0) + (plex1Regular.fitness_tv_shows || 0)], // Combine non-anime TV
+          ['anime_tv_shows', plex1Regular.anime_tv_shows || 0],
           ['tv_seasons', plex1Regular.total_seasons || 0],
           ['tv_episodes', plex1Regular.total_episodes || 0],
           ['audiobooks', plex1Regular.audio_albums || 0]
         ];
         
-        await db.query('DELETE FROM plex_statistics WHERE stat_key IN (?, ?, ?, ?, ?, ?, ?)', 
-          ['hd_movies', 'anime_movies', 'fourk_movies', 'tv_shows', 'tv_seasons', 'tv_episodes', 'audiobooks']);
+        console.log('📊 Stats to store:', statsToStore);
+        
+        await db.query('DELETE FROM plex_statistics WHERE stat_key IN (?, ?, ?, ?, ?, ?, ?, ?)', 
+          ['hd_movies', 'anime_movies', 'fourk_movies', 'tv_shows', 'anime_tv_shows', 'tv_seasons', 'tv_episodes', 'audiobooks']);
         
         for (const [key, value] of statsToStore) {
           await db.query(
@@ -778,14 +791,17 @@ async refreshPlexStatsCache() {
           );
         }
         
+        console.log('✅ Plex statistics cached in database');
         resolve();
         
       } catch (parseError) {
+        console.error('❌ Error parsing Python output:', parseError);
         reject(parseError);
       }
     });
     
     python.on('error', (err) => {
+      console.error('❌ Failed to spawn Python process:', err);
       reject(err);
     });
   });
