@@ -378,11 +378,31 @@ function getNestedProperty(obj, path) {
     return path.split('.').reduce((current, key) => current && current[key], obj);
 }
 
-// Sort utility
+// Enhanced sort utility with case-insensitive string sorting
 function sortArray(array, field, direction = 'asc') {
     return [...array].sort((a, b) => {
-        const aVal = getNestedProperty(a, field);
-        const bVal = getNestedProperty(b, field);
+        let aVal = getNestedProperty(a, field);
+        let bVal = getNestedProperty(b, field);
+        
+        // Handle null/undefined values - put them at the end
+        if (aVal == null && bVal == null) return 0;
+        if (aVal == null) return direction === 'asc' ? 1 : -1;
+        if (bVal == null) return direction === 'asc' ? -1 : 1;
+        
+        // Convert to strings and normalize for case-insensitive comparison
+        if (typeof aVal === 'string' && typeof bVal === 'string') {
+            aVal = aVal.toLowerCase().trim();
+            bVal = bVal.toLowerCase().trim();
+        }
+        
+        // Numeric comparison for dates and numbers
+        if (!isNaN(Date.parse(aVal)) && !isNaN(Date.parse(bVal))) {
+            aVal = new Date(aVal);
+            bVal = new Date(bVal);
+        } else if (!isNaN(aVal) && !isNaN(bVal)) {
+            aVal = Number(aVal);
+            bVal = Number(bVal);
+        }
         
         if (aVal < bVal) return direction === 'asc' ? -1 : 1;
         if (aVal > bVal) return direction === 'asc' ? 1 : -1;

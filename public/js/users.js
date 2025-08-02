@@ -8,11 +8,12 @@ window.Users = {
     originalLibraryBaseline: null, // Track original library state for change detection
     originalTagsBaseline: null, // Track original tags for comparison
     
-    async init() {
-        await this.loadUsers();
-        this.setupEventListeners();
-        this.startBackgroundTaskMonitor();
-    },
+async init() {
+    await this.loadUsers();
+    await this.loadExpiringUsers();
+    this.setupEventListeners();
+    this.startBackgroundTaskMonitor();
+},
     
     setupEventListeners() {
         // Setup search with debounce
@@ -98,10 +99,6 @@ populateOwnerFilter(users) {
         if (task.type === 'plex_update' && result.data && result.data.success) {
             this.updateUserBaselinesAfterPlexOperation(task.data);
         }
-        
-        // Refresh users list if it was a user operation
-// REMOVED: Duplicate loadUsers() call that was causing rate limits
-// The users list is already reloaded when navigating back to users page
     },
     
     handleTaskFailure(taskId, task, result) {
@@ -112,6 +109,46 @@ populateOwnerFilter(users) {
         
         Utils.hideLoading();
     },
+	
+	// Load expiring users
+async loadExpiringUsers() {
+    try {
+        const expiringUsers = await API.User.getExpiring(7);
+        const expiringDiv = document.getElementById('expiringUsers');
+        
+        if (!expiringDiv) return; // Element doesn't exist on this page
+        
+        if (expiringUsers.length === 0) {
+            expiringDiv.innerHTML = '<span style="color: #4caf50; font-size: 0.9rem;">None this week</span>';
+        } else {
+            // Create compact inline display
+            const userList = expiringUsers.map(user => `
+                <span style="display: inline-flex; align-items: center; background: rgba(255, 152, 0, 0.2); 
+                      border: 1px solid rgba(255, 152, 0, 0.4); border-radius: 6px; padding: 4px 8px; 
+                      margin: 2px; font-size: 0.85rem; white-space: nowrap;">
+                    <strong>${user.name}</strong>
+                    <span style="color: #ff9800; margin-left: 6px;">${Utils.formatDate(user.expiration_date)}</span>
+                    <button class="btn-icon" onclick="Users.editUser(${user.id})" 
+                            style="background: #ff9800; margin-left: 6px; padding: 2px 6px; font-size: 0.7rem; 
+                                   border-radius: 3px; min-width: auto; height: auto;" title="Edit ${user.name}">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                </span>
+            `).join('');
+            
+            expiringDiv.innerHTML = userList;
+        }
+        
+        console.log(`📅 Loaded ${expiringUsers.length} expiring users (compact)`);
+        
+    } catch (error) {
+        console.error('Error loading expiring users:', error);
+        const expiringDiv = document.getElementById('expiringUsers');
+        if (expiringDiv) {
+            expiringDiv.innerHTML = '<span style="color: #f44336; font-size: 0.9rem;">Error loading</span>';
+        }
+    }
+},
     
     // NEW: Update user baselines after successful Plex operations
     async updateUserBaselinesAfterPlexOperation(taskData) {

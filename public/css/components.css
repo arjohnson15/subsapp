@@ -3370,3 +3370,34 @@ table tbody td:last-child .btn-small:nth-child(4) {
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+.expiring-soon-compact {
+    background: rgba(255, 152, 0, 0.1);
+    border: 1px solid rgba(255, 152, 0, 0.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+}
+
+.expiring-soon-compact #expiringUsers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+/* Mobile responsiveness for compact view */
+@media (max-width: 768px) {
+    .expiring-soon-compact > div {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .expiring-soon-compact h4 {
+        font-size: 0.9rem;
+    }
+    
+    .expiring-soon-compact #expiringUsers span {
+        font-size: 0.8rem !important;
+    }
+}
