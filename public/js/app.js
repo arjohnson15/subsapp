@@ -1063,7 +1063,7 @@ window.Dashboard = {
         try {
             console.log('🎬 Loading Plex content statistics from cache...');
             
-            const response = await fetch('/api/plex/dashboard-stats');
+            const response = await fetch('/api/dashboard/plex-stats');
             const plexStats = await response.json();
             
             console.log('🎬 Plex stats loaded from cache:', plexStats);

@@ -29,18 +29,20 @@ PLEX_SERVERS = {
 }
 
 def get_library_stats(server_config):
-    """Get detailed content statistics from a Plex server with proper library combining"""
+    """Get detailed content statistics from a Plex server with your specific library breakdown"""
     try:
         plex = PlexServer(server_config['url'], server_config['token'], timeout=10)
         stats = {
-            'hd_movies': 0,      # All non-anime movies
-            'anime_movies': 0,   # Only anime movies
-            'total_shows': 0,    # All TV show libraries combined
-            'total_seasons': 0,  # All seasons across all show libraries
-            'total_episodes': 0, # All episodes across all show libraries
-            'audio_artists': 0,  # Artists (audiobooks)
-            'audio_albums': 0,   # Albums
-            'audio_tracks': 0,   # Tracks
+            'hd_movies': 0,      # HD Movies library
+            'anime_movies': 0,   # Anime Movies library
+            'regular_tv_shows': 0,    # TV Shows library
+            'anime_tv_shows': 0,      # Anime TV library
+            'kids_tv_shows': 0,       # Kids Shows library
+            'fitness_tv_shows': 0,    # Fitness library
+            'total_seasons': 0,       # All seasons across all show libraries
+            'total_episodes': 0,      # All episodes across all show libraries
+            'audio_artists': 0,       # Artists (audiobooks)
+            'audio_albums': 0,        # Albums
             'library_breakdown': {}
         }
         
@@ -60,13 +62,17 @@ def get_library_stats(server_config):
                     'count': movie_count
                 }
                 
-                # Check if this is anime movies
-                if 'anime' in section_title.lower():
-                    stats['anime_movies'] += movie_count
-                    print(f"  🎌 {section_title}: {movie_count} anime movies", file=sys.stderr)
+                # Map your specific movie libraries
+                if section_title == 'HD Movies':
+                    stats['hd_movies'] = movie_count
+                    print(f"  📽️ HD Movies: {movie_count}", file=sys.stderr)
+                elif section_title == 'Anime Movies':
+                    stats['anime_movies'] = movie_count
+                    print(f"  🎌 Anime Movies: {movie_count}", file=sys.stderr)
                 else:
+                    # Any other movie library goes to HD movies
                     stats['hd_movies'] += movie_count
-                    print(f"  📽️ {section_title}: {movie_count} HD movies", file=sys.stderr)
+                    print(f"  📽️ Other Movies ({section_title}): {movie_count} → HD Movies", file=sys.stderr)
                 
             elif section_type == 'show':
                 shows = section.all()
@@ -81,18 +87,33 @@ def get_library_stats(server_config):
                     library_episodes += show.leafCount    # Episodes in this show
                 
                 # Add to totals
-                stats['total_shows'] += show_count
                 stats['total_seasons'] += library_seasons
                 stats['total_episodes'] += library_episodes
+                
+                # Map your specific TV libraries
+                if section_title == 'TV Shows':
+                    stats['regular_tv_shows'] = show_count
+                    print(f"  📺 TV Shows: {show_count} shows, {library_seasons} seasons, {library_episodes} episodes", file=sys.stderr)
+                elif section_title == 'Anime TV':
+                    stats['anime_tv_shows'] = show_count
+                    print(f"  🎌 Anime TV: {show_count} shows, {library_seasons} seasons, {library_episodes} episodes", file=sys.stderr)
+                elif section_title == 'Kids Shows':
+                    stats['kids_tv_shows'] = show_count
+                    print(f"  👶 Kids Shows: {show_count} shows, {library_seasons} seasons, {library_episodes} episodes", file=sys.stderr)
+                elif section_title == 'Fitness':
+                    stats['fitness_tv_shows'] = show_count
+                    print(f"  💪 Fitness: {show_count} shows, {library_seasons} seasons, {library_episodes} episodes", file=sys.stderr)
+                else:
+                    # Any other show library goes to regular TV
+                    stats['regular_tv_shows'] += show_count
+                    print(f"  📺 Other Shows ({section_title}): {show_count} → TV Shows", file=sys.stderr)
                 
                 stats['library_breakdown'][section_title] = {
                     'type': 'show',
                     'shows': show_count,
-                    'seasons': library_seasons, 
+                    'seasons': library_seasons,
                     'episodes': library_episodes
                 }
-                
-                print(f"  📺 {section_title}: {show_count} shows, {library_seasons} seasons, {library_episodes} episodes", file=sys.stderr)
                 
             elif section_type == 'artist':
                 artists = section.all()
@@ -100,27 +121,21 @@ def get_library_stats(server_config):
                 stats['audio_artists'] += artist_count
                 
                 library_albums = 0
-                library_tracks = 0
-                
                 for artist in artists:
                     albums = artist.albums()
                     library_albums += len(albums)
-                    for album in albums:
-                        library_tracks += len(album.tracks())
                         
                 stats['audio_albums'] += library_albums
-                stats['audio_tracks'] += library_tracks
                 
                 stats['library_breakdown'][section_title] = {
                     'type': 'artist',
                     'artists': artist_count,
-                    'albums': library_albums,
-                    'tracks': library_tracks
+                    'albums': library_albums
                 }
                 
-                print(f"  🎵 {section_title}: {artist_count} artists, {library_albums} albums, {library_tracks} tracks", file=sys.stderr)
+                print(f"  🎵 {section_title}: {artist_count} artists, {library_albums} albums", file=sys.stderr)
         
-        print(f"✅ {server_config['name']} totals: Movies({stats['hd_movies']}+{stats['anime_movies']}), Shows({stats['total_shows']}/{stats['total_seasons']}/{stats['total_episodes']}), Audio({stats['audio_artists']}/{stats['audio_albums']})", file=sys.stderr)
+        print(f"✅ {server_config['name']} totals: HD({stats['hd_movies']}) + Anime({stats['anime_movies']}) movies, TV({stats['regular_tv_shows']}) + AnimeTV({stats['anime_tv_shows']}) + Kids({stats['kids_tv_shows']}) + Fitness({stats['fitness_tv_shows']}) shows, {stats['total_seasons']} seasons, {stats['total_episodes']} episodes, {stats['audio_albums']} albums", file=sys.stderr)
         
         return {
             'success': True,

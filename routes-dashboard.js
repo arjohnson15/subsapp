@@ -225,107 +225,84 @@ async function getPlexStats() {
   try {
     console.log('📊 Getting Plex content statistics...');
     
-    // Check if we have recent cached data
-    const [lastUpdate] = await db.query(
-      'SELECT setting_value FROM settings WHERE setting_key = ?',
-      ['plex_stats_last_update']
-    );
+    // Check if we have recent cached data from plex_statistics table
+    const [cachedStats] = await db.query(`
+      SELECT stat_key, stat_value, last_updated 
+      FROM plex_statistics 
+      WHERE stat_key IN ('hd_movies', 'anime_movies', 'fourk_movies', 'tv_shows', 'anime_tv_shows', 'tv_seasons', 'tv_episodes', 'audiobooks')
+      ORDER BY last_updated DESC
+    `);
     
-    const [updateInterval] = await db.query(
-      'SELECT setting_value FROM settings WHERE setting_key = ?', 
-      ['plex_stats_update_interval']
-    );
-    
-    const cacheValid = checkCacheValidity(
-      lastUpdate?.[0]?.setting_value, 
-      updateInterval?.[0]?.setting_value || '86400'
-    );
-    
-    if (cacheValid) {
-      console.log('📊 Using cached Plex statistics...');
-      return await getCachedPlexStats();
+    // FIX: Check if cachedStats exists and has data
+    if (!cachedStats || !Array.isArray(cachedStats) || cachedStats.length === 0) {
+      console.log('📊 No cached Plex stats found');
+      return getDefaultPlexStats();
     }
     
-    console.log('📊 Fetching fresh Plex statistics...');
+    // FIX: Check if first element exists before accessing last_updated
+    if (cachedStats[0] && cachedStats[0].last_updated) {
+      const lastUpdate = new Date(cachedStats[0].last_updated);
+      const fourHoursAgo = new Date(Date.now() - (4 * 60 * 60 * 1000));
+      
+      if (lastUpdate < fourHoursAgo) {
+        console.log('📊 Plex cache is stale');
+      }
+    }
     
-    return new Promise((resolve) => {
-      // Execute Python script to get fresh Plex stats
-      const python = spawn('python3', ['plex_statistics.py'], {
-        cwd: __dirname,
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
+    // Build stats from cached data
+    const stats = {
+      hdMovies: 0,
+      animeMovies: 0,
+      fourkMovies: 0,
+      tvShows: 0,
+      animeTVShows: 0,
+      tvSeasons: 0,
+      tvEpisodes: 0,
+      audioBooks: 0,
+      lastUpdate: new Date().toLocaleDateString()
+    };
+    
+    // Process cached entries
+    for (const row of cachedStats) {
+      if (!row || !row.stat_key || row.stat_value === undefined) {
+        continue; // Skip invalid rows
+      }
       
-      let dataString = '';
-      let errorString = '';
-      
-      python.stdout.on('data', (data) => {
-        dataString += data.toString();
-      });
-      
-      python.stderr.on('data', (data) => {
-        errorString += data.toString();
-      });
-      
-      python.on('close', async (code) => {
-        if (code !== 0) {
-          console.error('❌ Python script error:', errorString);
-          resolve(await getCachedPlexStats()); // Fallback to cache
-          return;
-        }
-        
-        if (!dataString.trim()) {
-          console.error('❌ Python script returned empty data');
-          resolve(await getCachedPlexStats()); // Fallback to cache
-          return;
-        }
-        
-        try {
-          const rawStats = JSON.parse(dataString);
-          console.log('📊 Raw Plex stats received from Python');
-          
-          // ONLY use Plex 1 servers (not doubling with Plex 2)
-          const plex1Regular = rawStats.plex1?.regular?.stats || {};
-          const plex1Fourk = rawStats.plex1?.fourk?.stats || {};
-          
-          // Process the specific library counts you want
-          const processedStats = {
-            // Movies breakdown - specific libraries
-            hdMovies: plex1Regular.movies || 0,  // This should be the HD Movies library
-            animeMovies: 0,  // We'll get this from specific library
-            fourkMovies: plex1Fourk.movies || 0,  // 4K movies = 241 as you said
-            
-            // TV Shows - all counts
-            tvShows: plex1Regular.shows || 0,
-            tvSeasons: 0,  // We'll calculate this
-            tvEpisodes: plex1Regular.episodes || 0,
-            
-            // Audio Books - use albums count
-            audioBooks: plex1Regular.albums || 0,  // Albums, not artists
-            
-            lastUpdate: new Date().toLocaleDateString()
-          };
-          
-          // Cache the results in database
-          await cacheStats('plex', processedStats, rawStats);
-          
-          console.log(`✅ Plex stats processed: HD:${processedStats.hdMovies}, 4K:${processedStats.fourkMovies}, Shows:${processedStats.tvShows}, Episodes:${processedStats.tvEpisodes}, Albums:${processedStats.audioBooks}`);
-          resolve(processedStats);
-          
-        } catch (parseError) {
-          console.error('❌ Error parsing Plex stats:', parseError);
-          resolve(await getCachedPlexStats()); // Fallback to cache
-        }
-      });
-      
-      python.on('error', async (err) => {
-        console.error('❌ Failed to spawn Python process:', err);
-        resolve(await getCachedPlexStats()); // Fallback to cache
-      });
-    });
+      switch (row.stat_key) {
+        case 'hd_movies':
+          stats.hdMovies = parseInt(row.stat_value) || 0;
+          break;
+        case 'anime_movies':
+          stats.animeMovies = parseInt(row.stat_value) || 0;
+          break;
+        case 'fourk_movies':
+          stats.fourkMovies = parseInt(row.stat_value) || 0;
+          break;
+        case 'tv_shows':
+          stats.tvShows = parseInt(row.stat_value) || 0;
+          break;
+        case 'anime_tv_shows':
+          stats.animeTVShows = parseInt(row.stat_value) || 0;
+          break;
+        case 'tv_seasons':
+          stats.tvSeasons = parseInt(row.stat_value) || 0;
+          break;
+        case 'tv_episodes':
+          stats.tvEpisodes = parseInt(row.stat_value) || 0;
+          break;
+        case 'audiobooks':
+          stats.audioBooks = parseInt(row.stat_value) || 0;
+          break;
+      }
+    }
+    
+    console.log(`✅ Plex stats from cache: HD:${stats.hdMovies}, Anime:${stats.animeMovies}, 4K:${stats.fourkMovies}, TV:${stats.tvShows}, AnimeTV:${stats.animeTVShows}, Seasons:${stats.tvSeasons}, Episodes:${stats.tvEpisodes}, Audio:${stats.audioBooks}`);
+    
+    return stats;
     
   } catch (error) {
     console.error('❌ Error getting Plex stats:', error);
-    return await getCachedPlexStats(); // Fallback to cache
+    return getDefaultPlexStats();
   }
 }
 

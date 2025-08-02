@@ -625,19 +625,20 @@ async function refreshPlexStats() {
         const plex1Fourk = rawStats.plex1?.fourk?.stats || {};
         
         // Store in database
-        const statsToStore = [
-          ['hd_movies', plex1Regular.hd_movies || 0],
-          ['anime_movies', plex1Regular.anime_movies || 0],
-          ['fourk_movies', plex1Fourk.hd_movies || 0], // 4K movies from 4K server
-          ['tv_shows', plex1Regular.total_shows || 0],
-          ['tv_seasons', plex1Regular.total_seasons || 0],
-          ['tv_episodes', plex1Regular.total_episodes || 0],
-          ['audiobooks', plex1Regular.audio_albums || 0] // Use albums count for audiobooks
-        ];
+const statsToStore = [
+  ['hd_movies', plex1Regular.hd_movies || 0],
+  ['anime_movies', plex1Regular.anime_movies || 0],
+  ['fourk_movies', plex1Fourk.hd_movies || 0], // 4K movies from 4K server
+  ['tv_shows', (plex1Regular.regular_tv_shows || 0) + (plex1Regular.kids_tv_shows || 0) + (plex1Regular.fitness_tv_shows || 0)], // Combine non-anime shows
+  ['anime_tv_shows', plex1Regular.anime_tv_shows || 0], // Separate anime TV
+  ['tv_seasons', plex1Regular.total_seasons || 0],
+  ['tv_episodes', plex1Regular.total_episodes || 0],
+  ['audiobooks', plex1Regular.audio_albums || 0]
+];
         
         // Clear old stats and insert new ones
-        await db.query('DELETE FROM plex_statistics WHERE stat_key IN (?, ?, ?, ?, ?, ?, ?)', 
-          ['hd_movies', 'anime_movies', 'fourk_movies', 'tv_shows', 'tv_seasons', 'tv_episodes', 'audiobooks']);
+await db.query('DELETE FROM plex_statistics WHERE stat_key IN (?, ?, ?, ?, ?, ?, ?, ?)', 
+  ['hd_movies', 'anime_movies', 'fourk_movies', 'tv_shows', 'anime_tv_shows', 'tv_seasons', 'tv_episodes', 'audiobooks']);
         
         for (const [key, value] of statsToStore) {
           await db.query(
@@ -669,11 +670,18 @@ function buildStatsResponse(dbRows) {
     animeMovies: 0,
     fourkMovies: 0,
     tvShows: 0,
+    animeTVShows: 0,  // NEW
     tvSeasons: 0,
     tvEpisodes: 0,
     audioBooks: 0,
     lastUpdate: new Date().toLocaleDateString()
   };
+  
+  // FIX: Handle undefined or non-array dbRows
+  if (!dbRows || !Array.isArray(dbRows)) {
+    console.warn('⚠️ buildStatsResponse received invalid data:', dbRows);
+    return stats;
+  }
   
   for (const row of dbRows) {
     switch (row.stat_key) {
@@ -688,6 +696,9 @@ function buildStatsResponse(dbRows) {
         break;
       case 'tv_shows':
         stats.tvShows = parseInt(row.stat_value);
+        break;
+      case 'anime_tv_shows':  // NEW
+        stats.animeTVShows = parseInt(row.stat_value);
         break;
       case 'tv_seasons':
         stats.tvSeasons = parseInt(row.stat_value);
