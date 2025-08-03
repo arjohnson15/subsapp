@@ -1,4 +1,4 @@
-// Management Tools JavaScript Module
+// Management Tools JavaScript Module - SIMPLIFIED VERSION (NEW TAB ONLY)
 console.log('📋 Loading Management.js...');
 
 window.Management = {
@@ -130,36 +130,54 @@ window.Management = {
     getDefaultTools() {
         return [
             {
-                id: 'xui-panel',
-                name: 'XUI IPTV Panel',
-                url: 'https://example.com/xui',
-                username: 'admin',
-                password: 'password123',
-                notes: 'Main IPTV management panel for user accounts and streaming configuration.'
+                id: 'radarr-main',
+                name: 'Radarr Main',
+                url: 'http://192.168.10.92:9390',
+                username: '',
+                password: '',
+                api_key: '3209f1c4db0d45fa853347db0bf757be',
+                notes: 'Main Radarr instance for movie management.',
+                access_type: 'both'
             },
             {
-                id: 'iptv-editor',
-                name: 'IPTV Editor',
-                url: 'https://example.com/editor',
-                username: 'editor',
-                password: 'edit123',
-                notes: 'Tool for editing and managing IPTV playlists and channel configurations.'
+                id: 'radarr-4k',
+                name: 'Radarr 4K',
+                url: 'http://192.168.10.92:9391',
+                username: '',
+                password: '',
+                api_key: '',
+                notes: '4K Radarr instance (add API key from settings).',
+                access_type: 'both'
             },
             {
-                id: 'implayer',
-                name: 'iMPlayer',
-                url: 'https://example.com/implayer',
-                username: 'player',
-                password: 'player456',
-                notes: 'iMPlayer management for device codes and user streaming settings.'
+                id: 'radarr-anime',
+                name: 'Radarr Anime',
+                url: 'http://192.168.10.92:9392',
+                username: '',
+                password: '',
+                api_key: '',
+                notes: 'Anime Radarr instance (add API key from settings).',
+                access_type: 'both'
             },
             {
-                id: 'roku-panel',
-                name: 'Roku Player Panel',
-                url: 'https://example.com/roku',
-                username: 'roku_admin',
-                password: 'roku789',
-                notes: 'Roku device management and channel configuration panel.'
+                id: 'sonarr-main',
+                name: 'Sonarr Main',
+                url: 'http://192.168.10.92:8989',
+                username: '',
+                password: '',
+                api_key: '',
+                notes: 'Main Sonarr instance for TV shows (add API key from settings).',
+                access_type: 'both'
+            },
+            {
+                id: 'sonarr-anime',
+                name: 'Sonarr Anime',
+                url: 'http://192.168.10.92:8990',
+                username: '',
+                password: '',
+                api_key: '',
+                notes: 'Anime Sonarr instance (add API key from settings).',
+                access_type: 'both'
             }
         ];
     },
@@ -193,160 +211,176 @@ window.Management = {
             return;
         }
         
-        grid.innerHTML = this.tools.map(tool => `
-            <div class="management-tool">
-                <div class="tool-header">
-                    <h3 class="tool-name">${tool.name}</h3>
-                    <div class="tool-actions">
-                        <button class="btn btn-small btn-tool-edit" onclick="Management.editTool('${tool.id}')">Edit</button>
-                        <button class="btn btn-small btn-tool-delete" onclick="Management.deleteTool('${tool.id}')">Delete</button>
+        grid.innerHTML = this.tools.map(tool => {
+            return `
+                <div class="management-tool">
+                    <div class="tool-header">
+                        <h3 class="tool-name">${tool.name}</h3>
+                        <div class="tool-actions">
+                            <button class="btn btn-small btn-tool-edit" onclick="Management.editTool('${tool.id}')">Edit</button>
+                            <button class="btn btn-small btn-tool-delete" onclick="Management.deleteTool('${tool.id}')">Delete</button>
+                        </div>
                     </div>
+                    
+                    <div class="tool-access-buttons">
+                        <button class="tool-button tool-button-newtab" onclick="Management.openInNewTab('${tool.id}')" style="width: 100%;">
+                            ↗️ Open ${tool.name}
+                        </button>
+                    </div>
+                    
+                    <div class="tool-credentials">
+                        <div class="credential-row">
+                            <span class="credential-label">URL:</span>
+                            <span class="credential-value url-value" onclick="Management.copyToClipboard('${tool.url}')" title="Click to copy">
+                                ${tool.url}
+                            </span>
+                        </div>
+                        ${tool.api_key ? `
+                        <div class="credential-row">
+                            <span class="credential-label">API Key:</span>
+                            <span class="credential-value" onclick="Management.copyToClipboard('${tool.api_key}')" title="Click to copy">
+                                ${tool.api_key.substring(0, 8)}...${tool.api_key.substring(tool.api_key.length - 4)}
+                            </span>
+                        </div>
+                        ` : ''}
+                        ${tool.username ? `
+                        <div class="credential-row">
+                            <span class="credential-label">Username:</span>
+                            <span class="credential-value" onclick="Management.copyToClipboard('${tool.username}')" title="Click to copy">
+                                ${tool.username}
+                            </span>
+                        </div>
+                        ` : ''}
+                        ${tool.password ? `
+                        <div class="credential-row">
+                            <span class="credential-label">Password:</span>
+                            <span class="credential-value" onclick="Management.copyToClipboard('${tool.password}')" title="Click to copy">
+                                ••••••••
+                            </span>
+                        </div>
+                        ` : ''}
+                        <div class="credential-row">
+                            <span class="credential-label">Status:</span>
+                            <button class="btn btn-small" onclick="Management.testTool('${tool.id}')" style="padding: 4px 8px; font-size: 11px;">
+                                🧪 Test Connection
+                            </button>
+                        </div>
+                    </div>
+                    
+                    ${tool.notes ? `
+                        <div class="tool-notes">
+                            <strong>Notes:</strong>
+                            <p>${tool.notes}</p>
+                        </div>
+                    ` : ''}
                 </div>
-                
-                <a href="${tool.url}" target="_blank" class="tool-button">
-                    Open ${tool.name}
-                </a>
-                
-                <div class="tool-credentials">
-                    <div class="credential-row">
-                        <span class="credential-label">Username:</span>
-                        <span class="credential-value" onclick="Management.copyToClipboard('${tool.username}')" title="Click to copy">
-                            ${tool.username || 'Not set'}
-                        </span>
-                    </div>
-                    <div class="credential-row">
-                        <span class="credential-label">Password:</span>
-                        <span class="credential-value" onclick="Management.copyToClipboard('${tool.password}')" title="Click to copy">
-                            ${tool.password ? '••••••••' : 'Not set'}
-                        </span>
-                    </div>
-                </div>
-                
-                ${tool.notes ? `
-                    <div class="tool-notes">
-                        <strong>Notes:</strong><br>
-                        ${tool.notes}
-                    </div>
-                ` : ''}
-            </div>
-        `).join('');
+            `;
+        }).join('');
     },
     
-    showAddForm() {
-        this.editingToolId = null;
-        this.resetForm();
-        
-        const titleElement = document.getElementById('toolFormTitle');
-        const containerElement = document.getElementById('toolFormContainer');
-        
-        if (titleElement) titleElement.textContent = 'Add New Tool';
-        if (containerElement) {
-            containerElement.style.display = 'block';
-            containerElement.scrollIntoView({ behavior: 'smooth' });
-        }
-    },
-    
-    hideForm() {
-        const containerElement = document.getElementById('toolFormContainer');
-        if (containerElement) {
-            containerElement.style.display = 'none';
-        }
-        this.resetForm();
-        this.editingToolId = null;
-    },
-    
-    resetForm() {
-        const form = document.getElementById('toolForm');
-        if (form) {
-            form.reset();
-        }
-    },
-    
-    editTool(toolId) {
+    openInNewTab(toolId) {
         const tool = this.tools.find(t => t.id === toolId);
         if (!tool) {
             Utils.showNotification('Tool not found', 'error');
             return;
         }
         
+        console.log(`↗️ Opening ${tool.name} in new tab: ${tool.url}`);
+        window.open(tool.url, '_blank');
+        Utils.showNotification(`Opening ${tool.name} in new tab`, 'info');
+    },
+    
+    showAddForm() {
+        this.editingToolId = null;
+        document.getElementById('toolFormTitle').textContent = 'Add New Tool';
+        document.getElementById('toolForm').reset();
+        document.getElementById('toolFormContainer').style.display = 'block';
+        
+        // Set default access type to new_tab for now
+        document.getElementById('toolAccessType').value = 'new_tab';
+        
+        // Scroll to form
+        document.getElementById('toolFormContainer').scrollIntoView({ behavior: 'smooth' });
+        
+        // Focus on name field
+        setTimeout(() => {
+            document.getElementById('toolName').focus();
+        }, 100);
+    },
+    
+    hideForm() {
+        document.getElementById('toolFormContainer').style.display = 'none';
+        this.editingToolId = null;
+    },
+    
+    editTool(toolId) {
+        const tool = this.tools.find(t => t.id === toolId);
+        if (!tool) return;
+        
         this.editingToolId = toolId;
+        document.getElementById('toolFormTitle').textContent = 'Edit Tool';
         
         // Populate form
-        const fields = {
-            'toolName': tool.name,
-            'toolUrl': tool.url,
-            'toolUsername': tool.username || '',
-            'toolPassword': tool.password || '',
-            'toolNotes': tool.notes || ''
-        };
+        document.getElementById('toolName').value = tool.name;
+        document.getElementById('toolUrl').value = tool.url;
+        document.getElementById('toolUsername').value = tool.username || '';
+        document.getElementById('toolPassword').value = tool.password || '';
+        document.getElementById('toolApiKey').value = tool.api_key || '';
+        document.getElementById('toolNotes').value = tool.notes || '';
+        document.getElementById('toolAccessType').value = tool.access_type || 'new_tab';
         
-        Object.keys(fields).forEach(fieldId => {
-            const element = document.getElementById(fieldId);
-            if (element) {
-                element.value = fields[fieldId];
-            }
-        });
+        document.getElementById('toolFormContainer').style.display = 'block';
         
-        // Show form
-        const titleElement = document.getElementById('toolFormTitle');
-        const containerElement = document.getElementById('toolFormContainer');
-        
-        if (titleElement) titleElement.textContent = 'Edit Tool';
-        if (containerElement) {
-            containerElement.style.display = 'block';
-            containerElement.scrollIntoView({ behavior: 'smooth' });
-        }
+        // Scroll to form
+        document.getElementById('toolFormContainer').scrollIntoView({ behavior: 'smooth' });
     },
     
     async saveTool(event) {
         event.preventDefault();
         
+        const formData = new FormData(event.target);
+        const toolData = {
+            name: formData.get('name'),
+            url: formData.get('url'),
+            username: formData.get('username'),
+            password: formData.get('password'),
+            api_key: formData.get('api_key'),
+            notes: formData.get('notes'),
+            access_type: formData.get('access_type') || 'new_tab'
+        };
+        
+        // Validate required fields
+        if (!toolData.name || !toolData.url) {
+            Utils.showNotification('Name and URL are required', 'error');
+            return;
+        }
+        
         try {
-            const formData = Utils.collectFormData('toolForm');
-            
-            // Validate required fields
-            if (!formData.name || !formData.url) {
-                Utils.showNotification('Name and URL are required', 'error');
-                return;
-            }
-            
             if (this.editingToolId) {
                 // Update existing tool
                 const toolIndex = this.tools.findIndex(t => t.id === this.editingToolId);
                 if (toolIndex !== -1) {
-                    this.tools[toolIndex] = {
-                        ...this.tools[toolIndex],
-                        name: formData.name,
-                        url: formData.url,
-                        username: formData.username || '',
-                        password: formData.password || '',
-                        notes: formData.notes || ''
-                    };
+                    this.tools[toolIndex] = { ...this.tools[toolIndex], ...toolData };
+                    console.log(`✏️ Updated tool: ${toolData.name}`);
+                    Utils.showNotification(`Updated ${toolData.name}`, 'success');
                 }
-                Utils.showNotification('Tool updated successfully', 'success');
             } else {
-                // Create new tool
+                // Add new tool
                 const newTool = {
-                    id: `tool-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    name: formData.name,
-                    url: formData.url,
-                    username: formData.username || '',
-                    password: formData.password || '',
-                    notes: formData.notes || ''
+                    id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                    ...toolData
                 };
-                
                 this.tools.push(newTool);
-                Utils.showNotification('Tool created successfully', 'success');
+                console.log(`➕ Added new tool: ${toolData.name}`);
+                Utils.showNotification(`Added ${toolData.name}`, 'success');
             }
             
-            // Save to database
             await this.saveTools();
-            
-            // Re-render and hide form
             this.renderTools();
             this.hideForm();
             
         } catch (error) {
+            console.error('❌ Error saving tool:', error);
             Utils.handleError(error, 'Saving tool');
         }
     },
@@ -355,45 +389,73 @@ window.Management = {
         const tool = this.tools.find(t => t.id === toolId);
         if (!tool) return;
         
-        if (!confirm(`Are you sure you want to delete "${tool.name}"?`)) return;
-        
-        try {
-            // Remove from array
-            this.tools = this.tools.filter(t => t.id !== toolId);
-            
-            // Save to database
-            await this.saveTools();
-            
-            // Re-render
-            this.renderTools();
-            
-            Utils.showNotification(`"${tool.name}" deleted successfully`, 'success');
-        } catch (error) {
-            Utils.handleError(error, 'Deleting tool');
+        if (confirm(`Are you sure you want to delete "${tool.name}"? This action cannot be undone.`)) {
+            try {
+                this.tools = this.tools.filter(t => t.id !== toolId);
+                await this.saveTools();
+                this.renderTools();
+                
+                console.log(`🗑️ Deleted tool: ${tool.name}`);
+                Utils.showNotification(`Deleted ${tool.name}`, 'success');
+            } catch (error) {
+                console.error('❌ Error deleting tool:', error);
+                Utils.handleError(error, 'Deleting tool');
+            }
         }
     },
     
-    async copyToClipboard(text) {
-        if (!text || text === 'Not set') {
-            Utils.showNotification('No value to copy', 'warning');
+    copyToClipboard(text) {
+        if (!text) return;
+        
+        navigator.clipboard.writeText(text).then(() => {
+            Utils.showNotification('Copied to clipboard', 'success');
+        }).catch(err => {
+            console.error('Failed to copy to clipboard:', err);
+            Utils.showNotification('Failed to copy to clipboard', 'error');
+        });
+    },
+    
+    // Test tool connectivity
+    async testTool(toolId) {
+        const tool = this.tools.find(t => t.id === toolId);
+        if (!tool) {
+            Utils.showNotification('Tool not found', 'error');
             return;
         }
         
         try {
-            await navigator.clipboard.writeText(text);
-            Utils.showNotification('Copied to clipboard', 'success');
-        } catch (error) {
-            // Fallback for older browsers
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
+            console.log(`🧪 Testing connectivity for ${tool.name}...`);
+            Utils.showNotification(`Testing ${tool.name} connectivity...`, 'info');
             
-            Utils.showNotification('Copied to clipboard', 'success');
+            const response = await fetch(`/api/management/tools/${toolId}/test`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const result = await response.json();
+            
+            if (result.success && result.accessible) {
+                Utils.showNotification(`✅ ${tool.name} is accessible (${result.responseTime})`, 'success');
+                console.log(`✅ Test result for ${tool.name}:`, result);
+            } else {
+                Utils.showNotification(`❌ ${tool.name} is not accessible: ${result.error || 'Unknown error'}`, 'error');
+                console.error(`❌ Test failed for ${tool.name}:`, result);
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error testing ${tool.name}:`, error);
+            Utils.showNotification(`❌ Failed to test ${tool.name}: ${error.message}`, 'error');
         }
     }
 };
 
-console.log('✅ Management.js loaded successfully');
+// Initialize when page loads
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('📋 Management module ready for initialization');
+    });
+} else {
+    console.log('📋 Management module loaded');
+}

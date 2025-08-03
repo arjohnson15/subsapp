@@ -23,6 +23,7 @@ const emailService = require('./email-service');
 const iptvRoutes = require('./routes-iptv');
 const iptvEditorRoutes = require('./routes-iptv-editor');
 const iptvEditorService = require('./iptv-editor-service');
+const managementRoutes = require('./routes-management'); // ADDED - Management tools
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -73,6 +74,7 @@ app.use('/api/email-schedules', emailScheduleRoutes);
 app.use('/api/iptv', iptvRoutes);
 app.use('/api/iptv-editor', iptvEditorRoutes); 
 app.use('/api/dashboard', require('./routes-dashboard'));
+app.use('/api/management', managementRoutes); // ADDED - Management tools API
 
 
 // ===== GUIDE ROUTES =====
