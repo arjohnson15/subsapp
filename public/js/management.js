@@ -1,15 +1,12 @@
-// Management Tools JavaScript Module - SIMPLIFIED VERSION (NEW TAB ONLY)
-console.log('📋 Loading Management.js...');
-
-window.Management = {
-    isAuthenticated: false,
-    editingToolId: null,
+const Management = {
+    authenticated: false,
     tools: [],
+    editingToolId: null,
     
     async init() {
-        console.log('🔧 Initializing Management module...');
+        console.log('🔧 Initializing Management Panel...');
         
-        // Check if user should be authenticated (based on session storage)
+        // Check if user is already authenticated (session storage)
         const authToken = sessionStorage.getItem('managementAuth');
         const authTime = sessionStorage.getItem('managementAuthTime');
         
@@ -17,96 +14,128 @@ window.Management = {
         if (authToken && authTime) {
             const fourHoursAgo = Date.now() - (4 * 60 * 60 * 1000);
             if (parseInt(authTime) > fourHoursAgo && authToken === 'authenticated') {
-                this.isAuthenticated = true;
+                this.authenticated = true;
                 console.log('✅ User already authenticated via session');
             }
         }
         
-        if (!this.isAuthenticated) {
+        if (!this.authenticated) {
             this.showPasswordModal();
             return;
         }
         
-        await this.loadTools();
-        this.renderTools();
-        console.log('✅ Management module initialized');
+        try {
+            await this.loadTools();
+            this.renderTools();
+            console.log('✅ Management Panel initialized');
+        } catch (error) {
+            console.error('❌ Management initialization failed:', error);
+            Utils.handleError(error, 'Management initialization');
+        }
     },
     
     showPasswordModal() {
         const modal = document.getElementById('managementPasswordModal');
         if (modal) {
-            modal.classList.add('active');
+            modal.style.display = 'flex';
             
-            // Focus on password input
+            // Focus on password field
             setTimeout(() => {
-                const passwordInput = document.getElementById('managementPassword');
-                if (passwordInput) {
-                    passwordInput.focus();
+                const passwordField = document.getElementById('managementPassword');
+                if (passwordField) {
+                    passwordField.focus();
                     
-                    // Allow Enter key to submit
-                    passwordInput.addEventListener('keypress', (e) => {
-                        if (e.key === 'Enter') {
-                            this.verifyPassword();
-                        }
-                    });
+                    // Handle Enter key - remove any existing listeners first
+                    passwordField.removeEventListener('keypress', this.handlePasswordKeypress);
+                    passwordField.addEventListener('keypress', this.handlePasswordKeypress.bind(this));
                 }
             }, 100);
         }
     },
     
-    async verifyPassword() {
+    handlePasswordKeypress(e) {
+        if (e.key === 'Enter') {
+            this.verifyPassword();
+        }
+    },
+    
+    verifyPassword() {
         const passwordInput = document.getElementById('managementPassword');
         const errorDiv = document.getElementById('passwordError');
         
-        if (!passwordInput) return;
+        if (!passwordInput) {
+            console.error('Password input not found');
+            return;
+        }
         
-        const enteredPassword = passwordInput.value;
+        const enteredPassword = passwordInput.value.trim();
         
+        if (!enteredPassword) {
+            if (errorDiv) {
+                errorDiv.textContent = 'Please enter a password';
+                errorDiv.style.display = 'block';
+            }
+            return;
+        }
+        
+        console.log('🔐 Verifying password...');
+        
+        // CLIENT-SIDE PASSWORD CHECK - NO API CALL
         if (enteredPassword === 'Gunshy@1') {
             // Correct password
-            this.isAuthenticated = true;
+            console.log('✅ Password correct, granting access');
+            this.authenticated = true;
             
-            // Store authentication in session
+            // Store authentication in session (expires in 4 hours)
             sessionStorage.setItem('managementAuth', 'authenticated');
             sessionStorage.setItem('managementAuthTime', Date.now().toString());
             
-            // Hide modal
-            document.getElementById('managementPasswordModal').classList.remove('active');
+            // Hide modal and clear error
+            const modal = document.getElementById('managementPasswordModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+            if (errorDiv) {
+                errorDiv.style.display = 'none';
+            }
             
-            // Load management tools
-            await this.loadTools();
-            this.renderTools();
+            // Load and render management tools
+            this.loadAndRenderTools();
             
             Utils.showNotification('Management access granted', 'success');
         } else {
             // Wrong password
+            console.log('❌ Incorrect password entered');
             if (errorDiv) {
+                errorDiv.textContent = 'Incorrect password. Please try again.';
                 errorDiv.style.display = 'block';
+                
+                // Hide error after 3 seconds
                 setTimeout(() => {
                     errorDiv.style.display = 'none';
                 }, 3000);
             }
+            
+            // Clear input and refocus
             passwordInput.value = '';
             passwordInput.focus();
         }
     },
     
-    logout() {
-        if (confirm('Are you sure you want to logout from the management panel?')) {
-            this.isAuthenticated = false;
-            sessionStorage.removeItem('managementAuth');
-            sessionStorage.removeItem('managementAuthTime');
-            
-            Utils.showNotification('Logged out of management panel', 'info');
-            showPage('dashboard');
+    async loadAndRenderTools() {
+        try {
+            await this.loadTools();
+            this.renderTools();
+        } catch (error) {
+            console.error('❌ Error loading tools:', error);
+            Utils.handleError(error, 'Loading management tools');
         }
     },
     
     async loadTools() {
         try {
-            console.log('📊 Loading management tools...');
+            console.log('📥 Loading management tools...');
             
-            // Get tools from settings
             const settings = await API.Settings.getAll();
             const toolsData = settings.management_tools;
             
@@ -118,11 +147,9 @@ window.Management = {
                 await this.saveTools();
             }
             
-            console.log('📊 Management tools loaded:', this.tools.length);
+            console.log(`📋 Loaded ${this.tools.length} management tools`);
         } catch (error) {
             console.error('❌ Error loading management tools:', error);
-            
-            // Use default tools on error
             this.tools = this.getDefaultTools();
         }
     },
@@ -130,43 +157,23 @@ window.Management = {
     getDefaultTools() {
         return [
             {
-                id: 'radarr-main',
-                name: 'Radarr Main',
-                url: 'http://192.168.10.92:9390',
-                username: '',
-                password: '',
-                api_key: '3209f1c4db0d45fa853347db0bf757be',
-                notes: 'Main Radarr instance for movie management.',
-                access_type: 'both'
-            },
-            {
-                id: 'radarr-4k',
-                name: 'Radarr 4K',
-                url: 'http://192.168.10.92:9391',
+                id: 'radarr',
+                name: 'Radarr',
+                url: 'http://192.168.10.92:7878',
                 username: '',
                 password: '',
                 api_key: '',
-                notes: '4K Radarr instance (add API key from settings).',
+                notes: 'Movies downloader and manager (add API key from settings).',
                 access_type: 'both'
             },
             {
-                id: 'radarr-anime',
-                name: 'Radarr Anime',
-                url: 'http://192.168.10.92:9392',
-                username: '',
-                password: '',
-                api_key: '',
-                notes: 'Anime Radarr instance (add API key from settings).',
-                access_type: 'both'
-            },
-            {
-                id: 'sonarr-main',
-                name: 'Sonarr Main',
+                id: 'sonarr',
+                name: 'Sonarr',
                 url: 'http://192.168.10.92:8989',
                 username: '',
                 password: '',
                 api_key: '',
-                notes: 'Main Sonarr instance for TV shows (add API key from settings).',
+                notes: 'TV Shows downloader and manager (add API key from settings).',
                 access_type: 'both'
             },
             {
@@ -199,7 +206,10 @@ window.Management = {
     
     renderTools() {
         const grid = document.getElementById('managementToolsGrid');
-        if (!grid) return;
+        if (!grid) {
+            console.error('Management tools grid not found');
+            return;
+        }
         
         if (this.tools.length === 0) {
             grid.innerHTML = `
@@ -212,22 +222,47 @@ window.Management = {
         }
         
         grid.innerHTML = this.tools.map(tool => {
+            // Generate access buttons based on access_type
+            let accessButtons = '';
+            const accessType = tool.access_type || 'new_tab';
+            
+            if (accessType === 'iframe' || accessType === 'both') {
+                accessButtons += `
+                    <button class="tool-button tool-button-iframe" onclick="Management.openInIframe('${tool.id}')" title="Open in embedded iframe">
+                        📺 Open in App
+                    </button>
+                `;
+            }
+            
+            if (accessType === 'new_tab' || accessType === 'both') {
+                accessButtons += `
+                    <button class="tool-button tool-button-newtab" onclick="Management.openInNewTab('${tool.id}')" title="Open in new browser tab">
+                        ↗️ Open in New Tab
+                    </button>
+                `;
+            }
+            
             return `
-                <div class="management-tool">
+                <div class="management-tool" data-tool-id="${tool.id}">
                     <div class="tool-header">
                         <h3 class="tool-name">${tool.name}</h3>
                         <div class="tool-actions">
-                            <button class="btn btn-small btn-tool-edit" onclick="Management.editTool('${tool.id}')">Edit</button>
-                            <button class="btn btn-small btn-tool-delete" onclick="Management.deleteTool('${tool.id}')">Delete</button>
+                            <button class="btn btn-small btn-tool-edit" onclick="Management.editTool('${tool.id}')" title="Edit tool settings">Edit</button>
+                            <button class="btn btn-small btn-tool-delete" onclick="Management.deleteTool('${tool.id}')" title="Delete this tool">Delete</button>
                         </div>
                     </div>
                     
                     <div class="tool-access-buttons">
-                        <button class="tool-button tool-button-newtab" onclick="Management.openInNewTab('${tool.id}')" style="width: 100%;">
-                            ↗️ Open ${tool.name}
-                        </button>
+                        ${accessButtons}
                     </div>
                     
+                    <!-- Collapsible Credentials Toggle -->
+                    <div class="credentials-toggle" onclick="Management.toggleCredentials('${tool.id}')">
+                        <span class="credentials-toggle-text">Show Details</span>
+                        <span class="credentials-toggle-icon">▼</span>
+                    </div>
+                    
+                    <!-- Collapsible Credentials Section -->
                     <div class="tool-credentials">
                         <div class="credential-row">
                             <span class="credential-label">URL:</span>
@@ -236,46 +271,50 @@ window.Management = {
                             </span>
                         </div>
                         ${tool.api_key ? `
-                        <div class="credential-row">
-                            <span class="credential-label">API Key:</span>
-                            <span class="credential-value" onclick="Management.copyToClipboard('${tool.api_key}')" title="Click to copy">
-                                ${tool.api_key.substring(0, 8)}...${tool.api_key.substring(tool.api_key.length - 4)}
-                            </span>
-                        </div>
+                            <div class="credential-row">
+                                <span class="credential-label">API Key:</span>
+                                <span class="credential-value" onclick="Management.copyToClipboard('${tool.api_key}')" title="Click to copy">
+                                    ${tool.api_key.substring(0, 8)}...${tool.api_key.substring(tool.api_key.length - 4)}
+                                </span>
+                            </div>
                         ` : ''}
                         ${tool.username ? `
-                        <div class="credential-row">
-                            <span class="credential-label">Username:</span>
-                            <span class="credential-value" onclick="Management.copyToClipboard('${tool.username}')" title="Click to copy">
-                                ${tool.username}
-                            </span>
-                        </div>
+                            <div class="credential-row">
+                                <span class="credential-label">Username:</span>
+                                <span class="credential-value" onclick="Management.copyToClipboard('${tool.username}')" title="Click to copy">
+                                    ${tool.username}
+                                </span>
+                            </div>
                         ` : ''}
                         ${tool.password ? `
-                        <div class="credential-row">
-                            <span class="credential-label">Password:</span>
-                            <span class="credential-value" onclick="Management.copyToClipboard('${tool.password}')" title="Click to copy">
-                                ••••••••
-                            </span>
-                        </div>
+                            <div class="credential-row">
+                                <span class="credential-label">Password:</span>
+                                <span class="credential-value" onclick="Management.copyToClipboard('${tool.password}')" title="Click to copy">
+                                    ••••••••
+                                </span>
+                            </div>
                         ` : ''}
                         <div class="credential-row">
-                            <span class="credential-label">Status:</span>
-                            <button class="btn btn-small" onclick="Management.testTool('${tool.id}')" style="padding: 4px 8px; font-size: 11px;">
-                                🧪 Test Connection
-                            </button>
+                            <span class="credential-label">Access:</span>
+                            <span class="credential-value access-type-${accessType}">
+                                ${accessType === 'both' ? '📺↗️ Both Methods' : 
+                                  accessType === 'iframe' ? '📺 iframe Only' : 
+                                  '↗️ New Tab Only'}
+                            </span>
                         </div>
+                        
+                        ${tool.notes ? `
+                            <div class="tool-notes">
+                                <strong>Notes:</strong>
+                                <p>${tool.notes}</p>
+                            </div>
+                        ` : ''}
                     </div>
-                    
-                    ${tool.notes ? `
-                        <div class="tool-notes">
-                            <strong>Notes:</strong>
-                            <p>${tool.notes}</p>
-                        </div>
-                    ` : ''}
                 </div>
             `;
         }).join('');
+        
+        console.log(`✅ Rendered ${this.tools.length} management tools`);
     },
     
     openInNewTab(toolId) {
@@ -290,14 +329,129 @@ window.Management = {
         Utils.showNotification(`Opening ${tool.name} in new tab`, 'info');
     },
     
+    openInIframe(toolId) {
+        const tool = this.tools.find(t => t.id === toolId);
+        if (!tool) {
+            Utils.showNotification('Tool not found', 'error');
+            return;
+        }
+        
+        // Check if tool supports iframe access
+        if (tool.access_type !== 'iframe' && tool.access_type !== 'both') {
+            Utils.showNotification('This tool only supports opening in new tab', 'warning');
+            this.openInNewTab(toolId);
+            return;
+        }
+        
+        console.log(`📺 Opening ${tool.name} in iframe: ${tool.url}`);
+        this.showIframeModal(tool);
+    },
+    
+    showIframeModal(tool) {
+        // Create modal if it doesn't exist
+        let modal = document.getElementById('iframeModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'iframeModal';
+            modal.className = 'modal iframe-modal';
+            document.body.appendChild(modal);
+        }
+        
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="iframe-header">
+                    <h3>${tool.name}</h3>
+                    <div class="iframe-controls">
+                        <button class="btn btn-small" onclick="Management.refreshIframe()" title="Refresh">
+                            🔄 Refresh
+                        </button>
+                        <button class="btn btn-small" onclick="Management.openInNewTab('${tool.id}')" title="Open in new tab">
+                            ↗️ New Tab
+                        </button>
+                        <button class="btn btn-small btn-secondary" onclick="Management.closeIframeModal()" title="Close">
+                            ✕ Close
+                        </button>
+                    </div>
+                </div>
+                <div class="iframe-container">
+                    <div class="iframe-loader" id="iframeLoader">
+                        <div class="loader-content">
+                            <div class="spinner"></div>
+                            <p>Loading ${tool.name}...</p>
+                            <small>This may take a few moments</small>
+                        </div>
+                    </div>
+                    <iframe id="toolIframe" src="/api/management/tools/${tool.id}/proxy" style="display: none;"></iframe>
+                </div>
+            </div>
+        `;
+        
+        modal.style.display = 'flex';
+        
+        // Handle iframe load
+        const iframe = document.getElementById('toolIframe');
+        const loader = document.getElementById('iframeLoader');
+        
+        iframe.onload = () => {
+            loader.style.display = 'none';
+            iframe.style.display = 'block';
+            console.log(`✅ ${tool.name} loaded in iframe`);
+        };
+        
+        iframe.onerror = () => {
+            loader.innerHTML = `
+                <div class="loader-content">
+                    <p style="color: #f44336;">Failed to load ${tool.name}</p>
+                    <small>This service may not support iframe embedding</small>
+                    <div style="margin-top: 15px;">
+                        <button class="btn" onclick="Management.openInNewTab('${tool.id}')">
+                            Open in New Tab Instead
+                        </button>
+                    </div>
+                </div>
+            `;
+        };
+        
+        // Add escape key handler
+        document.addEventListener('keydown', this.handleIframeKeydown);
+        
+        Utils.showNotification(`Opening ${tool.name} in iframe`, 'info');
+    },
+    
+    refreshIframe() {
+        const iframe = document.getElementById('toolIframe');
+        if (iframe) {
+            const loader = document.getElementById('iframeLoader');
+            if (loader) {
+                loader.style.display = 'flex';
+                iframe.style.display = 'none';
+            }
+            iframe.src = iframe.src; // Refresh iframe
+        }
+    },
+    
+    closeIframeModal() {
+        const modal = document.getElementById('iframeModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        document.removeEventListener('keydown', this.handleIframeKeydown);
+    },
+    
+    handleIframeKeydown(event) {
+        if (event.key === 'Escape') {
+            Management.closeIframeModal();
+        }
+    },
+    
     showAddForm() {
         this.editingToolId = null;
         document.getElementById('toolFormTitle').textContent = 'Add New Tool';
         document.getElementById('toolForm').reset();
         document.getElementById('toolFormContainer').style.display = 'block';
         
-        // Set default access type to new_tab for now
-        document.getElementById('toolAccessType').value = 'new_tab';
+        // Set default access type to both
+        document.getElementById('toolAccessType').value = 'both';
         
         // Scroll to form
         document.getElementById('toolFormContainer').scrollIntoView({ behavior: 'smooth' });
@@ -327,7 +481,7 @@ window.Management = {
         document.getElementById('toolPassword').value = tool.password || '';
         document.getElementById('toolApiKey').value = tool.api_key || '';
         document.getElementById('toolNotes').value = tool.notes || '';
-        document.getElementById('toolAccessType').value = tool.access_type || 'new_tab';
+        document.getElementById('toolAccessType').value = tool.access_type || 'both';
         
         document.getElementById('toolFormContainer').style.display = 'block';
         
@@ -346,7 +500,7 @@ window.Management = {
             password: formData.get('password'),
             api_key: formData.get('api_key'),
             notes: formData.get('notes'),
-            access_type: formData.get('access_type') || 'new_tab'
+            access_type: formData.get('access_type') || 'both'
         };
         
         // Validate required fields
@@ -389,7 +543,7 @@ window.Management = {
         const tool = this.tools.find(t => t.id === toolId);
         if (!tool) return;
         
-        if (confirm(`Are you sure you want to delete "${tool.name}"? This action cannot be undone.`)) {
+        if (confirm(`Are you sure you want to delete "${tool.name}"?\n\nThis action cannot be undone.`)) {
             try {
                 this.tools = this.tools.filter(t => t.id !== toolId);
                 await this.saveTools();
@@ -415,41 +569,58 @@ window.Management = {
         });
     },
     
-    // Test tool connectivity
-    async testTool(toolId) {
-        const tool = this.tools.find(t => t.id === toolId);
-        if (!tool) {
-            Utils.showNotification('Tool not found', 'error');
+    toggleCredentials(toolId) {
+        const toggle = document.querySelector(`[data-tool-id="${toolId}"] .credentials-toggle`);
+        const credentials = document.querySelector(`[data-tool-id="${toolId}"] .tool-credentials`);
+        
+        if (!toggle || !credentials) {
+            console.error('Toggle or credentials element not found for tool:', toolId);
             return;
         }
         
-        try {
-            console.log(`🧪 Testing connectivity for ${tool.name}...`);
-            Utils.showNotification(`Testing ${tool.name} connectivity...`, 'info');
+        const isExpanded = toggle.classList.contains('expanded');
+        
+        if (isExpanded) {
+            // Collapse
+            toggle.classList.remove('expanded');
+            credentials.classList.remove('expanded');
+        } else {
+            // Expand
+            toggle.classList.add('expanded');
+            credentials.classList.add('expanded');
+        }
+    },
+    
+    logout() {
+        if (confirm('Are you sure you want to logout of the management panel?')) {
+            this.authenticated = false;
+            this.tools = [];
             
-            const response = await fetch(`/api/management/tools/${toolId}/test`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
+            // Clear session storage
+            sessionStorage.removeItem('managementAuth');
+            sessionStorage.removeItem('managementAuthTime');
             
-            const result = await response.json();
-            
-            if (result.success && result.accessible) {
-                Utils.showNotification(`✅ ${tool.name} is accessible (${result.responseTime})`, 'success');
-                console.log(`✅ Test result for ${tool.name}:`, result);
-            } else {
-                Utils.showNotification(`❌ ${tool.name} is not accessible: ${result.error || 'Unknown error'}`, 'error');
-                console.error(`❌ Test failed for ${tool.name}:`, result);
+            // Clear the grid
+            const grid = document.getElementById('managementToolsGrid');
+            if (grid) {
+                grid.innerHTML = `
+                    <div class="card" style="text-align: center; color: #4fc3f7;">
+                        <h3>Management Panel Locked</h3>
+                        <p>Please authenticate to access management tools.</p>
+                    </div>
+                `;
             }
             
-        } catch (error) {
-            console.error(`❌ Error testing ${tool.name}:`, error);
-            Utils.showNotification(`❌ Failed to test ${tool.name}: ${error.message}`, 'error');
+            // Show password modal
+            this.showPasswordModal();
+            
+            Utils.showNotification('Logged out of management panel', 'info');
         }
     }
 };
+
+// Expose Management to window for app.js to access
+window.Management = Management;
 
 // Initialize when page loads
 if (document.readyState === 'loading') {

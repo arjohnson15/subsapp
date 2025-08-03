@@ -1,7 +1,24 @@
-// routes-management.js - SIMPLE WORKING PROXY VERSION
+// routes-management.js - WORKING VERSION WITH MANUAL PATH PARSING
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
+
+// Debug middleware
+router.use((req, res, next) => {
+  console.log(`🔍 Management Route: ${req.method} ${req.originalUrl}`);
+  next();
+});
+
+// Test route
+router.get('/test', (req, res) => {
+  res.json({ 
+    message: 'Management routes working!', 
+    method: req.method,
+    path: req.path,
+    originalUrl: req.originalUrl,
+    params: req.params
+  });
+});
 
 // Get all management tools
 router.get('/tools', async (req, res) => {
@@ -49,17 +66,41 @@ router.post('/tools', async (req, res) => {
   }
 });
 
-// Simple proxy that handles all requests manually
-router.all('/proxy/:toolId/*', async (req, res) => {
+// PROXY HANDLER - Catch everything that starts with /tools/*/proxy
+router.all('*', async (req, res, next) => {
+  // Check if this is a proxy request by examining the URL
+  const urlPath = req.originalUrl.replace('/api/management', '');
+  const proxyMatch = urlPath.match(/^\/tools\/([^\/]+)\/proxy(.*)$/);
+  
+  if (!proxyMatch) {
+    // Not a proxy request, continue to next handler
+    return next();
+  }
+  
   try {
-    const { toolId } = req.params;
-    const proxyPath = req.params[0] || '';
+    const toolId = proxyMatch[1];
+    const subPath = proxyMatch[2] || '';
+    const queryString = req.originalUrl.includes('?') ? req.originalUrl.split('?')[1] : '';
+    
+    console.log(`🔗 PROXY REQUEST DETECTED:`);
+    console.log(`   Full URL: ${req.originalUrl}`);
+    console.log(`   URL Path: ${urlPath}`);
+    console.log(`   Tool ID: ${toolId}`);
+    console.log(`   Sub Path: "${subPath}"`);
+    console.log(`   Query String: "${queryString}"`);
+    console.log(`   Method: ${req.method}`);
+    
+    if (!toolId) {
+      console.error('❌ No toolId extracted from URL');
+      return res.status(400).json({ error: 'Tool ID is required' });
+    }
     
     // Get tool configuration
     const db = require('./database-config');
     const result = await db.query('SELECT setting_value FROM settings WHERE setting_key = ?', ['management_tools']);
     
     if (result.length === 0) {
+      console.error('❌ No management tools configured in database');
       return res.status(404).json({ error: 'No management tools configured' });
     }
     
@@ -67,28 +108,38 @@ router.all('/proxy/:toolId/*', async (req, res) => {
     try {
       const toolsData = JSON.parse(result[0].setting_value);
       tools = Array.isArray(toolsData) ? toolsData : Object.values(toolsData);
+      console.log(`🔍 Found ${tools.length} tools in database`);
     } catch (parseError) {
+      console.error('❌ Error parsing tools data:', parseError);
       return res.status(500).json({ error: 'Invalid tools configuration' });
     }
     
     const tool = tools.find(t => t.id === toolId);
     if (!tool) {
-      return res.status(404).json({ error: 'Tool not found' });
+      console.error(`❌ Tool with ID ${toolId} not found. Available tools:`, tools.map(t => ({ id: t.id, name: t.name })));
+      return res.status(404).json({ error: 'Tool not found', toolId, availableTools: tools.map(t => ({ id: t.id, name: t.name })) });
     }
+    
+    console.log(`✅ Found tool: ${tool.name} - ${tool.url}`);
     
     // Check if tool supports iframe access
     if (tool.access_type !== 'iframe' && tool.access_type !== 'both') {
+      console.error(`❌ Tool ${tool.name} does not support iframe access (${tool.access_type})`);
       return res.status(403).json({ error: 'Tool does not support iframe access' });
     }
     
-    // Build target URL
-    let targetUrl = tool.url;
-    if (proxyPath) {
-      // Remove trailing slash from tool.url and ensure proxyPath starts with /
-      targetUrl = tool.url.replace(/\/$/, '') + '/' + proxyPath.replace(/^\//, '');
+    // Build target URL correctly
+    let targetUrl = tool.url.replace(/\/$/, ''); // Remove trailing slash from base URL
+    if (subPath) {
+      targetUrl = targetUrl + subPath;
     }
     
-    console.log(`🔗 Proxying ${req.method} ${req.originalUrl} -> ${targetUrl}`);
+    // Add query parameters if they exist
+    if (queryString) {
+      targetUrl += '?' + queryString;
+    }
+    
+    console.log(`🎯 Target URL: ${targetUrl}`);
     
     // Prepare request options
     const requestOptions = {
@@ -99,19 +150,16 @@ router.all('/proxy/:toolId/*', async (req, res) => {
         'Accept': req.headers['accept'] || '*/*',
         'Accept-Language': req.headers['accept-language'] || 'en-US,en;q=0.9',
         'Accept-Encoding': req.headers['accept-encoding'] || 'gzip, deflate',
-        'Host': new URL(tool.url).host,
-        // Don't set X-Forwarded headers that might trigger auth
-        // 'X-Forwarded-Host': req.get('host'),
-        // 'X-Forwarded-Proto': req.protocol,
-        // 'X-Forwarded-For': req.ip
+        'Referer': tool.url,
+        'Host': new URL(tool.url).host
       },
       timeout: 30000,
-      validateStatus: () => true, // Accept all status codes
-      responseType: 'stream', // Stream the response
+      validateStatus: () => true,
+      responseType: 'stream',
       maxRedirects: 5
     };
     
-    // Remove headers that might cause issues
+    // Clean up headers that can cause issues
     delete requestOptions.headers['host'];
     delete requestOptions.headers['connection'];
     delete requestOptions.headers['content-length'];
@@ -122,6 +170,7 @@ router.all('/proxy/:toolId/*', async (req, res) => {
         username: tool.username,
         password: tool.password
       };
+      console.log(`🔐 Using authentication for ${tool.username}`);
     }
     
     // Add request body for POST/PUT requests
@@ -129,12 +178,34 @@ router.all('/proxy/:toolId/*', async (req, res) => {
       requestOptions.data = req;
     }
     
+    console.log(`🚀 Making request to ${targetUrl}...`);
+    
     // Make the request
     const response = await axios(requestOptions);
     
-    // Handle HTML responses - rewrite asset paths for iframe compatibility
+    console.log(`📥 Response: ${response.status} ${response.statusText}`);
+    console.log(`📦 Content-Type: ${response.headers['content-type']}`);
+    
+    // Handle the response
     const contentType = response.headers['content-type'] || '';
+    
+    // Copy all response headers except problematic ones
+    Object.keys(response.headers).forEach(key => {
+      const lowerKey = key.toLowerCase();
+      if (!['connection', 'content-encoding', 'transfer-encoding', 'content-length', 'x-frame-options', 'content-security-policy'].includes(lowerKey)) {
+        res.set(key, response.headers[key]);
+      }
+    });
+    
+    // Add iframe-friendly headers
+    res.set('X-Frame-Options', 'ALLOWALL');
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+    
     if (contentType.includes('text/html')) {
+      console.log('📄 Processing HTML response...');
+      
       // Convert stream to string for HTML processing
       let htmlContent = '';
       response.data.on('data', chunk => {
@@ -142,78 +213,65 @@ router.all('/proxy/:toolId/*', async (req, res) => {
       });
       
       response.data.on('end', () => {
-        // Use base tag injection for cleaner path handling
-        const baseProxyPath = `/api/management/proxy/${toolId}/`;
+        console.log(`📝 HTML Content length: ${htmlContent.length} chars`);
         
-        // Inject base tag to handle relative paths automatically
-        if (htmlContent.includes('<head>')) {
-          htmlContent = htmlContent.replace(
-            '<head>', 
-            `<head><base href="${baseProxyPath}">`
-          );
-        } else if (htmlContent.includes('<html>')) {
-          htmlContent = htmlContent.replace(
-            '<html>', 
-            `<html><head><base href="${baseProxyPath}"></head>`
-          );
-        }
+        // URL rewriting for iframe compatibility
+        const baseProxyPath = `/api/management/tools/${toolId}/proxy`;
         
-        // Also remove any existing base tags that might conflict
-        htmlContent = htmlContent.replace(/<base\s+href="[^"]*"[^>]*>/gi, '');
+        // Replace relative URLs with proxy URLs
+        htmlContent = htmlContent
+          .replace(/href="\/([^"]*?)"/g, `href="${baseProxyPath}/$1"`)
+          .replace(/src="\/([^"]*?)"/g, `src="${baseProxyPath}/$1"`)
+          .replace(/href='\/([^']*?)'/g, `href='${baseProxyPath}/$1'`)
+          .replace(/src='\/([^']*?)'/g, `src='${baseProxyPath}/$1'`)
+          .replace(/url\(\/([^)]*?)\)/g, `url(${baseProxyPath}/$1)`)
+          .replace(/url\("\/([^"]*?)"\)/g, `url("${baseProxyPath}/$1")`)
+          .replace(/url\('\/([^']*?)'\)/g, `url('${baseProxyPath}/$1')`);
         
-        // Set response headers
-        Object.keys(response.headers).forEach(key => {
-          if (!['connection', 'content-encoding', 'transfer-encoding', 'content-length'].includes(key.toLowerCase())) {
-            res.set(key, response.headers[key]);
-          }
-        });
-        
-        // Remove/modify headers that prevent iframe embedding
-        res.removeHeader('X-Frame-Options');
-        res.removeHeader('Content-Security-Policy');
-        res.removeHeader('Content-Security-Policy-Report-Only');
-        
-        // Add headers to allow iframe embedding
-        res.set('X-Frame-Options', 'ALLOWALL');
-        res.set('Access-Control-Allow-Origin', '*');
-        res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
-        res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
         res.set('Content-Length', Buffer.byteLength(htmlContent));
-        
         res.status(response.status).send(htmlContent);
-        console.log(`✅ HTML Proxy response: ${response.status} for ${req.originalUrl} (${htmlContent.length} bytes)`);
-        console.log(`🔍 First 200 chars of HTML:`, htmlContent.substring(0, 200));
+        console.log(`✅ HTML response sent successfully`);
+      });
+      
+      response.data.on('error', (error) => {
+        console.error('❌ HTML stream error:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'HTML processing error' });
+        }
       });
       
     } else {
-      // For non-HTML responses (CSS, JS, images, etc.), stream directly
-      Object.keys(response.headers).forEach(key => {
-        if (!['connection', 'content-encoding', 'transfer-encoding'].includes(key.toLowerCase())) {
-          res.set(key, response.headers[key]);
-        }
-      });
+      console.log(`📦 Streaming ${contentType} response directly (${response.headers['content-length'] || 'unknown size'})...`);
       
-      // Remove iframe-blocking headers for all responses
-      res.removeHeader('X-Frame-Options');
-      res.removeHeader('Content-Security-Policy');
-      res.removeHeader('Content-Security-Policy-Report-Only');
-      
-      // Add iframe-friendly headers
-      res.set('Access-Control-Allow-Origin', '*');
-      
+      // Stream non-HTML responses directly (CSS, JS, images, etc.)
       res.status(response.status);
       response.data.pipe(res);
-      console.log(`✅ Asset Proxy response: ${response.status} for ${req.originalUrl}`);
+      
+      response.data.on('end', () => {
+        console.log(`✅ ${contentType} response streamed successfully`);
+      });
+      
+      response.data.on('error', (error) => {
+        console.error('❌ Asset stream error:', error);
+      });
     }
     
   } catch (error) {
-    console.error('❌ Proxy error:', error.message);
+    console.error('❌ Proxy error:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      code: error.code,
+      url: error.config?.url,
+      status: error.response?.status,
+      responseHeaders: error.response?.headers
+    });
     
     if (!res.headersSent) {
       res.status(502).json({
         error: 'Proxy Error',
-        message: 'Failed to connect to the target service',
-        details: error.code || error.message,
+        message: error.message,
+        details: error.code || 'Unknown error',
+        targetUrl: error.config?.url || 'Unknown',
         timestamp: new Date().toISOString()
       });
     }
@@ -224,6 +282,7 @@ router.all('/proxy/:toolId/*', async (req, res) => {
 router.post('/tools/:toolId/test', async (req, res) => {
   try {
     const { toolId } = req.params;
+    console.log(`🧪 Testing tool: ${toolId}`);
     
     const db = require('./database-config');
     const result = await db.query('SELECT setting_value FROM settings WHERE setting_key = ?', ['management_tools']);
@@ -275,11 +334,11 @@ router.post('/tools/:toolId/test', async (req, res) => {
         responseTime: `${responseTime}ms`,
         url: tool.url,
         accessible: response.status >= 200 && response.status < 400,
-        supportsIframe: !response.headers['x-frame-options'] && !response.headers['content-security-policy'],
+        supportsIframe: !response.headers['x-frame-options'],
         timestamp: new Date().toISOString()
       };
       
-      console.log(`🧪 Test result for ${tool.name}:`, testResult);
+      console.log(`🧪 Test result:`, testResult);
       res.json(testResult);
       
     } catch (error) {
@@ -299,27 +358,6 @@ router.post('/tools/:toolId/test', async (req, res) => {
   } catch (error) {
     console.error('Error testing tool connectivity:', error);
     res.status(500).json({ error: 'Failed to test tool connectivity' });
-  }
-});
-
-// Get proxy status
-router.get('/proxy/status', (req, res) => {
-  try {
-    const proxyStats = {
-      type: 'Simple axios-based proxy',
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString(),
-      features: {
-        iframe: true,
-        streaming: true,
-        authentication: true
-      }
-    };
-    
-    res.json(proxyStats);
-  } catch (error) {
-    console.error('Error getting proxy status:', error);
-    res.status(500).json({ error: 'Failed to get proxy status' });
   }
 });
 
