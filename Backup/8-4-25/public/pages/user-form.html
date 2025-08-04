@@ -1,0 +1,507 @@
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+    <h2 style="color: #4fc3f7;">Create or Edit User</h2>
+    <button class="btn btn-secondary" onclick="showPage('users')">Back to Users</button>
+</div>
+
+<div class="form-container">
+    <form id="userFormData" onsubmit="saveUser(event)">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="userName">Name:</label>
+                <input type="text" id="userName" name="name" required>
+            </div>
+            <div class="form-group">
+                <label for="userEmail">Email:</label>
+                <input type="email" id="userEmail" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="userOwner">Owner:</label>
+                <select id="userOwner" name="owner_id">
+                    <option value="">-- No Owner --</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="plexEmail">Plex Email:</label>
+                <input type="email" id="plexEmail" name="plex_email">
+                <small style="color: #4fc3f7;">Email used for Plex invitations</small>
+            </div>
+        </div>
+		
+        <!-- SAVE BASIC INFO BUTTON (for new users only) - COMPACT VERSION -->
+        <div class="form-group" id="saveBasicInfoSection" style="display: none;">
+            <div style="background: rgba(76, 175, 80, 0.1); border: 1px solid #4caf50; border-radius: 4px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 15px;">
+                <div style="flex: 1;">
+                    <span style="color: #4caf50; font-weight: 500; font-size: 0.9rem;">Save basic info first</span>
+                    <small style="display: block; color: #81c784; font-size: 0.8rem; margin-top: 2px;">Then add services below</small>
+                </div>
+                <button type="button" id="saveBasicInfoBtn" class="btn" 
+                        style="background: linear-gradient(45deg, #4caf50, #8bc34a); padding: 6px 15px; font-size: 0.85rem; white-space: nowrap;"
+                        onclick="saveBasicUserInfo()">
+                    <i class="fas fa-save"></i> Save Basic
+                </button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Tags:</label>
+            <div class="checkbox-group">
+                <div class="checkbox-item">
+                    <input type="checkbox" id="tag-plex1" name="tags" value="Plex 1" onchange="updatePlexAccessCheckVisibility()">
+                    <label for="tag-plex1">Plex 1</label>
+                </div>
+                <div class="checkbox-item">
+                    <input type="checkbox" id="tag-plex2" name="tags" value="Plex 2" onchange="updatePlexAccessCheckVisibility()">
+                    <label for="tag-plex2">Plex 2</label>
+                </div>
+                <div class="checkbox-item">
+                    <input type="checkbox" id="tag-iptv" name="tags" value="IPTV" onchange="toggleIptvManagementByTag(this.checked)">
+                    <label for="tag-iptv">IPTV</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- CHECK FOR PLEX ACCESS SECTION -->
+        <div class="form-group" id="plexAccessCheckSection" style="display: none;">
+            <div class="plex-access-check-container">
+                <div class="plex-access-check-header">
+                    <h4>Check Existing Plex Access</h4>
+                    <button type="button" class="check-access-btn" onclick="checkExistingPlexAccess()">
+                        <span id="checkAccessBtnText"><i class="fas fa-search" style="color: #4fc3f7;"></i> Check for Plex Access</span>
+                    </button>
+                </div>
+                <p class="check-access-description">
+                    Use this if you've already invited this user to Plex and want to detect their current library access.
+                </p>
+                <div id="plexAccessResults" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Plex Library Management -->
+        <div class="form-group">
+            <label>Plex/IPTV Access:</label>
+            <p style="color: #4fc3f7; font-size: 0.9rem; margin-bottom: 15px;">Select a tag to configure access to services</p>
+            
+            <!-- Plex 1 Libraries -->
+            <div class="library-group" id="plex1LibraryGroup" style="display: none;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <h5>Plex 1 Libraries</h5>
+                    <div class="plex-actions">
+                        <button type="button" class="btn btn-test" style="padding: 6px 12px; font-size: 0.8rem;" onclick="testPlexConnection('plex1')">Test</button>
+                        <button type="button" class="btn btn-sync" style="padding: 6px 12px; font-size: 0.8rem;" onclick="refreshPlexLibraries('plex1')">Refresh</button>
+                        <button type="button" class="btn" style="background: linear-gradient(45deg, #9c27b0, #e91e63); padding: 6px 12px; font-size: 0.8rem;" onclick="debugPlexLibraries('plex1')">Debug</button>
+                    </div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <span id="plex1Status" class="connection-status">Click Test Connection</span>
+                    <button type="button" class="btn" style="margin-left: 10px; padding: 4px 12px; font-size: 0.8rem;" onclick="selectAllPlex1Libraries()">Select All</button>
+                    <button type="button" class="btn btn-secondary" style="margin-left: 5px; padding: 4px 12px; font-size: 0.8rem;" onclick="clearAllPlex1Libraries()">Clear All</button>
+                    <button type="button" class="btn" style="background: linear-gradient(45deg, #f44336, #e91e63); margin-left: 5px; padding: 4px 12px; font-size: 0.8rem;" onclick="Users.removePlexServerAccess('plex1')">Remove from Plex</button>
+                </div>
+                <div class="library-checkboxes">
+                    <div class="library-group">
+                        <h5>Regular Libraries</h5>
+                        <div id="plex1RegularLibrariesList">Loading...</div>
+                    </div>
+                    <div class="library-group">
+                        <h5>4K Libraries</h5>
+                        <div id="plex1FourkLibrariesList">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Plex 2 Libraries -->
+            <div class="library-group" id="plex2LibraryGroup" style="display: none;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <h5>Plex 2 Libraries</h5>
+                    <div class="plex-actions">
+                        <button type="button" class="btn btn-test" style="padding: 6px 12px; font-size: 0.8rem;" onclick="testPlexConnection('plex2')">Test</button>
+                        <button type="button" class="btn btn-sync" style="padding: 6px 12px; font-size: 0.8rem;" onclick="refreshPlexLibraries('plex2')">Refresh</button>
+                        <button type="button" class="btn" style="background: linear-gradient(45deg, #9c27b0, #e91e63); padding: 6px 12px; font-size: 0.8rem;" onclick="debugPlexLibraries('plex2')">Debug</button>
+                    </div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <span id="plex2Status" class="connection-status">Click Test Connection</span>
+                    <button type="button" class="btn" style="margin-left: 10px; padding: 4px 12px; font-size: 0.8rem;" onclick="selectAllPlex2Libraries()">Select All</button>
+                    <button type="button" class="btn btn-secondary" style="margin-left: 5px; padding: 4px 12px; font-size: 0.8rem;" onclick="clearAllPlex2Libraries()">Clear All</button>
+                    <button type="button" class="btn" style="background: linear-gradient(45deg, #f44336, #e91e63); margin-left: 5px; padding: 4px 12px; font-size: 0.8rem;" onclick="Users.removePlexServerAccess('plex2')">Remove from Plex</button>
+                </div>
+                <div class="library-checkboxes">
+                    <div class="library-group">
+                        <h5>Regular Libraries</h5>
+                        <div id="plex2RegularLibrariesList">Loading...</div>
+                    </div>
+                    <div class="library-group">
+                        <h5>4K Libraries</h5>
+                        <div id="plex2FourkLibrariesList">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- IPTV Subscription Management Section -->
+        <div class="subscription-section" id="iptvSection" style="display: none;">
+            <div class="subscription-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h5>IPTV Subscription Management</h5>
+                <div class="iptv-actions">
+                    <!-- Removed buttons - not needed for user form -->
+                </div>
+            </div>
+
+<!-- ALWAYS VISIBLE IPTV ACCESS CHECK -->
+<div class="iptv-access-check-simple" style="background: rgba(79, 195, 247, 0.1); border: 1px solid #4fc3f7; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
+    <h6 style="color: #4fc3f7; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-search"></i>
+        Check IPTV Access
+    </h6>
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <input type="text" 
+               id="existingIptvUsername" 
+               placeholder="Enter IPTV username to check"
+               style="flex: 1; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px;"
+               maxlength="50">
+        <button type="button" 
+                id="checkAccessBtn" 
+                class="btn"
+                style="background: linear-gradient(45deg, #4fc3f7, #29b6f6); color: #000; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold;">
+            <i class="fas fa-search"></i> Check
+        </button>
+    </div>
+    <!-- Results area -->
+    <div id="accessCheckResults" class="access-results" style="display: none; margin-top: 15px;">
+        <!-- Results will be populated here -->
+    </div>
+</div>
+
+<!-- IPTV EDITOR ACCESS CHECK -->
+<div class="iptv-access-check-simple" style="background: rgba(142, 36, 170, 0.1); border: 1px solid #8e24aa; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
+    <h6 style="color: #8e24aa; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-search"></i>
+        Check IPTV Editor Access
+    </h6>
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <input type="text" 
+               id="existingIptvEditorUsername" 
+               placeholder="Enter IPTV username to check in Editor"
+               style="flex: 1; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #8e24aa; border-radius: 4px;"
+               maxlength="50">
+        <button type="button" 
+                id="checkEditorAccessBtn" 
+                class="btn"
+                style="background: linear-gradient(45deg, #8e24aa, #ab47bc); color: #fff; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold;"
+                onclick="checkIPTVEditorAccess()">
+            <i class="fas fa-search"></i> Check
+        </button>
+    </div>
+    <!-- Results area -->
+    <div id="editorAccessCheckResults" class="access-results" style="display: none; margin-top: 15px;">
+        <!-- Results will be populated here -->
+    </div>
+</div>
+
+<!-- Current IPTV Status Display -->
+<div class="iptv-status-container">
+  <div id="iptvStatusDisplay" class="current-status-display">
+    <h6 style="color: #4fc3f7; margin-bottom: 15px;">Current IPTV Status</h6>
+    <div style="background: rgba(0, 0, 0, 0.8); padding: 20px; border-radius: 8px; border: 1px solid #4fc3f7;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
+            
+            <!-- Line ID -->
+            <div>
+                <label style="color: #4fc3f7; font-size: 0.9rem; display: block; margin-bottom: 5px;">Line ID:</label>
+                <span id="iptvLineId" style="color: #fff; font-weight: bold;">None</span>
+            </div>
+            
+            <!-- Max Connections -->
+            <div>
+                <label style="color: #4fc3f7; font-size: 0.9rem; display: block; margin-bottom: 5px;">Connections:</label>
+                <span id="iptvConnections" style="color: #fff; font-weight: bold;">0/0</span>
+            </div>
+            
+            <!-- Days Until Expiration -->
+            <div>
+                <label style="color: #4fc3f7; font-size: 0.9rem; display: block; margin-bottom: 5px;">Days Left:</label>
+                <span id="iptvDaysLeft" style="color: #fff; font-weight: bold;">None</span>
+            </div>
+            
+            <!-- Expiration Date -->
+            <div>
+                <label style="color: #4fc3f7; font-size: 0.9rem; display: block; margin-bottom: 5px;">Expiration:</label>
+                <span id="iptvExpiration" style="color: #fff; font-weight: bold;">None</span>
+            </div>
+        </div>
+        
+        <!-- M3U Plus URL Section -->
+        <div id="iptvM3USection" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #4fc3f7; display: none;">
+            <label style="color: #4fc3f7; font-size: 0.9rem; display: block; margin-bottom: 8px;">M3U Plus URL:</label>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="iptvM3UUrl" readonly 
+                       style="flex: 1; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px; font-size: 0.85rem;">
+                <button type="button" id="copyM3UBtn" onclick="copyM3UUrl()" 
+                        style="background: linear-gradient(45deg, #4fc3f7, #29b6f6); color: #000; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                    Copy
+                </button>
+            </div>
+        </div>
+		
+		<!-- IPTV Editor Status Indicator - ADD THIS -->
+<div id="iptvEditorStatusSection" style="margin-top: 15px; padding: 10px; background: rgba(79, 195, 247, 0.1); border: 1px solid #4fc3f7; border-radius: 4px; display: none;">
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+        <div id="iptvEditorStatusDot" style="width: 12px; height: 12px; border-radius: 50%; background: #4fc3f7;"></div>
+        <span style="color: #4fc3f7; font-weight: bold;">IPTV Editor Account Active</span>
+        <button type="button" id="syncIptvEditorBtn" onclick="handleIPTVEditorSync()" 
+        style="background: #4fc3f7; color: #000; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.8rem;">
+    Sync
+</button>
+    </div>
+    <div id="iptvEditorDetails" style="font-size: 0.85rem; color: #ccc;">
+        <div>Username: <span id="iptvEditorUsername">-</span></div>
+        <div>Last Sync: <span id="iptvEditorLastSync">-</span></div>
+        <div>Status: <span id="iptvEditorSyncStatus">-</span></div>
+    </div>
+</div>
+
+<!-- IPTV Editor M3U Plus URL Section - ADD THIS -->
+<div id="iptvEditorM3USection" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #4fc3f7; display: none;">
+    <label style="color: #4fc3f7; font-size: 0.9rem; display: block; margin-bottom: 8px;">IPTV Editor M3U Plus URL:</label>
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <input type="text" id="iptvEditorM3UUrl" readonly 
+               style="flex: 1; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px; font-size: 0.85rem;">
+        <button type="button" id="copyEditorM3UBtn" onclick="copyEditorM3UUrl()" 
+                style="background: linear-gradient(45deg, #4fc3f7, #29b6f6); color: #000; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+            Copy
+        </button>
+        <button type="button" id="regenerateM3UBtn" onclick="regenerateM3UUrl(window.currentUserId)" 
+                style="background: linear-gradient(45deg, #ff9800, #f57c00); color: #fff; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+            Regenerate
+        </button>
+    </div>
+</div>
+
+<!-- Cleanup button for orphaned IPTV Editor accounts -->
+<div id="iptvEditorCleanupSection" style="margin-top: 10px; display: none;">
+    <div style="padding: 10px; background: rgba(255, 193, 7, 0.1); border: 1px solid #ffc107; border-radius: 5px;">
+        <p style="margin: 0 0 10px 0; color: #856404;">
+            <i class="fas fa-exclamation-triangle"></i> 
+            Orphaned IPTV Editor account detected. No regular IPTV subscription found.
+        </p>
+        <button type="button" id="cleanupIPTVEditorBtn" class="btn btn-warning btn-small" onclick="cleanupIPTVEditor(document.getElementById('userId').value)">
+            <i class="fas fa-broom"></i> Cleanup IPTV Editor Account
+        </button>
+    </div>
+</div>
+		
+		<!-- Delete Button Row (Bottom Right) -->
+<div style="display: flex; justify-content: flex-end; margin-top: 15px; padding-top: 10px; border-top: 1px solid #333;">
+  <button type="button" 
+          id="iptvDeleteBtn" 
+          onclick="IPTV.deleteSubscription()"
+          style="background: linear-gradient(45deg, #f44336, #d32f2f); color: #fff; border: none; padding: 10px 15px; border-radius: 4px; font-weight: bold; cursor: pointer;">
+    <i class="fas fa-trash"></i> Delete Subscription
+  </button>
+</div>
+        
+        <!-- Status Indicators -->
+        <div style="margin-top: 15px; display: flex; gap: 15px; flex-wrap: wrap;">
+            <div id="iptvStatusIndicator" style="display: flex; align-items: center; gap: 8px;">
+                <div id="iptvStatusDot" style="width: 12px; height: 12px; border-radius: 50%; background: #f44336;"></div>
+                <span id="iptvStatusText" style="color: #fff; font-size: 0.9rem;">Inactive</span>
+            </div>
+            
+            <div id="iptvTrialIndicator" style="display: none; align-items: center; gap: 8px;">
+                <div style="width: 12px; height: 12px; border-radius: 50%; background: #ff9800;"></div>
+                <span style="color: #ff9800; font-size: 0.9rem;">Trial Account</span>
+            </div>
+        </div>
+    </div>
+  </div>
+</div>
+
+<!-- Action Selection -->
+<div class="form-section" style="background: rgba(76, 175, 80, 0.1); border: 1px solid #4caf50; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+    <h6 style="color: #4caf50; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-tasks"></i>
+        Action Selection
+    </h6>
+    <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+        <label class="radio-option" style="display: flex; align-items: center; cursor: pointer; padding: 10px 15px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; background: rgba(255, 255, 255, 0.05); transition: all 0.3s ease;">
+            <input type="radio" name="iptvAction" value="extend" id="iptvActionExtend" style="margin-right: 8px;" onchange="IPTV.handleActionChange()">
+            <span style="color: #fff;">Extend Current Subscription</span>
+        </label>
+        <label class="radio-option" style="display: flex; align-items: center; cursor: pointer; padding: 10px 15px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; background: rgba(255, 255, 255, 0.05); transition: all 0.3s ease;">
+            <input type="radio" name="iptvAction" value="create" id="iptvActionCreate" style="margin-right: 8px;" onchange="IPTV.handleActionChange()" checked>
+            <span style="color: #fff;">Create New Subscription</span>
+        </label>
+    </div>
+    
+    <!-- Trial User Checkbox - Only shows when "Create New" is selected -->
+    <div id="trialCheckboxGroup" style="margin-bottom: 15px;">
+        <label class="checkbox-option" style="display: flex; align-items: center; cursor: pointer; padding: 12px; background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.3); border-radius: 6px;">
+            <input type="checkbox" id="isTrialUser" onchange="IPTV.handleActionChange()" style="margin-right: 8px; transform: scale(1.2);">
+            <span style="color: #ff9800; font-weight: 500;">Create Trial User</span>
+        </label>
+        <small style="color: #ff9800; font-size: 0.85rem; margin-top: 5px; display: block;">
+            ⚠️ Trial users get 12-24 hour access at no credit cost. Trial option only applies to "Create New Subscription"
+        </small>
+    </div>
+</div>
+
+            <!-- Credit Balance Display -->
+            <div class="form-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(76, 175, 80, 0.1); padding: 12px; border-radius: 8px; border: 1px solid #4caf50;">
+                    <div>
+                        <span style="color: #4caf50; font-weight: 500;">Available Credits: </span>
+                        <span id="currentCreditBalance" style="color: #fff; font-size: 1.2rem; font-weight: bold;">Loading...</span>
+                    </div>
+                    <button type="button" class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a); padding: 6px 12px; font-size: 0.8rem;" onclick="IPTV.syncCredits()">Sync Credits</button>
+                </div>
+            </div>
+
+            <!-- Package Selection -->
+            <div class="form-section">
+                <h6 style="color: #4fc3f7; margin-bottom: 15px;">Package Selection</h6>
+                <select id="iptvPackageSelect" style="width: 100%; padding: 10px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px; margin-bottom: 15px;" onchange="IPTV.onPackageChange(this.value)">
+                    <option value="">Loading packages...</option>
+                </select>
+                
+                <!-- Package Summary -->
+                <div id="iptvPackageSummary" style="background: rgba(0, 0, 0, 0.5); padding: 15px; border-radius: 8px; border: 1px solid #4fc3f7; margin-bottom: 15px; display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span style="color: #4fc3f7;">Selected: </span>
+                            <span id="selectedPackageName" style="color: #fff; font-weight: bold;"></span>
+                        </div>
+                        <div>
+                            <span style="color: #4caf50;">Credits Required: </span>
+                            <span id="selectedPackageCredits" style="color: #fff; font-weight: bold;"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Channel Group Selection -->
+            <div class="form-section">
+                <h6 style="color: #4fc3f7; margin-bottom: 15px;">Channel Groups</h6>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <label for="iptvChannelGroupSelect" style="color: #fff;">Select Channel Group:</label>
+                    <a href="#" onclick="showPage('settings')" style="color: #4fc3f7; font-size: 0.9rem; text-decoration: none;">Manage Channel Groups</a>
+                </div>
+                <select id="iptvChannelGroupSelect" style="width: 100%; padding: 10px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px;">
+                    <option value="">Loading channel groups...</option>
+                </select>
+                <small style="color: #4fc3f7; font-size: 0.85rem;">Channel groups define which bouquets (channel packages) the user will receive.</small>
+            </div>
+
+            <!-- Subscription Details -->
+            <div class="form-section">
+                <h6 style="color: #4fc3f7; margin-bottom: 15px;">Subscription Details</h6>
+                <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                    <div class="form-group">
+                        <label for="iptvUsernameField" style="color: #fff;">Username:</label>
+                        <input type="text" id="iptvUsernameField" placeholder="Leave blank for auto-generation" style="width: 100%; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px;">
+                        <small style="color: #4fc3f7; font-size: 0.85rem;">Leave blank and the IPTV panel will auto-generate.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="iptvPasswordField" style="color: #fff;">Password:</label>
+                        <input type="text" id="iptvPasswordField" placeholder="Leave blank for auto-generation" style="width: 100%; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px;">
+                        <small style="color: #4fc3f7; font-size: 0.85rem;">Leave blank and the IPTV panel will auto-generate.</small>
+                    </div>
+                </div>
+                
+                <!-- Notes Field -->
+                <div class="form-group" style="margin-top: 15px;">
+                    <label for="iptvNotesField" style="color: #fff;">Notes (Optional):</label>
+                    <textarea id="iptvNotesField" placeholder="Enter any notes or description for this user..." style="width: 100%; padding: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #4fc3f7; border-radius: 4px; min-height: 60px; resize: vertical;"></textarea>
+                    <small style="color: #4fc3f7; font-size: 0.85rem;">These notes will be stored with the user account for reference.</small>
+                </div>
+            </div>
+
+<!-- Action Buttons -->
+<div class="form-section">
+    <div style="display: flex; gap: 15px; justify-content: center;">
+        <button type="button" id="iptvSubmitBtn" class="btn" style="background: linear-gradient(45deg, #4caf50, #8bc34a); padding: 10px 20px;" onclick="IPTV.executeAction()">
+            <span id="iptvSubmitBtnText">Create Subscription</span>
+        </button>
+    </div>
+</div>
+
+        </div>
+        <div class="form-group">
+            <label>Subscription Information:</label>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="plexSubscription">Plex Subscription:</label>
+                    <select id="plexSubscription" name="plex_subscription" onchange="calculateNewPlexExpiration()">
+                        <option value="">No Plex Subscription</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="plexExpiration">Plex Expiration:</label>
+                    <input type="date" id="plexExpiration" name="plex_expiration">
+                    <small style="color: #4fc3f7;">Manual override - leave blank for auto-calculation</small>
+                </div>
+                <div class="form-group">
+                    <label for="iptvSubscription">IPTV Subscription:</label>
+                    <select id="iptvSubscription" name="iptv_subscription" onchange="calculateNewIptvExpiration()">
+                        <option value="">No IPTV Subscription</option>
+                    </select>
+                </div>
+<div class="form-group">
+    <label for="iptvExpiration">IPTV Expiration:</label>
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <input type="date" id="iptvExpiration" name="iptv_expiration" style="flex: 1;">
+        <button type="button" id="syncIptvDateBtn" onclick="syncIptvExpirationFromPanel()" 
+                style="background: #00bcd4; color: white; border: none; padding: 8px 12px; border-radius: 4px; font-size: 12px; white-space: nowrap;">
+            Sync with Panel
+        </button>
+    </div>
+    <small style="color: #4fc3f7;">Auto-calculates from subscription or sync from IPTV panel</small>
+</div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Optional Details:</label>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="iptvUsername">IPTV Username:</label>
+                    <input type="text" id="iptvUsername" name="iptv_username">
+                </div>
+                <div class="form-group">
+                    <label for="iptvPassword">IPTV Password:</label>
+                    <input type="text" id="iptvPassword" name="iptv_password">
+                </div>
+                <div class="form-group">
+                    <label for="implayerCode">iMPlayer Code:</label>
+                    <input type="text" id="implayerCode" name="implayer_code">
+                </div>
+                <div class="form-group">
+                    <label for="deviceCount">iMPlayer Device Count:</label>
+                    <input type="number" id="deviceCount" name="device_count" min="1" value="1">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Email & Owner Settings:</label>
+            <div class="checkbox-group">
+                <div class="checkbox-item">
+                    <input type="checkbox" id="bccOwnerRenewal" name="bcc_owner_renewal">
+                    <label for="bccOwnerRenewal">BCC Owner on Renewal Reminders</label>
+                </div>
+                <div class="checkbox-item">
+                    <input type="checkbox" id="excludeBulkEmails" name="exclude_bulk_emails">
+                    <label for="excludeBulkEmails">Exclude from Bulk Emails</label>
+                </div>
+                <div class="checkbox-item">
+                    <input type="checkbox" id="excludeAutomatedEmails" name="exclude_automated_emails">
+                    <label for="excludeAutomatedEmails">Exclude from Automated Emails</label>
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button type="submit" class="btn">Save User</button>
+            <button type="button" class="btn btn-secondary" onclick="showPage('users')">Cancel</button>
+        </div>
+    </form>
+</div>

@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JohnsonFlix IPTV Guide</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+        .header { text-align: center; margin-bottom: 30px; }
+        .logo {
+            font-size: 2.5rem; font-weight: bold; margin-bottom: 10px;
+            background: linear-gradient(45deg, #ff00ff, #00ffff);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .subtitle { font-size: 1.2rem; color: #4fc3f7; }
+
+        .controls {
+            display: flex; gap: 15px; margin-bottom: 20px; align-items: center; flex-wrap: wrap;
+        }
+        .search-box { flex: 1; min-width: 200px; position: relative; }
+        .search-box input {
+            width: 100%; padding: 10px 40px 10px 15px; background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: white; font-size: 14px;
+        }
+        .search-box input:focus { outline: none; border-color: #4fc3f7; }
+        .search-box i { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #4fc3f7; }
+        
+        .back-btn {
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            color: white; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 14px;
+            display: none;
+        }
+
+        .refresh-btn {
+            background: linear-gradient(45deg, #4fc3f7, #8e24aa); border: none; color: white;
+            padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;
+        }
+
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; text-align: center; }
+        .stat-num { font-size: 1.5rem; font-weight: bold; color: #4fc3f7; }
+        .stat-label { font-size: 0.8rem; color: rgba(255,255,255,0.7); text-transform: uppercase; }
+
+        .loading { text-align: center; padding: 60px 20px; color: #4fc3f7; }
+        .spinner { 
+            width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.3); 
+            border-top: 3px solid #4fc3f7; border-radius: 50%; 
+            animation: spin 1s linear infinite; margin: 0 auto 20px; 
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .categories { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        
+        .category {
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); 
+            border-radius: 12px; padding: 20px; text-align: center; cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .category:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 8px 25px rgba(79,195,247,0.2);
+            background: rgba(79,195,247,0.1);
+        }
+        
+        .category-name { font-size: 1.2rem; font-weight: 600; margin-bottom: 10px; }
+        .category-count { color: #4fc3f7; font-size: 0.9rem; }
+
+        .channels-view { display: none; }
+        .channels-view.active { display: block; }
+
+        .channels-header {
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 20px; padding-bottom: 15px; 
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .channels-title { font-size: 1.5rem; font-weight: 600; color: #4fc3f7; }
+
+        .channels-list { display: grid; gap: 15px; }
+        
+        .channel {
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px; padding: 15px; cursor: pointer; transition: all 0.2s ease;
+        }
+        .channel:hover { 
+            background: rgba(79,195,247,0.1); 
+            border-color: rgba(79,195,247,0.3);
+        }
+        .channel.expanded {
+            background: rgba(79,195,247,0.15);
+            border-color: rgba(79,195,247,0.5);
+        }
+
+        .channel-header { display: flex; align-items: center; gap: 12px; }
+        .channel-logo {
+            width: 40px; height: 40px; border-radius: 6px; flex-shrink: 0;
+            background: linear-gradient(45deg, #4fc3f7, #8e24aa); display: flex; align-items: center; 
+            justify-content: center; font-weight: bold; color: white; font-size: 14px;
+        }
+        .channel-info { flex: 1; min-width: 0; }
+        .channel-name { font-weight: 600; margin-bottom: 4px; }
+        .channel-current { font-size: 0.85rem; color: rgba(255,255,255,0.8); }
+        .now-label { 
+            background: rgba(76,175,80,0.3); color: #4caf50; 
+            padding: 2px 6px; border-radius: 3px; font-size: 0.75rem; margin-right: 8px; 
+        }
+
+        .channel-programs { 
+            max-height: 0; overflow: hidden; transition: max-height 0.3s ease;
+            margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .channel.expanded .channel-programs { max-height: 400px; overflow-y: auto; }
+
+        .program {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .program:last-child { border-bottom: none; }
+        .program.current { 
+            background: rgba(76,175,80,0.1); border-radius: 4px; 
+            padding: 8px 12px; margin: 0 -12px;
+        }
+        .program-title { font-weight: 500; }
+        .program.current .program-title { color: #4caf50; }
+        .program-time { color: #4fc3f7; font-size: 0.8rem; white-space: nowrap; margin-left: 10px; }
+
+        .pagination {
+            display: flex; justify-content: center; align-items: center; gap: 10px; margin: 20px 0;
+        }
+        .page-btn {
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            color: white; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+        }
+        .page-btn:hover { background: rgba(79,195,247,0.2); }
+        .page-btn.active { background: linear-gradient(45deg, #4fc3f7, #8e24aa); }
+        .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .search-results { display: none; }
+        .search-results.active { display: block; }
+
+        .error {
+            background: rgba(244,67,54,0.1); border: 1px solid rgba(244,67,54,0.3);
+            border-radius: 8px; padding: 20px; text-align: center; color: #f44336; margin: 20px 0;
+        }
+
+        .hidden { display: none !important; }
+
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .controls { flex-direction: column; align-items: stretch; }
+            .search-box { margin-bottom: 10px; }
+            .categories { grid-template-columns: 1fr; gap: 15px; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .channels-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">JOHNSONFLIX</div>
+            <div class="subtitle">Live IPTV Program Guide</div>
+        </div>
+
+        <div class="controls" id="controls">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search channels or programs..." />
+                <i class="fas fa-search"></i>
+            </div>
+            <button class="back-btn" id="backBtn" onclick="showCategories()">
+                <i class="fas fa-arrow-left"></i> Back to Categories
+            </button>
+            <button class="refresh-btn" onclick="loadEPG()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+
+        <div id="stats" class="stats" style="display: none;">
+            <div class="stat">
+                <div class="stat-num" id="totalChannels">0</div>
+                <div class="stat-label">Total Channels</div>
+            </div>
+            <div class="stat">
+                <div class="stat-num" id="totalCategories">0</div>
+                <div class="stat-label">Categories</div>
+            </div>
+            <div class="stat">
+                <div class="stat-num" id="lastUpdate">--</div>
+                <div class="stat-label">Last Updated</div>
+            </div>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Loading EPG data...</p>
+        </div>
+
+        <div id="categoriesView" class="categories" style="display: none;"></div>
+        
+        <div id="channelsView" class="channels-view">
+            <div class="channels-header">
+                <div class="channels-title" id="channelsTitle">Category Channels</div>
+            </div>
+            <div id="channelsList" class="channels-list"></div>
+            <div id="pagination" class="pagination"></div>
+        </div>
+
+        <div id="searchResults" class="search-results">
+            <div class="channels-header">
+                <div class="channels-title">Search Results</div>
+            </div>
+            <div id="searchResultsList" class="channels-list"></div>
+        </div>
+
+        <div id="error" style="display: none;"></div>
+    </div>
+
+    <script>
+        let epgSummary = null;
+        let currentCategory = null;
+        let currentPage = 1;
+        let searchTimeout = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadEPG();
+            setupSearch();
+        });
+
+        async function loadEPG() {
+            showLoading();
+            try {
+                console.log('Loading EPG summary...');
+                const response = await fetch('/api/epg');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                epgSummary = await response.json();
+                console.log('EPG summary loaded:', epgSummary.totalChannels, 'channels');
+                
+                displayCategories();
+                hideLoading();
+                
+            } catch (error) {
+                console.error('EPG load error:', error);
+                showError(error.message);
+                hideLoading();
+            }
+        }
+
+        function updateStats() {
+            if (!epgSummary) return;
+
+            const updateTime = new Date(epgSummary.lastUpdated).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
+
+            document.getElementById('totalChannels').textContent = epgSummary.totalChannels;
+            document.getElementById('totalCategories').textContent = epgSummary.categories.length;
+            document.getElementById('lastUpdate').textContent = updateTime;
+        }
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('categoriesView').style.display = 'none';
+            document.getElementById('channelsView').classList.remove('active');
+            document.getElementById('searchResults').classList.remove('active');
+            document.getElementById('stats').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showError(message) {
+            document.getElementById('error').innerHTML = `
+                <div class="error">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                    <h3>Failed to load EPG data</h3>
+                    <p>${message}</p>
+                    <button class="refresh-btn" onclick="loadEPG()" style="margin-top: 15px;">
+                        <i class="fas fa-sync-alt"></i> Try Again
+                    </button>
+                </div>
+            `;
+            document.getElementById('error').style.display = 'block';
+        }
+
+        // Auto-refresh every 30 minutes
+        setInterval(loadEPG, 30 * 60 * 1000);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                showCategories();
+            }
+            if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
+                e.preventDefault();
+                loadEPG();
+            }
+        });
+    </script>
+</body>
+</html> displayCategories() {
+            const categoriesDiv = document.getElementById('categoriesView');
+            categoriesDiv.innerHTML = '';
+
+            if (!epgSummary || !epgSummary.categories) {
+                categoriesDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.6);">No categories available</div>';
+                return;
+            }
+
+            epgSummary.categories.forEach(category => {
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'category';
+                categoryDiv.onclick = () => loadCategory(category.name);
+                
+                categoryDiv.innerHTML = `
+                    <div class="category-name">${category.name}</div>
+                    <div class="category-count">${category.channelCount} channels</div>
+                `;
+                
+                categoriesDiv.appendChild(categoryDiv);
+            });
+
+            updateStats();
+            showCategories();
+        }
+
+        async function loadCategory(categoryName, page = 1) {
+            showLoading();
+            try {
+                console.log(`Loading category: ${categoryName}, page: ${page}`);
+                const response = await fetch(`/api/epg/category/${encodeURIComponent(categoryName)}?page=${page}&limit=50`);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load category: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log(`Loaded ${data.channels.length} channels for ${categoryName}`);
+                
+                displayChannels(data);
+                currentCategory = categoryName;
+                currentPage = page;
+                hideLoading();
+                
+            } catch (error) {
+                console.error('Category load error:', error);
+                showError(error.message);
+                hideLoading();
+            }
+        }
+
+        function displayChannels(data) {
+            const channelsTitle = document.getElementById('channelsTitle');
+            const channelsList = document.getElementById('channelsList');
+            const pagination = document.getElementById('pagination');
+            
+            channelsTitle.textContent = `${data.category} (${data.pagination.total} channels)`;
+            
+            channelsList.innerHTML = '';
+            data.channels.forEach(channel => {
+                const channelDiv = createChannelElement(channel);
+                channelsList.appendChild(channelDiv);
+            });
+            
+            // Create pagination
+            pagination.innerHTML = '';
+            if (data.pagination.pages > 1) {
+                createPagination(data.pagination);
+            }
+            
+            showChannels();
+        }
+
+        function createChannelElement(channel) {
+            const div = document.createElement('div');
+            div.className = 'channel';
+            div.setAttribute('data-channel', channel.id);
+            
+            const initials = channel.name.split(' ').map(w => w.charAt(0)).join('').substring(0, 2).toUpperCase();
+            
+            div.innerHTML = `
+                <div class="channel-header" onclick="toggleChannel(this, '${channel.id}')">
+                    <div class="channel-logo">${initials}</div>
+                    <div class="channel-info">
+                        <div class="channel-name">${channel.name}</div>
+                        <div class="channel-current">
+                            ${channel.currentProgram ? 
+                                `<span class="now-label">NOW</span>${channel.currentProgram.title} (${channel.currentProgram.startTime} - ${channel.currentProgram.stopTime})` : 
+                                'No current program data'
+                            }
+                            ${channel.nextProgram ? `<br><small>Next: ${channel.nextProgram.title} at ${channel.nextProgram.startTime}</small>` : ''}
+                        </div>
+                    </div>
+                </div>
+                <div class="channel-programs" id="programs-${channel.id}">
+                    <div class="loading" style="padding: 20px;">
+                        <div class="spinner"></div>
+                        <p>Loading programs...</p>
+                    </div>
+                </div>
+            `;
+            
+            return div;
+        }
+
+        async function toggleChannel(headerElement, channelId) {
+            const channelDiv = headerElement.closest('.channel');
+            const programsDiv = document.getElementById(`programs-${channelId}`);
+            const isExpanded = channelDiv.classList.contains('expanded');
+            
+            // Collapse all other channels
+            document.querySelectorAll('.channel.expanded').forEach(ch => {
+                if (ch !== channelDiv) ch.classList.remove('expanded');
+            });
+            
+            if (isExpanded) {
+                channelDiv.classList.remove('expanded');
+            } else {
+                channelDiv.classList.add('expanded');
+                
+                // Load programs if not already loaded
+                if (programsDiv.innerHTML.includes('Loading programs...')) {
+                    await loadChannelPrograms(channelId, programsDiv);
+                }
+            }
+        }
+
+        async function loadChannelPrograms(channelId, programsDiv) {
+            try {
+                const response = await fetch(`/api/epg/channel/${channelId}/programs`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load programs');
+                }
+                
+                const data = await response.json();
+                
+                if (data.programs && data.programs.length > 0) {
+                    const now = Date.now();
+                    programsDiv.innerHTML = data.programs.map(program => {
+                        const isCurrent = program.startDate <= now && now <= program.stopDate;
+                        return `
+                            <div class="program ${isCurrent ? 'current' : ''}">
+                                <div class="program-title">${program.title}</div>
+                                <div class="program-time">${program.startTime} - ${program.stopTime}</div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    programsDiv.innerHTML = '<div style="padding: 20px; color: rgba(255,255,255,0.6);">No program data available</div>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading programs:', error);
+                programsDiv.innerHTML = '<div style="padding: 20px; color: #f44336;">Failed to load programs</div>';
+            }
+        }
+
+        function createPagination(pagination) {
+            const paginationDiv = document.getElementById('pagination');
+            
+            // Previous button
+            if (pagination.hasPrev) {
+                const prevBtn = document.createElement('button');
+                prevBtn.className = 'page-btn';
+                prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i> Prev';
+                prevBtn.onclick = () => loadCategory(currentCategory, pagination.page - 1);
+                paginationDiv.appendChild(prevBtn);
+            }
+            
+            // Page numbers (show max 5 pages)
+            const startPage = Math.max(1, pagination.page - 2);
+            const endPage = Math.min(pagination.pages, startPage + 4);
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const pageBtn = document.createElement('button');
+                pageBtn.className = `page-btn ${i === pagination.page ? 'active' : ''}`;
+                pageBtn.textContent = i;
+                if (i !== pagination.page) {
+                    pageBtn.onclick = () => loadCategory(currentCategory, i);
+                }
+                paginationDiv.appendChild(pageBtn);
+            }
+            
+            // Next button
+            if (pagination.hasNext) {
+                const nextBtn = document.createElement('button');
+                nextBtn.className = 'page-btn';
+                nextBtn.innerHTML = 'Next <i class="fas fa-chevron-right"></i>';
+                nextBtn.onclick = () => loadCategory(currentCategory, pagination.page + 1);
+                paginationDiv.appendChild(nextBtn);
+            }
+        }
+
+        async function performSearch(query) {
+            if (!query.trim()) {
+                showCategories();
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/epg/search?q=${encodeURIComponent(query)}&limit=20`);
+                const data = await response.json();
+                
+                const searchResultsList = document.getElementById('searchResultsList');
+                searchResultsList.innerHTML = '';
+                
+                if (data.results && data.results.length > 0) {
+                    data.results.forEach(channel => {
+                        const channelDiv = createChannelElement(channel);
+                        searchResultsList.appendChild(channelDiv);
+                    });
+                    showSearchResults();
+                } else {
+                    searchResultsList.innerHTML = '<div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.6);">No results found</div>';
+                    showSearchResults();
+                }
+                
+            } catch (error) {
+                console.error('Search error:', error);
+            }
+        }
+
+        function setupSearch() {
+            const searchInput = document.getElementById('searchInput');
+            searchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => performSearch(this.value), 300);
+            });
+        }
+
+        function showCategories() {
+            document.getElementById('categoriesView').style.display = 'grid';
+            document.getElementById('channelsView').classList.remove('active');
+            document.getElementById('searchResults').classList.remove('active');
+            document.getElementById('backBtn').style.display = 'none';
+            document.getElementById('stats').style.display = 'grid';
+        }
+
+        function showChannels() {
+            document.getElementById('categoriesView').style.display = 'none';
+            document.getElementById('channelsView').classList.add('active');
+            document.getElementById('searchResults').classList.remove('active');
+            document.getElementById('backBtn').style.display = 'block';
+            document.getElementById('stats').style.display = 'none';
+        }
+
+        function showSearchResults() {
+            document.getElementById('categoriesView').style.display = 'none';
+            document.getElementById('channelsView').classList.remove('active');
+            document.getElementById('searchResults').classList.add('active');
+            document.getElementById('backBtn').style.display = 'block';
+            document.getElementById('stats').style.display = 'none';
+        }
+
+        function

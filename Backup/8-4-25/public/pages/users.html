@@ -1,0 +1,64 @@
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h2 style="color: #4fc3f7;">Manage Users</h2>
+    <button class="btn" onclick="showUserForm()">Create New User</button>
+</div>
+
+<!-- Expiring Users Section -->
+<div class="expiring-soon-compact" style="margin-bottom: 15px;">
+    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+        <h4 style="margin: 0; color: #ff9800; font-size: 1rem;">Expiring This Week:</h4>
+        <div id="expiringUsers" style="flex: 1; min-width: 200px;">Loading expiring users...</div>
+    </div>
+</div>
+<!-- Search and Filter Controls -->
+<div style="display: grid; grid-template-columns: 1fr auto auto; gap: 15px; margin-bottom: 20px; align-items: end;">
+    <div>
+        <input type="text" class="search-bar" id="userSearch" placeholder="Search by name or email..." onkeyup="Users.filterUsers()">
+    </div>
+    
+    <div class="form-group" style="margin: 0; min-width: 180px;">
+        <label for="ownerFilter" style="margin-bottom: 5px;">Filter by Owner:</label>
+        <select id="ownerFilter" onchange="Users.filterUsers()" style="padding: 8px;">
+            <option value="">All Owners</option>
+        </select>
+    </div>
+    
+    <div class="form-group" style="margin: 0; min-width: 160px;">
+        <label for="tagFilter" style="margin-bottom: 5px;">Filter by Tag:</label>
+        <select id="tagFilter" onchange="Users.filterUsers()" style="padding: 8px;">
+            <option value="">All Tags</option>
+            <option value="Plex 1">Plex 1</option>
+            <option value="Plex 2">Plex 2</option>
+            <option value="IPTV">IPTV</option>
+        </select>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+<thead>
+    <tr>
+        <th onclick="Users.sortUsers('name')" style="cursor: pointer;">
+            Name <span id="sort-name" style="color: #666;">v</span>
+        </th>
+        <th onclick="Users.sortUsers('email')" style="cursor: pointer;">
+            Email <span id="sort-email" style="color: #666;">v</span>
+        </th>
+        <th onclick="Users.sortUsers('owner_name')" style="cursor: pointer;">
+            Owner <span id="sort-owner_name" style="color: #666;">v</span>
+        </th>
+        <th>Tags</th>
+        <th onclick="Users.sortUsers('plex_expiration')" style="cursor: pointer;">
+            Plex Expiration <span id="sort-plex_expiration" style="color: #666;">v</span>
+        </th>
+        <th onclick="Users.sortUsers('iptv_expiration')" style="cursor: pointer;">
+            IPTV Expiration <span id="sort-iptv_expiration" style="color: #666;">v</span>
+        </th>
+        <th>Actions</th>
+    </tr>
+</thead>
+        <tbody id="usersTableBody">
+            <tr><td colspan="8" style="text-align: center;">Loading users...</td></tr>
+        </tbody>
+    </table>
+</div>

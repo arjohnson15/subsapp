@@ -1,0 +1,455 @@
+<!-- Enhanced Management Page with Collapsible Credentials -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+    <h2 style="color: #4fc3f7;">Management Panel</h2>
+    <div style="display: flex; gap: 10px;">
+        <button class="btn" onclick="Management.showAddForm()">Add New Tool</button>
+        <button class="btn btn-secondary" onclick="Management.logout()">Logout</button>
+    </div>
+</div>
+
+<!-- Add/Edit Tool Form -->
+<div class="form-container" id="toolFormContainer" style="display: none; margin-bottom: 30px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="color: #4fc3f7;" id="toolFormTitle">Add New Tool</h3>
+        <button class="btn btn-secondary" onclick="Management.hideForm()">Cancel</button>
+    </div>
+    
+    <form id="toolForm" onsubmit="Management.saveTool(event)">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="toolName">Tool Name:</label>
+                <input type="text" id="toolName" name="name" required placeholder="e.g., Sonarr, Radarr">
+            </div>
+            <div class="form-group">
+                <label for="toolUrl">URL:</label>
+                <input type="url" id="toolUrl" name="url" required placeholder="http://192.168.10.92:8989">
+            </div>
+        </div>
+        
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="toolUsername">Username/Login:</label>
+                <input type="text" id="toolUsername" name="username" placeholder="Login username (if needed)">
+            </div>
+            <div class="form-group">
+                <label for="toolPassword">Password:</label>
+                <input type="password" id="toolPassword" name="password" placeholder="Login password (if needed)">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="toolApiKey">API Key:</label>
+            <input type="text" id="toolApiKey" name="api_key" placeholder="API Key for *arr applications (Radarr/Sonarr)">
+            <small style="color: #888; margin-top: 5px; display: block;">
+                Get this from Settings → General → Security in your *arr application. Required for API access.
+            </small>
+        </div>
+        
+        <div class="form-group">
+            <label for="toolAccessType">Access Method:</label>
+            <select id="toolAccessType" name="access_type" style="width: 100%;">
+                <option value="iframe">📺 iframe Only (Embedded in app)</option>
+                <option value="new_tab">↗️ New Tab Only (External window)</option>
+                <option value="both">📺↗️ Both Methods Available</option>
+            </select>
+            <small style="color: #888; margin-top: 5px; display: block;">
+                iframe is best for local network tools. New Tab for external services that may block iframes.
+            </small>
+        </div>
+        
+        <div class="form-group">
+            <label for="toolNotes">Notes:</label>
+            <textarea id="toolNotes" name="notes" placeholder="Instructions, security notes, or important information..." rows="4"></textarea>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <button type="submit" class="btn">Save Tool</button>
+            <button type="button" class="btn btn-secondary" onclick="Management.hideForm()">Cancel</button>
+        </div>
+    </form>
+</div>
+
+<!-- Management Tools Grid -->
+<div class="management-tools-grid" id="managementToolsGrid">
+    <div class="card" style="text-align: center; color: #4fc3f7;">
+        <h3>Loading management tools...</h3>
+        <p>Please wait while we load your management panel.</p>
+    </div>
+</div>
+
+<!-- Password Modal -->
+<div id="managementPasswordModal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h3>Management Access</h3>
+        </div>
+        <div style="margin: 20px 0;">
+            <p style="color: #4fc3f7; margin-bottom: 20px;">This page requires authentication to access management tools.</p>
+            <div class="form-group">
+                <label for="managementPassword">Password:</label>
+                <input type="password" id="managementPassword" placeholder="Enter management password" style="width: 100%;">
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="btn" onclick="Management.verifyPassword()">Access Management</button>
+            </div>
+            <div id="passwordError" style="color: #f44336; text-align: center; margin-top: 10px; display: none;">
+                Incorrect password. Please try again.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Styles for Management Tools with Collapsible Credentials -->
+<style>
+/* Management Tools Grid */
+.management-tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+/* Individual Tool Card */
+.management-tool {
+    background: linear-gradient(135deg, #1e1e2e 0%, #2a2a3e 100%);
+    border: 1px solid #444;
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.management-tool:hover {
+    border-color: #4fc3f7;
+    box-shadow: 0 8px 25px rgba(79, 195, 247, 0.15);
+    transform: translateY(-2px);
+}
+
+/* Tool Header */
+.tool-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 10px;
+}
+
+.tool-name {
+    color: #4fc3f7;
+    margin: 0;
+    font-size: 1.2em;
+    font-weight: 600;
+}
+
+.tool-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* Access Buttons */
+.tool-access-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.tool-button {
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    text-decoration: none;
+    text-align: center;
+    transition: all 0.3s ease;
+    font-size: 14px;
+}
+
+.tool-button-iframe {
+    background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
+    color: white;
+}
+
+.tool-button-iframe:hover {
+    background: linear-gradient(135deg, #29b6f6 0%, #0288d1 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(79, 195, 247, 0.3);
+}
+
+.tool-button-newtab {
+    background: linear-gradient(135deg, #66bb6a 0%, #4caf50 100%);
+    color: white;
+}
+
+.tool-button-newtab:hover {
+    background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+/* Collapsible Credentials Toggle */
+.credentials-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(79, 195, 247, 0.1);
+    border: 1px solid rgba(79, 195, 247, 0.2);
+    border-radius: 8px;
+    padding: 12px 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 0;
+}
+
+.credentials-toggle:hover {
+    background: rgba(79, 195, 247, 0.15);
+    border-color: rgba(79, 195, 247, 0.3);
+}
+
+.credentials-toggle-text {
+    color: #4fc3f7;
+    font-weight: 600;
+    font-size: 0.9em;
+}
+
+.credentials-toggle-icon {
+    color: #4fc3f7;
+    font-size: 0.8em;
+    transition: transform 0.3s ease;
+}
+
+.credentials-toggle.expanded .credentials-toggle-icon {
+    transform: rotate(180deg);
+}
+
+/* Credentials Section - Collapsible */
+.tool-credentials {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 0 0 8px 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border: 1px solid rgba(79, 195, 247, 0.2);
+    border-top: none;
+    max-height: 0;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    opacity: 0;
+}
+
+.tool-credentials.expanded {
+    max-height: 500px;
+    opacity: 1;
+}
+
+.credential-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 5px 0;
+}
+
+.credential-row:last-child {
+    margin-bottom: 0;
+}
+
+.credential-label {
+    font-weight: 600;
+    color: #888;
+    min-width: 80px;
+}
+
+.credential-value {
+    color: #e0e0e0;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+    flex: 1;
+    text-align: right;
+}
+
+.credential-value:hover {
+    background-color: rgba(79, 195, 247, 0.1);
+    color: #4fc3f7;
+}
+
+.url-value {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    word-break: break-all;
+}
+
+/* Access Type Indicators */
+.access-type-iframe {
+    color: #4fc3f7 !important;
+}
+
+.access-type-new_tab {
+    color: #66bb6a !important;
+}
+
+.access-type-both {
+    color: #ffa726 !important;
+}
+
+/* Tool Notes */
+.tool-notes {
+    background: rgba(79, 195, 247, 0.1);
+    border-left: 4px solid #4fc3f7;
+    padding: 12px;
+    border-radius: 0 8px 8px 0;
+    margin-top: 15px;
+}
+
+.tool-notes strong {
+    color: #4fc3f7;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.tool-notes p {
+    margin: 0;
+    color: #e0e0e0;
+    line-height: 1.4;
+}
+
+/* iframe Modal Styles - FIXED FOR FULL SCREEN */
+.iframe-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.95);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 1vh 1vw;
+}
+
+.iframe-modal .modal-content {
+    max-width: 98vw;
+    max-height: 98vh;
+    width: 98vw;
+    height: 98vh;
+    padding: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #1e1e2e;
+    display: flex;
+    flex-direction: column;
+}
+
+.iframe-header {
+    background: linear-gradient(135deg, #2a2a3e 0%, #1e1e2e 100%);
+    border-bottom: 1px solid #444;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    min-height: 60px;
+}
+
+.iframe-header h3 {
+    color: #4fc3f7;
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.iframe-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.iframe-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.iframe-loader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #1e1e2e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.loader-content {
+    text-align: center;
+    color: #4fc3f7;
+}
+
+.loader-content .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(79, 195, 247, 0.3);
+    border-top: 4px solid #4fc3f7;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 15px;
+}
+
+.loader-content p {
+    margin: 0 0 5px;
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+.loader-content small {
+    opacity: 0.8;
+    font-size: 0.9rem;
+}
+
+#toolIframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #ffffff;
+    flex: 1;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .iframe-modal {
+        padding: 0;
+    }
+    
+    .iframe-modal .modal-content {
+        width: 100vw;
+        height: 100vh;
+        max-width: 100vw;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+    
+    .iframe-header {
+        padding: 12px 15px;
+        min-height: 50px;
+    }
+    
+    .iframe-header h3 {
+        font-size: 1rem;
+    }
+    
+    .iframe-controls .btn {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+    }
+}
