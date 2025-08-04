@@ -146,14 +146,13 @@ function updateGlobalFavicon(faviconUrl) {
 }
 
 
-// Page navigation with hash routing
 async function showPage(pageId) {
     try {
         console.log(`📄 Navigating to page: ${pageId}`);
         
-        // NEW: Clean up previous page if it was dashboard
+        // CRITICAL FIX: Clean up previous page if it was dashboard
         if (window.AppState.currentPage === 'dashboard' && window.Dashboard) {
-            console.log('📊 Leaving dashboard - stopping all refreshes');
+            console.log('📊 Leaving dashboard - stopping ALL refreshes and cleaning up');
             window.Dashboard.destroy();
         }
         
@@ -954,9 +953,14 @@ async init() {
     await this.loadStats();
     await this.loadContentStats();
     
-    // NEW: Preload live data immediately
-	await this.preloadLiveData();
-    this.startBackgroundRefresh();
+    // FIXED: Only start live data refresh if we're actually on dashboard page
+    if (window.AppState.currentPage === 'dashboard') {
+        await this.preloadLiveData();
+        this.startBackgroundRefresh();
+        console.log('✅ Dashboard fully initialized with live data refresh');
+    } else {
+        console.log('⚠️ Dashboard init called but not on dashboard page - skipping live refresh');
+    }
 },
     
     async loadStats() {
@@ -1386,21 +1390,20 @@ updateIPTVViewers(iptvData) {
     },
     
 destroy() {
-    console.log('📊 Dashboard destroyed - stopping all refreshes');
+    console.log('📊 Dashboard destroyed - stopping ALL refreshes and cleaning up');
     
     // Stop the expanded sections refresh
     this.stopAutoRefresh();
     
-    // Stop the background refresh  
-    if (this.backgroundRefreshInterval) {
-        clearInterval(this.backgroundRefreshInterval);
-        this.backgroundRefreshInterval = null;
-        console.log('📊 Stopped background refresh');
-    }
+    // Stop the background refresh (this is the critical fix)
+    this.stopBackgroundRefresh();
     
+    // Clear all cached data
     this.expandedSections.clear();
     this.cachedIPTVData = null;
     this.cachedPlexData = null;
+    
+    console.log('✅ Dashboard cleanup completed');
 },
 
 // NEW METHOD 1: Preload live data on dashboard init
@@ -1441,12 +1444,21 @@ async preloadLiveData() {
     }
 },
 
-// Background refresh every 30 seconds - runs when on dashboard page
 startBackgroundRefresh() {
-    if (this.backgroundRefreshInterval) return;
+    if (this.backgroundRefreshInterval) {
+        console.log('📊 Background refresh already running');
+        return;
+    }
     
     console.log('📊 Starting background refresh for dashboard');
     this.backgroundRefreshInterval = setInterval(async () => {
+        // CRITICAL CHECK: Only refresh if still on dashboard page
+        if (window.AppState.currentPage !== 'dashboard') {
+            console.log('🚫 Not on dashboard page - stopping background refresh');
+            this.stopBackgroundRefresh();
+            return;
+        }
+        
         try {
             console.log('🔄 Background refresh: Updating live data...');
             const [iptvResponse, plexResponse] = await Promise.allSettled([
@@ -1488,6 +1500,14 @@ startBackgroundRefresh() {
             console.error('❌ Background refresh error:', error);
         }
     }, 30000); // 30 seconds
+},
+
+stopBackgroundRefresh() {
+    if (this.backgroundRefreshInterval) {
+        clearInterval(this.backgroundRefreshInterval);
+        this.backgroundRefreshInterval = null;
+        console.log('📊 Stopped background refresh');
+    }
 }
 };
 

@@ -2109,7 +2109,7 @@ const userData = {
     const cron = require('node-cron');
     
     // Run every hour at minute 0
-    this.tokenRefreshJob = cron.schedule('0 * * * *', async () => {
+    this.tokenRefreshJob = cron.schedule('*/30 * * * *', async () => {
       console.log('⏰ Scheduled IPTV token refresh...');
       try {
         // Force fresh login by clearing current auth
@@ -2128,7 +2128,7 @@ const userData = {
       timezone: "America/Chicago"
     });
 
-    console.log('⏰ Token refresh job scheduled for every hour');
+    console.log('⏰ Token refresh job scheduled for every 30 minutes');
   }
 
   /**
