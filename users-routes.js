@@ -966,9 +966,9 @@ router.get('/expiring/:days', async (req, res) => {
   try {
     const days = parseInt(req.params.days) || 7;
     const users = await db.query(`
-      SELECT u.name, u.email, s.expiration_date, 
-             st.name as subscription_name, 
-             st.type as subscription_type
+      SELECT u.id, u.name, u.email, s.expiration_date, 
+       st.name as subscription_name, 
+       st.type as subscription_type
       FROM users u
       JOIN subscriptions s ON u.id = s.user_id
       JOIN subscription_types st ON s.subscription_type_id = st.id

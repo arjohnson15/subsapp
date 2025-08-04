@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('./database-config');
 const axios = require('axios');
 const { spawn } = require('child_process');
+const iptvService = require('./iptv-service');
 
 // GET /api/dashboard/stats - Combined endpoint for all dashboard data
 router.get('/stats', async (req, res) => {
@@ -96,6 +97,49 @@ router.post('/refresh-cache', async (req, res) => {
       error: 'Failed to refresh cache',
       message: error.message 
     });
+  }
+});
+
+// GET /api/dashboard/live-data - Real-time viewing data 
+router.get('/live-data', async (req, res) => {
+  try {
+    console.log('🔴 Loading real-time viewing data...');
+    
+    const [iptvLiveData, plexNowPlaying] = await Promise.allSettled([
+      getIPTVLiveViewers(),
+      getPlexNowPlaying()
+    ]);
+    
+    res.json({
+      iptv: iptvLiveData.status === 'fulfilled' ? iptvLiveData.value : { viewers: [], total: 0 },
+      plex: plexNowPlaying.status === 'fulfilled' ? plexNowPlaying.value : { sessions: [], total: 0 }
+    });
+    
+  } catch (error) {
+    console.error('Error loading live data:', error);
+    res.status(500).json({ error: 'Failed to load live data' });
+  }
+});
+
+// GET /api/dashboard/iptv-live - IPTV live streaming data only
+router.get('/iptv-live', async (req, res) => {
+  try {
+    const liveData = await getIPTVLiveViewers();
+    res.json(liveData);
+  } catch (error) {
+    console.error('Error loading IPTV live data:', error);
+    res.json({ viewers: [], total: 0, error: 'Failed to load IPTV live data' });
+  }
+});
+
+// GET /api/dashboard/plex-now-playing - Plex now playing sessions only  
+router.get('/plex-now-playing', async (req, res) => {
+  try {
+    const nowPlaying = await getPlexNowPlaying();
+    res.json(nowPlaying);
+  } catch (error) {
+    console.error('Error loading Plex now playing:', error);
+    res.json({ sessions: [], total: 0, error: 'Failed to load Plex sessions' });
   }
 });
 
@@ -469,6 +513,132 @@ function getDefaultPlexStats() {
     audioBooks: 0,
     lastUpdate: 'Not available'
   };
+}
+
+// NEW: Get live IPTV viewers from panel API using existing iptv-service
+async function getIPTVLiveViewers() {
+  try {
+    console.log('🔴 Getting live IPTV viewers using authenticated service...');
+    
+    // Import the existing IPTV service
+    const iptvService = require('./iptv-service');
+    
+    // Ensure we're authenticated
+    await iptvService.initialize();
+    
+    if (!iptvService.isAuthenticated()) {
+      console.log('🔐 Not authenticated, attempting login...');
+      await iptvService.ensureAuthenticated();
+    }
+    
+    // Make authenticated request to lines/data endpoint
+    const response = await axios.post('https://panel.pinkpony.lol/lines/data', {}, {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': iptvService.csrfToken,
+        'Cookie': iptvService.sessionCookies,
+        'User-Agent': 'Mozilla/5.0 (compatible; JohnsonFlix/1.0)',
+        'Accept': 'application/json',
+        'Referer': 'https://panel.pinkpony.lol/dashboard',
+        'Origin': 'https://panel.pinkpony.lol'
+      },
+      timeout: 15000
+    });
+    
+    console.log('📡 IPTV Panel API Response Status:', response.status);
+    console.log('📡 IPTV Panel API Response Data Type:', typeof response.data);
+    
+    if (!response.data || !Array.isArray(response.data)) {
+      console.warn('⚠️ Invalid response format from IPTV Panel API');
+      return { viewers: [], total: 0, error: 'Invalid API response format' };
+    }
+    
+    console.log(`📊 Total lines from API: ${response.data.length}`);
+    
+    // Filter only active connections and map to useful format
+    const activeViewers = response.data
+      .filter(user => user.active_connections > 0)
+      .map(user => ({
+        username: user.username || 'Unknown',
+        streamName: user.stream_display_name || 'Unknown Stream',
+        activeConnections: user.active_connections || 0,
+        maxConnections: user.user_connection || 2,
+        watchIP: user.watch_ip || 'Unknown',
+        expireDate: user.exp_date || 'Unknown',
+        isOwner: user.owner === 'johnsonflix'
+      }));
+    
+    console.log(`🔴 Found ${activeViewers.length} active IPTV viewers out of ${response.data.length} total lines`);
+    
+    // Log some example data for debugging (without sensitive info)
+    if (activeViewers.length > 0) {
+      console.log('📺 Sample active viewer:', {
+        username: activeViewers[0].username,
+        streamName: activeViewers[0].streamName,
+        connections: `${activeViewers[0].activeConnections}/${activeViewers[0].maxConnections}`
+      });
+    }
+    
+    return {
+      viewers: activeViewers,
+      total: activeViewers.length,
+      totalConnections: activeViewers.reduce((sum, viewer) => sum + viewer.activeConnections, 0),
+      lastUpdate: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.error('❌ Error getting IPTV live viewers:', error.message);
+    
+    // More detailed error logging
+    if (error.response) {
+      console.error('❌ API Response Status:', error.response.status);
+      console.error('❌ API Response Data:', error.response.data);
+      
+      // If it's a CSRF error, the session may have expired
+      if (error.response.status === 419) {
+        console.log('🔐 CSRF token expired, clearing authentication...');
+        const iptvService = require('./iptv-service');
+        iptvService.csrfToken = null;
+        iptvService.sessionCookies = null;
+        iptvService.csrfExpires = null;
+      }
+    } else if (error.request) {
+      console.error('❌ No response received from API');
+    } else {
+      console.error('❌ Error setting up request:', error.message);
+    }
+    
+    return { 
+      viewers: [], 
+      total: 0, 
+      error: `Failed to load IPTV viewers: ${error.message}` 
+    };
+  }
+}
+
+// NEW: Get Plex now playing sessions (placeholder for now)
+async function getPlexNowPlaying() {
+  try {
+    console.log('🎬 Getting Plex now playing sessions...');
+    
+    // TODO: Implement Plex sessions API calls
+    // For now, return empty data
+    console.log('⚠️ Plex now playing not implemented yet');
+    
+    return {
+      sessions: [],
+      total: 0,
+      lastUpdate: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.error('❌ Error getting Plex now playing:', error.message);
+    return { 
+      sessions: [], 
+      total: 0, 
+      error: `Failed to load Plex sessions: ${error.message}` 
+    };
+  }
 }
 
 module.exports = router;
