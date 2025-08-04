@@ -151,7 +151,7 @@ async function showPage(pageId) {
     try {
         console.log(`📄 Navigating to page: ${pageId}`);
         
-        // NEW: Clean up previous page
+        // NEW: Clean up previous page if it was dashboard
         if (window.AppState.currentPage === 'dashboard' && window.Dashboard) {
             console.log('📊 Leaving dashboard - stopping all refreshes');
             window.Dashboard.destroy();
@@ -955,8 +955,8 @@ async init() {
     await this.loadContentStats();
     
     // NEW: Preload live data immediately
-    await this.preloadLiveData();
-	this.startBackgroundRefresh();
+	await this.preloadLiveData();
+    this.startBackgroundRefresh();
 },
     
     async loadStats() {
@@ -1391,7 +1391,7 @@ destroy() {
     // Stop the expanded sections refresh
     this.stopAutoRefresh();
     
-    // Stop the background refresh
+    // Stop the background refresh  
     if (this.backgroundRefreshInterval) {
         clearInterval(this.backgroundRefreshInterval);
         this.backgroundRefreshInterval = null;
@@ -1435,7 +1435,6 @@ async preloadLiveData() {
             }
         }
         
-        this.startBackgroundRefresh();
         
     } catch (error) {
         console.error('❌ Error preloading live data:', error);

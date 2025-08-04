@@ -471,39 +471,38 @@
 </style>
 
 <script>
-// Enhanced Dashboard Module matching your existing structure
+// Simplified Dashboard Module - Content Stats Only (No Live Streaming)
 window.Dashboard = {
     expandedSections: new Set(),
-    autoRefreshInterval: null,
     
     async init() {
-        console.log('?? Initializing collapsible dashboard...');
+        console.log('📊 Initializing dashboard (content stats only)...');
         
         // Load users first if they're not already loaded
         if (!window.AppState || !window.AppState.users || window.AppState.users.length === 0) {
-            console.log('?? Dashboard: Loading users for stats...');
+            console.log('📊 Dashboard: Loading users for stats...');
             try {
                 const users = await API.User.getAll();
                 if (!window.AppState) window.AppState = {};
                 window.AppState.users = users;
                 window.AppState.allUsers = users;
-                console.log(`?? Dashboard: Loaded ${users.length} users for stats`);
+                console.log(`📊 Dashboard: Loaded ${users.length} users for stats`);
             } catch (error) {
-                console.error('?? Dashboard: Error loading users:', error);
+                console.error('📊 Dashboard: Error loading users:', error);
                 if (!window.AppState) window.AppState = {};
                 window.AppState.users = [];
             }
         }
         
-        // Load initial stats (no live data)
+        // Load initial stats (content counts only)
         await this.loadStats();
         
-        console.log('?? Dashboard initialized (live data loads on demand)');
+        console.log('📊 Dashboard initialized (content stats only)');
     },
     
     async loadStats() {
         try {
-            console.log('?? Loading dashboard statistics...');
+            console.log('📊 Loading dashboard statistics...');
             const response = await fetch('/api/dashboard/stats');
             const stats = await response.json();
             
@@ -522,184 +521,11 @@ window.Dashboard = {
             this.updateIPTVStats(stats.iptv);
             this.updatePlexStats(stats.plex);
             
-            console.log('?? Dashboard stats loaded successfully');
+            console.log('📊 Dashboard stats loaded successfully');
             
         } catch (error) {
             console.error('Error loading dashboard stats:', error);
         }
-    },
-    
-    async toggleLiveSection(type) {
-        const section = document.getElementById(`${type}LiveSection`);
-        const isExpanded = section.classList.contains('expanded');
-        
-        if (isExpanded) {
-            // Collapse section
-            section.classList.remove('expanded');
-            this.expandedSections.delete(type);
-            console.log(`?? Collapsed ${type} live section`);
-            
-            // Stop auto-refresh if no sections are expanded
-            if (this.expandedSections.size === 0) {
-                this.stopAutoRefresh();
-            }
-        } else {
-            // Expand section and load data
-            section.classList.add('expanded');
-            this.expandedSections.add(type);
-            console.log(`?? Expanded ${type} live section`);
-            
-            // Start auto-refresh if this is the first expanded section
-            if (this.expandedSections.size === 1) {
-                this.startAutoRefresh();
-            }
-            
-            // Load data for this section
-            await this.loadLiveDataForSection(type);
-        }
-    },
-    
-    async loadLiveDataForSection(type) {
-        try {
-            if (type === 'iptv') {
-                console.log('?? Loading IPTV live viewers...');
-                const response = await fetch('/api/dashboard/iptv-live');
-                const iptvData = await response.json();
-                this.updateIPTVViewers(iptvData);
-            } else if (type === 'plex') {
-                console.log('?? Loading Plex sessions...');
-                const response = await fetch('/api/dashboard/plex-now-playing');
-                const plexData = await response.json();
-                this.updatePlexSessions(plexData);
-            }
-        } catch (error) {
-            console.error(`Error loading ${type} live data:`, error);
-            this.setLiveDataError(type);
-        }
-    },
-    
-    startAutoRefresh() {
-        if (this.autoRefreshInterval) return;
-        
-        console.log('?? Starting auto-refresh for expanded sections');
-        this.autoRefreshInterval = setInterval(() => {
-            this.expandedSections.forEach(type => {
-                this.loadLiveDataForSection(type);
-            });
-        }, 30000); // 30 seconds
-    },
-    
-    stopAutoRefresh() {
-        if (this.autoRefreshInterval) {
-            clearInterval(this.autoRefreshInterval);
-            this.autoRefreshInterval = null;
-            console.log('?? Stopped auto-refresh');
-        }
-    },
-    
-    async refreshIPTVViewers() {
-        console.log('?? Manual refresh IPTV viewers...');
-        const container = document.getElementById('iptvViewersContainer');
-        if (container) {
-            container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Refreshing...</div>';
-        }
-        await this.loadLiveDataForSection('iptv');
-    },
-    
-    async refreshPlexSessions() {
-        console.log('?? Manual refresh Plex sessions...');
-        const container = document.getElementById('plexSessionsContainer');
-        if (container) {
-            container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Refreshing...</div>';
-        }
-        await this.loadLiveDataForSection('plex');
-    },
-    
-    updatePlexSessions(plexData) {
-        const container = document.getElementById('plexSessionsContainer');
-        const countElement = document.getElementById('plexSessionCount');
-        
-        if (!container) return;
-        
-        if (!plexData.sessions || plexData.sessions.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-pause"></i>
-                    <p>No active sessions</p>
-                </div>
-            `;
-            if (countElement) countElement.textContent = '0';
-            return;
-        }
-        
-        if (countElement) {
-            countElement.textContent = plexData.sessions.length.toString();
-        }
-        
-        const sessionsHtml = plexData.sessions.map(session => {
-            const posterUrl = session.thumb ? 
-                `${session.serverUrl || ''}${session.thumb}${session.token ? '?X-Plex-Token=' + session.token : ''}` : 
-                '';
-            
-            const statusClass = session.state === 'playing' ? 'status-playing' : 
-                               session.state === 'paused' ? 'status-paused' : 'status-buffering';
-            
-            return `
-                <div class="plex-session-card">
-                    <div class="session-poster" style="background-image: url('${posterUrl}')"></div>
-                    <div class="session-info">
-                        <div class="session-title">${this.escapeHtml(session.title)}</div>
-                        <div class="session-subtitle">${this.escapeHtml(session.subtitle || '')}</div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${session.progress || 0}%"></div>
-                        </div>
-                        <div class="session-meta">
-                            <span><span class="status-indicator ${statusClass}"></span>${this.escapeHtml(session.user)}</span>
-                            <span>${session.quality || 'Unknown'}</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-        
-        container.innerHTML = '<div class="plex-sessions-grid">' + sessionsHtml + '</div>';
-    },
-    
-    updateIPTVViewers(iptvData) {
-        const container = document.getElementById('iptvViewersContainer');
-        const countElement = document.getElementById('iptvViewerCount');
-        
-        if (!container) return;
-        
-        if (!iptvData.viewers || iptvData.viewers.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-tv"></i>
-                    <p>No active viewers</p>
-                </div>
-            `;
-            if (countElement) countElement.textContent = '0';
-            return;
-        }
-        
-        if (countElement) {
-            countElement.textContent = iptvData.viewers.length.toString();
-        }
-        
-        const viewersHtml = iptvData.viewers.map(viewer => `
-            <div class="iptv-viewer-card">
-                <div class="viewer-header">
-                    <span class="viewer-username">${this.escapeHtml(viewer.username)}</span>
-                    <span class="viewer-connections">${viewer.activeConnections}/${viewer.maxConnections}</span>
-                </div>
-                <div class="viewer-stream">${this.escapeHtml(viewer.streamName)}</div>
-                <div class="viewer-meta">
-                    ${viewer.watchIP} • ${viewer.expireDate}
-                </div>
-            </div>
-        `).join('');
-        
-        container.innerHTML = '<div class="iptv-viewers-grid">' + viewersHtml + '</div>';
     },
     
     updateIPTVStats(iptvStats) {
@@ -753,19 +579,8 @@ window.Dashboard = {
     },
     
     destroy() {
-        this.stopAutoRefresh();
         this.expandedSections.clear();
-        console.log('?? Dashboard destroyed');
+        console.log('📊 Dashboard destroyed');
     }
 };
-
-// Auto-initialize when the dashboard loads
-if (typeof API !== 'undefined') {
-    Dashboard.init();
-} else {
-    // Wait for API to be available if not loaded yet
-    document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => Dashboard.init(), 100);
-    });
-}
 </script>
