@@ -149,7 +149,13 @@ function updateGlobalFavicon(faviconUrl) {
 // Page navigation with hash routing
 async function showPage(pageId) {
     try {
-        console.log(`?? Navigating to page: ${pageId}`);
+        console.log(`📄 Navigating to page: ${pageId}`);
+        
+        // NEW: Clean up previous page
+        if (window.AppState.currentPage === 'dashboard' && window.Dashboard) {
+            console.log('📊 Leaving dashboard - stopping all refreshes');
+            window.Dashboard.destroy();
+        }
         
         // Update hash
         Utils.updateUrlHash(pageId);
@@ -164,7 +170,7 @@ async function showPage(pageId) {
         // Update current page state
         window.AppState.currentPage = pageId;
         
-        console.log(`? Loaded page: ${pageId}`);
+        console.log(`✅ Loaded page: ${pageId}`);
     } catch (error) {
         console.error(`Error loading page ${pageId}:`, error);
         Utils.handleError(error, `Loading ${pageId} page`);
@@ -925,6 +931,9 @@ function handleHashChange() {
 window.Dashboard = {
 	expandedSections: new Set(),
     autoRefreshInterval: null,
+	backgroundRefreshInterval: null,
+    cachedIPTVData: null,
+    cachedPlexData: null,
 async init() {
     console.log('📊 Initializing enhanced dashboard...');
     
@@ -947,6 +956,7 @@ async init() {
     
     // NEW: Preload live data immediately
     await this.preloadLiveData();
+	this.startBackgroundRefresh();
 },
     
     async loadStats() {
@@ -1375,18 +1385,23 @@ updateIPTVViewers(iptvData) {
         return div.innerHTML;
     },
     
-    destroy() {
-        this.stopAutoRefresh();
-        
-        // NEW: Stop background refresh
-        if (this.backgroundRefreshInterval) {
-            clearInterval(this.backgroundRefreshInterval);
-            this.backgroundRefreshInterval = null;
-        }
-        
-        this.expandedSections.clear();
-        console.log('📊 Dashboard destroyed');
-    },
+destroy() {
+    console.log('📊 Dashboard destroyed - stopping all refreshes');
+    
+    // Stop the expanded sections refresh
+    this.stopAutoRefresh();
+    
+    // Stop the background refresh
+    if (this.backgroundRefreshInterval) {
+        clearInterval(this.backgroundRefreshInterval);
+        this.backgroundRefreshInterval = null;
+        console.log('📊 Stopped background refresh');
+    }
+    
+    this.expandedSections.clear();
+    this.cachedIPTVData = null;
+    this.cachedPlexData = null;
+},
 
 // NEW METHOD 1: Preload live data on dashboard init
 async preloadLiveData() {
@@ -1427,12 +1442,14 @@ async preloadLiveData() {
     }
 },
 
-// NEW METHOD 2: Background refresh every 30 seconds
+// Background refresh every 30 seconds - runs when on dashboard page
 startBackgroundRefresh() {
     if (this.backgroundRefreshInterval) return;
     
+    console.log('📊 Starting background refresh for dashboard');
     this.backgroundRefreshInterval = setInterval(async () => {
         try {
+            console.log('🔄 Background refresh: Updating live data...');
             const [iptvResponse, plexResponse] = await Promise.allSettled([
                 fetch('/api/dashboard/iptv-live'),
                 fetch('/api/dashboard/plex-now-playing')
@@ -1441,38 +1458,37 @@ startBackgroundRefresh() {
             if (iptvResponse.status === 'fulfilled') {
                 this.cachedIPTVData = await iptvResponse.value.json();
                 
-                // NEW: Update count even when collapsed
+                // Update count even when collapsed
                 const iptvCountElement = document.getElementById('iptvViewerCount');
                 if (iptvCountElement && this.cachedIPTVData.viewers) {
                     iptvCountElement.textContent = this.cachedIPTVData.viewers.length.toString();
+                }
+                
+                // Update displayed data if section is expanded
+                if (this.expandedSections.has('iptv')) {
+                    this.updateIPTVViewers(this.cachedIPTVData);
                 }
             }
             
             if (plexResponse.status === 'fulfilled') {
                 this.cachedPlexData = await plexResponse.value.json();
                 
-                // NEW: Update count even when collapsed
+                // Update count even when collapsed
                 const plexCountElement = document.getElementById('plexSessionCount');
                 if (plexCountElement && this.cachedPlexData.sessions) {
                     plexCountElement.textContent = this.cachedPlexData.sessions.length.toString();
                 }
-            }
-            
-            // Update any currently expanded sections with full data
-            this.expandedSections.forEach(type => {
-                if (type === 'iptv' && this.cachedIPTVData) {
-                    this.updateIPTVViewers(this.cachedIPTVData);
-                } else if (type === 'plex' && this.cachedPlexData) {
+                
+                // Update displayed data if section is expanded
+                if (this.expandedSections.has('plex')) {
                     this.updatePlexSessions(this.cachedPlexData);
                 }
-            });
+            }
             
         } catch (error) {
             console.error('❌ Background refresh error:', error);
         }
-    }, 30000);
-    
-    console.log('🔄 Background refresh started');
+    }, 30000); // 30 seconds
 }
 };
 
