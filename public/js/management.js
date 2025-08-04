@@ -4,7 +4,7 @@ const Management = {
     editingToolId: null,
     
     async init() {
-        console.log('🔧 Initializing Management Panel...');
+        console.log('?? Initializing Management Panel...');
         
         // Check if user is already authenticated (session storage)
         const authToken = sessionStorage.getItem('managementAuth');
@@ -15,7 +15,7 @@ const Management = {
             const fourHoursAgo = Date.now() - (4 * 60 * 60 * 1000);
             if (parseInt(authTime) > fourHoursAgo && authToken === 'authenticated') {
                 this.authenticated = true;
-                console.log('✅ User already authenticated via session');
+                console.log('? User already authenticated via session');
             }
         }
         
@@ -27,9 +27,9 @@ const Management = {
         try {
             await this.loadTools();
             this.renderTools();
-            console.log('✅ Management Panel initialized');
+            console.log('? Management Panel initialized');
         } catch (error) {
-            console.error('❌ Management initialization failed:', error);
+            console.error('? Management initialization failed:', error);
             Utils.handleError(error, 'Management initialization');
         }
     },
@@ -78,12 +78,12 @@ const Management = {
             return;
         }
         
-        console.log('🔐 Verifying password...');
+        console.log('?? Verifying password...');
         
         // CLIENT-SIDE PASSWORD CHECK - NO API CALL
         if (enteredPassword === 'Gunshy@1') {
             // Correct password
-            console.log('✅ Password correct, granting access');
+            console.log('? Password correct, granting access');
             this.authenticated = true;
             
             // Store authentication in session (expires in 4 hours)
@@ -105,7 +105,7 @@ const Management = {
             Utils.showNotification('Management access granted', 'success');
         } else {
             // Wrong password
-            console.log('❌ Incorrect password entered');
+            console.log('? Incorrect password entered');
             if (errorDiv) {
                 errorDiv.textContent = 'Incorrect password. Please try again.';
                 errorDiv.style.display = 'block';
@@ -127,14 +127,14 @@ const Management = {
             await this.loadTools();
             this.renderTools();
         } catch (error) {
-            console.error('❌ Error loading tools:', error);
+            console.error('? Error loading tools:', error);
             Utils.handleError(error, 'Loading management tools');
         }
     },
     
     async loadTools() {
         try {
-            console.log('📥 Loading management tools...');
+            console.log('?? Loading management tools...');
             
             const settings = await API.Settings.getAll();
             const toolsData = settings.management_tools;
@@ -147,9 +147,9 @@ const Management = {
                 await this.saveTools();
             }
             
-            console.log(`📋 Loaded ${this.tools.length} management tools`);
+            console.log(`?? Loaded ${this.tools.length} management tools`);
         } catch (error) {
-            console.error('❌ Error loading management tools:', error);
+            console.error('? Error loading management tools:', error);
             this.tools = this.getDefaultTools();
         }
     },
@@ -191,15 +191,15 @@ const Management = {
     
     async saveTools() {
         try {
-            console.log('💾 Saving management tools...');
+            console.log('?? Saving management tools...');
             
             await API.Settings.update({
                 management_tools: this.tools
             });
             
-            console.log('✅ Management tools saved');
+            console.log('? Management tools saved');
         } catch (error) {
-            console.error('❌ Error saving management tools:', error);
+            console.error('? Error saving management tools:', error);
             Utils.handleError(error, 'Saving management tools');
         }
     },
@@ -229,7 +229,7 @@ const Management = {
             if (accessType === 'iframe' || accessType === 'both') {
                 accessButtons += `
                     <button class="tool-button tool-button-iframe" onclick="Management.openInIframe('${tool.id}')" title="Open in embedded iframe">
-                        📺 Open in App
+                        ?? Open in App
                     </button>
                 `;
             }
@@ -237,7 +237,7 @@ const Management = {
             if (accessType === 'new_tab' || accessType === 'both') {
                 accessButtons += `
                     <button class="tool-button tool-button-newtab" onclick="Management.openInNewTab('${tool.id}')" title="Open in new browser tab">
-                        ↗️ Open in New Tab
+                        ?? Open in New Tab
                     </button>
                 `;
             }
@@ -259,7 +259,7 @@ const Management = {
                     <!-- Collapsible Credentials Toggle -->
                     <div class="credentials-toggle" onclick="Management.toggleCredentials('${tool.id}')">
                         <span class="credentials-toggle-text">Show Details</span>
-                        <span class="credentials-toggle-icon">▼</span>
+                        <span class="credentials-toggle-icon">?</span>
                     </div>
                     
                     <!-- Collapsible Credentials Section -->
@@ -297,9 +297,9 @@ const Management = {
                         <div class="credential-row">
                             <span class="credential-label">Access:</span>
                             <span class="credential-value access-type-${accessType}">
-                                ${accessType === 'both' ? '📺↗️ Both Methods' : 
-                                  accessType === 'iframe' ? '📺 iframe Only' : 
-                                  '↗️ New Tab Only'}
+                                ${accessType === 'both' ? '???? Both Methods' : 
+                                  accessType === 'iframe' ? '?? iframe Only' : 
+                                  '?? New Tab Only'}
                             </span>
                         </div>
                         
@@ -314,7 +314,7 @@ const Management = {
             `;
         }).join('');
         
-        console.log(`✅ Rendered ${this.tools.length} management tools`);
+        console.log(`? Rendered ${this.tools.length} management tools`);
     },
     
     openInNewTab(toolId) {
@@ -324,7 +324,7 @@ const Management = {
             return;
         }
         
-        console.log(`↗️ Opening ${tool.name} in new tab: ${tool.url}`);
+        console.log(`?? Opening ${tool.name} in new tab: ${tool.url}`);
         window.open(tool.url, '_blank');
         Utils.showNotification(`Opening ${tool.name} in new tab`, 'info');
     },
@@ -343,80 +343,92 @@ const Management = {
             return;
         }
         
-        console.log(`📺 Opening ${tool.name} in iframe: ${tool.url}`);
+        console.log(`?? Opening ${tool.name} in iframe: ${tool.url}`);
         this.showIframeModal(tool);
     },
     
-    showIframeModal(tool) {
-        // Create modal if it doesn't exist
-        let modal = document.getElementById('iframeModal');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'iframeModal';
-            modal.className = 'modal iframe-modal';
-            document.body.appendChild(modal);
-        }
-        
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="iframe-header">
-                    <h3>${tool.name}</h3>
-                    <div class="iframe-controls">
-                        <button class="btn btn-small" onclick="Management.refreshIframe()" title="Refresh">
-                            🔄 Refresh
-                        </button>
-                        <button class="btn btn-small" onclick="Management.openInNewTab('${tool.id}')" title="Open in new tab">
-                            ↗️ New Tab
-                        </button>
-                        <button class="btn btn-small btn-secondary" onclick="Management.closeIframeModal()" title="Close">
-                            ✕ Close
-                        </button>
+showIframeModal(tool) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('iframeModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'iframeModal';
+        modal.className = 'modal iframe-modal';
+        modal.style.display = 'none';
+        document.body.appendChild(modal);
+    }
+    
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="iframe-header">
+                <h3>${tool.name}</h3>
+                <div class="iframe-controls">
+                    <button class="btn btn-small" onclick="Management.refreshIframe()" title="Refresh">
+                        🔄 Refresh
+                    </button>
+                    <button class="btn btn-small" onclick="Management.openInNewTab('${tool.id}')" title="Open in new tab">
+                        ↗️ New Tab
+                    </button>
+                    <button class="btn btn-small btn-secondary" onclick="Management.closeIframeModal()" title="Close">
+                        ✕ Close
+                    </button>
+                </div>
+            </div>
+            <div class="iframe-container">
+                <div class="iframe-loader" id="iframeLoader">
+                    <div class="loader-content">
+                        <div class="spinner"></div>
+                        <p>Loading ${tool.name}...</p>
+                        <small>This may take a few moments</small>
                     </div>
                 </div>
-                <div class="iframe-container">
-                    <div class="iframe-loader" id="iframeLoader">
-                        <div class="loader-content">
-                            <div class="spinner"></div>
-                            <p>Loading ${tool.name}...</p>
-                            <small>This may take a few moments</small>
-                        </div>
-                    </div>
-                    <iframe id="toolIframe" src="/api/management/tools/${tool.id}/proxy" style="display: none;"></iframe>
+                <iframe id="toolIframe" src="/api/management/tools/${tool.id}/proxy" style="display: none;"></iframe>
+            </div>
+        </div>
+    `;
+    
+    modal.style.display = 'flex';
+    
+    // Prevent body scrolling
+    document.body.style.overflow = 'hidden';
+    
+    // Handle iframe load
+    const iframe = document.getElementById('toolIframe');
+    const loader = document.getElementById('iframeLoader');
+    
+    iframe.onload = () => {
+        loader.style.display = 'none';
+        iframe.style.display = 'block';
+        console.log(`✅ ${tool.name} loaded in iframe`);
+    };
+    
+    iframe.onerror = () => {
+        loader.innerHTML = `
+            <div class="loader-content">
+                <p style="color: #f44336;">Failed to load ${tool.name}</p>
+                <small>This service may not support iframe embedding</small>
+                <div style="margin-top: 15px;">
+                    <button class="btn" onclick="Management.openInNewTab('${tool.id}')">
+                        Open in New Tab Instead
+                    </button>
                 </div>
             </div>
         `;
-        
-        modal.style.display = 'flex';
-        
-        // Handle iframe load
-        const iframe = document.getElementById('toolIframe');
-        const loader = document.getElementById('iframeLoader');
-        
-        iframe.onload = () => {
-            loader.style.display = 'none';
-            iframe.style.display = 'block';
-            console.log(`✅ ${tool.name} loaded in iframe`);
-        };
-        
-        iframe.onerror = () => {
-            loader.innerHTML = `
-                <div class="loader-content">
-                    <p style="color: #f44336;">Failed to load ${tool.name}</p>
-                    <small>This service may not support iframe embedding</small>
-                    <div style="margin-top: 15px;">
-                        <button class="btn" onclick="Management.openInNewTab('${tool.id}')">
-                            Open in New Tab Instead
-                        </button>
-                    </div>
-                </div>
-            `;
-        };
-        
-        // Add escape key handler
-        document.addEventListener('keydown', this.handleIframeKeydown);
-        
-        Utils.showNotification(`Opening ${tool.name} in iframe`, 'info');
-    },
+    };
+    
+    // Add escape key handler
+    const keyHandler = (event) => {
+        if (event.key === 'Escape') {
+            Management.closeIframeModal();
+        }
+    };
+    document.addEventListener('keydown', keyHandler);
+    
+    // Store handler for cleanup
+    modal.keyHandler = keyHandler;
+    
+    Utils.showNotification(`Opening ${tool.name} in iframe`, 'info');
+},
     
     refreshIframe() {
         const iframe = document.getElementById('toolIframe');
@@ -430,13 +442,21 @@ const Management = {
         }
     },
     
-    closeIframeModal() {
-        const modal = document.getElementById('iframeModal');
-        if (modal) {
-            modal.style.display = 'none';
+closeIframeModal() {
+    const modal = document.getElementById('iframeModal');
+    if (modal) {
+        modal.style.display = 'none';
+        
+        // Clean up event listener
+        if (modal.keyHandler) {
+            document.removeEventListener('keydown', modal.keyHandler);
+            delete modal.keyHandler;
         }
-        document.removeEventListener('keydown', this.handleIframeKeydown);
-    },
+    }
+    
+    // Restore body scrolling
+    document.body.style.overflow = '';
+},
     
     handleIframeKeydown(event) {
         if (event.key === 'Escape') {
@@ -515,7 +535,7 @@ const Management = {
                 const toolIndex = this.tools.findIndex(t => t.id === this.editingToolId);
                 if (toolIndex !== -1) {
                     this.tools[toolIndex] = { ...this.tools[toolIndex], ...toolData };
-                    console.log(`✏️ Updated tool: ${toolData.name}`);
+                    console.log(`?? Updated tool: ${toolData.name}`);
                     Utils.showNotification(`Updated ${toolData.name}`, 'success');
                 }
             } else {
@@ -525,7 +545,7 @@ const Management = {
                     ...toolData
                 };
                 this.tools.push(newTool);
-                console.log(`➕ Added new tool: ${toolData.name}`);
+                console.log(`? Added new tool: ${toolData.name}`);
                 Utils.showNotification(`Added ${toolData.name}`, 'success');
             }
             
@@ -534,7 +554,7 @@ const Management = {
             this.hideForm();
             
         } catch (error) {
-            console.error('❌ Error saving tool:', error);
+            console.error('? Error saving tool:', error);
             Utils.handleError(error, 'Saving tool');
         }
     },
@@ -549,10 +569,10 @@ const Management = {
                 await this.saveTools();
                 this.renderTools();
                 
-                console.log(`🗑️ Deleted tool: ${tool.name}`);
+                console.log(`??? Deleted tool: ${tool.name}`);
                 Utils.showNotification(`Deleted ${tool.name}`, 'success');
             } catch (error) {
-                console.error('❌ Error deleting tool:', error);
+                console.error('? Error deleting tool:', error);
                 Utils.handleError(error, 'Deleting tool');
             }
         }
@@ -625,8 +645,8 @@ window.Management = Management;
 // Initialize when page loads
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        console.log('📋 Management module ready for initialization');
+        console.log('?? Management module ready for initialization');
     });
 } else {
-    console.log('📋 Management module loaded');
+    console.log('?? Management module loaded');
 }
