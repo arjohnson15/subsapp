@@ -548,16 +548,43 @@ async function getIPTVLiveViewers() {
     console.log('📡 IPTV Panel API Response Status:', response.status);
     console.log('📡 IPTV Panel API Response Data Type:', typeof response.data);
     
-    if (!response.data || !Array.isArray(response.data)) {
-      console.warn('⚠️ Invalid response format from IPTV Panel API');
-      return { viewers: [], total: 0, error: 'Invalid API response format' };
+    // DEBUG: Let's see what we actually got
+    console.log('🔍 DEBUG: Response data keys:', Object.keys(response.data || {}));
+    console.log('🔍 DEBUG: Response data sample:', JSON.stringify(response.data).substring(0, 200));
+    
+    let userData = response.data;
+    
+    // Handle different response formats
+    if (typeof userData === 'object' && !Array.isArray(userData)) {
+      // If it's an object, check common property names that might contain the array
+      if (userData.data && Array.isArray(userData.data)) {
+        userData = userData.data;
+      } else if (userData.lines && Array.isArray(userData.lines)) {
+        userData = userData.lines;
+      } else if (userData.users && Array.isArray(userData.users)) {
+        userData = userData.users;
+      } else {
+        // If it's an object but not wrapped, try to convert object values to array
+        const values = Object.values(userData);
+        if (values.length > 0 && typeof values[0] === 'object' && values[0].hasOwnProperty('active_connections')) {
+          userData = values;
+        } else {
+          console.error('🔍 DEBUG: Could not find user array in response:', userData);
+          return { viewers: [], total: 0, error: 'Could not parse user data from API response' };
+        }
+      }
     }
     
-    console.log(`📊 Total lines from API: ${response.data.length}`);
+    if (!Array.isArray(userData)) {
+      console.warn('⚠️ Still not an array after parsing attempts');
+      return { viewers: [], total: 0, error: 'API response is not in expected format' };
+    }
+    
+    console.log(`📊 Total lines from API: ${userData.length}`);
     
     // Filter only active connections and map to useful format
-    const activeViewers = response.data
-      .filter(user => user.active_connections > 0)
+    const activeViewers = userData
+      .filter(user => user && user.active_connections > 0)
       .map(user => ({
         username: user.username || 'Unknown',
         streamName: user.stream_display_name || 'Unknown Stream',
@@ -568,7 +595,7 @@ async function getIPTVLiveViewers() {
         isOwner: user.owner === 'johnsonflix'
       }));
     
-    console.log(`🔴 Found ${activeViewers.length} active IPTV viewers out of ${response.data.length} total lines`);
+    console.log(`🔴 Found ${activeViewers.length} active IPTV viewers out of ${userData.length} total lines`);
     
     // Log some example data for debugging (without sensitive info)
     if (activeViewers.length > 0) {
@@ -602,10 +629,6 @@ async function getIPTVLiveViewers() {
         iptvService.sessionCookies = null;
         iptvService.csrfExpires = null;
       }
-    } else if (error.request) {
-      console.error('❌ No response received from API');
-    } else {
-      console.error('❌ Error setting up request:', error.message);
     }
     
     return { 
