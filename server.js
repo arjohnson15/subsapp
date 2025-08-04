@@ -23,7 +23,7 @@ const emailService = require('./email-service');
 const iptvRoutes = require('./routes-iptv');
 const iptvEditorRoutes = require('./routes-iptv-editor');
 const iptvEditorService = require('./iptv-editor-service');
-const managementRoutes = require('./routes-management'); // ADDED - Management tools
+const managementRoutes = require('./routes-management');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -228,8 +228,11 @@ cron.schedule('0 3 * * *', async () => {
  }
 });
 
-// Initialize IPTV service on startup
+// Initialize IPTV service on startup with token caching
 iptvService.initialize().catch(console.error);
+iptvService.initializeTokenCache().catch(error => {
+  console.error('❌ Failed to initialize IPTV token cache:', error.message);
+});
 
 // Initialize IPTV Editor service on startup
 (async () => {

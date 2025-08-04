@@ -2070,7 +2070,101 @@ const userData = {
       return {};
     }
   }
+  
+  /**
+   * Initialize token caching on startup
+   */
+  async initializeTokenCache() {
+    try {
+      console.log('🚀 Initializing IPTV token cache...');
+      
+      // Load existing authentication if valid
+      await this.initialize();
+      
+      if (!this.isAuthenticated()) {
+        console.log('🔑 Getting fresh token for cache...');
+        await this.ensureAuthenticated();
+      }
+      
+      // Start hourly refresh job
+      this.startTokenRefreshJob();
+      
+      console.log('✅ IPTV token cache initialized');
+      
+    } catch (error) {
+      console.error('❌ Failed to initialize token cache:', error.message);
+      // Still start the refresh job for retry attempts
+      this.startTokenRefreshJob();
+    }
+  }
+
+  /**
+   * Start scheduled token refresh job (hourly)
+   */
+  startTokenRefreshJob() {
+    if (this.tokenRefreshJob) {
+      return; // Already running
+    }
+
+    const cron = require('node-cron');
+    
+    // Run every hour at minute 0
+    this.tokenRefreshJob = cron.schedule('0 * * * *', async () => {
+      console.log('⏰ Scheduled IPTV token refresh...');
+      try {
+        // Force fresh login by clearing current auth
+        this.csrfToken = null;
+        this.sessionCookies = null;
+        this.csrfExpires = null;
+        
+        await this.ensureAuthenticated();
+        console.log('✅ Scheduled token refresh completed');
+        
+      } catch (error) {
+        console.error('❌ Scheduled token refresh failed:', error.message);
+      }
+    }, {
+      scheduled: true,
+      timezone: "America/Chicago"
+    });
+
+    console.log('⏰ Token refresh job scheduled for every hour');
+  }
+
+  /**
+   * Get cached authentication (for fast dashboard calls)
+   */
+  getCachedAuth() {
+    if (this.isAuthenticated()) {
+      return {
+        csrfToken: this.csrfToken,
+        sessionCookies: this.sessionCookies,
+        isValid: true
+      };
+    }
+    
+    return {
+      csrfToken: null,
+      sessionCookies: null,
+      isValid: false
+    };
+  }
+
+  /**
+   * Force refresh cached token (for manual refresh endpoint)
+   */
+  async forceRefreshToken() {
+    console.log('🔧 Force refreshing IPTV token...');
+    
+    // Clear current auth
+    this.csrfToken = null;
+    this.sessionCookies = null;
+    this.csrfExpires = null;
+    
+    return await this.ensureAuthenticated();
+  }
 }
+
 
 // Export singleton instance
 module.exports = new IPTVService();

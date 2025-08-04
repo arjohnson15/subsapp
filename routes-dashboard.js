@@ -100,6 +100,36 @@ router.post('/refresh-cache', async (req, res) => {
   }
 });
 
+// POST /api/dashboard/refresh-iptv-token - Force refresh IPTV token
+router.post('/refresh-iptv-token', async (req, res) => {
+  try {
+    console.log('🔧 Manual IPTV token refresh requested...');
+    
+    const iptvService = require('./iptv-service');
+    const success = await iptvService.forceRefreshToken();
+    
+    if (success) {
+      res.json({
+        success: true,
+        message: 'IPTV token refreshed successfully',
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to refresh IPTV token'
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Manual token refresh failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // GET /api/dashboard/live-data - Real-time viewing data 
 router.get('/live-data', async (req, res) => {
   try {
@@ -515,120 +545,157 @@ function getDefaultPlexStats() {
   };
 }
 
-// NEW: Get live IPTV viewers from panel API using existing iptv-service
+// NEW: Get live IPTV viewers using both endpoints for complete data
 async function getIPTVLiveViewers() {
   try {
-    console.log('🔴 Getting live IPTV viewers using authenticated service...');
+    console.log('🔴 Getting live IPTV viewers using cached token...');
     
-    // Import the existing IPTV service
     const iptvService = require('./iptv-service');
     
-    // Ensure we're authenticated
-    await iptvService.initialize();
+    // Get cached authentication
+    const cachedAuth = iptvService.getCachedAuth();
     
-    if (!iptvService.isAuthenticated()) {
-      console.log('🔐 Not authenticated, attempting login...');
-      await iptvService.ensureAuthenticated();
+    if (!cachedAuth.isValid) {
+      console.log('⚠️ No valid cached token available');
+      return { viewers: [], total: 0, error: 'Authentication not available' };
     }
     
-    // Make authenticated request to lines/data endpoint
-    const response = await axios.post('https://panel.pinkpony.lol/lines/data', {}, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': iptvService.csrfToken,
-        'Cookie': iptvService.sessionCookies,
-        'User-Agent': 'Mozilla/5.0 (compatible; JohnsonFlix/1.0)',
-        'Accept': 'application/json',
-        'Referer': 'https://panel.pinkpony.lol/dashboard',
-        'Origin': 'https://panel.pinkpony.lol'
-      },
-      timeout: 15000
+    console.log('✅ Using cached IPTV authentication');
+    
+    // Make both API calls in parallel
+    const [connectionsResponse, usersResponse] = await Promise.allSettled([
+      // Get active streaming connections
+      axios.post('https://panel.pinkpony.lol/rconnections/data', {
+        draw: 1,
+        start: 0,
+        length: 1000,
+        search: ''
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': cachedAuth.csrfToken,
+          'Cookie': cachedAuth.sessionCookies,
+          'User-Agent': 'Mozilla/5.0 (compatible; JohnsonFlix/1.0)',
+          'Accept': 'application/json',
+          'Referer': 'https://panel.pinkpony.lol/dashboard',
+          'Origin': 'https://panel.pinkpony.lol'
+        },
+        timeout: 15000
+      }),
+      
+      // Get user account data for connection limits
+      axios.post('https://panel.pinkpony.lol/lines/data', {
+        draw: 1,
+        start: 0,
+        length: 1000,
+        search: '',
+        reseller: '1435'
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': cachedAuth.csrfToken,
+          'Cookie': cachedAuth.sessionCookies,
+          'User-Agent': 'Mozilla/5.0 (compatible; JohnsonFlix/1.0)',
+          'Accept': 'application/json',
+          'Referer': 'https://panel.pinkpony.lol/dashboard',
+          'Origin': 'https://panel.pinkpony.lol'
+        },
+        timeout: 15000
+      })
+    ]);
+    
+    // Process connections data
+    let connectionsData = [];
+    if (connectionsResponse.status === 'fulfilled' && connectionsResponse.value?.data?.data) {
+      connectionsData = connectionsResponse.value.data.data;
+      console.log(`📡 Got ${connectionsData.length} active streaming connections`);
+    } else {
+      console.warn('⚠️ Failed to get connections data:', connectionsResponse.reason?.message);
+    }
+    
+    // Process users data
+    let usersData = [];
+    if (usersResponse.status === 'fulfilled' && usersResponse.value?.data?.data) {
+      usersData = usersResponse.value.data.data;
+      console.log(`👥 Got ${usersData.length} user accounts`);
+    } else {
+      console.warn('⚠️ Failed to get users data:', usersResponse.reason?.message);
+    }
+    
+    // Create user lookup map for connection limits
+    const userLookup = {};
+    usersData.forEach(user => {
+      userLookup[user.username] = {
+        maxConnections: parseInt(user.user_connection) || 0,
+        activeConnections: parseInt(user.active_connections) || 0,
+        expireDate: user.exp_date || 'Unknown',
+        enabled: user.enabled
+      };
     });
     
-    console.log('📡 IPTV Panel API Response Status:', response.status);
-    console.log('📡 IPTV Panel API Response Data Type:', typeof response.data);
-    
-    // DEBUG: Let's see what we actually got
-    console.log('🔍 DEBUG: Response data keys:', Object.keys(response.data || {}));
-    console.log('🔍 DEBUG: Response data sample:', JSON.stringify(response.data).substring(0, 200));
-    
-    let userData = response.data;
-    
-    // Handle different response formats
-    if (typeof userData === 'object' && !Array.isArray(userData)) {
-      // If it's an object, check common property names that might contain the array
-      if (userData.data && Array.isArray(userData.data)) {
-        userData = userData.data;
-      } else if (userData.lines && Array.isArray(userData.lines)) {
-        userData = userData.lines;
-      } else if (userData.users && Array.isArray(userData.users)) {
-        userData = userData.users;
-      } else {
-        // If it's an object but not wrapped, try to convert object values to array
-        const values = Object.values(userData);
-        if (values.length > 0 && typeof values[0] === 'object' && values[0].hasOwnProperty('active_connections')) {
-          userData = values;
-        } else {
-          console.error('🔍 DEBUG: Could not find user array in response:', userData);
-          return { viewers: [], total: 0, error: 'Could not parse user data from API response' };
-        }
+    // Process and group connections by user
+    const userConnections = {};
+    connectionsData.forEach(conn => {
+      const username = conn.username;
+      
+      if (!userConnections[username]) {
+        userConnections[username] = {
+          username: username,
+          connections: [],
+          totalConnections: 0,
+          maxConnections: userLookup[username]?.maxConnections || 0,
+          activeConnections: userLookup[username]?.activeConnections || 0,
+          expireDate: userLookup[username]?.expireDate || 'Unknown',
+          isOwner: conn.owner === 'johnsonflix',
+          userIP: conn.user_ip,
+          geoCountry: conn.geoip_country_code,
+          isp: conn.isp
+        };
       }
-    }
+      
+      // Add this connection/stream to the user
+      userConnections[username].connections.push({
+        streamName: conn.stream_display_name || 'Unknown Stream',
+        userAgent: conn.user_agent || 'Unknown',
+        startTime: conn.date_start || 'Unknown',
+        totalOnlineTime: conn.total_time_online || '0s',
+        container: conn.container || 'unknown',
+        serverId: conn.server_id
+      });
+      
+      userConnections[username].totalConnections = userConnections[username].connections.length;
+    });
     
-    if (!Array.isArray(userData)) {
-      console.warn('⚠️ Still not an array after parsing attempts');
-      return { viewers: [], total: 0, error: 'API response is not in expected format' };
-    }
+    // Convert to array format for response
+    const activeViewers = Object.values(userConnections);
     
-    console.log(`📊 Total lines from API: ${userData.length}`);
+    console.log(`🔴 Found ${activeViewers.length} users with active streams`);
     
-    // Filter only active connections and map to useful format
-    const activeViewers = userData
-      .filter(user => user && user.active_connections > 0)
-      .map(user => ({
-        username: user.username || 'Unknown',
-        streamName: user.stream_display_name || 'Unknown Stream',
-        activeConnections: user.active_connections || 0,
-        maxConnections: user.user_connection || 2,
-        watchIP: user.watch_ip || 'Unknown',
-        expireDate: user.exp_date || 'Unknown',
-        isOwner: user.owner === 'johnsonflix'
-      }));
-    
-    console.log(`🔴 Found ${activeViewers.length} active IPTV viewers out of ${userData.length} total lines`);
-    
-    // Log some example data for debugging (without sensitive info)
+    // Log sample data for debugging
     if (activeViewers.length > 0) {
-      console.log('📺 Sample active viewer:', {
+      console.log('📺 Sample viewer:', {
         username: activeViewers[0].username,
-        streamName: activeViewers[0].streamName,
-        connections: `${activeViewers[0].activeConnections}/${activeViewers[0].maxConnections}`
+        connections: `${activeViewers[0].totalConnections}/${activeViewers[0].maxConnections}`,
+        streams: activeViewers[0].connections.length,
+        firstStream: activeViewers[0].connections[0]?.streamName
       });
     }
     
     return {
       viewers: activeViewers,
       total: activeViewers.length,
-      totalConnections: activeViewers.reduce((sum, viewer) => sum + viewer.activeConnections, 0),
+      totalConnections: connectionsData.length,
       lastUpdate: new Date().toISOString()
     };
     
   } catch (error) {
     console.error('❌ Error getting IPTV live viewers:', error.message);
     
-    // More detailed error logging
-    if (error.response) {
-      console.error('❌ API Response Status:', error.response.status);
-      console.error('❌ API Response Data:', error.response.data);
-      
-      // If it's a CSRF error, the session may have expired
-      if (error.response.status === 419) {
-        console.log('🔐 CSRF token expired, clearing authentication...');
-        const iptvService = require('./iptv-service');
-        iptvService.csrfToken = null;
-        iptvService.sessionCookies = null;
-        iptvService.csrfExpires = null;
-      }
+    // If it's a CSRF error, the cached token may have expired
+    if (error.response?.status === 419) {
+      console.log('🔐 CSRF token expired, triggering refresh...');
+      const iptvService = require('./iptv-service');
+      iptvService.forceRefreshToken().catch(console.error);
     }
     
     return { 

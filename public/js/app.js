@@ -925,26 +925,29 @@ function handleHashChange() {
 window.Dashboard = {
 	expandedSections: new Set(),
     autoRefreshInterval: null,
-    async init() {
-        console.log('📊 Initializing enhanced dashboard...');
-        
-        // Load users first if they're not already loaded
-        if (!window.AppState.users || window.AppState.users.length === 0) {
-            console.log('📊 Dashboard: Loading users for stats...');
-            try {
-                const users = await API.User.getAll();
-                window.AppState.users = users;
-                window.AppState.allUsers = users;
-                console.log(`📊 Dashboard: Loaded ${users.length} users for stats`);
-            } catch (error) {
-                console.error('📊 Dashboard: Error loading users:', error);
-                window.AppState.users = []; // Fallback to empty array
-            }
+async init() {
+    console.log('📊 Initializing enhanced dashboard...');
+    
+    // Load users first if they're not already loaded
+    if (!window.AppState.users || window.AppState.users.length === 0) {
+        console.log('📊 Dashboard: Loading users for stats...');
+        try {
+            const users = await API.User.getAll();
+            window.AppState.users = users;
+            window.AppState.allUsers = users;
+            console.log(`📊 Dashboard: Loaded ${users.length} users for stats`);
+        } catch (error) {
+            console.error('📊 Dashboard: Error loading users:', error);
+            window.AppState.users = []; // Fallback to empty array
         }
-        
-        await this.loadStats();
-        await this.loadContentStats();
-    },
+    }
+    
+    await this.loadStats();
+    await this.loadContentStats();
+    
+    // NEW: Preload live data immediately
+    await this.preloadLiveData();
+},
     
     async loadStats() {
         try {
@@ -1179,24 +1182,34 @@ async loadPlexContentStats() {
         }
     },
     
-    async loadLiveDataForSection(type) {
-        try {
-            if (type === 'iptv') {
-                console.log('📺 Loading IPTV live viewers...');
+async loadLiveDataForSection(type) {
+    try {
+        if (type === 'iptv') {
+            console.log('📺 Loading IPTV live viewers (cached)...');
+            if (this.cachedIPTVData) {
+                this.updateIPTVViewers(this.cachedIPTVData);
+            } else {
                 const response = await fetch('/api/dashboard/iptv-live');
                 const iptvData = await response.json();
+                this.cachedIPTVData = iptvData;
                 this.updateIPTVViewers(iptvData);
-            } else if (type === 'plex') {
-                console.log('🎬 Loading Plex sessions...');
+            }
+        } else if (type === 'plex') {
+            console.log('🎬 Loading Plex sessions (cached)...');
+            if (this.cachedPlexData) {
+                this.updatePlexSessions(this.cachedPlexData);
+            } else {
                 const response = await fetch('/api/dashboard/plex-now-playing');
                 const plexData = await response.json();
+                this.cachedPlexData = plexData;
                 this.updatePlexSessions(plexData);
             }
-        } catch (error) {
-            console.error(`Error loading ${type} live data:`, error);
-            this.setLiveDataError(type);
         }
-    },
+    } catch (error) {
+        console.error(`Error loading ${type} live data:`, error);
+        this.setLiveDataError(type);
+    }
+},
     
     startAutoRefresh() {
         if (this.autoRefreshInterval) return;
@@ -1288,45 +1301,60 @@ async loadPlexContentStats() {
         container.innerHTML = '<div class="plex-sessions-grid">' + sessionsHtml + '</div>';
     },
     
-    updateIPTVViewers(iptvData) {
-        const container = document.getElementById('iptvViewersContainer');
-        const countElement = document.getElementById('iptvViewerCount');
-        
-        if (!container) {
-            console.warn('IPTV viewers container not found');
-            return;
-        }
-        
-        if (!iptvData.viewers || iptvData.viewers.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-tv"></i>
-                    <p>No active viewers</p>
+updateIPTVViewers(iptvData) {
+    const container = document.getElementById('iptvViewersContainer');
+    const countElement = document.getElementById('iptvViewerCount');
+    
+    if (!container) {
+        console.warn('IPTV viewers container not found');
+        return;
+    }
+    
+    if (!iptvData.viewers || iptvData.viewers.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-tv"></i>
+                <p>No active viewers</p>
+            </div>
+        `;
+        if (countElement) countElement.textContent = '0';
+        return;
+    }
+    
+    if (countElement) {
+        countElement.textContent = iptvData.viewers.length.toString();
+    }
+    
+    const viewersHtml = iptvData.viewers.map(viewer => {
+        // Build streams list for this viewer
+        let streamsHtml = '';
+        if (viewer.connections && viewer.connections.length > 0) {
+            streamsHtml = viewer.connections.map(stream => `
+                <div class="stream-item">
+                    <span class="stream-name">${this.escapeHtml(stream.streamName)}</span>
+                    <span class="stream-time">${stream.totalOnlineTime}</span>
                 </div>
-            `;
-            if (countElement) countElement.textContent = '0';
-            return;
+            `).join('');
         }
         
-        if (countElement) {
-            countElement.textContent = iptvData.viewers.length.toString();
-        }
-        
-        const viewersHtml = iptvData.viewers.map(viewer => `
+        return `
             <div class="iptv-viewer-card">
                 <div class="viewer-header">
                     <span class="viewer-username">${this.escapeHtml(viewer.username)}</span>
-                    <span class="viewer-connections">${viewer.activeConnections}/${viewer.maxConnections}</span>
+                    <span class="viewer-connections">${viewer.totalConnections}/${viewer.maxConnections}</span>
                 </div>
-                <div class="viewer-stream">${this.escapeHtml(viewer.streamName)}</div>
-                <div class="viewer-meta">
-                    ${viewer.watchIP} • ${viewer.expireDate}
+                <div class="viewer-details">
+                    <div class="viewer-ip">${viewer.userIP} (${viewer.geoCountry})</div>
+                    <div class="viewer-streams">
+                        ${streamsHtml}
+                    </div>
                 </div>
             </div>
-        `).join('');
-        
-        container.innerHTML = '<div class="iptv-viewers-grid">' + viewersHtml + '</div>';
-    },
+        `;
+    }).join('');
+    
+    container.innerHTML = '<div class="iptv-viewers-grid">' + viewersHtml + '</div>';
+},
     
     setLiveDataError(type) {
         const container = document.getElementById(type === 'iptv' ? 'iptvViewersContainer' : 'plexSessionsContainer');
@@ -1349,9 +1377,103 @@ async loadPlexContentStats() {
     
     destroy() {
         this.stopAutoRefresh();
+        
+        // NEW: Stop background refresh
+        if (this.backgroundRefreshInterval) {
+            clearInterval(this.backgroundRefreshInterval);
+            this.backgroundRefreshInterval = null;
+        }
+        
         this.expandedSections.clear();
         console.log('📊 Dashboard destroyed');
+    },
+
+// NEW METHOD 1: Preload live data on dashboard init
+async preloadLiveData() {
+    try {
+        console.log('🔄 Preloading live data for instant display...');
+        
+        const [iptvResponse, plexResponse] = await Promise.allSettled([
+            fetch('/api/dashboard/iptv-live'),
+            fetch('/api/dashboard/plex-now-playing')
+        ]);
+        
+        if (iptvResponse.status === 'fulfilled') {
+            this.cachedIPTVData = await iptvResponse.value.json();
+            console.log('✅ IPTV live data cached');
+            
+            // NEW: Set initial count
+            const iptvCountElement = document.getElementById('iptvViewerCount');
+            if (iptvCountElement && this.cachedIPTVData.viewers) {
+                iptvCountElement.textContent = this.cachedIPTVData.viewers.length.toString();
+            }
+        }
+        
+        if (plexResponse.status === 'fulfilled') {
+            this.cachedPlexData = await plexResponse.value.json();
+            console.log('✅ Plex live data cached');
+            
+            // NEW: Set initial count
+            const plexCountElement = document.getElementById('plexSessionCount');
+            if (plexCountElement && this.cachedPlexData.sessions) {
+                plexCountElement.textContent = this.cachedPlexData.sessions.length.toString();
+            }
+        }
+        
+        this.startBackgroundRefresh();
+        
+    } catch (error) {
+        console.error('❌ Error preloading live data:', error);
     }
+},
+
+// NEW METHOD 2: Background refresh every 30 seconds
+startBackgroundRefresh() {
+    if (this.backgroundRefreshInterval) return;
+    
+    this.backgroundRefreshInterval = setInterval(async () => {
+        try {
+            const [iptvResponse, plexResponse] = await Promise.allSettled([
+                fetch('/api/dashboard/iptv-live'),
+                fetch('/api/dashboard/plex-now-playing')
+            ]);
+            
+            if (iptvResponse.status === 'fulfilled') {
+                this.cachedIPTVData = await iptvResponse.value.json();
+                
+                // NEW: Update count even when collapsed
+                const iptvCountElement = document.getElementById('iptvViewerCount');
+                if (iptvCountElement && this.cachedIPTVData.viewers) {
+                    iptvCountElement.textContent = this.cachedIPTVData.viewers.length.toString();
+                }
+            }
+            
+            if (plexResponse.status === 'fulfilled') {
+                this.cachedPlexData = await plexResponse.value.json();
+                
+                // NEW: Update count even when collapsed
+                const plexCountElement = document.getElementById('plexSessionCount');
+                if (plexCountElement && this.cachedPlexData.sessions) {
+                    plexCountElement.textContent = this.cachedPlexData.sessions.length.toString();
+                }
+            }
+            
+            // Update any currently expanded sections with full data
+            this.expandedSections.forEach(type => {
+                if (type === 'iptv' && this.cachedIPTVData) {
+                    this.updateIPTVViewers(this.cachedIPTVData);
+                } else if (type === 'plex' && this.cachedPlexData) {
+                    this.updatePlexSessions(this.cachedPlexData);
+                }
+            });
+            
+        } catch (error) {
+            console.error('❌ Background refresh error:', error);
+        }
+    }, 30000);
+    
+    console.log('🔄 Background refresh started');
+}
 };
 
 
