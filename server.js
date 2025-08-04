@@ -237,6 +237,7 @@ iptvService.initialize().catch(console.error);
     const initialized = await iptvEditorService.initialize();
     if (initialized) {
       console.log('✅ IPTV Editor service initialized successfully');
+      // MISSING: No scheduler initialization here!
     } else {
       console.log('⚠️ IPTV Editor service not configured (bearer token missing)');
     }

@@ -923,6 +923,8 @@ function handleHashChange() {
 
 // Enhanced Dashboard functionality with content library stats
 window.Dashboard = {
+	expandedSections: new Set(),
+    autoRefreshInterval: null,
     async init() {
         console.log('📊 Initializing enhanced dashboard...');
         
@@ -942,7 +944,6 @@ window.Dashboard = {
         
         await this.loadStats();
         await this.loadContentStats();
-        await this.loadExpiringUsers();
     },
     
     async loadStats() {
@@ -1141,28 +1142,215 @@ async loadPlexContentStats() {
         if (num === 0 || num === null || num === undefined) return '0';
         return new Intl.NumberFormat().format(num);
     },
-    
-    async loadExpiringUsers() {
-        try {
-            const expiringUsers = await API.User.getExpiring(7);
-            const expiringDiv = document.getElementById('expiringUsers');
+	
+	// NEW: Collapsible live section functionality
+    async toggleLiveSection(type) {
+        const section = document.getElementById(`${type}LiveSection`);
+        if (!section) {
+            console.error(`Live section ${type} not found`);
+            return;
+        }
+        
+        const isExpanded = section.classList.contains('expanded');
+        
+        if (isExpanded) {
+            // Collapse section
+            section.classList.remove('expanded');
+            this.expandedSections.delete(type);
+            console.log(`📱 Collapsed ${type} live section`);
             
-            if (expiringUsers.length === 0) {
-                expiringDiv.innerHTML = '<p style="color: #4caf50;">No users expiring this week!</p>';
-            } else {
-                expiringDiv.innerHTML = expiringUsers.map(user => `
-                    <div class="expiring-user">
-                        <span>${user.name} - ${user.subscription_type}</span>
-                        <span style="color: #ff9800;">Expires ${Utils.formatDate(user.expiration_date)}</span>
-                    </div>
-                `).join('');
+            // Stop auto-refresh if no sections are expanded
+            if (this.expandedSections.size === 0) {
+                this.stopAutoRefresh();
+            }
+        } else {
+            // Expand section and load data
+            section.classList.add('expanded');
+            this.expandedSections.add(type);
+            console.log(`📱 Expanded ${type} live section`);
+            
+            // Start auto-refresh if this is the first expanded section
+            if (this.expandedSections.size === 1) {
+                this.startAutoRefresh();
             }
             
-        } catch (error) {
-            console.error('Error loading expiring users:', error);
-            document.getElementById('expiringUsers').innerHTML = 
-                '<p style="color: #f44336;">Error loading expiring users</p>';
+            // Load data for this section
+            await this.loadLiveDataForSection(type);
         }
+    },
+    
+    async loadLiveDataForSection(type) {
+        try {
+            if (type === 'iptv') {
+                console.log('📺 Loading IPTV live viewers...');
+                const response = await fetch('/api/dashboard/iptv-live');
+                const iptvData = await response.json();
+                this.updateIPTVViewers(iptvData);
+            } else if (type === 'plex') {
+                console.log('🎬 Loading Plex sessions...');
+                const response = await fetch('/api/dashboard/plex-now-playing');
+                const plexData = await response.json();
+                this.updatePlexSessions(plexData);
+            }
+        } catch (error) {
+            console.error(`Error loading ${type} live data:`, error);
+            this.setLiveDataError(type);
+        }
+    },
+    
+    startAutoRefresh() {
+        if (this.autoRefreshInterval) return;
+        
+        console.log('🔄 Starting auto-refresh for expanded sections');
+        this.autoRefreshInterval = setInterval(() => {
+            this.expandedSections.forEach(type => {
+                this.loadLiveDataForSection(type);
+            });
+        }, 30000); // 30 seconds
+    },
+    
+    stopAutoRefresh() {
+        if (this.autoRefreshInterval) {
+            clearInterval(this.autoRefreshInterval);
+            this.autoRefreshInterval = null;
+            console.log('⏹️ Stopped auto-refresh');
+        }
+    },
+    
+    async refreshIPTVViewers() {
+        console.log('📺 Manual refresh IPTV viewers...');
+        const container = document.getElementById('iptvViewersContainer');
+        if (container) {
+            container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Refreshing...</div>';
+        }
+        await this.loadLiveDataForSection('iptv');
+    },
+    
+    async refreshPlexSessions() {
+        console.log('🎬 Manual refresh Plex sessions...');
+        const container = document.getElementById('plexSessionsContainer');
+        if (container) {
+            container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Refreshing...</div>';
+        }
+        await this.loadLiveDataForSection('plex');
+    },
+    
+    updatePlexSessions(plexData) {
+        const container = document.getElementById('plexSessionsContainer');
+        const countElement = document.getElementById('plexSessionCount');
+        
+        if (!container) {
+            console.warn('Plex sessions container not found');
+            return;
+        }
+        
+        if (!plexData.sessions || plexData.sessions.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-pause"></i>
+                    <p>No active sessions</p>
+                </div>
+            `;
+            if (countElement) countElement.textContent = '0';
+            return;
+        }
+        
+        if (countElement) {
+            countElement.textContent = plexData.sessions.length.toString();
+        }
+        
+        const sessionsHtml = plexData.sessions.map(session => {
+            const posterUrl = session.thumb ? 
+                `${session.serverUrl || ''}${session.thumb}${session.token ? '?X-Plex-Token=' + session.token : ''}` : 
+                '';
+            
+            const statusClass = session.state === 'playing' ? 'status-playing' : 
+                               session.state === 'paused' ? 'status-paused' : 'status-buffering';
+            
+            return `
+                <div class="plex-session-card">
+                    <div class="session-poster" style="background-image: url('${posterUrl}')"></div>
+                    <div class="session-info">
+                        <div class="session-title">${this.escapeHtml(session.title)}</div>
+                        <div class="session-subtitle">${this.escapeHtml(session.subtitle || '')}</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${session.progress || 0}%"></div>
+                        </div>
+                        <div class="session-meta">
+                            <span><span class="status-indicator ${statusClass}"></span>${this.escapeHtml(session.user)}</span>
+                            <span>${session.quality || 'Unknown'}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = '<div class="plex-sessions-grid">' + sessionsHtml + '</div>';
+    },
+    
+    updateIPTVViewers(iptvData) {
+        const container = document.getElementById('iptvViewersContainer');
+        const countElement = document.getElementById('iptvViewerCount');
+        
+        if (!container) {
+            console.warn('IPTV viewers container not found');
+            return;
+        }
+        
+        if (!iptvData.viewers || iptvData.viewers.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-tv"></i>
+                    <p>No active viewers</p>
+                </div>
+            `;
+            if (countElement) countElement.textContent = '0';
+            return;
+        }
+        
+        if (countElement) {
+            countElement.textContent = iptvData.viewers.length.toString();
+        }
+        
+        const viewersHtml = iptvData.viewers.map(viewer => `
+            <div class="iptv-viewer-card">
+                <div class="viewer-header">
+                    <span class="viewer-username">${this.escapeHtml(viewer.username)}</span>
+                    <span class="viewer-connections">${viewer.activeConnections}/${viewer.maxConnections}</span>
+                </div>
+                <div class="viewer-stream">${this.escapeHtml(viewer.streamName)}</div>
+                <div class="viewer-meta">
+                    ${viewer.watchIP} • ${viewer.expireDate}
+                </div>
+            </div>
+        `).join('');
+        
+        container.innerHTML = '<div class="iptv-viewers-grid">' + viewersHtml + '</div>';
+    },
+    
+    setLiveDataError(type) {
+        const container = document.getElementById(type === 'iptv' ? 'iptvViewersContainer' : 'plexSessionsContainer');
+        if (container) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Error loading live data</p>
+                </div>
+            `;
+        }
+    },
+    
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    },
+    
+    destroy() {
+        this.stopAutoRefresh();
+        this.expandedSections.clear();
+        console.log('📊 Dashboard destroyed');
     }
 };
 
