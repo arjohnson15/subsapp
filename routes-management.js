@@ -1,12 +1,11 @@
-// routes-management.js - WORKING VERSION WITH MANUAL PATH PARSING
+// routes-management.js - COMPLETE FIXED VERSION WITH PROPER IFRAME PROXY
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
-const toolSessions = new Map();
 
 // Debug middleware
 router.use((req, res, next) => {
-  console.log(`?? Management Route: ${req.method} ${req.originalUrl}`);
+  console.log(`🔍 Management Route: ${req.method} ${req.originalUrl}`);
   next();
 });
 
@@ -67,273 +66,425 @@ router.post('/tools', async (req, res) => {
   }
 });
 
-
-// UNIVERSAL IFRAME PROXY - REPLACE ENTIRE PROXY SECTION
-// This handles ANY website, not just IPTV panels
-
-// PROXY HANDLER - Universal approach
+// UNIVERSAL PROXY HANDLER - Catch everything that starts with /tools/*/proxy
 router.all('*', async (req, res, next) => {
+  // Check if this is a proxy request by examining the URL
   const urlPath = req.originalUrl.replace('/api/management', '');
   const proxyMatch = urlPath.match(/^\/tools\/([^\/]+)\/proxy(.*)$/);
   
   if (!proxyMatch) {
+    // Not a proxy request, continue to next handler
     return next();
   }
+  
+  console.log(`🔗 UNIVERSAL PROXY: ${req.method} ${req.originalUrl}`);
   
   try {
     const toolId = proxyMatch[1];
     const subPath = proxyMatch[2] || '';
     const queryString = req.originalUrl.includes('?') ? req.originalUrl.split('?')[1] : '';
     
-    console.log(`🔗 UNIVERSAL PROXY: ${req.method} ${req.originalUrl}`);
+    console.log(`🎯 Proxying to tool: ${toolId}, path: "${subPath}"`);
+    
+    if (!toolId) {
+      console.error('❌ No toolId extracted from URL');
+      return res.status(400).json({ error: 'Tool ID is required' });
+    }
     
     // Get tool configuration
     const db = require('./database-config');
     const result = await db.query('SELECT setting_value FROM settings WHERE setting_key = ?', ['management_tools']);
     
     if (result.length === 0) {
+      console.error('❌ No management tools configured in database');
       return res.status(404).json({ error: 'No management tools configured' });
     }
     
-    const toolsData = JSON.parse(result[0].setting_value);
-    const tools = Array.isArray(toolsData) ? toolsData : Object.values(toolsData);
+    let tools = [];
+    try {
+      const toolsData = JSON.parse(result[0].setting_value);
+      tools = Array.isArray(toolsData) ? toolsData : Object.values(toolsData);
+      console.log(`🔍 Found ${tools.length} tools in database`);
+    } catch (parseError) {
+      console.error('❌ Error parsing tools data:', parseError);
+      return res.status(500).json({ error: 'Invalid tools configuration' });
+    }
+    
     const tool = tools.find(t => t.id === toolId);
-    
     if (!tool) {
-      return res.status(404).json({ error: 'Tool not found' });
+      console.error(`❌ Tool with ID ${toolId} not found. Available tools:`, tools.map(t => ({ id: t.id, name: t.name })));
+      return res.status(404).json({ error: 'Tool not found', toolId, availableTools: tools.map(t => ({ id: t.id, name: t.name })) });
     }
     
-    // Build target URL - UNIVERSAL METHOD
-    let targetUrl;
-    const parsedToolUrl = new URL(tool.url);
+    console.log(`✅ Found tool: ${tool.name} - ${tool.url}`);
     
+    // Check if tool supports iframe access
+    if (tool.access_type !== 'iframe' && tool.access_type !== 'both') {
+      console.error(`❌ Tool ${tool.name} does not support iframe access (${tool.access_type})`);
+      return res.status(403).json({ error: 'Tool does not support iframe access' });
+    }
+    
+    // Build target URL correctly
+    let targetUrl = tool.url.replace(/\/$/, ''); // Remove trailing slash from base URL
     if (subPath) {
-      // For assets and sub-pages, use base domain + path
-      targetUrl = `${parsedToolUrl.protocol}//${parsedToolUrl.host}${subPath}`;
-    } else {
-      // For main page
-      targetUrl = tool.url;
+      targetUrl = targetUrl + subPath;
     }
     
+    // Add query parameters if they exist
     if (queryString) {
-      targetUrl += (targetUrl.includes('?') ? '&' : '?') + queryString;
+      targetUrl += '?' + queryString;
     }
     
     console.log(`🎯 Proxying to: ${targetUrl}`);
     
-    // UNIVERSAL REQUEST SETUP - Works with any website
-    const proxyOptions = {
+    // Prepare request options
+    const requestOptions = {
       method: req.method,
       url: targetUrl,
       headers: {
-        ...req.headers,
-        'host': parsedToolUrl.host,
-        'origin': parsedToolUrl.origin,
-        'referer': parsedToolUrl.origin
+        'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': req.headers['accept'] || 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': req.headers['accept-language'] || 'en-US,en;q=0.9',
+        'Accept-Encoding': req.headers['accept-encoding'] || 'gzip, deflate, br',
+        'Referer': req.headers['referer'] || tool.url,
+        'Host': new URL(tool.url).host,
+        'Origin': new URL(tool.url).origin
       },
       timeout: 30000,
       validateStatus: () => true,
       responseType: 'stream',
-      maxRedirects: 0 // Handle redirects manually
+      maxRedirects: 0, // Handle redirects manually to preserve cookies
+      withCredentials: true
     };
     
-    // Remove problematic headers
-    delete proxyOptions.headers['host'];
-    delete proxyOptions.headers['x-forwarded-for'];
-    delete proxyOptions.headers['x-forwarded-proto'];
-    delete proxyOptions.headers['x-real-ip'];
+    // Forward important headers from the browser
+    const importantHeaders = [
+      'authorization', 'x-csrf-token', 'x-xsrf-token', 'x-requested-with',
+      'content-type', 'cache-control', 'pragma'
+    ];
     
-    // Add basic auth if provided
+    importantHeaders.forEach(header => {
+      if (req.headers[header]) {
+        requestOptions.headers[header] = req.headers[header];
+      }
+    });
+    
+    // CRITICAL: Handle cookies properly for session management
+    if (req.headers.cookie) {
+      console.log('🍪 Forwarding cookies from browser:', req.headers.cookie.substring(0, 100) + '...');
+      requestOptions.headers['Cookie'] = req.headers.cookie;
+    }
+    
+    // Add authentication if provided
     if (tool.username && tool.password) {
-      proxyOptions.auth = {
+      requestOptions.auth = {
         username: tool.username,
         password: tool.password
       };
+      console.log(`🔐 Using authentication for ${tool.username}`);
     }
     
-    // Handle request body for POST/PUT requests
+    // Add request body for POST/PUT requests and preserve all headers
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      console.log('📝 Processing request body...');
+      console.log('📤 Processing request body...');
+      requestOptions.data = req;
+    }
+    
+    console.log(`🚀 Making request to ${targetUrl}...`);
+    
+    // Make the request
+    const response = await axios(requestOptions);
+    
+    console.log(`📥 Response: ${response.status} ${response.statusText}`);
+    console.log(`📦 Content-Type: ${response.headers['content-type']}`);
+    
+    // Handle redirects manually to preserve session
+    if (response.status >= 300 && response.status < 400 && response.headers.location) {
+      console.log(`🔄 Handling redirect to: ${response.headers.location}`);
       
-      return new Promise((resolve, reject) => {
-        const chunks = [];
+      // Forward cookies from the redirect response
+      if (response.headers['set-cookie']) {
+        const cookieStrings = Array.isArray(response.headers['set-cookie']) 
+          ? response.headers['set-cookie'] 
+          : [response.headers['set-cookie']];
         
-req.on('data', chunk => {
-          console.log(`📋 Received chunk: ${chunk.length} bytes`);
-          chunks.push(chunk);
+        cookieStrings.forEach(cookie => {
+          res.append('Set-Cookie', cookie);
         });
+        console.log('🍪 Forwarded Set-Cookie headers from redirect');
+      }
+      
+      // Return redirect to browser with proxy path
+      let redirectLocation = response.headers.location;
+      if (redirectLocation.startsWith('/')) {
+        redirectLocation = `/api/management/tools/${toolId}/proxy${redirectLocation}`;
+      } else if (redirectLocation.startsWith(new URL(tool.url).origin)) {
+        redirectLocation = redirectLocation.replace(new URL(tool.url).origin, `/api/management/tools/${toolId}/proxy`);
+      }
+      
+      res.status(response.status);
+      res.set('Location', redirectLocation);
+      return res.end();
+    }
+    
+    // Handle the response
+    const contentType = response.headers['content-type'] || '';
+    
+    // Copy all response headers except problematic ones
+    Object.keys(response.headers).forEach(key => {
+      const lowerKey = key.toLowerCase();
+      if (!['connection', 'content-encoding', 'transfer-encoding', 'content-length', 'x-frame-options', 'content-security-policy'].includes(lowerKey)) {
+        res.set(key, response.headers[key]);
+      }
+    });
+    
+    // CRITICAL: Preserve Set-Cookie headers for session management
+    if (response.headers['set-cookie']) {
+      const cookieStrings = Array.isArray(response.headers['set-cookie']) 
+        ? response.headers['set-cookie'] 
+        : [response.headers['set-cookie']];
+      
+      cookieStrings.forEach(cookie => {
+        res.append('Set-Cookie', cookie);
+      });
+      console.log('🍪 Forwarded Set-Cookie headers to browser');
+    }
+    
+    // Add iframe-friendly headers
+    res.set('X-Frame-Options', 'ALLOWALL');
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Cookie');
+    res.set('Access-Control-Allow-Credentials', 'true');
+    
+    if (contentType.includes('text/html')) {
+      console.log('📄 Processing HTML...');
+      
+      // Convert stream to string for HTML processing
+      let htmlContent = '';
+      response.data.on('data', chunk => {
+        htmlContent += chunk.toString();
+      });
+      
+      response.data.on('end', () => {
+        console.log(`📝 HTML Content length: ${htmlContent.length} chars`);
         
-        req.on('end', async () => {
-          console.log('📋 Request body end event triggered');
-          try {
-            if (chunks.length > 0) {
-              proxyOptions.data = Buffer.concat(chunks);
-              console.log(`📋 Body size: ${proxyOptions.data.length} bytes`);
-            }
-            
-            const response = await axios(proxyOptions);
-            handleResponse(response, res, toolId, parsedToolUrl);
-            resolve();
-          } catch (error) {
-            console.error('❌ Request error:', error.message);
-            if (!res.headersSent) {
-              res.status(502).json({ error: 'Proxy error', details: error.message });
-            }
-            resolve();
-          }
-        });
+        // URL rewriting for iframe compatibility
+        const baseProxyPath = `/api/management/tools/${toolId}/proxy`;
         
-        req.on('error', error => {
-          console.error('❌ Request stream error:', error);
-          if (!res.headersSent) {
-            res.status(400).json({ error: 'Request error' });
-          }
-          resolve();
-        });
+        // Replace relative URLs with proxy URLs
+        htmlContent = htmlContent
+          .replace(/href="\/([^"]*?)"/g, `href="${baseProxyPath}/$1"`)
+          .replace(/src="\/([^"]*?)"/g, `src="${baseProxyPath}/$1"`)
+          .replace(/href='\/([^']*?)'/g, `href='${baseProxyPath}/$1'`)
+          .replace(/src='\/([^']*?)'/g, `src='${baseProxyPath}/$1'`)
+          .replace(/url\(\/([^)]*?)\)/g, `url(${baseProxyPath}/$1)`)
+          .replace(/url\("\/([^"]*?)"\)/g, `url("${baseProxyPath}/$1")`)
+          .replace(/url\('\/([^']*?)'\)/g, `url('${baseProxyPath}/$1')`)
+          // Add iframe compatibility script
+          .replace(/<\/body>/gi, `
+            <script>
+              console.log("🔗 JohnsonFlix iframe proxy loaded");
+              
+              // Check if we're in an iframe
+              const isInIframe = window !== window.top;
+              
+              // Add iframe detection message
+              if (isInIframe) {
+                console.log("🖼️ Running inside iframe - special handling enabled");
+                
+                // Set credentials to include for all requests
+                const originalFetch = window.fetch;
+                window.fetch = function(...args) {
+                  if (args[1]) {
+                    args[1].credentials = 'include';
+                  } else {
+                    args[1] = { credentials: 'include' };
+                  }
+                  return originalFetch.apply(this, args);
+                };
+                
+                // Add an option to break out of iframe if login fails
+                setTimeout(() => {
+                  const loginForms = document.querySelectorAll('form');
+                  if (loginForms.length > 0) {
+                    const breakoutDiv = document.createElement('div');
+                    breakoutDiv.style.cssText = \`
+                      position: fixed;
+                      top: 10px;
+                      right: 10px;
+                      background: #f44336;
+                      color: white;
+                      padding: 10px;
+                      border-radius: 5px;
+                      z-index: 9999;
+                      font-size: 12px;
+                      cursor: pointer;
+                      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+                    \`;
+                    breakoutDiv.innerHTML = '🚪 Open in New Tab';
+                    breakoutDiv.onclick = () => {
+                      window.top.postMessage({
+                        type: 'OPEN_IN_NEW_TAB',
+                        url: window.location.href.replace('/api/management/tools/${toolId}/proxy', '')
+                      }, '*');
+                    };
+                    document.body.appendChild(breakoutDiv);
+                  }
+                }, 2000);
+              }
+              
+              // Handle form submissions for iframe compatibility
+              document.addEventListener('DOMContentLoaded', function() {
+                // Intercept form submissions
+                const forms = document.querySelectorAll('form');
+                forms.forEach(form => {
+                  form.addEventListener('submit', function(e) {
+                    console.log('📋 Form submission intercepted:', e);
+                    
+                    // For iframe context, allow natural form submission with enhanced cookie handling
+                    if (isInIframe) {
+                      console.log('🖼️ Iframe form submission - allowing natural submission');
+                      
+                      // Get form data for logging
+                      const formData = new FormData(form);
+                      const data = {};
+                      for (let [key, value] of formData.entries()) {
+                        data[key] = value;
+                      }
+                      console.log('📋 Form data:', data);
+                      
+                      // Ensure form action goes through proxy
+                      let action = form.action || window.location.href;
+                      if (action.startsWith('/') && !action.includes('/api/management/tools/')) {
+                        action = '${baseProxyPath}' + action;
+                        form.action = action;
+                        console.log('📋 Updated form action to:', action);
+                      }
+                      
+                      // Let form submit naturally - don't prevent default
+                      return true;
+                    }
+                    
+                    // Original fetch-based approach for non-iframe
+                    console.log('🌐 Standard form submission via fetch');
+                    
+                    // Get form data
+                    const formData = new FormData(form);
+                    const data = {};
+                    for (let [key, value] of formData.entries()) {
+                      data[key] = value;
+                    }
+                    console.log('📋 Form data:', data);
+                    
+                    // Get form action
+                    let action = form.action || window.location.href;
+                    if (action.startsWith('/')) {
+                      action = '${baseProxyPath}' + action;
+                    }
+                    console.log('📋 Submitting to:', action);
+                    
+                    // Create timeout for slow responses
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => {
+                      console.log('⏰ Fetch timeout - reloading page');
+                      controller.abort();
+                      window.location.reload();
+                    }, 15000);
+                    
+                    // Submit via fetch with proxy - preserve credentials and headers
+                    fetch(action, {
+                      method: form.method || 'POST',
+                      body: formData,
+                      credentials: 'include',
+                      headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                      },
+                      signal: controller.signal
+                    })
+                    .then(response => {
+                      clearTimeout(timeoutId);
+                      if (response.ok) {
+                        return response.text();
+                      }
+                      throw new Error('Network response was not ok');
+                    })
+                    .then(html => {
+                      document.open();
+                      document.write(html);
+                      document.close();
+                    })
+                    .catch(error => {
+                      clearTimeout(timeoutId);
+                      console.log('❌ Fetch error or timeout:', error.name);
+                      if (error.name !== 'AbortError') {
+                        window.location.reload();
+                      }
+                    });
+                    
+                    e.preventDefault();
+                    return false;
+                  });
+                });
+              });
+            </script>
+            </body>`);
+        
+        res.set('Content-Length', Buffer.byteLength(htmlContent));
+        res.status(response.status).send(htmlContent);
+        console.log(`✅ HTML sent (${htmlContent.length} chars)`);
+      });
+      
+      response.data.on('error', (error) => {
+        console.error('❌ HTML stream error:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'HTML processing error' });
+        }
+      });
+      
+    } else {
+      console.log(`📦 Streaming ${contentType} response directly (${response.headers['content-length'] || 'unknown size'})...`);
+      
+      // Stream non-HTML responses directly (CSS, JS, images, etc.)
+      res.status(response.status);
+      response.data.pipe(res);
+      
+      response.data.on('end', () => {
+        console.log(`✅ ${contentType} response streamed successfully`);
+      });
+      
+      response.data.on('error', (error) => {
+        console.error('❌ Asset stream error:', error);
       });
     }
     
-    // For GET requests
-    const response = await axios(proxyOptions);
-    handleResponse(response, res, toolId, parsedToolUrl);
-    
   } catch (error) {
-    console.error('❌ Proxy error:', error.message);
+    console.error('❌ Proxy error:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      code: error.code,
+      url: error.config?.url,
+      status: error.response?.status,
+      responseHeaders: error.response?.headers
+    });
+    
     if (!res.headersSent) {
-      res.status(502).json({ error: 'Proxy error', details: error.message });
+      res.status(502).json({
+        error: 'Proxy Error',
+        message: error.message,
+        details: error.code || 'Unknown error',
+        targetUrl: error.config?.url || 'Unknown',
+        timestamp: new Date().toISOString()
+      });
     }
   }
 });
-
-// UNIVERSAL RESPONSE HANDLER
-function handleResponse(response, res, toolId, parsedToolUrl) {
-  console.log(`📥 Response: ${response.status} ${response.statusText}`);
-  
-  const contentType = response.headers['content-type'] || '';
-  
-  // Copy headers but make iframe-friendly
-  Object.keys(response.headers).forEach(key => {
-    const lowerKey = key.toLowerCase();
-    if (!['connection', 'content-encoding', 'transfer-encoding', 'content-length'].includes(lowerKey)) {
-      if (lowerKey === 'x-frame-options') {
-        res.set('X-Frame-Options', 'ALLOWALL');
-      } else if (lowerKey === 'content-security-policy') {
-        // Remove CSP that blocks iframes
-        const csp = response.headers[key].replace(/frame-ancestors[^;]+;?/gi, '');
-        if (csp.trim()) res.set(key, csp);
-      } else {
-        res.set(key, response.headers[key]);
-      }
-    }
-  });
-  
-  // Add iframe-friendly headers
-  res.set('X-Frame-Options', 'ALLOWALL');
-  res.set('Access-Control-Allow-Origin', '*');
-  
-  // Handle redirects
-  if (response.status >= 300 && response.status < 400) {
-    const location = response.headers['location'];
-    if (location) {
-      console.log(`🔄 Redirect to: ${location}`);
-      
-      let proxyRedirect;
-      if (location.startsWith('/')) {
-        // Relative redirect
-        proxyRedirect = `/api/management/tools/${toolId}/proxy${location}`;
-      } else if (location.includes(parsedToolUrl.host)) {
-        // Same domain redirect
-        const path = location.replace(parsedToolUrl.origin, '');
-        proxyRedirect = `/api/management/tools/${toolId}/proxy${path}`;
-      } else {
-        // External redirect - allow it
-        proxyRedirect = location;
-      }
-      
-      res.set('Location', proxyRedirect);
-      res.status(response.status).end();
-      return;
-    }
-  }
-  
-  // Handle HTML content
-  if (contentType.includes('text/html')) {
-    console.log('📄 Processing HTML...');
-    
-    let htmlContent = '';
-    response.data.on('data', chunk => {
-      htmlContent += chunk.toString();
-    });
-    
-    response.data.on('end', () => {
-      // URL rewriting for iframe compatibility
-      const baseProxyPath = `/api/management/tools/${toolId}/proxy`;
-      const toolOrigin = parsedToolUrl.origin;
-      
-      // Replace URLs to go through proxy
-      htmlContent = htmlContent
-        // Relative URLs
-        .replace(/href="\/([^"]*?)"/g, `href="${baseProxyPath}/$1"`)
-        .replace(/src="\/([^"]*?)"/g, `src="${baseProxyPath}/$1"`)
-        .replace(/action="\/([^"]*?)"/g, `action="${baseProxyPath}/$1"`)
-        .replace(/href='\/([^']*?)'/g, `href='${baseProxyPath}/$1'`)
-        .replace(/src='\/([^']*?)'/g, `src='${baseProxyPath}/$1'`)
-        .replace(/action='\/([^']*?)'/g, `action='${baseProxyPath}/$1'`)
-        // CSS URLs
-        .replace(/url\(\/([^)]*?)\)/g, `url(${baseProxyPath}/$1)`)
-        .replace(/url\("\/([^"]*?)"\)/g, `url("${baseProxyPath}/$1")`)
-        .replace(/url\('\/([^']*?)'\)/g, `url('${baseProxyPath}/$1')`)
-        // Absolute URLs to same domain
-        .replace(new RegExp(`href="${toolOrigin}([^"]*?)"`, 'g'), `href="${baseProxyPath}$1"`)
-        .replace(new RegExp(`src="${toolOrigin}([^"]*?)"`, 'g'), `src="${baseProxyPath}$1"`)
-        .replace(new RegExp(`action="${toolOrigin}([^"]*?)"`, 'g'), `action="${baseProxyPath}$1"`)
-// Remove frame-busting scripts and inject form interceptor
-        .replace(/if\s*\(\s*top\s*[!=]=\s*self\s*\)/gi, 'if(false)')
-        .replace(/if\s*\(\s*self\s*[!=]==\s*top\s*\)/gi, 'if(false)')
-        .replace(/top\.location\s*=\s*self\.location/gi, '// removed frame buster')
-        .replace(/parent\.location\s*=\s*self\.location/gi, '// removed frame buster')
-        .replace(/<\/body>/gi, '<script>console.log("🔥 JohnsonFlix iframe proxy loaded");document.addEventListener("submit", function(e) {console.log("🔥 Form submission intercepted:", e.target);e.preventDefault();const form = e.target;const formData = new FormData(form);const params = new URLSearchParams(formData);console.log("📋 Form data:", params.toString());const submitUrl = form.action || window.location.href;console.log("🎯 Submitting to:", submitUrl);const controller = new AbortController();const timeoutId = setTimeout(() => {controller.abort();console.log("⏰ Fetch timeout - reloading page");window.location.reload();}, 3000);fetch(submitUrl, {method: form.method || "POST",headers: {"Content-Type": "application/x-www-form-urlencoded"},body: params.toString(),redirect: "manual",signal: controller.signal}).then(response => {clearTimeout(timeoutId);console.log("📥 Form response:", response.status, response.statusText);window.location.reload();}).catch(error => {clearTimeout(timeoutId);console.log("❌ Fetch error or timeout:", error.name);window.location.reload();});});</script></body>');
-		
-      res.set('Content-Length', Buffer.byteLength(htmlContent));
-      res.status(response.status).send(htmlContent);
-      console.log(`✅ HTML sent (${htmlContent.length} chars)`);
-    });
-    
-    response.data.on('error', error => {
-      console.error('❌ HTML stream error:', error);
-      if (!res.headersSent) {
-        res.status(500).send('HTML processing error');
-      }
-    });
-    
-  } else {
-    // Stream non-HTML content directly
-    console.log(`📦 Streaming ${contentType}...`);
-    res.status(response.status);
-    response.data.pipe(res);
-    
-    response.data.on('error', error => {
-      console.error('❌ Stream error:', error);
-    });
-  }
-}
-
-// Clean up old sessions periodically (every 30 minutes)
-setInterval(() => {
-  const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000);
-  for (const [toolId, session] of toolSessions.entries()) {
-    if (session.lastActivity < thirtyMinutesAgo) {
-      toolSessions.delete(toolId);
-      console.log(`🧹 Cleaned up inactive session for tool: ${toolId}`);
-    }
-  }
-}, 30 * 60 * 1000);
 
 // Test tool connectivity
 router.post('/tools/:toolId/test', async (req, res) => {
   try {
     const { toolId } = req.params;
-    console.log(`?? Testing tool: ${toolId}`);
+    console.log(`🧪 Testing tool: ${toolId}`);
     
     const db = require('./database-config');
     const result = await db.query('SELECT setting_value FROM settings WHERE setting_key = ?', ['management_tools']);
@@ -389,7 +540,7 @@ router.post('/tools/:toolId/test', async (req, res) => {
         timestamp: new Date().toISOString()
       };
       
-      console.log(`?? Test result:`, testResult);
+      console.log(`🧪 Test result:`, testResult);
       res.json(testResult);
       
     } catch (error) {

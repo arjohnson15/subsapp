@@ -639,6 +639,26 @@ closeIframeModal() {
     }
 };
 
+window.addEventListener('message', (event) => {
+    // Security check - only accept messages from our proxy
+    if (!event.origin.includes(window.location.origin)) {
+        return;
+    }
+    
+    if (event.data && event.data.type === 'OPEN_IN_NEW_TAB') {
+        console.log('🚪 Received request to break out of iframe:', event.data.url);
+        
+        // Close the iframe modal
+        Management.closeIframeModal();
+        
+        // Open in new tab
+        window.open(event.data.url, '_blank');
+        
+        // Show notification
+        Utils.showNotification('Opening in new tab for better compatibility', 'info');
+    }
+}, false);
+
 // Expose Management to window for app.js to access
 window.Management = Management;
 
