@@ -3734,12 +3734,13 @@ table tbody td:last-child .btn-small:nth-child(4) {
 }
 
 .tautulli-session-card {
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.8);  /* Darker background */
     border: 1px solid rgba(78, 205, 196, 0.3);
-    border-radius: 12px;
+    border-radius: 8px;  /* Smaller radius */
     overflow: hidden;
     display: flex;
-    min-height: 180px;
+    flex-direction: row;  /* CHANGED: Now horizontal */
+    min-height: 180px;  /* CHANGED: Shorter height */
     transition: all 0.3s ease;
     position: relative;
 }
@@ -4178,9 +4179,9 @@ table tbody td:last-child .btn-small:nth-child(4) {
 /* Tautulli-style Session Grid */
 .tautulli-sessions-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));  /* Wider minimum */
     gap: 16px;
-    margin-top: 10px;
+    padding: 16px 0;
     width: 100%;
 }
 
@@ -4203,12 +4204,18 @@ table tbody td:last-child .btn-small:nth-child(4) {
 
 /* Large Session Poster */
 .session-poster-large {
-    height: 150px;
+    width: 100px;  /* ADD: Fixed width */
+    min-width: 100px;  /* ADD: Prevent shrinking */
+    height: 150px;  /* Keep height */
     background: #2a2a2a;
     background-size: cover;
     background-position: center;
+    background-repeat: no-repeat;
     position: relative;
-    border-bottom: 1px solid rgba(78, 205, 196, 0.2);
+    flex-shrink: 0;  /* ADD: Don't shrink */
+    margin: 15px;  /* ADD: Spacing around poster */
+    border-radius: 6px;  /* ADD: Rounded corners */
+    box-shadow: 0 4px 8px rgba(0,0,0,0.4);  /* ADD: Shadow */
 }
 
 /* Quality and Server Badges */
@@ -4265,9 +4272,12 @@ table tbody td:last-child .btn-small:nth-child(4) {
 /* Session Details */
 .session-details {
     padding: 16px;
+    padding-left: 0;  /* No padding on left since poster has margin */
     flex: 1;
     display: flex;
     flex-direction: column;
+    justify-content: space-between;
+    min-width: 0;  /* Allow text truncation */
 }
 
 .session-header {
@@ -4528,5 +4538,61 @@ table tbody td:last-child .btn-small:nth-child(4) {
     .session-summary {
         font-size: 0.8rem;
         padding: 10px 12px;
+    }
+}
+
+/* Additional styles for horizontal Tautulli cards */
+.tautulli-session-card .poster-placeholder {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 32px;
+    color: rgba(255,255,255,0.3);
+}
+
+/* Adjust quality badge position for horizontal layout */
+.tautulli-session-card .quality-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;  /* Move to right side */
+    left: auto;  /* Remove left positioning */
+}
+
+/* Adjust server badge */
+.tautulli-session-card .server-badge {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    background: rgba(78, 205, 196, 0.9);
+    color: #000;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.65rem;
+    font-weight: 600;
+}
+
+/* Ensure metadata doesn't overflow */
+.session-metadata {
+    margin-top: auto;  /* Push to bottom */
+    border-top: 1px solid rgba(78, 205, 196, 0.1);
+    padding-top: 12px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .tautulli-sessions-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .tautulli-session-card {
+        min-height: 140px;
+    }
+    
+    .session-poster-large {
+        width: 80px;
+        min-width: 80px;
+        height: 120px;
+        margin: 10px;
     }
 }
