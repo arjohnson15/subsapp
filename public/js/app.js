@@ -25,14 +25,15 @@ document.addEventListener('DOMContentLoaded', function() {
     window.ResponsiveUtils.init();
     window.AccessibilityUtils.enhanceAccessibility();
     
-    // FIXED: Load initial data but wait for user navigation
+
 loadInitialData().then(() => {
-    // Only show page if there's a hash in URL (user navigated)
+    // Check for hash first, otherwise default to dashboard
     const hash = window.location.hash.substring(1);
     if (hash) {
         showPage(hash);
+    } else {
+        showPage('dashboard');  // ✅ Restore auto-dashboard loading
     }
-    // DON'T auto-show dashboard - wait for user to click
     console.log('✅ JohnsonFlix Manager initialized');
 }).catch(error => {
         console.error('❌ Failed to initialize app:', error);
@@ -141,11 +142,11 @@ async function showPage(pageId) {
         const loaded = await Utils.loadPageContent(pageId);
         if (!loaded) return;
         
+// Update current page state BEFORE initializing (critical for dashboard)
+        window.AppState.currentPage = pageId;
+        
         // Initialize page-specific functionality
         await initializePage(pageId);
-        
-        // Update current page state
-        window.AppState.currentPage = pageId;
         
         console.log(`✅ Loaded page: ${pageId}`);
     } catch (error) {
@@ -931,14 +932,8 @@ async init() {
     await this.loadStats();
     await this.loadContentStats();
     
-    // FIXED: Only start live refresh if actually on dashboard page
-    if (window.AppState.currentPage === 'dashboard') {
-        await this.preloadLiveData();
-        this.startBackgroundRefresh();
-        console.log('✅ Dashboard fully initialized with live refresh');
-    } else {
-        console.log('⚠️ Dashboard init called but not on dashboard page - skipping live refresh');
-    }
+    // ✅ FIXED: No automatic live data loading - only when user expands sections
+    console.log('✅ Dashboard fully initialized (live data loads on user interaction only)');
 },
     
     async loadStats() {
