@@ -1435,7 +1435,7 @@ generateSessionSummary(sessions) {
     return summary;
 },
 
-// REPLACE the createTautulliSessionCard method with this enhanced parser:
+// REPLACE the createTautulliSessionCard method with this CLEANED version:
 
 createTautulliSessionCard(session) {
     console.log('🎬 Parsing session for:', session.title, '- User:', session.user);
@@ -1446,40 +1446,42 @@ createTautulliSessionCard(session) {
     const rawMedia = debugData.rawMedia || {};
     const rawPlayer = debugData.rawPlayer || {};
     
-    console.log('🔍 Raw video attrs:', Object.keys(rawAttrs));
-    console.log('🔍 Raw media:', Object.keys(rawMedia));
-    console.log('🔍 Raw player:', Object.keys(rawPlayer));
-    
-    // Enhanced poster handling
+    // FIXED: Better poster URL handling
     let posterUrl = '';
+    
+    // Try multiple poster sources
     if (session.thumbUrl) {
         posterUrl = session.thumbUrl;
-    } else if (session.thumb) {
-        posterUrl = session.thumb;
-    } else if (rawAttrs.thumb) {
-        const thumbPath = rawAttrs.thumb;
+        console.log('📸 Using session.thumbUrl:', posterUrl);
+    } else if (session.thumb && session.serverUrl && session.token) {
+        // Build full URL from thumb path
+        const thumbPath = session.thumb.startsWith('/') ? session.thumb : '/' + session.thumb;
         posterUrl = `${session.serverUrl}${thumbPath}?X-Plex-Token=${session.token}`;
+        console.log('📸 Built poster URL:', posterUrl);
+    } else if (rawAttrs.thumb && session.serverUrl && session.token) {
+        const thumbPath = rawAttrs.thumb.startsWith('/') ? rawAttrs.thumb : '/' + rawAttrs.thumb;
+        posterUrl = `${session.serverUrl}${thumbPath}?X-Plex-Token=${session.token}`;
+        console.log('📸 Built poster from rawAttrs:', posterUrl);
     }
     
     const posterStyle = posterUrl ? `background-image: url('${posterUrl}')` : '';
     
-    // Extract quality from rawMedia
-    let quality = 'Unknown';
-    let bandwidth = 'Unknown';
-    let videoCodec = 'Unknown';
-    let audioCodec = 'Unknown';
-    let container = 'Unknown';
-    let streamDecision = 'Unknown';
+    // Extract quality from rawMedia - CLEANED UP
+    let quality = 'SD';
+    let bandwidth = '';
+    let videoCodec = '';
+    let audioCodec = '';
+    let container = '';
+    let streamDecision = 'Direct Play';
     
     if (rawMedia.$ && rawMedia.Part && rawMedia.Part[0]) {
         const mediaDollar = rawMedia.$;
         const partData = rawMedia.Part[0];
         const partDollar = partData.$ || {};
         
-        // Extract quality and resolution
+        // Extract quality and resolution - SIMPLIFIED
         const videoResolution = mediaDollar.videoResolution || partDollar.videoResolution;
         const height = mediaDollar.height || partDollar.height;
-        const width = mediaDollar.width || partDollar.width;
         
         if (videoResolution) {
             if (videoResolution.includes('4k') || videoResolution === '2160') {
@@ -1488,10 +1490,10 @@ createTautulliSessionCard(session) {
                 quality = '1080p';
             } else if (videoResolution === '720') {
                 quality = '720p';
-            } else if (videoResolution === 'sd') {
+            } else if (videoResolution.toLowerCase() === 'sd') {
                 quality = 'SD';
             } else {
-                quality = videoResolution + 'p';
+                quality = videoResolution;
             }
         } else if (height) {
             const h = parseInt(height);
@@ -1501,83 +1503,62 @@ createTautulliSessionCard(session) {
             else quality = 'SD';
         }
         
-        // Extract bandwidth
+        // Extract bandwidth - CLEANED
         const bitrate = mediaDollar.bitrate || partDollar.bitrate;
-        if (bitrate) {
+        if (bitrate && bitrate !== '0') {
             const br = parseInt(bitrate);
             bandwidth = (br / 1000).toFixed(1) + ' Mbps';
         }
         
-        // Extract codecs
-        videoCodec = mediaDollar.videoCodec || partDollar.videoCodec || 'Unknown';
-        audioCodec = mediaDollar.audioCodec || partDollar.audioCodec || 'Unknown';
-        container = mediaDollar.container || partDollar.container || 'Unknown';
+        // Extract codecs - CLEANED
+        const vCodec = mediaDollar.videoCodec || partDollar.videoCodec;
+        const aCodec = mediaDollar.audioCodec || partDollar.audioCodec;
         
-        // Extract stream decision
-        const decision = partDollar.decision || mediaDollar.decision;
+        if (vCodec && vCodec !== 'Unknown' && vCodec !== 'UNKNOWN') {
+            videoCodec = vCodec.toUpperCase();
+        }
+        if (aCodec && aCodec !== 'Unknown' && aCodec !== 'UNKNOWN') {
+            audioCodec = aCodec.toUpperCase();
+        }
+        
+        container = mediaDollar.container || partDollar.container || '';
+        
+        // Extract stream decision - SIMPLIFIED
+        const decision = partDollar.decision || mediaDollar.decision || 'directplay';
+        
         if (decision === 'directplay') {
             streamDecision = 'Direct Play';
         } else if (decision === 'directstream') {
             streamDecision = 'Direct Stream';
         } else if (decision === 'transcode') {
             streamDecision = 'Transcode';
-        } else if (decision) {
-            streamDecision = decision.charAt(0).toUpperCase() + decision.slice(1);
+        } else {
+            streamDecision = 'Direct Play'; // Default fallback
         }
-        
-        console.log('📊 Extracted tech details:', {
-            quality,
-            bandwidth,
-            videoCodec,
-            audioCodec,
-            container,
-            streamDecision,
-            decision
-        });
     }
     
-    // Extract player information from rawPlayer
-    let playerTitle = 'Unknown Player';
-    let playerProduct = 'Unknown';
-    let playerPlatform = 'Unknown';
-    let location = 'Unknown Location';
+    // Extract player information - CLEANED
+    let playerTitle = 'Unknown';
+    let playerProduct = '';
+    let location = 'WAN';
     
     if (rawPlayer.$) {
         const playerData = rawPlayer.$;
-        playerTitle = playerData.title || playerData.device || 'Unknown Player';
-        playerProduct = playerData.product || 'Unknown';
-        playerPlatform = playerData.platform || 'Unknown';
+        playerTitle = playerData.title || playerData.device || 'Unknown';
+        playerProduct = playerData.product || '';
         
-        // Determine location
-        const isLocal = playerData.local === '1' || playerData.local === 1;
-        const isRelayed = playerData.relayed === '1' || playerData.relayed === 1;
-        
-        if (isLocal) {
-            location = 'LAN';
-        } else if (isRelayed) {
-            location = 'WAN (Relayed)';
-        } else {
-            location = 'WAN';
-        }
-        
-        console.log('📱 Player info:', {
-            playerTitle,
-            playerProduct,
-            playerPlatform,
-            location,
-            isLocal,
-            isRelayed
-        });
+        // Determine location - SIMPLIFIED
+        const isLocal = playerData.local === '1';
+        location = isLocal ? 'LAN' : 'WAN';
     }
     
-    // Enhanced status handling
-    let statusClass = 'status-unknown';
-    let statusIcon = '❓';
+    // Status handling - FIXED
+    let statusClass = 'status-playing';
+    let statusIcon = '▶️';
     
-    // Try to get state from player data first, then fallback
     const playerState = rawPlayer.$?.state;
     const sessionState = session.state;
-    const finalState = (playerState || sessionState || 'unknown').toLowerCase();
+    const finalState = (playerState || sessionState || 'playing').toLowerCase();
     
     switch(finalState) {
         case 'playing':
@@ -1593,10 +1574,11 @@ createTautulliSessionCard(session) {
             statusIcon = '⏳';
             break;
         default:
-            statusIcon = '❓';
+            statusClass = 'status-playing';
+            statusIcon = '▶️';
     }
     
-    // Enhanced title and subtitle
+    // Title and subtitle - CLEANED
     const title = this.escapeHtml(session.title || rawAttrs.title || 'Unknown Title');
     let subtitle = '';
     
@@ -1604,18 +1586,26 @@ createTautulliSessionCard(session) {
         const showName = this.escapeHtml(session.grandparentTitle || rawAttrs.grandparentTitle);
         const seasonNum = session.parentIndex || rawAttrs.parentIndex;
         const episodeNum = session.index || rawAttrs.index;
-        const seasonEp = seasonNum && episodeNum ? 
-            `S${String(seasonNum).padStart(2, '0')}E${String(episodeNum).padStart(2, '0')}` : '';
-        subtitle = `${showName}${seasonEp ? ' - ' + seasonEp : ''}`;
-        const year = session.year || rawAttrs.year;
-        if (year) subtitle += ` (${year})`;
+        
+        if (seasonNum && episodeNum) {
+            const seasonEp = `S${String(seasonNum).padStart(2, '0')}E${String(episodeNum).padStart(2, '0')}`;
+            subtitle = `${showName} - ${seasonEp}`;
+        } else {
+            subtitle = showName;
+        }
     } else if (session.type === 'movie') {
         const year = session.year || rawAttrs.year;
         const studio = session.studio || rawAttrs.studio;
-        if (year) subtitle = `(${year})`;
-        if (studio && subtitle) subtitle += ` • ${studio}`;
-        else if (studio) subtitle = studio;
+        
+        if (year && studio) {
+            subtitle = `(${year}) • ${studio}`;
+        } else if (year) {
+            subtitle = `(${year})`;
+        } else if (studio) {
+            subtitle = studio;
+        }
     }
+    
     subtitle = this.escapeHtml(subtitle);
     
     // Progress information
@@ -1628,28 +1618,33 @@ createTautulliSessionCard(session) {
                         quality.includes('1080') ? 'quality-1080p' :
                         quality.includes('720') ? 'quality-720p' : 'quality-sd';
     
-    // Server indicator
-    const serverName = session.serverName || 'Unknown Server';
+    // Server name - CLEANED
+    const serverName = session.serverName || 'PLEX1';
     
-    // User avatar (first letter of username)
+    // User avatar
     const userInitial = (session.user || 'U')[0].toUpperCase();
     
-    // Technical details for display
-    const videoInfo = [];
-    if (videoCodec !== 'Unknown') videoInfo.push(videoCodec.toUpperCase());
-    if (audioCodec !== 'Unknown') videoInfo.push(audioCodec.toUpperCase());
+    // Build codec display
+    const codecDisplay = [];
+    if (videoCodec) codecDisplay.push(videoCodec);
+    if (audioCodec) codecDisplay.push(audioCodec);
+    const codecText = codecDisplay.length > 0 ? codecDisplay.join(' • ') : 'Unknown';
     
-    console.log('✅ Parsed session for', title, ':', {
-        user: session.user,
-        state: finalState,
-        progress: progress + '%',
+    console.log('✅ Final parsed data:', {
+        title,
+        subtitle,
         quality,
-        hasThumb: !!posterUrl
+        streamDecision,
+        bandwidth: bandwidth || 'Unknown',
+        location,
+        playerTitle,
+        posterUrl: !!posterUrl
     });
     
     return `
         <div class="tautulli-session-card" data-type="${session.type}">
             <div class="session-poster-large" style="${posterStyle}">
+                ${!posterUrl ? `<div class="poster-placeholder"><i class="fas ${session.type === 'movie' ? 'fa-film' : 'fa-tv'}"></i></div>` : ''}
                 <div class="quality-badge ${qualityClass}">${quality}</div>
                 <div class="server-badge">${serverName}</div>
                 <div class="status-overlay">
@@ -1689,26 +1684,24 @@ createTautulliSessionCard(session) {
                         <span class="metadata-label">Stream:</span>
                         <span class="metadata-value">${streamDecision}</span>
                     </div>
-                    ${bandwidth !== 'Unknown' ? `
+                    ${bandwidth ? `
                     <div class="metadata-row">
                         <span class="metadata-label">Bandwidth:</span>
                         <span class="metadata-value">${bandwidth}</span>
                     </div>` : ''}
-                    ${videoInfo.length > 0 ? `
                     <div class="metadata-row">
                         <span class="metadata-label">Codecs:</span>
-                        <span class="metadata-value">${videoInfo.join(' • ')}</span>
-                    </div>` : ''}
+                        <span class="metadata-value">${codecText}</span>
+                    </div>
                     <div class="metadata-row">
                         <span class="metadata-label">Location:</span>
-                        <span class="metadata-value">${this.escapeHtml(location)}</span>
+                        <span class="metadata-value">${location}</span>
                     </div>
                 </div>
             </div>
         </div>
     `;
 },
-
 
 // ADD this new method (completely new):
 formatDuration(ms) {
