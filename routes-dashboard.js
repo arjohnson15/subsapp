@@ -4,6 +4,7 @@ const db = require('./database-config');
 const axios = require('axios');
 const { spawn } = require('child_process');
 const iptvService = require('./iptv-service');
+const xml2js = require('xml2js');
 
 // GET /api/dashboard/stats - Combined endpoint for all dashboard data
 router.get('/stats', async (req, res) => {
@@ -706,18 +707,49 @@ async function getIPTVLiveViewers() {
   }
 }
 
-// NEW: Get Plex now playing sessions (placeholder for now)
+// REPLACE the existing getPlexNowPlaying() function with this complete implementation:
+
 async function getPlexNowPlaying() {
   try {
-    console.log('🎬 Getting Plex now playing sessions...');
+    console.log('🎬 Getting Plex now playing sessions from all servers...');
     
-    // TODO: Implement Plex sessions API calls
-    // For now, return empty data
-    console.log('⚠️ Plex now playing not implemented yet');
+    // Get Plex server configs
+    const plexConfigs = getPlexServerConfigs();
+    const allSessions = [];
+    
+    // Fetch sessions from all servers
+    const serverPromises = [];
+    
+    for (const [serverGroup, config] of Object.entries(plexConfigs)) {
+      // Add regular server
+      serverPromises.push(fetchServerSessions(config.regular, `${serverGroup}-regular`));
+      
+      // Add 4K server if different from regular
+      if (config.fourk && config.fourk.serverId !== config.regular.serverId) {
+        serverPromises.push(fetchServerSessions(config.fourk, `${serverGroup}-4k`));
+      }
+    }
+    
+    // Wait for all server requests
+    const results = await Promise.allSettled(serverPromises);
+    
+    // Combine all successful results
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value) {
+        allSessions.push(...result.value);
+      } else {
+        console.warn(`Server ${index} sessions failed:`, result.reason?.message);
+      }
+    });
+    
+    // Sort by most recent activity
+    allSessions.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+    
+    console.log(`🎬 Found ${allSessions.length} total Plex sessions across all servers`);
     
     return {
-      sessions: [],
-      total: 0,
+      sessions: allSessions,
+      total: allSessions.length,
       lastUpdate: new Date().toISOString()
     };
     
@@ -730,5 +762,587 @@ async function getPlexNowPlaying() {
     };
   }
 }
+
+// ADD these new helper functions AFTER the getPlexNowPlaying() function:
+
+// Fetch sessions from a single Plex server
+async function fetchServerSessions(serverConfig, serverName) {
+  try {
+    console.log(`🔍 Fetching sessions from ${serverName}...`);
+    
+    // Try Plex.tv API first (more reliable for sessions)
+    const plexTvUrl = `https://plex.tv/api/servers/${serverConfig.serverId}/status/sessions`;
+    
+    try {
+      const response = await axios.get(plexTvUrl, {
+        headers: {
+          'X-Plex-Token': serverConfig.token,
+          'Accept': 'application/xml'
+        },
+        timeout: 10000
+      });
+      
+      const sessions = await parseSessionsXML(response.data, serverConfig, serverName);
+      console.log(`✅ ${serverName}: Found ${sessions.length} sessions via Plex.tv`);
+      return sessions;
+      
+    } catch (plexTvError) {
+      console.log(`⚠️ Plex.tv API failed for ${serverName}, trying direct connection...`);
+      
+      // Fallback to direct server connection
+      const directUrl = `${serverConfig.url}/status/sessions`;
+      const directResponse = await axios.get(directUrl, {
+        headers: {
+          'X-Plex-Token': serverConfig.token,
+          'Accept': 'application/xml'
+        },
+        timeout: 15000
+      });
+      
+      const sessions = await parseSessionsXML(directResponse.data, serverConfig, serverName);
+      console.log(`✅ ${serverName}: Found ${sessions.length} sessions via direct connection`);
+      return sessions;
+    }
+    
+  } catch (error) {
+    console.error(`❌ Failed to fetch sessions from ${serverName}:`, error.message);
+    return [];
+  }
+}
+
+// Parse Plex XML sessions response into our format
+async function parseSessionsXML(xmlData, serverConfig, serverName) {
+  try {
+    const parser = new xml2js.Parser();
+    const result = await parser.parseStringPromise(xmlData);
+    
+    if (!result || !result.MediaContainer || !result.MediaContainer.Video) {
+      return [];
+    }
+    
+    let videos = result.MediaContainer.Video;
+    if (!Array.isArray(videos)) {
+      videos = [videos];
+    }
+    
+    const sessions = videos.map(video => {
+      const session = parseVideoSession(video, serverConfig, serverName);
+      return session;
+    }).filter(session => session !== null);
+    
+    return sessions;
+    
+  } catch (error) {
+    console.error('Error parsing sessions XML:', error);
+    return [];
+  }
+}
+
+// REPLACE the parseVideoSession function in routes-dashboard.js with this enhanced version:
+
+function parseVideoSession(video, serverConfig, serverName) {
+  try {
+    const attrs = video.$ || {};
+    const user = video.User && video.User[0] && video.User[0].$ ? video.User[0].$.title : 'Unknown User';
+    const player = video.Player && video.Player[0] && video.Player[0].$ ? video.Player[0] : {};
+    
+    // Enhanced media parsing
+    const media = video.Media && video.Media[0] && video.Media[0].$ ? video.Media[0] : {};
+    const part = media.Part && media.Part && media.Part[0] ? media.Part[0] : {};
+    const stream = part.Stream && part.Stream[0] && part.Stream[0].$ ? part.Stream[0] : {};
+    
+    console.log(`🎬 Parsing session for: ${attrs.title} - User: ${user}`);
+    console.log(`📊 Raw video attrs:`, Object.keys(attrs));
+    console.log(`📊 Raw media:`, Object.keys(media));
+    console.log(`📊 Raw player:`, Object.keys(player));
+    
+    // Enhanced progress calculation
+    const viewOffset = parseInt(attrs.viewOffset) || 0;
+    const duration = parseInt(attrs.duration) || 1;
+    const progress = duration > 0 ? Math.round((viewOffset / duration) * 100) : 0;
+    
+    // Enhanced quality information
+    let quality = 'Unknown';
+    let resolution = 'Unknown';
+    let bitrate = null;
+    
+    if (media.videoResolution) {
+      resolution = media.videoResolution.toUpperCase();
+      quality = resolution;
+      
+      if (media.bitrate) {
+        bitrate = parseInt(media.bitrate);
+        quality += ` (${Math.round(bitrate / 1000)}Mbps)`;
+      }
+    } else if (stream.displayTitle) {
+      quality = stream.displayTitle;
+      resolution = stream.displayTitle;
+    }
+    
+    // Enhanced thumbnail handling
+    let thumbUrl = '';
+    if (attrs.thumb) {
+      if (attrs.thumb.startsWith('/')) {
+        // Local thumbnail - construct full URL
+        thumbUrl = `${serverConfig.url}${attrs.thumb}?X-Plex-Token=${serverConfig.token}`;
+      } else if (attrs.thumb.startsWith('http')) {
+        // External thumbnail - use as is but add token if needed
+        thumbUrl = attrs.thumb;
+        if (!thumbUrl.includes('X-Plex-Token')) {
+          thumbUrl += (thumbUrl.includes('?') ? '&' : '?') + `X-Plex-Token=${serverConfig.token}`;
+        }
+      } else {
+        // Relative path
+        thumbUrl = `${serverConfig.url}${attrs.thumb.startsWith('/') ? '' : '/'}${attrs.thumb}?X-Plex-Token=${serverConfig.token}`;
+      }
+    }
+    
+    // Also try art for fallback
+    if (!thumbUrl && attrs.art) {
+      if (attrs.art.startsWith('/')) {
+        thumbUrl = `${serverConfig.url}${attrs.art}?X-Plex-Token=${serverConfig.token}`;
+      }
+    }
+    
+    // Enhanced content type and subtitle handling
+    let subtitle = '';
+    let contentType = attrs.type || 'unknown';
+    
+    if (contentType === 'episode') {
+      // TV Show Episode
+      const showTitle = attrs.grandparentTitle || 'Unknown Show';
+      const seasonNum = attrs.parentIndex ? String(attrs.parentIndex).padStart(2, '0') : '00';
+      const episodeNum = attrs.index ? String(attrs.index).padStart(2, '0') : '00';
+      const episodeTitle = attrs.title || 'Unknown Episode';
+      
+      subtitle = `${showTitle} - S${seasonNum}E${episodeNum}`;
+      
+      // If there's a year, add it
+      if (attrs.year) {
+        subtitle += ` (${attrs.year})`;
+      }
+    } else if (contentType === 'movie') {
+      // Movie
+      if (attrs.year) {
+        subtitle = `(${attrs.year})`;
+      }
+      if (attrs.studio) {
+        subtitle += subtitle ? ` • ${attrs.studio}` : attrs.studio;
+      }
+    } else if (contentType === 'track') {
+      // Music Track
+      const artist = attrs.grandparentTitle || attrs.parentTitle || 'Unknown Artist';
+      const album = attrs.parentTitle || 'Unknown Album';
+      subtitle = `${artist} - ${album}`;
+    }
+    
+    // Enhanced technical information
+    const videoCodec = stream.codec || media.videoCodec || 'Unknown';
+    const audioCodec = media.audioCodec || 'Unknown';  
+    const container = media.container || part.container || 'Unknown';
+    
+    // Enhanced bandwidth calculation
+    let bandwidth = 'Unknown';
+    if (media.bitrate) {
+      bandwidth = `${Math.round(media.bitrate / 1000)} Mbps`;
+    } else if (part.bitrate) {
+      bandwidth = `${Math.round(part.bitrate / 1000)} Mbps`;
+    }
+    
+    // Enhanced player information
+    const playerTitle = player.title || player.device || 'Unknown Player';
+    const playerAddress = player.address || player.remotePublicAddress || 'Unknown Location';
+    const playerProduct = player.product || 'Unknown Client';
+    
+    // Enhanced state detection
+    let state = player.state || 'unknown';
+    if (!['playing', 'paused', 'buffering', 'stopped'].includes(state)) {
+      state = 'unknown';
+    }
+    
+    // Format durations
+    const formatDuration = (ms) => {
+      if (!ms || ms <= 0) return '0:00';
+      const totalSeconds = Math.floor(ms / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      
+      if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      } else {
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }
+    };
+    
+    const durationFormatted = formatDuration(duration);
+    const remainingTime = formatDuration(duration - viewOffset);
+    const elapsedTime = formatDuration(viewOffset);
+    
+    // Enhanced session object with all the data Tautulli shows
+    const sessionData = {
+      // Basic identification
+      sessionKey: attrs.sessionKey || attrs.key,
+      ratingKey: attrs.ratingKey,
+      
+      // User information
+      user: user,
+      userId: video.User && video.User[0] && video.User[0].$.id ? video.User[0].$.id : null,
+      
+      // Content information
+      title: attrs.title || 'Unknown Title',
+      subtitle: subtitle,
+      type: contentType,
+      year: attrs.year || null,
+      
+      // For TV shows
+      grandparentTitle: attrs.grandparentTitle || null, // Show name
+      parentTitle: attrs.parentTitle || null, // Season name
+      parentIndex: attrs.parentIndex || null, // Season number
+      index: attrs.index || null, // Episode number
+      
+      // Media information
+      thumb: thumbUrl,
+      art: attrs.art,
+      duration: duration,
+      durationFormatted: durationFormatted,
+      
+      // Progress information
+      viewOffset: viewOffset,
+      progress: progress,
+      elapsedTime: elapsedTime,
+      remainingTime: remainingTime,
+      
+      // Quality and technical information
+      quality: quality,
+      resolution: resolution,
+      bitrate: bitrate,
+      bandwidth: bandwidth,
+      videoCodec: videoCodec.toUpperCase(),
+      audioCodec: audioCodec.toUpperCase(),
+      container: container.toUpperCase(),
+      
+      // Player information
+      state: state,
+      playerTitle: playerTitle,
+      playerProduct: playerProduct,
+      location: playerAddress,
+      
+      // Server information
+      serverUrl: serverConfig.url,
+      serverName: serverName,
+      token: serverConfig.token,
+      
+      // Additional metadata
+      rating: attrs.rating || null,
+      studio: attrs.studio || null,
+      guid: attrs.guid || null,
+      
+      // Timestamps
+      addedAt: attrs.addedAt ? new Date(parseInt(attrs.addedAt) * 1000).toISOString() : null,
+      updatedAt: new Date().toISOString(),
+      
+      // Raw data for debugging
+      _debug: {
+        rawAttrs: attrs,
+        rawMedia: media,
+        rawPlayer: player,
+        hasThumb: !!attrs.thumb,
+        hasArt: !!attrs.art,
+        thumbUrl: thumbUrl
+      }
+    };
+    
+    console.log(`✅ Parsed session for ${sessionData.title}:`, {
+      user: sessionData.user,
+      state: sessionData.state,
+      progress: `${sessionData.progress}%`,
+      quality: sessionData.quality,
+      hasThumb: !!sessionData.thumb
+    });
+    
+    return sessionData;
+    
+  } catch (error) {
+    console.error('❌ Error parsing video session:', error);
+    console.error('❌ Raw video data:', video);
+    return null;
+  }
+}
+
+// Helper function to format duration in milliseconds to readable time
+function formatDuration(ms) {
+  if (!ms || ms <= 0) return '0:00';
+  
+  const totalMinutes = Math.floor(ms / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:00`;
+  } else {
+    return `${minutes}:00`;
+  }
+}
+
+// Get Plex server configurations from existing Plex service
+function getPlexServerConfigs() {
+  try {
+    // Use the existing Plex service's configuration
+    const plexService = require('./plex-service');
+    const configs = plexService.getServerConfig();
+    
+    console.log('✅ Loaded Plex config from plex-service.js');
+    return configs;
+    
+  } catch (error) {
+    console.error('❌ Error loading Plex service:', error);
+    
+    // Fallback to hardcoded config if service not available
+    return {
+      'plex1': {
+        regular: {
+          name: 'Plex 1',
+          serverId: '3ad72e19d4509a15d9f8253666a03efa78baac44',
+          token: 'sxuautpKvoH2aZKG-j95',
+          url: 'http://192.168.10.90:32400'
+        },
+        fourk: {
+          name: 'Plex 1 4K',
+          serverId: '90244d9a956da3afad32f85d6b24a9c24649d681',
+          token: 'sxuautpKvoH2aZKG-j95',
+          url: 'http://192.168.10.92:32400'
+        }
+      },
+      'plex2': {
+        regular: {
+          name: 'Plex 2',
+          serverId: '3ad72e19d4509a15d9f8253666a03efa78baac44',
+          token: 'B1QhFRA-Q2pSm15uxmMA',
+          url: 'http://192.168.10.94:32400'
+        },
+        fourk: {
+          name: 'Plex 2 4K',
+          serverId: 'c6448117a95874f18274f31495ff5118fd291089',
+          token: 'B1QhFRA-Q2pSm15uxmMA',
+          url: 'http://192.168.10.92:32700'
+        }
+      }
+    };
+  }
+}
+
+// ADD this debug route to your routes-dashboard.js file (after the existing routes)
+
+// DEBUG: Get raw Plex session data for troubleshooting
+router.get('/plex-debug', async (req, res) => {
+  try {
+    console.log('🔍 DEBUG: Getting raw Plex session data...');
+    
+    const plexConfigs = getPlexServerConfigs();
+    const debugInfo = {
+      servers: {},
+      rawSessions: [],
+      parsedSessions: [],
+      errors: []
+    };
+    
+    // Test each server individually
+    for (const [serverGroup, config] of Object.entries(plexConfigs)) {
+      debugInfo.servers[serverGroup] = {
+        regular: { tested: false, error: null, rawXML: null, sessionCount: 0 },
+        fourk: { tested: false, error: null, rawXML: null, sessionCount: 0 }
+      };
+      
+      // Test regular server
+      try {
+        console.log(`🔍 Testing ${serverGroup}-regular...`);
+        const regularSessions = await fetchServerSessions(config.regular, `${serverGroup}-regular`);
+        debugInfo.servers[serverGroup].regular = {
+          tested: true,
+          error: null,
+          sessionCount: regularSessions.length,
+          sessions: regularSessions
+        };
+        debugInfo.parsedSessions.push(...regularSessions);
+      } catch (error) {
+        debugInfo.servers[serverGroup].regular = {
+          tested: true,
+          error: error.message,
+          sessionCount: 0
+        };
+        debugInfo.errors.push(`${serverGroup}-regular: ${error.message}`);
+      }
+      
+      // Test 4K server if different
+      if (config.fourk && config.fourk.serverId !== config.regular.serverId) {
+        try {
+          console.log(`🔍 Testing ${serverGroup}-4k...`);
+          const fourkSessions = await fetchServerSessions(config.fourk, `${serverGroup}-4k`);
+          debugInfo.servers[serverGroup].fourk = {
+            tested: true,
+            error: null,
+            sessionCount: fourkSessions.length,
+            sessions: fourkSessions
+          };
+          debugInfo.parsedSessions.push(...fourkSessions);
+        } catch (error) {
+          debugInfo.servers[serverGroup].fourk = {
+            tested: true,
+            error: error.message,
+            sessionCount: 0
+          };
+          debugInfo.errors.push(`${serverGroup}-4k: ${error.message}`);
+        }
+      }
+    }
+    
+    // Get raw XML from one server for debugging
+    try {
+      const firstConfig = Object.values(plexConfigs)[0]?.regular;
+      if (firstConfig) {
+        console.log('🔍 Getting raw XML for debugging...');
+        const directUrl = `${firstConfig.url}/status/sessions`;
+        const response = await axios.get(directUrl, {
+          headers: {
+            'X-Plex-Token': firstConfig.token,
+            'Accept': 'application/xml'
+          },
+          timeout: 15000
+        });
+        debugInfo.rawXML = response.data;
+      }
+    } catch (error) {
+      debugInfo.rawXMLError = error.message;
+    }
+    
+    const summary = {
+      totalSessions: debugInfo.parsedSessions.length,
+      serversChecked: Object.keys(debugInfo.servers).length * 2,
+      errors: debugInfo.errors.length,
+      hasData: debugInfo.parsedSessions.length > 0
+    };
+    
+    console.log('🔍 Debug summary:', summary);
+    
+    res.json({
+      success: true,
+      summary: summary,
+      debugInfo: debugInfo,
+      sampleSession: debugInfo.parsedSessions[0] || null,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Debug route error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: error.stack
+    });
+  }
+});
+
+// DEBUG: Test individual server connection and XML parsing
+router.get('/plex-debug/:serverGroup/:serverType', async (req, res) => {
+  try {
+    const { serverGroup, serverType } = req.params;
+    
+    if (!['plex1', 'plex2'].includes(serverGroup) || !['regular', 'fourk'].includes(serverType)) {
+      return res.status(400).json({ error: 'Invalid parameters' });
+    }
+    
+    const plexConfigs = getPlexServerConfigs();
+    const serverConfig = plexConfigs[serverGroup]?.[serverType];
+    
+    if (!serverConfig) {
+      return res.status(404).json({ error: 'Server configuration not found' });
+    }
+    
+    console.log(`🔍 DEBUG: Testing ${serverGroup}-${serverType}...`);
+    
+    const debugResult = {
+      serverConfig: {
+        name: serverConfig.name,
+        url: serverConfig.url,
+        serverId: serverConfig.serverId,
+        hasToken: !!serverConfig.token
+      },
+      tests: {
+        plexTvAPI: { success: false, error: null, data: null },
+        directConnection: { success: false, error: null, data: null },
+        xmlParsing: { success: false, error: null, sessions: [] }
+      }
+    };
+    
+    // Test 1: Plex.tv API
+    try {
+      const plexTvUrl = `https://plex.tv/api/servers/${serverConfig.serverId}/status/sessions`;
+      const plexTvResponse = await axios.get(plexTvUrl, {
+        headers: {
+          'X-Plex-Token': serverConfig.token,
+          'Accept': 'application/xml'
+        },
+        timeout: 10000
+      });
+      
+      debugResult.tests.plexTvAPI.success = true;
+      debugResult.tests.plexTvAPI.data = plexTvResponse.data.substring(0, 500) + '...'; // Truncated
+      
+      // Try parsing
+      try {
+        const sessions = await parseSessionsXML(plexTvResponse.data, serverConfig, `${serverGroup}-${serverType}`);
+        debugResult.tests.xmlParsing.success = true;
+        debugResult.tests.xmlParsing.sessions = sessions;
+      } catch (parseError) {
+        debugResult.tests.xmlParsing.error = parseError.message;
+      }
+      
+    } catch (error) {
+      debugResult.tests.plexTvAPI.error = error.message;
+      
+      // Test 2: Direct connection fallback
+      try {
+        const directUrl = `${serverConfig.url}/status/sessions`;
+        const directResponse = await axios.get(directUrl, {
+          headers: {
+            'X-Plex-Token': serverConfig.token,
+            'Accept': 'application/xml'
+          },
+          timeout: 15000
+        });
+        
+        debugResult.tests.directConnection.success = true;
+        debugResult.tests.directConnection.data = directResponse.data.substring(0, 500) + '...'; // Truncated
+        
+        // Try parsing
+        try {
+          const sessions = await parseSessionsXML(directResponse.data, serverConfig, `${serverGroup}-${serverType}`);
+          debugResult.tests.xmlParsing.success = true;
+          debugResult.tests.xmlParsing.sessions = sessions;
+        } catch (parseError) {
+          debugResult.tests.xmlParsing.error = parseError.message;
+        }
+        
+      } catch (directError) {
+        debugResult.tests.directConnection.error = directError.message;
+      }
+    }
+    
+    res.json({
+      success: true,
+      server: `${serverGroup}-${serverType}`,
+      debugResult: debugResult,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Individual server debug error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
 module.exports = router;
