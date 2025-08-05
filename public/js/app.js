@@ -1,13 +1,12 @@
 // Main Application Logic for JohnsonFlix Manager - Enhanced with Library Pre-selection
 
-// Initialize application
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 JohnsonFlix Manager starting...');
     
-    // Initialize global state
+    // Initialize global state WITHOUT auto-starting dashboard
     if (!window.AppState) {
         window.AppState = {
-            currentPage: 'dashboard',
+            currentPage: null,  // <-- CRITICAL: Don't auto-set to dashboard
             editingUserId: null,
             currentUserData: null,
             users: [],
@@ -26,41 +25,20 @@ document.addEventListener('DOMContentLoaded', function() {
     window.ResponsiveUtils.init();
     window.AccessibilityUtils.enhanceAccessibility();
     
-    // Load initial data and then show dashboard
-    loadInitialData().then(() => {
-        showPage('dashboard');
-        console.log('✅ JohnsonFlix Manager initialized');
-    }).catch(error => {
+    // FIXED: Load initial data but wait for user navigation
+loadInitialData().then(() => {
+    // Only show page if there's a hash in URL (user navigated)
+    const hash = window.location.hash.substring(1);
+    if (hash) {
+        showPage(hash);
+    }
+    // DON'T auto-show dashboard - wait for user to click
+    console.log('✅ JohnsonFlix Manager initialized');
+}).catch(error => {
         console.error('❌ Failed to initialize app:', error);
         Utils.showNotification('Failed to initialize application: ' + error.message, 'error');
-        // Still show dashboard even if initial data fails
-        showPage('dashboard');
     });
-    
-    // Set up global error handlers
-    window.addEventListener('error', (e) => {
-        console.error('Global error:', e.error);
-        Utils.showNotification('An unexpected error occurred', 'error');
-    });
-    
-    window.addEventListener('unhandledrejection', function(event) {
-        console.error('Unhandled promise rejection:', event.reason);
-        Utils.handleError(event.reason, 'Promise rejection');
-        event.preventDefault();
-    });
-    
-    // Set up online/offline handlers
-    window.addEventListener('online', () => {
-        Utils.showNotification('Connection restored', 'success');
-    });
-    
-    window.addEventListener('offline', () => {
-        Utils.showNotification('Connection lost - some features may not work', 'warning');
-    });
-    
-    // Set up hash change handler
-    window.addEventListener('hashchange', handleHashChange);
-});
+	});
 
 
 async function loadInitialData() {
@@ -953,11 +931,11 @@ async init() {
     await this.loadStats();
     await this.loadContentStats();
     
-    // FIXED: Only start live data refresh if we're actually on dashboard page
+    // FIXED: Only start live refresh if actually on dashboard page
     if (window.AppState.currentPage === 'dashboard') {
         await this.preloadLiveData();
         this.startBackgroundRefresh();
-        console.log('✅ Dashboard fully initialized with live data refresh');
+        console.log('✅ Dashboard fully initialized with live refresh');
     } else {
         console.log('⚠️ Dashboard init called but not on dashboard page - skipping live refresh');
     }
@@ -1395,7 +1373,7 @@ destroy() {
     // Stop the expanded sections refresh
     this.stopAutoRefresh();
     
-    // Stop the background refresh (this is the critical fix)
+    // Stop the background refresh
     this.stopBackgroundRefresh();
     
     // Clear all cached data
