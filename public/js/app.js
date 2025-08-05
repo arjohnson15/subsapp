@@ -1368,11 +1368,11 @@ updatePlexSessions(data) {
     console.log(`✅ Updated ${data.sessions.length} Plex sessions with summary`);
 },
 
-// ADD this new method to generate session summary:
+// ALSO UPDATE the generateSessionSummary method to use the parsed data:
 generateSessionSummary(sessions) {
     const totalSessions = sessions.length;
     
-    // Count by decision type
+    // Count by decision type using the enhanced parsing
     let directPlays = 0;
     let directStreams = 0; 
     let transcodes = 0;
@@ -1380,37 +1380,39 @@ generateSessionSummary(sessions) {
     let wanBandwidth = 0;
     
     sessions.forEach(session => {
-        // Parse bandwidth (remove units and convert to number)
-        if (session.bandwidth && session.bandwidth !== 'Unknown') {
-            const bw = parseFloat(session.bandwidth.replace(/[^\d.]/g, ''));
-            if (!isNaN(bw)) {
-                totalBandwidth += bw;
-                // Assume all is WAN for now - could be enhanced with location data
-                wanBandwidth += bw;
+        const debugData = session._debug || {};
+        const rawMedia = debugData.rawMedia || {};
+        
+        // Parse bandwidth from rawMedia
+        if (rawMedia.$ && rawMedia.Part && rawMedia.Part[0]) {
+            const mediaDollar = rawMedia.$;
+            const partDollar = rawMedia.Part[0].$ || {};
+            
+            const bitrate = mediaDollar.bitrate || partDollar.bitrate;
+            if (bitrate) {
+                const bw = parseInt(bitrate) / 1000; // Convert to Mbps
+                if (!isNaN(bw)) {
+                    totalBandwidth += bw;
+                    wanBandwidth += bw; // Assume all is WAN for now
+                }
             }
-        }
-        
-        // Determine stream type from debug data or fallback logic
-        const decision = session._debug?.rawMedia?.$?.decision || 
-                        session._debug?.rawAttrs?.decision || 
-                        session.decision || 'unknown';
-        
-        if (decision === 'directplay' || decision === 'direct play') {
-            directPlays++;
-        } else if (decision === 'directstream' || decision === 'direct stream') {
-            directStreams++;
-        } else if (decision === 'transcode' || decision.includes('transcode')) {
-            transcodes++;
-        } else {
-            // Fallback logic based on available data
-            if (session.videoCodec === session.originalVideoCodec && 
-                session.audioCodec === session.originalAudioCodec) {
+            
+            // Parse decision type
+            const decision = partDollar.decision || mediaDollar.decision || 'unknown';
+            
+            if (decision === 'directplay') {
                 directPlays++;
-            } else if (session.container === session.originalContainer) {
+            } else if (decision === 'directstream') {
                 directStreams++;
+            } else if (decision === 'transcode') {
+                transcodes++;
             } else {
+                // Fallback - assume transcode if unknown
                 transcodes++;
             }
+        } else {
+            // No debug data available, assume transcode
+            transcodes++;
         }
     });
     
@@ -1427,39 +1429,157 @@ generateSessionSummary(sessions) {
     }
     
     if (totalBandwidth > 0) {
-        summary += ` | <strong>Bandwidth:</strong> ${totalBandwidth.toFixed(1)} Mbps`;
-        if (wanBandwidth > 0 && wanBandwidth !== totalBandwidth) {
-            summary += ` (WAN: ${wanBandwidth.toFixed(1)} Mbps)`;
-        } else if (wanBandwidth > 0) {
-            summary += ` (WAN: ${wanBandwidth.toFixed(1)} Mbps)`;
-        }
+        summary += ` | <strong>Bandwidth:</strong> ${totalBandwidth.toFixed(1)} Mbps (WAN: ${wanBandwidth.toFixed(1)} Mbps)`;
     }
     
     return summary;
 },
 
-// REPLACE the createPlexSessionCard method with this Tautulli-style version:
+// REPLACE the createTautulliSessionCard method with this enhanced parser:
+
 createTautulliSessionCard(session) {
+    console.log('🎬 Parsing session for:', session.title, '- User:', session.user);
+    
+    // Extract technical details from _debug data
+    const debugData = session._debug || {};
+    const rawAttrs = debugData.rawAttrs || {};
+    const rawMedia = debugData.rawMedia || {};
+    const rawPlayer = debugData.rawPlayer || {};
+    
+    console.log('🔍 Raw video attrs:', Object.keys(rawAttrs));
+    console.log('🔍 Raw media:', Object.keys(rawMedia));
+    console.log('🔍 Raw player:', Object.keys(rawPlayer));
+    
     // Enhanced poster handling
     let posterUrl = '';
     if (session.thumbUrl) {
         posterUrl = session.thumbUrl;
     } else if (session.thumb) {
         posterUrl = session.thumb;
-    } else if (session.art) {
-        const artUrl = session.art.startsWith('/') ? 
-            `${session.serverUrl}${session.art}?X-Plex-Token=${session.token}` : 
-            session.art;
-        posterUrl = artUrl;
+    } else if (rawAttrs.thumb) {
+        const thumbPath = rawAttrs.thumb;
+        posterUrl = `${session.serverUrl}${thumbPath}?X-Plex-Token=${session.token}`;
     }
     
     const posterStyle = posterUrl ? `background-image: url('${posterUrl}')` : '';
+    
+    // Extract quality from rawMedia
+    let quality = 'Unknown';
+    let bandwidth = 'Unknown';
+    let videoCodec = 'Unknown';
+    let audioCodec = 'Unknown';
+    let container = 'Unknown';
+    let streamDecision = 'Unknown';
+    
+    if (rawMedia.$ && rawMedia.Part && rawMedia.Part[0]) {
+        const mediaDollar = rawMedia.$;
+        const partData = rawMedia.Part[0];
+        const partDollar = partData.$ || {};
+        
+        // Extract quality and resolution
+        const videoResolution = mediaDollar.videoResolution || partDollar.videoResolution;
+        const height = mediaDollar.height || partDollar.height;
+        const width = mediaDollar.width || partDollar.width;
+        
+        if (videoResolution) {
+            if (videoResolution.includes('4k') || videoResolution === '2160') {
+                quality = '4K';
+            } else if (videoResolution === '1080') {
+                quality = '1080p';
+            } else if (videoResolution === '720') {
+                quality = '720p';
+            } else if (videoResolution === 'sd') {
+                quality = 'SD';
+            } else {
+                quality = videoResolution + 'p';
+            }
+        } else if (height) {
+            const h = parseInt(height);
+            if (h >= 2160) quality = '4K';
+            else if (h >= 1080) quality = '1080p';
+            else if (h >= 720) quality = '720p';
+            else quality = 'SD';
+        }
+        
+        // Extract bandwidth
+        const bitrate = mediaDollar.bitrate || partDollar.bitrate;
+        if (bitrate) {
+            const br = parseInt(bitrate);
+            bandwidth = (br / 1000).toFixed(1) + ' Mbps';
+        }
+        
+        // Extract codecs
+        videoCodec = mediaDollar.videoCodec || partDollar.videoCodec || 'Unknown';
+        audioCodec = mediaDollar.audioCodec || partDollar.audioCodec || 'Unknown';
+        container = mediaDollar.container || partDollar.container || 'Unknown';
+        
+        // Extract stream decision
+        const decision = partDollar.decision || mediaDollar.decision;
+        if (decision === 'directplay') {
+            streamDecision = 'Direct Play';
+        } else if (decision === 'directstream') {
+            streamDecision = 'Direct Stream';
+        } else if (decision === 'transcode') {
+            streamDecision = 'Transcode';
+        } else if (decision) {
+            streamDecision = decision.charAt(0).toUpperCase() + decision.slice(1);
+        }
+        
+        console.log('📊 Extracted tech details:', {
+            quality,
+            bandwidth,
+            videoCodec,
+            audioCodec,
+            container,
+            streamDecision,
+            decision
+        });
+    }
+    
+    // Extract player information from rawPlayer
+    let playerTitle = 'Unknown Player';
+    let playerProduct = 'Unknown';
+    let playerPlatform = 'Unknown';
+    let location = 'Unknown Location';
+    
+    if (rawPlayer.$) {
+        const playerData = rawPlayer.$;
+        playerTitle = playerData.title || playerData.device || 'Unknown Player';
+        playerProduct = playerData.product || 'Unknown';
+        playerPlatform = playerData.platform || 'Unknown';
+        
+        // Determine location
+        const isLocal = playerData.local === '1' || playerData.local === 1;
+        const isRelayed = playerData.relayed === '1' || playerData.relayed === 1;
+        
+        if (isLocal) {
+            location = 'LAN';
+        } else if (isRelayed) {
+            location = 'WAN (Relayed)';
+        } else {
+            location = 'WAN';
+        }
+        
+        console.log('📱 Player info:', {
+            playerTitle,
+            playerProduct,
+            playerPlatform,
+            location,
+            isLocal,
+            isRelayed
+        });
+    }
     
     // Enhanced status handling
     let statusClass = 'status-unknown';
     let statusIcon = '❓';
     
-    switch(session.state?.toLowerCase()) {
+    // Try to get state from player data first, then fallback
+    const playerState = rawPlayer.$?.state;
+    const sessionState = session.state;
+    const finalState = (playerState || sessionState || 'unknown').toLowerCase();
+    
+    switch(finalState) {
         case 'playing':
             statusClass = 'status-playing';
             statusIcon = '▶️';
@@ -1477,19 +1597,24 @@ createTautulliSessionCard(session) {
     }
     
     // Enhanced title and subtitle
-    const title = this.escapeHtml(session.title || 'Unknown Title');
+    const title = this.escapeHtml(session.title || rawAttrs.title || 'Unknown Title');
     let subtitle = '';
     
-    if (session.type === 'episode' && session.grandparentTitle) {
-        const showName = this.escapeHtml(session.grandparentTitle);
-        const seasonEp = session.parentIndex && session.index ? 
-            `S${String(session.parentIndex).padStart(2, '0')}E${String(session.index).padStart(2, '0')}` : '';
+    if (session.type === 'episode' && (session.grandparentTitle || rawAttrs.grandparentTitle)) {
+        const showName = this.escapeHtml(session.grandparentTitle || rawAttrs.grandparentTitle);
+        const seasonNum = session.parentIndex || rawAttrs.parentIndex;
+        const episodeNum = session.index || rawAttrs.index;
+        const seasonEp = seasonNum && episodeNum ? 
+            `S${String(seasonNum).padStart(2, '0')}E${String(episodeNum).padStart(2, '0')}` : '';
         subtitle = `${showName}${seasonEp ? ' - ' + seasonEp : ''}`;
-        if (session.year) subtitle += ` (${session.year})`;
+        const year = session.year || rawAttrs.year;
+        if (year) subtitle += ` (${year})`;
     } else if (session.type === 'movie') {
-        if (session.year) subtitle = `(${session.year})`;
-        if (session.studio && subtitle) subtitle += ` • ${session.studio}`;
-        else if (session.studio) subtitle = session.studio;
+        const year = session.year || rawAttrs.year;
+        const studio = session.studio || rawAttrs.studio;
+        if (year) subtitle = `(${year})`;
+        if (studio && subtitle) subtitle += ` • ${studio}`;
+        else if (studio) subtitle = studio;
     }
     subtitle = this.escapeHtml(subtitle);
     
@@ -1498,9 +1623,8 @@ createTautulliSessionCard(session) {
     const progressText = session.elapsedTime && session.durationFormatted ? 
         `${session.elapsedTime} / ${session.durationFormatted}` : '';
     
-    // Enhanced quality display
-    const quality = session.quality || session.resolution || 'Unknown';
-    const qualityClass = quality.includes('4K') || quality.includes('2160') ? 'quality-4k' :
+    // Quality badge styling
+    const qualityClass = quality.includes('4K') ? 'quality-4k' :
                         quality.includes('1080') ? 'quality-1080p' :
                         quality.includes('720') ? 'quality-720p' : 'quality-sd';
     
@@ -1510,33 +1634,18 @@ createTautulliSessionCard(session) {
     // User avatar (first letter of username)
     const userInitial = (session.user || 'U')[0].toUpperCase();
     
-    // Technical details
+    // Technical details for display
     const videoInfo = [];
-    if (session.videoCodec && session.videoCodec !== 'UNKNOWN') {
-        videoInfo.push(session.videoCodec.toUpperCase());
-    }
-    if (session.audioCodec && session.audioCodec !== 'UNKNOWN') {
-        videoInfo.push(session.audioCodec.toUpperCase());
-    }
+    if (videoCodec !== 'Unknown') videoInfo.push(videoCodec.toUpperCase());
+    if (audioCodec !== 'Unknown') videoInfo.push(audioCodec.toUpperCase());
     
-    // Stream decision
-    let streamDecision = 'Unknown';
-    const decision = session._debug?.rawMedia?.$?.decision || 
-                    session._debug?.rawAttrs?.decision || 
-                    session.decision;
-    
-    if (decision === 'directplay' || decision === 'direct play') {
-        streamDecision = 'Direct Play';
-    } else if (decision === 'directstream' || decision === 'direct stream') {
-        streamDecision = 'Direct Stream';  
-    } else if (decision === 'transcode' || decision?.includes('transcode')) {
-        streamDecision = 'Transcode';
-    }
-    
-    // Player and location info
-    const playerInfo = session.playerTitle || session.playerProduct || 'Unknown Player';
-    const location = session.location || 'Unknown';
-    const bandwidth = session.bandwidth || 'Unknown';
+    console.log('✅ Parsed session for', title, ':', {
+        user: session.user,
+        state: finalState,
+        progress: progress + '%',
+        quality,
+        hasThumb: !!posterUrl
+    });
     
     return `
         <div class="tautulli-session-card" data-type="${session.type}">
@@ -1570,7 +1679,7 @@ createTautulliSessionCard(session) {
                     </div>
                     <div class="metadata-row">
                         <span class="metadata-label">Player:</span>
-                        <span class="metadata-value">${this.escapeHtml(playerInfo)}</span>
+                        <span class="metadata-value">${this.escapeHtml(playerTitle)}</span>
                     </div>
                     <div class="metadata-row">
                         <span class="metadata-label">Quality:</span>
@@ -1599,6 +1708,7 @@ createTautulliSessionCard(session) {
         </div>
     `;
 },
+
 
 // ADD this new method (completely new):
 formatDuration(ms) {
