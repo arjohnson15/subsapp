@@ -1435,225 +1435,105 @@ generateSessionSummary(sessions) {
     return summary;
 },
 
-// REPLACE the createTautulliSessionCard method with this CLEANED version:
-
 createTautulliSessionCard(session) {
-    console.log('🎬 Parsing session for:', session.title, '- User:', session.user);
+    console.log('🎬 Creating card for:', session.title);
     
-    // Extract technical details from _debug data
-    const debugData = session._debug || {};
-    const rawAttrs = debugData.rawAttrs || {};
-    const rawMedia = debugData.rawMedia || {};
-    const rawPlayer = debugData.rawPlayer || {};
-    
-    // FIXED: Better poster URL handling
-    let posterUrl = '';
-    
-    // Try multiple poster sources
-    if (session.thumbUrl) {
-        posterUrl = session.thumbUrl;
-        console.log('📸 Using session.thumbUrl:', posterUrl);
-    } else if (session.thumb && session.serverUrl && session.token) {
-        // Build full URL from thumb path
+// FIXED: Better poster URL handling
+let posterUrl = '';
+
+// The backend should have already built complete URLs
+if (session.thumb && session.thumb.includes('http')) {
+    posterUrl = session.thumb;
+    console.log('📸 Using thumb:', posterUrl);
+} else if (session.grandparentThumb && session.grandparentThumb.includes('http')) {
+    // For TV shows, use the show poster
+    posterUrl = session.grandparentThumb;
+    console.log('📸 Using grandparentThumb:', posterUrl);
+} else if (session.art && session.art.includes('http')) {
+    posterUrl = session.art;
+    console.log('📸 Using art:', posterUrl);
+} else {
+    // Fallback: try to build URL if needed
+    if (session.thumb && session.serverUrl && session.token) {
         const thumbPath = session.thumb.startsWith('/') ? session.thumb : '/' + session.thumb;
         posterUrl = `${session.serverUrl}${thumbPath}?X-Plex-Token=${session.token}`;
         console.log('📸 Built poster URL:', posterUrl);
-    } else if (rawAttrs.thumb && session.serverUrl && session.token) {
-        const thumbPath = rawAttrs.thumb.startsWith('/') ? rawAttrs.thumb : '/' + rawAttrs.thumb;
-        posterUrl = `${session.serverUrl}${thumbPath}?X-Plex-Token=${session.token}`;
-        console.log('📸 Built poster from rawAttrs:', posterUrl);
     }
+}
+
+if (!posterUrl) {
+    console.log('⚠️ No poster URL available for:', session.title);
+}
     
-    const posterStyle = posterUrl ? `background-image: url('${posterUrl}')` : '';
+const posterStyle = posterUrl ? `style="background-image: url('${posterUrl}')"` : '';
     
-    // Extract quality from rawMedia - CLEANED UP
-    let quality = 'SD';
-    let bandwidth = '';
-    let videoCodec = '';
-    let audioCodec = '';
-    let container = '';
-    let streamDecision = 'Direct Play';
+    // Parse server name to compact format
+    const serverName = session.serverName || 'PLEX';
+    const serverLabel = serverName.includes('Plex 1') && serverName.includes('4K') ? 'PLEX1-4K' :
+                       serverName.includes('Plex 1') ? 'PLEX1-REGULAR' :
+                       serverName.includes('Plex 2') && serverName.includes('4K') ? 'PLEX2-4K' :
+                       serverName.includes('Plex 2') ? 'PLEX2-REGULAR' : 
+                       'PLEX';
     
-    if (rawMedia.$ && rawMedia.Part && rawMedia.Part[0]) {
-        const mediaDollar = rawMedia.$;
-        const partData = rawMedia.Part[0];
-        const partDollar = partData.$ || {};
-        
-        // Extract quality and resolution - SIMPLIFIED
-        const videoResolution = mediaDollar.videoResolution || partDollar.videoResolution;
-        const height = mediaDollar.height || partDollar.height;
-        
-        if (videoResolution) {
-            if (videoResolution.includes('4k') || videoResolution === '2160') {
-                quality = '4K';
-            } else if (videoResolution === '1080') {
-                quality = '1080p';
-            } else if (videoResolution === '720') {
-                quality = '720p';
-            } else if (videoResolution.toLowerCase() === 'sd') {
-                quality = 'SD';
-            } else {
-                quality = videoResolution;
-            }
-        } else if (height) {
-            const h = parseInt(height);
-            if (h >= 2160) quality = '4K';
-            else if (h >= 1080) quality = '1080p';
-            else if (h >= 720) quality = '720p';
-            else quality = 'SD';
-        }
-        
-        // Extract bandwidth - CLEANED
-        const bitrate = mediaDollar.bitrate || partDollar.bitrate;
-        if (bitrate && bitrate !== '0') {
-            const br = parseInt(bitrate);
-            bandwidth = (br / 1000).toFixed(1) + ' Mbps';
-        }
-        
-        // Extract codecs - CLEANED
-        const vCodec = mediaDollar.videoCodec || partDollar.videoCodec;
-        const aCodec = mediaDollar.audioCodec || partDollar.audioCodec;
-        
-        if (vCodec && vCodec !== 'Unknown' && vCodec !== 'UNKNOWN') {
-            videoCodec = vCodec.toUpperCase();
-        }
-        if (aCodec && aCodec !== 'Unknown' && aCodec !== 'UNKNOWN') {
-            audioCodec = aCodec.toUpperCase();
-        }
-        
-        container = mediaDollar.container || partDollar.container || '';
-        
-        // Extract stream decision - SIMPLIFIED
-        const decision = partDollar.decision || mediaDollar.decision || 'directplay';
-        
-        if (decision === 'directplay') {
-            streamDecision = 'Direct Play';
-        } else if (decision === 'directstream') {
-            streamDecision = 'Direct Stream';
-        } else if (decision === 'transcode') {
-            streamDecision = 'Transcode';
-        } else {
-            streamDecision = 'Direct Play'; // Default fallback
-        }
-    }
+    // Parse quality
+    const quality = session.quality || session.videoResolution || '';
+    const qualityBadge = quality.includes('4K') || quality.includes('2160') ? '4K' :
+                        quality.includes('1080') ? '1080p' :
+                        quality.includes('720') ? '720p' : 
+                        quality || 'SD';
     
-    // Extract player information - CLEANED
-    let playerTitle = 'Unknown';
-    let playerProduct = '';
-    let location = 'WAN';
+    // Parse stream type
+    const streamDecision = session.streamingDecision === 'transcode' ? 'Transcode' :
+                          session.streamingDecision === 'directstream' ? 'Direct Stream' :
+                          'Direct Play';
     
-    if (rawPlayer.$) {
-        const playerData = rawPlayer.$;
-        playerTitle = playerData.title || playerData.device || 'Unknown';
-        playerProduct = playerData.product || '';
-        
-        // Determine location - SIMPLIFIED
-        const isLocal = playerData.local === '1';
-        location = isLocal ? 'LAN' : 'WAN';
-    }
-    
-    // Status handling - FIXED
-    let statusClass = 'status-playing';
-    let statusIcon = '▶️';
-    
-    const playerState = rawPlayer.$?.state;
-    const sessionState = session.state;
-    const finalState = (playerState || sessionState || 'playing').toLowerCase();
-    
-    switch(finalState) {
-        case 'playing':
-            statusClass = 'status-playing';
-            statusIcon = '▶️';
-            break;
-        case 'paused':
-            statusClass = 'status-paused';
-            statusIcon = '⏸️';
-            break;
-        case 'buffering':
-            statusClass = 'status-buffering';
-            statusIcon = '⏳';
-            break;
-        default:
-            statusClass = 'status-playing';
-            statusIcon = '▶️';
-    }
-    
-    // Title and subtitle - CLEANED
-    const title = this.escapeHtml(session.title || rawAttrs.title || 'Unknown Title');
+    // Build title and subtitle
+    const title = session.title || 'Unknown';
     let subtitle = '';
-    
-    if (session.type === 'episode' && (session.grandparentTitle || rawAttrs.grandparentTitle)) {
-        const showName = this.escapeHtml(session.grandparentTitle || rawAttrs.grandparentTitle);
-        const seasonNum = session.parentIndex || rawAttrs.parentIndex;
-        const episodeNum = session.index || rawAttrs.index;
-        
-        if (seasonNum && episodeNum) {
-            const seasonEp = `S${String(seasonNum).padStart(2, '0')}E${String(episodeNum).padStart(2, '0')}`;
-            subtitle = `${showName} - ${seasonEp}`;
-        } else {
-            subtitle = showName;
-        }
-    } else if (session.type === 'movie') {
-        const year = session.year || rawAttrs.year;
-        const studio = session.studio || rawAttrs.studio;
-        
-        if (year && studio) {
-            subtitle = `(${year}) • ${studio}`;
-        } else if (year) {
-            subtitle = `(${year})`;
-        } else if (studio) {
-            subtitle = studio;
-        }
+    if (session.type === 'episode' && session.grandparentTitle) {
+        const showTitle = session.grandparentTitle || '';
+        const season = session.parentIndex ? `S${String(session.parentIndex).padStart(2, '0')}` : '';
+        const episode = session.index ? `E${String(session.index).padStart(2, '0')}` : '';
+        subtitle = `${showTitle} - ${season}${episode}`;
+    } else if (session.year) {
+        subtitle = `(${session.year})`;
     }
     
-    subtitle = this.escapeHtml(subtitle);
+    // Parse progress
+    const progress = session.progress || 0;
+    const viewOffset = session.viewOffset || 0;
+    const duration = session.duration || 0;
     
-    // Progress information
-    const progress = Math.max(0, Math.min(100, session.progress || 0));
-    const progressText = session.elapsedTime && session.durationFormatted ? 
-        `${session.elapsedTime} / ${session.durationFormatted}` : '';
+    // Format time
+    const formatTime = (ms) => {
+        if (!ms) return '0:00';
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    };
     
-    // Quality badge styling
-    const qualityClass = quality.includes('4K') ? 'quality-4k' :
-                        quality.includes('1080') ? 'quality-1080p' :
-                        quality.includes('720') ? 'quality-720p' : 'quality-sd';
+    const currentTime = formatTime(viewOffset);
+    const totalTime = formatTime(duration);
+    const progressText = `${currentTime} / ${totalTime}`;
     
-    // Server name - CLEANED
-    const serverName = session.serverName || 'PLEX1';
+    // Get other metadata
+    const user = session.user || 'Unknown';
+    const player = session.player || session.device || 'Unknown';
+    const bandwidth = session.bandwidth ? `${session.bandwidth} Mbps` : '—';
+    const location = session.location || 'WAN';
     
-    // User avatar
-    const userInitial = (session.user || 'U')[0].toUpperCase();
-    
-    // Build codec display
-    const codecDisplay = [];
-    if (videoCodec) codecDisplay.push(videoCodec);
-    if (audioCodec) codecDisplay.push(audioCodec);
-    const codecText = codecDisplay.length > 0 ? codecDisplay.join(' • ') : 'Unknown';
-    
-    console.log('✅ Final parsed data:', {
-        title,
-        subtitle,
-        quality,
-        streamDecision,
-        bandwidth: bandwidth || 'Unknown',
-        location,
-        playerTitle,
-        posterUrl: !!posterUrl
-    });
-    
+    // Return compact HTML
     return `
-        <div class="tautulli-session-card" data-type="${session.type}">
-            <div class="session-poster-large" style="${posterStyle}">
-                ${!posterUrl ? `<div class="poster-placeholder"><i class="fas ${session.type === 'movie' ? 'fa-film' : 'fa-tv'}"></i></div>` : ''}
-                <div class="quality-badge ${qualityClass}">${quality}</div>
-                <div class="server-badge">${serverName}</div>
-                <div class="status-overlay">
-                    <span class="status-icon ${statusClass}">${statusIcon}</span>
-                </div>
+        <div class="tautulli-session-card">
+            <div class="session-poster-large" ${posterStyle}>
+                ${!posterUrl ? '<div class="poster-icon"><i class="fas fa-film"></i></div>' : ''}
+                <div class="server-badge">${serverLabel}</div>
+                <div class="quality-badge">${qualityBadge}</div>
             </div>
             <div class="session-details">
                 <div class="session-header">
-                    <div class="session-title-large">${title}</div>
+                    <div class="session-title-large">?? ${title}</div>
                     ${subtitle ? `<div class="session-subtitle-large">${subtitle}</div>` : ''}
                 </div>
                 
@@ -1661,20 +1541,17 @@ createTautulliSessionCard(session) {
                     <div class="progress-bar-large">
                         <div class="progress-fill-large" style="width: ${progress}%"></div>
                     </div>
-                    ${progressText ? `<div class="progress-text">${progressText}</div>` : ''}
+                    <div class="progress-text">${progressText}</div>
                 </div>
                 
                 <div class="session-metadata">
                     <div class="metadata-row">
                         <span class="metadata-label">User:</span>
-                        <span class="metadata-value">
-                            <span class="user-avatar">${userInitial}</span>
-                            ${this.escapeHtml(session.user || 'Unknown')}
-                        </span>
+                        <span class="metadata-value">${user}</span>
                     </div>
                     <div class="metadata-row">
                         <span class="metadata-label">Player:</span>
-                        <span class="metadata-value">${this.escapeHtml(playerTitle)}</span>
+                        <span class="metadata-value">${player}</span>
                     </div>
                     <div class="metadata-row">
                         <span class="metadata-label">Quality:</span>
@@ -1683,19 +1560,6 @@ createTautulliSessionCard(session) {
                     <div class="metadata-row">
                         <span class="metadata-label">Stream:</span>
                         <span class="metadata-value">${streamDecision}</span>
-                    </div>
-                    ${bandwidth ? `
-                    <div class="metadata-row">
-                        <span class="metadata-label">Bandwidth:</span>
-                        <span class="metadata-value">${bandwidth}</span>
-                    </div>` : ''}
-                    <div class="metadata-row">
-                        <span class="metadata-label">Codecs:</span>
-                        <span class="metadata-value">${codecText}</span>
-                    </div>
-                    <div class="metadata-row">
-                        <span class="metadata-label">Location:</span>
-                        <span class="metadata-value">${location}</span>
                     </div>
                 </div>
             </div>

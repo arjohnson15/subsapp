@@ -171,67 +171,68 @@
             </div>
         </div>
 
-        <!-- Plex Now Playing Collapsible Section -->
-        <div class="live-section plex-live" id="plexLiveSection">
-            <div class="live-header" onclick="Dashboard.toggleLiveSection('plex')" style="
-                padding: 12px 15px;
-                border-top: 1px solid rgba(255, 255, 255, 0.1);
-                background: rgba(78, 205, 196, 0.05);
+<!-- Plex Now Playing Collapsible Section -->
+<div class="live-section plex-live" id="plexLiveSection">
+    <div class="live-header" onclick="Dashboard.toggleLiveSection('plex')" style="
+        padding: 12px 15px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(78, 205, 196, 0.05);
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: background 0.3s ease;
+        border-bottom: 1px solid rgba(78, 205, 196, 0.1);
+    ">
+        <div style="display: flex; align-items: center;">
+            <i class="fas fa-play" style="color: #4ecdc4; margin-right: 8px; font-size: 0.9rem;"></i>
+            <span style="color: #4ecdc4; font-weight: 600; font-size: 0.9rem;">Now Playing</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span id="plexSessionCount" style="
+                background: rgba(78, 205, 196, 0.2);
+                padding: 4px 8px;
+                border-radius: 12px;
+                font-size: 0.7rem;
+                color: #4ecdc4;
+                font-weight: 600;
+            ">0</span>
+            <button class="refresh-btn plex-refresh" onclick="event.stopPropagation(); Dashboard.refreshPlexSessions()" style="
+                background: none;
+                border: 1px solid rgba(78, 205, 196, 0.3);
+                color: #4ecdc4;
+                padding: 4px 8px;
+                border-radius: 4px;
                 cursor: pointer;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                transition: background 0.3s ease;
+                font-size: 0.7rem;
+                opacity: 0;
+                transform: scale(0.8);
+                transition: all 0.3s ease;
             ">
-                <div style="display: flex; align-items: center;">
-                    <i class="fas fa-play" style="color: #4ecdc4; margin-right: 8px; font-size: 0.9rem;"></i>
-                    <span style="color: #4ecdc4; font-weight: 600; font-size: 0.9rem;">Now Playing</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span id="plexSessionCount" style="
-                        background: rgba(78, 205, 196, 0.2);
-                        padding: 4px 8px;
-                        border-radius: 12px;
-                        font-size: 0.7rem;
-                        color: #4ecdc4;
-                        font-weight: 600;
-                    ">0</span>
-                    <button class="refresh-btn plex-refresh" onclick="event.stopPropagation(); Dashboard.refreshPlexSessions()" style="
-                        background: none;
-                        border: 1px solid rgba(78, 205, 196, 0.3);
-                        color: #4ecdc4;
-                        padding: 4px 8px;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        font-size: 0.7rem;
-                        opacity: 0;
-                        transform: scale(0.8);
-                        transition: all 0.3s ease;
-                    ">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                    <i class="fas fa-chevron-down expand-icon" style="
-                        color: #4ecdc4;
-                        font-size: 0.8rem;
-                        transition: transform 0.3s ease;
-                    "></i>
-                </div>
-            </div>
-            <div class="live-content" style="
-                max-height: 0;
-                overflow: hidden;
-                transition: max-height 0.3s ease, padding 0.3s ease;
-                padding: 0 15px;
-                background: rgba(78, 205, 196, 0.02);
-            ">
-                <div id="plexSessionsContainer" style="padding: 0;">
-                    <div style="text-align: center; padding: 20px; color: #666; font-size: 0.9rem;">
-                        <i class="fas fa-mouse-pointer" style="margin-right: 8px; opacity: 0.5;"></i>
-                        Click to load Plex sessions...
-                    </div>
-                </div>
+                <i class="fas fa-sync-alt"></i>
+            </button>
+            <i class="fas fa-chevron-down expand-icon" style="
+                color: #4ecdc4;
+                font-size: 0.8rem;
+                transition: transform 0.3s ease;
+            "></i>
+        </div>
+    </div>
+    <div class="live-content" style="
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease, padding 0.3s ease;
+        padding: 0 15px;
+        background: rgba(78, 205, 196, 0.02);
+    ">
+        <div id="plexSessionsContainer" style="padding: 0;">
+            <div class="empty-state">
+                <i class="fas fa-mouse-pointer" style="margin-right: 8px; opacity: 0.5;"></i>
+                <span style="color: #666; font-size: 0.9rem;">Click to load Plex sessions...</span>
             </div>
         </div>
+    </div>
+</div>
     </div>
 </div>
 

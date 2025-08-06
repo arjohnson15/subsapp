@@ -879,30 +879,65 @@ function parseVideoSession(video, serverConfig, serverName) {
       resolution = stream.displayTitle;
     }
     
-    // Enhanced thumbnail handling
-    let thumbUrl = '';
-    if (attrs.thumb) {
-      if (attrs.thumb.startsWith('/')) {
-        // Local thumbnail - construct full URL
-        thumbUrl = `${serverConfig.url}${attrs.thumb}?X-Plex-Token=${serverConfig.token}`;
-      } else if (attrs.thumb.startsWith('http')) {
-        // External thumbnail - use as is but add token if needed
-        thumbUrl = attrs.thumb;
-        if (!thumbUrl.includes('X-Plex-Token')) {
-          thumbUrl += (thumbUrl.includes('?') ? '&' : '?') + `X-Plex-Token=${serverConfig.token}`;
-        }
-      } else {
-        // Relative path
-        thumbUrl = `${serverConfig.url}${attrs.thumb.startsWith('/') ? '' : '/'}${attrs.thumb}?X-Plex-Token=${serverConfig.token}`;
-      }
+// Enhanced thumbnail handling - BUILD FULL URLs
+let thumbUrl = '';
+let artUrl = '';
+let grandparentThumbUrl = '';
+
+// Build thumb URL
+if (attrs.thumb) {
+  if (attrs.thumb.startsWith('/')) {
+    // Local thumbnail - construct full URL
+    thumbUrl = `${serverConfig.url}${attrs.thumb}?X-Plex-Token=${serverConfig.token}`;
+  } else if (attrs.thumb.startsWith('http')) {
+    // External thumbnail - use as is but add token if needed
+    thumbUrl = attrs.thumb;
+    if (!thumbUrl.includes('X-Plex-Token')) {
+      thumbUrl += (thumbUrl.includes('?') ? '&' : '?') + `X-Plex-Token=${serverConfig.token}`;
     }
-    
-    // Also try art for fallback
-    if (!thumbUrl && attrs.art) {
-      if (attrs.art.startsWith('/')) {
-        thumbUrl = `${serverConfig.url}${attrs.art}?X-Plex-Token=${serverConfig.token}`;
-      }
+  } else {
+    // Relative path
+    thumbUrl = `${serverConfig.url}${attrs.thumb.startsWith('/') ? '' : '/'}${attrs.thumb}?X-Plex-Token=${serverConfig.token}`;
+  }
+}
+
+// Build art URL
+if (attrs.art) {
+  if (attrs.art.startsWith('/')) {
+    artUrl = `${serverConfig.url}${attrs.art}?X-Plex-Token=${serverConfig.token}`;
+  } else if (attrs.art.startsWith('http')) {
+    artUrl = attrs.art;
+    if (!artUrl.includes('X-Plex-Token')) {
+      artUrl += (artUrl.includes('?') ? '&' : '?') + `X-Plex-Token=${serverConfig.token}`;
     }
+  } else {
+    artUrl = `${serverConfig.url}${attrs.art.startsWith('/') ? '' : '/'}${attrs.art}?X-Plex-Token=${serverConfig.token}`;
+  }
+}
+
+// Build grandparentThumb URL (for TV shows)
+if (attrs.grandparentThumb) {
+  if (attrs.grandparentThumb.startsWith('/')) {
+    grandparentThumbUrl = `${serverConfig.url}${attrs.grandparentThumb}?X-Plex-Token=${serverConfig.token}`;
+  } else if (attrs.grandparentThumb.startsWith('http')) {
+    grandparentThumbUrl = attrs.grandparentThumb;
+    if (!grandparentThumbUrl.includes('X-Plex-Token')) {
+      grandparentThumbUrl += (grandparentThumbUrl.includes('?') ? '&' : '?') + `X-Plex-Token=${serverConfig.token}`;
+    }
+  } else {
+    grandparentThumbUrl = `${serverConfig.url}${attrs.grandparentThumb.startsWith('/') ? '' : '/'}${attrs.grandparentThumb}?X-Plex-Token=${serverConfig.token}`;
+  }
+}
+
+// Fallback: if no thumb but has art, use art as thumb
+if (!thumbUrl && artUrl) {
+  thumbUrl = artUrl;
+}
+
+// For TV shows, if no thumb, use grandparent thumb
+if (!thumbUrl && grandparentThumbUrl) {
+  thumbUrl = grandparentThumbUrl;
+}
     
     // Enhanced content type and subtitle handling
     let subtitle = '';
@@ -1001,11 +1036,12 @@ function parseVideoSession(video, serverConfig, serverName) {
       parentIndex: attrs.parentIndex || null, // Season number
       index: attrs.index || null, // Episode number
       
-      // Media information
-      thumb: thumbUrl,
-      art: attrs.art,
-      duration: duration,
-      durationFormatted: durationFormatted,
+// Media information
+thumb: thumbUrl,
+art: artUrl,  // CHANGED from attrs.art to artUrl
+grandparentThumb: grandparentThumbUrl,  // ADD this line
+duration: duration,
+durationFormatted: durationFormatted,
       
       // Progress information
       viewOffset: viewOffset,
