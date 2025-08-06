@@ -1453,32 +1453,35 @@ createTautulliSessionCard(session) {
         token: !!session.token
     });
 
-    // Since these are local network images that won't work externally anyway,
-    // we'll use a simpler approach to bypass mixed content restrictions
-    const createLocalImageUrl = (originalUrl) => {
+    // Create proxy URL for HTTP images to bypass mixed content blocking
+    const createProxyImageUrl = (originalUrl) => {
         if (!originalUrl) return '';
         
-        // For local network access, just return the original HTTP URL
-        // The proxy approach was overkill for local-only images
+        // If we're on HTTPS and image is HTTP, use our proxy
+        if (window.location.protocol === 'https:' && originalUrl.startsWith('http://')) {
+            return `/api/dashboard/plex-image?url=${encodeURIComponent(originalUrl)}`;
+        }
+        
         return originalUrl;
     };
 
     // FIXED: Prioritize grandparentThumb (show poster) over thumb (episode screenshot) for TV shows
     if (session.grandparentThumb && session.grandparentThumb.includes('http')) {
         // For TV shows, ALWAYS use the show poster first
-        posterUrl = session.grandparentThumb;
+        posterUrl = createProxyImageUrl(session.grandparentThumb);
         console.log('📸 Using grandparentThumb (show poster):', posterUrl);
     } else if (session.thumb && session.thumb.includes('http')) {
-        posterUrl = session.thumb;
+        posterUrl = createProxyImageUrl(session.thumb);
         console.log('📸 Using thumb:', posterUrl);
     } else if (session.art && session.art.includes('http')) {
-        posterUrl = session.art;
+        posterUrl = createProxyImageUrl(session.art);
         console.log('📸 Using art:', posterUrl);
     } else {
         // Fallback: try to build URL if needed
         if (session.thumb && session.serverUrl && session.token) {
             const thumbPath = session.thumb.startsWith('/') ? session.thumb : '/' + session.thumb;
-            posterUrl = `${session.serverUrl}${thumbPath}?X-Plex-Token=${session.token}`;
+            const fullUrl = `${session.serverUrl}${thumbPath}?X-Plex-Token=${session.token}`;
+            posterUrl = createProxyImageUrl(fullUrl);
             console.log('📸 Built poster URL:', posterUrl);
         }
     }

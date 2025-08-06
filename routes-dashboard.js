@@ -1381,4 +1381,37 @@ router.get('/plex-debug/:serverGroup/:serverType', async (req, res) => {
   }
 });
 
+// GET /api/dashboard/plex-image - Simple image proxy for local Plex servers
+router.get('/plex-image', async (req, res) => {
+  try {
+    const { url } = req.query;
+    
+    if (!url) {
+      return res.status(400).send('Missing url parameter');
+    }
+    
+    console.log('🖼️ Proxying Plex image:', url);
+    
+    // Simple fetch and pipe
+    const axios = require('axios');
+    const response = await axios.get(url, {
+      responseType: 'stream',
+      timeout: 5000
+    });
+    
+    // Set headers
+    res.setHeader('Content-Type', response.headers['content-type'] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=1800'); // 30 min cache
+    
+    // Pipe the image
+    response.data.pipe(res);
+    
+  } catch (error) {
+    console.error('❌ Image proxy error:', error.message);
+    // Return 1x1 transparent GIF on error
+    res.setHeader('Content-Type', 'image/gif');
+    res.send(Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'));
+  }
+});
+
 module.exports = router;
