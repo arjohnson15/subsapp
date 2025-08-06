@@ -1527,11 +1527,8 @@ generateSessionSummary(sessions) {
     return summary;
 },
 
-// COMPLETE REPLACEMENT for createTautulliSessionCard function in public/js/app.js
-// This version moves progress to bottom and fixes the subtitle issue
-
 createTautulliSessionCard(session) {
-    console.log('🎬 Creating redesigned session card for:', session.title);
+    console.log('🎬 Creating Tautulli-style card for:', session.title);
     
     // Enhanced poster URL handling
     let posterUrl = '';
@@ -1565,7 +1562,7 @@ createTautulliSessionCard(session) {
     const currentTime = session.elapsedTime || this.formatDuration(viewOffset);
     const totalTime = session.durationFormatted || this.formatDuration(duration);
     
-    // FIXED: Enhanced title and subtitle building
+    // FIXED: Enhanced title and subtitle building - NO MORE ? CHARACTERS
     let displayTitle = session.title || 'Unknown';
     let displaySubtitle = '';
     
@@ -1580,21 +1577,21 @@ createTautulliSessionCard(session) {
         
         displaySubtitle = `S${seasonNum}E${episodeNum}`;
         if (episodeTitle && episodeTitle !== displayTitle) {
-            displaySubtitle += ` • ${episodeTitle}`;
+            displaySubtitle += ` - ${episodeTitle}`; // Use dash instead of bullet
         }
         if (session.year) {
             displaySubtitle += ` (${session.year})`;
         }
         
     } else if (session.type === 'movie') {
-        // For movies, show movie title and year/studio
+        // For movies, show movie title and year/studio - FIXED SEPARATOR
         displayTitle = session.title;
         
         const yearPart = session.year ? `(${session.year})` : '';
         const studioPart = session.studio ? session.studio : '';
         
         if (yearPart && studioPart) {
-            displaySubtitle = `${yearPart} • ${studioPart}`;
+            displaySubtitle = `${yearPart} - ${studioPart}`; // Use dash instead of bullet
         } else if (yearPart) {
             displaySubtitle = yearPart;
         } else if (studioPart) {
@@ -1608,7 +1605,7 @@ createTautulliSessionCard(session) {
         const album = session.parentTitle || '';
         
         if (artist && album && artist !== album) {
-            displaySubtitle = `${artist} • ${album}`;
+            displaySubtitle = `${artist} - ${album}`; // Use dash instead of bullet
         } else if (artist) {
             displaySubtitle = artist;
         } else if (album) {
@@ -1616,105 +1613,166 @@ createTautulliSessionCard(session) {
         }
     }
     
-    // If we still don't have a subtitle and the backend provided one, use it
-    if (!displaySubtitle && session.subtitle && session.subtitle !== 'None') {
-        displaySubtitle = session.subtitle;
+    // ===== EXTRACT TAUTULLI-STYLE METADATA - FIXED PARSING =====
+    
+    // Player and Product info - exactly like Tautulli
+    const playerProduct = session.product || session.playerProduct || 'Unknown';
+    const playerTitle = session.player || session.playerTitle || playerProduct;
+    
+    // Quality info - use the enhanced session data
+    const qualityDisplay = session.quality || session.bandwidth || 'Unknown';
+    
+    // Stream Decision - use the enhanced session data
+    const streamDecision = session.stream || session.streamingDecision || session.transcodeDecision || session.decision || 'Unknown';
+    
+    // Container info - use the enhanced session data with proper formatting
+    let containerDisplay = 'Unknown';
+    if (session.container) {
+        containerDisplay = session.container;
+    } else {
+        const container = session.Container || session.containerFormat || 'Unknown';
+        if (container !== 'Unknown') {
+            containerDisplay = `Direct Play (${container.toUpperCase()})`;
+        }
     }
     
-    // Use the EXACT metadata fields from enhanced backend
-    const user = this.escapeHtml(session.user || 'Unknown User');
-    const product = session.product || 'Unknown Product';
-    const player = session.player || 'Unknown Player';
-    const quality = session.quality || 'Unknown';
-    const stream = session.stream || 'Unknown';
-    const container = session.container || 'Unknown';
-    const video = session.video || 'Unknown';
-    const audio = session.audio || 'Unknown';
-    const subtitle = session.subtitle || 'None';
+    // Video info - use the enhanced session data
+    let videoDisplay = 'Unknown';
+    if (session.video) {
+        videoDisplay = session.video;
+    } else {
+        const videoCodec = session.videoCodec || session.VideoCodec || '';
+        const videoResolution = session.videoResolution || session.resolution || '';
+        if (videoCodec) {
+            videoDisplay = `Direct Play (${videoCodec.toUpperCase()}${videoResolution ? ' ' + videoResolution : ''})`;
+        }
+    }
+    
+    // Audio info - use the enhanced session data
+    let audioDisplay = 'Unknown';
+    if (session.audio) {
+        audioDisplay = session.audio;
+    } else {
+        const audioCodec = session.audioCodec || session.AudioCodec || '';
+        const audioChannels = session.audioChannels || session.channels || '';
+        if (audioCodec) {
+            audioDisplay = `Direct Play (${audioCodec.toUpperCase()}${audioChannels ? ' ' + audioChannels : ''})`;
+        }
+    }
+    
+    // Location info - use enhanced session data
     const location = session.location || 'Unknown';
     const bandwidth = session.bandwidth || 'Unknown';
+    const user = session.user || session.username || 'Unknown';
+    const subtitleCodec = session.subtitle || session.subtitleCodec || 'None';
     
-    console.log('🔍 Redesigned metadata for', session.title, ':', {
+    console.log('🔍 Fixed Tautulli metadata for', session.title, ':', {
         displayTitle,
         displaySubtitle,
-        product,
-        player,
-        quality,
-        stream
+        playerProduct,
+        playerTitle,
+        qualityDisplay,
+        streamDecision,
+        containerDisplay,
+        videoDisplay,
+        audioDisplay
     });
     
     const cardHtml = `
-        <div class="tautulli-session-card redesigned" data-type="${session.type || 'unknown'}">
-            <!-- Poster Section - NO QUALITY BADGE -->
-            <div class="session-poster-redesigned" data-poster-url="${posterUrl}">
+        <div class="tautulli-session-card" data-type="${session.type || 'unknown'}">
+            <!-- Poster Section - NO BADGES -->
+            <div class="session-poster-large">
                 ${posterUrl ? `
                     <img src="${posterUrl}" 
                          alt="${this.escapeHtml(displayTitle)}" 
                          class="poster-image" 
                          crossorigin="anonymous"
-                         onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'poster-icon\\'>🎬</div>';" />
-                ` : '<div class="poster-icon">🎬</div>'}
+                         onerror="this.style.display='none'; this.parentElement.querySelector('.poster-icon').style.display='block'; this.parentElement.querySelector('.poster-text').style.display='block';" />
+                ` : ''}
+                <div class="poster-icon" style="${posterUrl ? 'display:none' : ''}">🎬</div>
+                <div class="poster-text" style="${posterUrl ? 'display:none' : ''}">${this.escapeHtml(displayTitle.substring(0, 12))}...</div>
+                
+                <!-- NO QUALITY OR SERVER BADGES -->
             </div>
             
-            <!-- Session Details Section - REDESIGNED LAYOUT -->
-            <div class="session-details-redesigned">
+            <!-- Session Details Section -->
+            <div class="session-details">
                 <!-- Header with title and subtitle -->
-                <div class="session-header-redesigned">
-                    <div class="session-title-redesigned" title="${this.escapeHtml(displayTitle)}">${this.escapeHtml(displayTitle)}</div>
-                    ${displaySubtitle ? `<div class="session-subtitle-redesigned" title="${this.escapeHtml(displaySubtitle)}">${this.escapeHtml(displaySubtitle)}</div>` : ''}
+                <div class="session-header">
+                    <div class="session-title-large" title="${this.escapeHtml(displayTitle)}">
+                        ${this.escapeHtml(displayTitle)}
+                    </div>
+                    ${displaySubtitle ? `
+                        <div class="session-subtitle-large" title="${this.escapeHtml(displaySubtitle)}">
+                            ${this.escapeHtml(displaySubtitle)}
+                        </div>
+                    ` : ''}
                 </div>
                 
-                <!-- COMPACT Tautulli Metadata Grid - ALL 10 FIELDS -->
-                <div class="session-metadata-redesigned">
-                    <div class="metadata-row-compact">
-                        <span class="metadata-label-compact">Product:</span>
-                        <span class="metadata-value-compact">${product}</span>
+                <!-- Detailed Metadata Grid - EXACTLY like Tautulli -->
+                <div class="session-metadata">
+                    <!-- First Column -->
+                    <div class="metadata-row">
+                        <span class="metadata-label">PRODUCT</span>
+                        <span class="metadata-value">${this.escapeHtml(playerProduct)}</span>
                     </div>
-                    <div class="metadata-row-compact">
-                        <span class="metadata-label-compact">Player:</span>
-                        <span class="metadata-value-compact">${player}</span>
+                    
+                    <div class="metadata-row">
+                        <span class="metadata-label">PLAYER</span>
+                        <span class="metadata-value">${this.escapeHtml(playerTitle)}</span>
                     </div>
-                    <div class="metadata-row-compact">
-                        <span class="metadata-label-compact">Quality:</span>
-                        <span class="metadata-value-compact">${quality}</span>
+                    
+                    <div class="metadata-row">
+                        <span class="metadata-label">QUALITY</span>
+                        <span class="metadata-value" title="${this.escapeHtml(qualityDisplay)}">${this.escapeHtml(qualityDisplay)}</span>
                     </div>
-                    <div class="metadata-row-compact">
-                        <span class="metadata-label-compact">Stream:</span>
-                        <span class="metadata-value-compact">${stream}</span>
+                    
+                    <div class="metadata-row">
+                        <span class="metadata-label">STREAM</span>
+                        <span class="metadata-value stream-type">${this.escapeHtml(streamDecision)}</span>
                     </div>
-                    <div class="metadata-row-compact">
-                        <span class="metadata-label-compact">Container:</span>
-                        <span class="metadata-value-compact">${container}</span>
+                    
+                    <div class="metadata-row">
+                        <span class="metadata-label">CONTAINER</span>
+                        <span class="metadata-value" title="${this.escapeHtml(containerDisplay)}">${this.escapeHtml(containerDisplay)}</span>
                     </div>
-                    <div class="metadata-row-compact">
-                        <span class="metadata-label-compact">Video:</span>
-                        <span class="metadata-value-compact">${video}</span>
+                    
+                    <!-- Second Column -->
+                    <div class="metadata-row">
+                        <span class="metadata-label">VIDEO</span>
+                        <span class="metadata-value" title="${this.escapeHtml(videoDisplay)}">${this.escapeHtml(videoDisplay)}</span>
                     </div>
-                    <div class="metadata-row-compact">
-                        <span class="metadata-label-compact">Audio:</span>
-                        <span class="metadata-value-compact">${audio}</span>
+                    
+                    <div class="metadata-row">
+                        <span class="metadata-label">AUDIO</span>
+                        <span class="metadata-value" title="${this.escapeHtml(audioDisplay)}">${this.escapeHtml(audioDisplay)}</span>
                     </div>
-                    <div class="metadata-row-compact">
-                        <span class="metadata-label-compact">Subtitle:</span>
-                        <span class="metadata-value-compact">${subtitle}</span>
+                    
+                    <div class="metadata-row">
+                        <span class="metadata-label">SUBTITLE</span>
+                        <span class="metadata-value">${this.escapeHtml(subtitleCodec)}</span>
                     </div>
-                    <div class="metadata-row-compact">
-                        <span class="metadata-label-compact">Location:</span>
-                        <span class="metadata-value-compact">${location}</span>
+                    
+                    <div class="metadata-row">
+                        <span class="metadata-label">LOCATION</span>
+                        <span class="metadata-value location">🔒 ${this.escapeHtml(location)}</span>
                     </div>
-                    <div class="metadata-row-compact">
-                        <span class="metadata-label-compact">Bandwidth:</span>
-                        <span class="metadata-value-compact">${bandwidth}</span>
+                    
+                    <div class="metadata-row">
+                        <span class="metadata-label">BANDWIDTH</span>
+                        <span class="metadata-value bandwidth">${this.escapeHtml(bandwidth)}</span>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Progress Bar - MOVED TO BOTTOM -->
-            <div class="progress-section-bottom">
-                <div class="progress-bar-bottom">
-                    <div class="progress-fill-bottom" style="width: ${progressWidth}%"></div>
+                
+                <!-- Progress Section -->
+                <div class="progress-section">
+                    <div class="progress-bar-large">
+                        <div class="progress-fill-large" style="width: ${progressWidth}%"></div>
+                    </div>
+                    <div class="progress-text">
+                        ${currentTime} / ${totalTime} (${progressPercent}%)
+                    </div>
                 </div>
-                <div class="progress-text-bottom">${currentTime} / ${totalTime} (${progressPercent}%)</div>
             </div>
         </div>
     `;
