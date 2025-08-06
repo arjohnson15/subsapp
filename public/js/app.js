@@ -1330,10 +1330,14 @@ async refreshPlexSessions() {
     }
 },
     
+// REPLACE the updatePlexSessions method in your app.js with this version:
+
 updatePlexSessions(data) {
     console.log('🎬 Updating Plex sessions:', data);
     
     const container = document.getElementById('plexSessionsContainer');
+    const summaryElement = document.getElementById('plexSessionSummary'); // Add this line
+    
     if (!container) {
         console.error('❌ Plex sessions container not found');
         return;
@@ -1347,17 +1351,26 @@ updatePlexSessions(data) {
                 <small>Users will appear here when streaming content</small>
             </div>
         `;
+        
+        // Hide summary in header when no sessions
+        if (summaryElement) {
+            summaryElement.style.display = 'none';
+        }
+        
         return;
     }
     
-    // Generate session summary stats
+    // Generate session summary for HEADER
     const summaryStats = this.generateSessionSummary(data.sessions);
     
-    // Create sessions grid with summary and cards
+    // Update header summary element
+    if (summaryElement) {
+        summaryElement.innerHTML = summaryStats;
+        summaryElement.style.display = 'block';
+    }
+    
+    // Create ONLY session cards for expanded content (NO summary)
     const sessionsHtml = `
-        <div class="session-summary">
-            ${summaryStats}
-        </div>
         <div class="tautulli-sessions-grid">
             ${data.sessions.map(session => this.createTautulliSessionCard(session)).join('')}
         </div>
@@ -1365,7 +1378,7 @@ updatePlexSessions(data) {
     
     container.innerHTML = sessionsHtml;
     
-    console.log(`✅ Updated ${data.sessions.length} Plex sessions with summary`);
+    console.log(`✅ Updated ${data.sessions.length} Plex sessions - summary in header, cards in content`);
 },
 
 // ALSO UPDATE the generateSessionSummary method to use the parsed data:
@@ -1889,23 +1902,41 @@ startBackgroundRefresh() {
                 }
             }
             
-            // Update Plex now playing data
-            if (plexResponse.status === 'fulfilled') {
-                this.cachedPlexData = await plexResponse.value.json();
-                
-                // Update count badge even when collapsed
-                const plexCountElement = document.getElementById('plexSessionCount');
-                if (plexCountElement && this.cachedPlexData.sessions) {
-                    const count = this.cachedPlexData.sessions.length;
-                    plexCountElement.textContent = count.toString();
-                    console.log(`🎬 Updated Plex session count: ${count}`);
-                }
-                
-                // Update displayed data if section is expanded
-                if (this.expandedSections.has('plex')) {
-                    this.updatePlexSessions(this.cachedPlexData);
-                }
-            }
+// Update Plex now playing data
+if (plexResponse.status === 'fulfilled') {
+    this.cachedPlexData = await plexResponse.value.json();
+    
+    // Update count badge even when collapsed
+    const plexCountElement = document.getElementById('plexSessionCount');
+    if (plexCountElement && this.cachedPlexData.sessions) {
+        const count = this.cachedPlexData.sessions.length;
+        plexCountElement.textContent = count.toString();
+        console.log(`🎬 Updated Plex session count: ${count}`);
+    }
+    
+    // ADD THIS: Update session summary in header even when collapsed
+const plexSummaryElement = document.getElementById('plexSessionSummary');
+console.log('🐛 plexSummaryElement found:', !!plexSummaryElement);
+console.log('🐛 sessions data:', this.cachedPlexData.sessions?.length);
+
+if (plexSummaryElement) {
+    if (this.cachedPlexData.sessions && this.cachedPlexData.sessions.length > 0) {
+        const summaryStats = this.generateSessionSummary(this.cachedPlexData.sessions);
+        console.log('🐛 Generated summary:', summaryStats);
+        plexSummaryElement.innerHTML = summaryStats;
+        plexSummaryElement.style.display = 'block';
+        console.log('🐛 Summary element display:', plexSummaryElement.style.display);
+    } else {
+        plexSummaryElement.style.display = 'none';
+        console.log('🐛 Hiding summary - no sessions');
+    }
+}
+    
+    // Update displayed data if section is expanded
+    if (this.expandedSections.has('plex')) {
+        this.updatePlexSessions(this.cachedPlexData);
+    }
+}
             
         } catch (error) {
             console.error('❌ Background refresh failed:', error);
