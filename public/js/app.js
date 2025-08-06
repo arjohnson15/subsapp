@@ -1435,115 +1435,225 @@ generateSessionSummary(sessions) {
     return summary;
 },
 
+// COMPLETE REPLACEMENT FOR createTautulliSessionCard function in app.js
+// This goes in your public/js/app.js file - replace the existing createTautulliSessionCard function
+
 createTautulliSessionCard(session) {
-    console.log('🎬 Creating card for:', session.title);
+    console.log('🎬 Creating Tautulli-style card for:', session.title);
     
-// FIXED: Better poster URL handling
-let posterUrl = '';
+    // FIXED: Better poster URL handling
+    let posterUrl = '';
 
-// The backend should have already built complete URLs
-if (session.thumb && session.thumb.includes('http')) {
-    posterUrl = session.thumb;
-    console.log('📸 Using thumb:', posterUrl);
-} else if (session.grandparentThumb && session.grandparentThumb.includes('http')) {
-    // For TV shows, use the show poster
-    posterUrl = session.grandparentThumb;
-    console.log('📸 Using grandparentThumb:', posterUrl);
-} else if (session.art && session.art.includes('http')) {
-    posterUrl = session.art;
-    console.log('📸 Using art:', posterUrl);
-} else {
-    // Fallback: try to build URL if needed
-    if (session.thumb && session.serverUrl && session.token) {
-        const thumbPath = session.thumb.startsWith('/') ? session.thumb : '/' + session.thumb;
-        posterUrl = `${session.serverUrl}${thumbPath}?X-Plex-Token=${session.token}`;
-        console.log('📸 Built poster URL:', posterUrl);
+    // Debug: Log what URLs we have
+    console.log('📸 Poster data for', session.title, ':', {
+        thumb: session.thumb,
+        art: session.art,
+        grandparentThumb: session.grandparentThumb,
+        serverUrl: session.serverUrl,
+        token: !!session.token
+    });
+
+    // Since these are local network images that won't work externally anyway,
+    // we'll use a simpler approach to bypass mixed content restrictions
+    const createLocalImageUrl = (originalUrl) => {
+        if (!originalUrl) return '';
+        
+        // For local network access, just return the original HTTP URL
+        // The proxy approach was overkill for local-only images
+        return originalUrl;
+    };
+
+    // FIXED: Prioritize grandparentThumb (show poster) over thumb (episode screenshot) for TV shows
+    if (session.grandparentThumb && session.grandparentThumb.includes('http')) {
+        // For TV shows, ALWAYS use the show poster first
+        posterUrl = session.grandparentThumb;
+        console.log('📸 Using grandparentThumb (show poster):', posterUrl);
+    } else if (session.thumb && session.thumb.includes('http')) {
+        posterUrl = session.thumb;
+        console.log('📸 Using thumb:', posterUrl);
+    } else if (session.art && session.art.includes('http')) {
+        posterUrl = session.art;
+        console.log('📸 Using art:', posterUrl);
+    } else {
+        // Fallback: try to build URL if needed
+        if (session.thumb && session.serverUrl && session.token) {
+            const thumbPath = session.thumb.startsWith('/') ? session.thumb : '/' + session.thumb;
+            posterUrl = `${session.serverUrl}${thumbPath}?X-Plex-Token=${session.token}`;
+            console.log('📸 Built poster URL:', posterUrl);
+        }
     }
-}
 
-if (!posterUrl) {
-    console.log('⚠️ No poster URL available for:', session.title);
-}
+    if (!posterUrl) {
+        console.log('⚠️ No poster URL available for:', session.title);
+    }
     
-const posterStyle = posterUrl ? `style="background-image: url('${posterUrl}')"` : '';
+    const posterStyle = posterUrl ? `style="background-image: url('${posterUrl}')"` : '';
     
-    // Parse server name to compact format
-    const serverName = session.serverName || 'PLEX';
-    const serverLabel = serverName.includes('Plex 1') && serverName.includes('4K') ? 'PLEX1-4K' :
-                       serverName.includes('Plex 1') ? 'PLEX1-REGULAR' :
-                       serverName.includes('Plex 2') && serverName.includes('4K') ? 'PLEX2-4K' :
-                       serverName.includes('Plex 2') ? 'PLEX2-REGULAR' : 
-                       'PLEX';
-    
-    // Parse quality
-    const quality = session.quality || session.videoResolution || '';
+    // Parse quality for badge
+    const quality = session.quality || session.videoResolution || session.resolution || '';
     const qualityBadge = quality.includes('4K') || quality.includes('2160') ? '4K' :
                         quality.includes('1080') ? '1080p' :
                         quality.includes('720') ? '720p' : 
                         quality || 'SD';
     
-    // Parse stream type
+    // Quality badge color
+    const qualityClass = qualityBadge === '4K' ? 'quality-4k' : 
+                        qualityBadge === '1080p' ? 'quality-1080p' :
+                        qualityBadge === '720p' ? 'quality-720p' : 'quality-sd';
+    
+    // Parse stream decision for metadata
     const streamDecision = session.streamingDecision === 'transcode' ? 'Transcode' :
                           session.streamingDecision === 'directstream' ? 'Direct Stream' :
-                          'Direct Play';
+                          session.streamingDecision === 'directplay' ? 'Direct Play' : 'Unknown';
     
-    // Build title and subtitle
-    const title = session.title || 'Unknown';
-    let subtitle = '';
-    if (session.type === 'episode' && session.grandparentTitle) {
-        const showTitle = session.grandparentTitle || '';
-        const season = session.parentIndex ? `S${String(session.parentIndex).padStart(2, '0')}` : '';
-        const episode = session.index ? `E${String(session.index).padStart(2, '0')}` : '';
-        subtitle = `${showTitle} - ${season}${episode}`;
-    } else if (session.year) {
-        subtitle = `(${session.year})`;
-    }
+    // Progress calculation
+    const viewOffset = parseInt(session.viewOffset) || 0;
+    const duration = parseInt(session.duration) || 1;
+    const progressPercent = Math.round((viewOffset / duration) * 100);
+    const progressWidth = Math.min(progressPercent, 100);
     
-    // Parse progress
-    const progress = session.progress || 0;
-    const viewOffset = session.viewOffset || 0;
-    const duration = session.duration || 0;
-    
-    // Format time
+    // Format time display
     const formatTime = (ms) => {
-        if (!ms) return '0:00';
-        const totalSeconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        const seconds = Math.floor(ms / 1000);
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
     };
     
     const currentTime = formatTime(viewOffset);
     const totalTime = formatTime(duration);
-    const progressText = `${currentTime} / ${totalTime}`;
     
-    // Get other metadata
-    const user = session.user || 'Unknown';
-    const player = session.player || session.device || 'Unknown';
-    const bandwidth = session.bandwidth ? `${session.bandwidth} Mbps` : '—';
-    const location = session.location || 'WAN';
+    // Build title and subtitle based on content type
+    let displayTitle = session.title || 'Unknown';
+    let displaySubtitle = '';
     
-    // Return compact HTML
-    return `
-        <div class="tautulli-session-card">
-            <div class="session-poster-large" ${posterStyle}>
-                ${!posterUrl ? '<div class="poster-icon"><i class="fas fa-film"></i></div>' : ''}
-                <div class="server-badge">${serverLabel}</div>
-                <div class="quality-badge">${qualityBadge}</div>
+    if (session.type === 'episode') {
+        displayTitle = session.grandparentTitle || session.title;
+        const seasonNum = session.parentIndex ? String(session.parentIndex).padStart(2, '0') : '00';
+        const episodeNum = session.index ? String(session.index).padStart(2, '0') : '00';
+        displaySubtitle = `S${seasonNum}E${episodeNum} - ${session.title}`;
+        if (session.year) displaySubtitle += ` (${session.year})`;
+    } else if (session.type === 'movie') {
+        displayTitle = session.title;
+        displaySubtitle = session.year ? `(${session.year})` : '';
+        if (session.studio) displaySubtitle += displaySubtitle ? ` • ${session.studio}` : session.studio;
+    } else if (session.type === 'track') {
+        displayTitle = session.title;
+        displaySubtitle = session.grandparentTitle || session.parentTitle || '';
+    }
+    
+    // Extract key Tautulli metadata fields using the EXACT field names from routes-dashboard.js
+    const user = this.escapeHtml(session.user || 'Unknown User');
+    const player = session.playerTitle || session.playerProduct || session.player || 'Unknown Player';
+    const location = session.location || 'Unknown Location';
+    const ipAddress = session.ipAddress || 'Unknown IP';
+    
+    // Use the exact bandwidth field from your session structure
+    let bandwidth = 'Unknown';
+    if (session.bandwidth && session.bandwidth !== 'Unknown') {
+        bandwidth = session.bandwidth;
+    } else if (session.bitrate && typeof session.bitrate === 'number') {
+        bandwidth = `${Math.round(session.bitrate / 1000)} Mbps`;
+    }
+    
+    // Use the EXACT field names from your routes-dashboard.js sessionData structure
+    const container = session.container || 'Unknown';
+    const videoCodec = session.videoCodec || 'Unknown';
+    const audioCodec = session.audioCodec || 'Unknown';
+    const audioChannels = session.audioChannels || '';
+    
+    // For subtitle, check multiple possible sources
+    const subtitleCodec = session.subtitleCodec || session.subtitle || 'None';
+    
+    // Enhanced stream decision - check the exact field names from your session
+    let streamType = 'Unknown';
+    if (session.streamingDecision) {
+        streamType = session.streamingDecision === 'transcode' ? 'Transcode' :
+                    session.streamingDecision === 'directstream' ? 'Direct Stream' :
+                    session.streamingDecision === 'directplay' ? 'Direct Play' : 
+                    session.streamingDecision;
+    } else if (session.transcodeDecision) {
+        streamType = session.transcodeDecision;
+    } else if (session.decision) {
+        streamType = session.decision;
+    }
+    
+    // Enhanced debug logging - show actual values instead of just "Object"
+    console.log('🔍 Complete Session data for', session.title, ':', JSON.stringify({
+        // Basic info
+        title: session.title,
+        type: session.type,
+        user: session.user,
+        
+        // Technical metadata we need
+        container: session.container,
+        videoCodec: session.videoCodec,
+        audioCodec: session.audioCodec,
+        bandwidth: session.bandwidth,
+        bitrate: session.bitrate,
+        streamingDecision: session.streamingDecision,
+        transcodeDecision: session.transcodeDecision,
+        decision: session.decision,
+        
+        // Player info
+        playerTitle: session.playerTitle,
+        playerProduct: session.playerProduct,
+        location: session.location,
+        
+        // All available keys for reference
+        availableKeys: Object.keys(session)
+    }, null, 2));
+    
+    console.log('🔍 Extracted metadata:', JSON.stringify({
+        container,
+        videoCodec,
+        audioCodec,
+        streamType,
+        bandwidth,
+        subtitleCodec,
+        audioChannels,
+        user,
+        player
+    }, null, 2));
+    
+    const cardHtml = `
+        <div class="tautulli-session-card" data-type="${session.type || 'unknown'}">
+            <!-- Poster Section with multiple fallback approaches -->
+            <div class="session-poster-large" data-poster-url="${posterUrl}">
+                ${posterUrl ? `
+                    <img src="${posterUrl}" 
+                         alt="${this.escapeHtml(displayTitle)}" 
+                         class="poster-image" 
+                         crossorigin="anonymous"
+                         onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'poster-icon\\'>🎬</div><div class=\\'poster-text\\'>${this.escapeHtml(displayTitle.substring(0, 10))}...</div>';" />
+                ` : '<div class="poster-icon">🎬</div>'}
+                
+                <!-- Quality Badge - top left like Tautulli -->
+                <div class="quality-badge ${qualityClass}">${qualityBadge}</div>
             </div>
+            
+            <!-- Session Details Section -->
             <div class="session-details">
+                <!-- Header with title and subtitle -->
                 <div class="session-header">
-                    <div class="session-title-large">?? ${title}</div>
-                    ${subtitle ? `<div class="session-subtitle-large">${subtitle}</div>` : ''}
+                    <div class="session-title-large" title="${this.escapeHtml(displayTitle)}">${this.escapeHtml(displayTitle)}</div>
+                    ${displaySubtitle ? `<div class="session-subtitle-large" title="${this.escapeHtml(displaySubtitle)}">${this.escapeHtml(displaySubtitle)}</div>` : ''}
                 </div>
                 
+                <!-- Progress Section -->
                 <div class="progress-section">
                     <div class="progress-bar-large">
-                        <div class="progress-fill-large" style="width: ${progress}%"></div>
+                        <div class="progress-fill-large" style="width: ${progressWidth}%"></div>
                     </div>
-                    <div class="progress-text">${progressText}</div>
+                    <div class="progress-text">${currentTime} / ${totalTime} (${progressPercent}%)</div>
                 </div>
                 
+                <!-- Exact Tautulli Metadata Layout -->
                 <div class="session-metadata">
                     <div class="metadata-row">
                         <span class="metadata-label">User:</span>
@@ -1554,17 +1664,43 @@ const posterStyle = posterUrl ? `style="background-image: url('${posterUrl}')"` 
                         <span class="metadata-value">${player}</span>
                     </div>
                     <div class="metadata-row">
-                        <span class="metadata-label">Quality:</span>
-                        <span class="metadata-value">${quality}</span>
+                        <span class="metadata-label">Stream:</span>
+                        <span class="metadata-value">${streamType}</span>
                     </div>
                     <div class="metadata-row">
-                        <span class="metadata-label">Stream:</span>
-                        <span class="metadata-value">${streamDecision}</span>
+                        <span class="metadata-label">Location:</span>
+                        <span class="metadata-value">${location}</span>
+                    </div>
+                    <div class="metadata-row">
+                        <span class="metadata-label">Container:</span>
+                        <span class="metadata-value">${container}</span>
+                    </div>
+                    <div class="metadata-row">
+                        <span class="metadata-label">Bandwidth:</span>
+                        <span class="metadata-value">${bandwidth}</span>
+                    </div>
+                    <div class="metadata-row">
+                        <span class="metadata-label">Video:</span>
+                        <span class="metadata-value">${videoCodec}</span>
+                    </div>
+                    <div class="metadata-row">
+                        <span class="metadata-label">Audio:</span>
+                        <span class="metadata-value">${audioCodec}${audioChannels ? ` ${audioChannels}` : ''}</span>
+                    </div>
+                    <div class="metadata-row">
+                        <span class="metadata-label">Subtitle:</span>
+                        <span class="metadata-value">${subtitleCodec}</span>
+                    </div>
+                    <div class="metadata-row">
+                        <span class="metadata-label">Quality:</span>
+                        <span class="metadata-value">${qualityBadge}</span>
                     </div>
                 </div>
             </div>
         </div>
     `;
+
+    return cardHtml;
 },
 
 // ADD this new method (completely new):
