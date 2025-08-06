@@ -235,12 +235,15 @@ iptvService.initializeTokenCache().catch(error => {
 });
 
 // Initialize IPTV Editor service on startup
+// Initialize IPTV Editor service on startup
 (async () => {
   try {
     const initialized = await iptvEditorService.initialize();
     if (initialized) {
       console.log('✅ IPTV Editor service initialized successfully');
-      // MISSING: No scheduler initialization here!
+      
+      // ADD: Initialize auto-updater scheduler
+      await initializeAutoUpdaterScheduler();
     } else {
       console.log('⚠️ IPTV Editor service not configured (bearer token missing)');
     }
@@ -248,6 +251,72 @@ iptvService.initializeTokenCache().catch(error => {
     console.error('❌ Failed to initialize IPTV Editor service:', error.message);
   }
 })();
+
+// ADD this new function AFTER the IPTV Editor initialization section:
+async function initializeAutoUpdaterScheduler() {
+  try {
+    console.log('🕐 Initializing IPTV auto-updater scheduler...');
+    
+    const settings = await iptvEditorService.getAllSettings();
+    const enabled = settings.auto_updater_enabled;
+    const hours = settings.auto_updater_schedule_hours || 1;
+    
+    if (enabled === true || enabled === 'true') {
+      // Convert hours to cron expression
+      let cronExpression;
+      switch(parseInt(hours)) {
+        case 1: cronExpression = '0 * * * *'; break;        // Every hour at minute 0
+        case 2: cronExpression = '0 */2 * * *'; break;      // Every 2 hours at minute 0
+        case 4: cronExpression = '0 */4 * * *'; break;      // Every 4 hours at minute 0
+        case 6: cronExpression = '0 */6 * * *'; break;      // Every 6 hours at minute 0
+        case 12: cronExpression = '0 */12 * * *'; break;    // Every 12 hours at minute 0
+        case 24: cronExpression = '0 2 * * *'; break;       // Daily at 2:00 AM
+        default: cronExpression = '0 * * * *'; break;       // Default to every hour
+      }
+      
+      console.log(`📅 Scheduling auto updater every ${hours} hours (${cronExpression})`);
+      
+      // Use the same cron that's already imported in your server.js
+      const cron = require('node-cron');
+      
+      global.autoUpdaterTask = cron.schedule(cronExpression, async () => {
+        console.log('🔄 Running scheduled auto updater...');
+        
+        try {
+          const currentSettings = await iptvEditorService.getAllSettings();
+          const playlistId = currentSettings.default_playlist_id;
+          const bearerToken = currentSettings.bearer_token;
+          
+          if (!playlistId || !bearerToken) {
+            console.error('❌ Missing playlist or token for scheduled update');
+            return;
+          }
+          
+          // Make internal API call (same as manual trigger)
+          const axios = require('axios');
+          const response = await axios.post(`http://localhost:${PORT}/api/iptv-editor/run-auto-updater`, {}, {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 600000 // 10 minutes
+          });
+          
+          console.log('✅ Scheduled auto updater completed successfully');
+          
+        } catch (error) {
+          console.error('❌ Scheduled auto updater failed:', error.message);
+        }
+      });
+      
+      global.autoUpdaterTask.start();
+      console.log('✅ Auto updater scheduled successfully on startup');
+      
+    } else {
+      console.log('ℹ️ Auto updater disabled - no scheduling needed');
+    }
+    
+  } catch (error) {
+    console.error('❌ Failed to initialize auto-updater scheduler:', error.message);
+  }
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {
