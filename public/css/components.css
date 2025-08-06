@@ -3782,3 +3782,274 @@ table tbody td:last-child .btn-small:nth-child(4) {
         grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
     }
 }
+
+/* Redesigned session card - taller and more compact */
+.tautulli-session-card.redesigned {
+    background: rgba(40, 40, 40, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 200px; /* Increased height to fit all metadata */
+    transition: background-color 0.2s ease;
+    position: relative;
+}
+
+.tautulli-session-card.redesigned:hover {
+    background: rgba(45, 45, 45, 0.95);
+}
+
+/* Redesigned poster section - smaller to save space */
+.session-poster-redesigned {
+    width: 80px;
+    min-width: 80px;
+    height: 120px;
+    background: #1a1a1a;
+    position: relative;
+    flex-shrink: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    float: left;
+    margin: 8px;
+    border-radius: 4px;
+}
+
+.session-poster-redesigned .poster-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+    border-radius: 4px;
+}
+
+.session-poster-redesigned .poster-icon {
+    font-size: 24px;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* Redesigned session details - more compact */
+.session-details-redesigned {
+    flex: 1;
+    padding: 8px 12px 8px 8px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+    margin-left: 96px; /* Account for floated poster */
+}
+
+/* Redesigned header - more compact */
+.session-header-redesigned {
+    margin-bottom: 8px;
+}
+
+.session-title-redesigned {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #ffffff;
+    line-height: 1.2;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.session-subtitle-redesigned {
+    font-size: 0.75rem;
+    color: #b0b0b0;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 6px;
+}
+
+/* COMPACT metadata grid - fits all 10 fields */
+.session-metadata-redesigned {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px 8px;
+    flex: 1;
+    font-size: 0.65rem;
+    line-height: 1.3;
+}
+
+.metadata-row-compact {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1px 0;
+    min-height: 14px;
+}
+
+.metadata-label-compact {
+    color: #888888;
+    font-weight: 500;
+    font-size: 0.65rem;
+    min-width: 45px;
+    text-align: left;
+    flex-shrink: 0;
+}
+
+.metadata-value-compact {
+    color: #cccccc;
+    text-align: right;
+    font-size: 0.65rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+    margin-left: 4px;
+    flex: 1;
+}
+
+/* Progress bar at bottom of card */
+.progress-section-bottom {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 4px 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.progress-bar-bottom {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 2px;
+}
+
+.progress-fill-bottom {
+    height: 100%;
+    background: #3fa9f5;
+    transition: width 0.3s ease;
+}
+
+.progress-text-bottom {
+    font-size: 0.6rem;
+    color: #888888;
+    text-align: center;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    line-height: 1;
+}
+
+/* Grid container adjustments for taller cards */
+.tautulli-sessions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 15px;
+    padding: 15px 0;
+    width: 100%;
+}
+
+/* Content type left border indicators */
+.tautulli-session-card.redesigned[data-type="movie"] {
+    border-left: 4px solid #e91e63;
+}
+
+.tautulli-session-card.redesigned[data-type="episode"] {
+    border-left: 4px solid #ff5722;
+}
+
+.tautulli-session-card.redesigned[data-type="track"] {
+    border-left: 4px solid #9c27b0;
+}
+
+/* Mobile responsiveness for redesigned cards */
+@media (max-width: 768px) {
+    .tautulli-sessions-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .tautulli-session-card.redesigned {
+        height: 180px;
+    }
+    
+    .session-poster-redesigned {
+        width: 70px;
+        min-width: 70px;
+        height: 105px;
+        margin: 6px;
+    }
+    
+    .session-details-redesigned {
+        margin-left: 82px;
+        padding: 6px 10px 6px 6px;
+    }
+    
+    .session-title-redesigned {
+        font-size: 0.85rem;
+    }
+    
+    .session-subtitle-redesigned {
+        font-size: 0.7rem;
+    }
+    
+    .metadata-row-compact {
+        min-height: 12px;
+    }
+    
+    .metadata-label-compact,
+    .metadata-value-compact {
+        font-size: 0.6rem;
+    }
+    
+    .metadata-value-compact {
+        max-width: 80px;
+    }
+    
+    .progress-text-bottom {
+        font-size: 0.55rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .tautulli-session-card.redesigned {
+        height: 160px;
+    }
+    
+    .session-poster-redesigned {
+        width: 60px;
+        min-width: 60px;
+        height: 90px;
+    }
+    
+    .session-details-redesigned {
+        margin-left: 72px;
+    }
+    
+    .session-metadata-redesigned {
+        gap: 1px 4px;
+    }
+    
+    .metadata-label-compact {
+        min-width: 35px;
+    }
+    
+    .metadata-value-compact {
+        max-width: 70px;
+    }
+}
+
+/* Desktop adjustments for wider screens */
+@media (min-width: 1200px) {
+    .tautulli-sessions-grid {
+        grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    }
+}
+
+@media (min-width: 1600px) {
+    .tautulli-sessions-grid {
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    }
+}

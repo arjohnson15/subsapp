@@ -1333,10 +1333,10 @@ async refreshPlexSessions() {
 // REPLACE the updatePlexSessions method in your app.js with this version:
 
 updatePlexSessions(data) {
-    console.log('🎬 Updating Plex sessions:', data);
+    console.log('🎬 Updating Plex sessions with stable ordering:', data);
     
     const container = document.getElementById('plexSessionsContainer');
-    const summaryElement = document.getElementById('plexSessionSummary'); // Add this line
+    const summaryElement = document.getElementById('plexSessionSummary');
     
     if (!container) {
         console.error('❌ Plex sessions container not found');
@@ -1352,7 +1352,7 @@ updatePlexSessions(data) {
             </div>
         `;
         
-        // Hide summary in header when no sessions
+        // Hide summary when no sessions
         if (summaryElement) {
             summaryElement.style.display = 'none';
         }
@@ -1369,23 +1369,105 @@ updatePlexSessions(data) {
         summaryElement.style.display = 'block';
     }
     
-    // Create ONLY session cards for expanded content (NO summary)
+    // STABLE ORDER LOGIC - Don't rebuild if sessions haven't changed significantly
+    const existingGrid = container.querySelector('.tautulli-sessions-grid');
+    const existingSessions = existingGrid ? Array.from(existingGrid.querySelectorAll('.tautulli-session-card')).map(card => 
+        card.getAttribute('data-session-key')
+    ) : [];
+    
+    const newSessionKeys = data.sessions.map(s => s.sessionKey || s.ratingKey || s.user + s.title);
+    
+    // Check if we can do an in-place update instead of full rebuild
+    const canUpdateInPlace = existingSessions.length > 0 && 
+                             existingSessions.length === newSessionKeys.length &&
+                             existingSessions.every((key, index) => key === newSessionKeys[index]);
+    
+    if (canUpdateInPlace && existingGrid) {
+        console.log('🔄 Doing in-place session update (maintains order)');
+        this.updateSessionsInPlace(existingGrid, data.sessions);
+    } else {
+        console.log('🔄 Full session rebuild (session list changed)');
+        this.rebuildSessionsGrid(container, data.sessions);
+    }
+    
+    console.log(`✅ Updated ${data.sessions.length} Plex sessions - order preserved`);
+},
+
+updateSingleSessionCard(card, session) {
+    try {
+        // Update progress bar
+        const progressFill = card.querySelector('.progress-fill-bottom');
+        const progressText = card.querySelector('.progress-text-bottom');
+        
+        if (progressFill && progressText) {
+            const viewOffset = parseInt(session.viewOffset) || 0;
+            const duration = parseInt(session.duration) || 1;
+            const progressPercent = Math.round((viewOffset / duration) * 100);
+            const progressWidth = Math.min(Math.max(progressPercent, 0), 100);
+            
+            progressFill.style.width = `${progressWidth}%`;
+            
+            const currentTime = session.elapsedTime || this.formatDuration(viewOffset);
+            const totalTime = session.durationFormatted || this.formatDuration(duration);
+            progressText.textContent = `${currentTime} / ${totalTime} (${progressPercent}%)`;
+        }
+        
+        // Update metadata values (bandwidths, stream states, etc. can change)
+        const metadataRows = card.querySelectorAll('.metadata-row-compact');
+        metadataRows.forEach(row => {
+            const label = row.querySelector('.metadata-label-compact');
+            const value = row.querySelector('.metadata-value-compact');
+            
+            if (label && value) {
+                const labelText = label.textContent.toLowerCase();
+                
+                if (labelText.includes('bandwidth')) {
+                    value.textContent = session.bandwidth || 'Unknown';
+                } else if (labelText.includes('stream')) {
+                    value.textContent = session.stream || 'Unknown';
+                } else if (labelText.includes('quality')) {
+                    value.textContent = session.quality || 'Unknown';
+                }
+                // Add more fields as needed
+            }
+        });
+        
+        console.log('✅ Updated session card in-place for:', session.title);
+        
+    } catch (error) {
+        console.error('❌ Error updating session card:', error);
+    }
+},
+
+// NEW METHOD: Full rebuild when session list changes
+rebuildSessionsGrid(container, sessions) {
+    // Sort sessions by a stable criteria (user + title) to maintain consistent order
+    const sortedSessions = [...sessions].sort((a, b) => {
+        const keyA = `${a.user}_${a.title}_${a.sessionKey || a.ratingKey}`;
+        const keyB = `${b.user}_${b.title}_${b.sessionKey || b.ratingKey}`;
+        return keyA.localeCompare(keyB);
+    });
+    
     const sessionsHtml = `
         <div class="tautulli-sessions-grid">
-            ${data.sessions.map(session => this.createTautulliSessionCard(session)).join('')}
+            ${sortedSessions.map(session => {
+                const sessionCard = this.createTautulliSessionCard(session);
+                // Add session key for tracking
+                const sessionKey = session.sessionKey || session.ratingKey || session.user + session.title;
+                return sessionCard.replace('<div class="tautulli-session-card redesigned"', 
+                    `<div class="tautulli-session-card redesigned" data-session-key="${sessionKey}"`);
+            }).join('')}
         </div>
     `;
     
     container.innerHTML = sessionsHtml;
-    
-    console.log(`✅ Updated ${data.sessions.length} Plex sessions - summary in header, cards in content`);
 },
 
 // ALSO UPDATE the generateSessionSummary method to use the parsed data:
 generateSessionSummary(sessions) {
     const totalSessions = sessions.length;
     
-    // Count by decision type using the enhanced parsing
+    // Count by decision type using the enhanced backend data
     let directPlays = 0;
     let directStreams = 0; 
     let transcodes = 0;
@@ -1393,38 +1475,32 @@ generateSessionSummary(sessions) {
     let wanBandwidth = 0;
     
     sessions.forEach(session => {
-        const debugData = session._debug || {};
-        const rawMedia = debugData.rawMedia || {};
-        
-        // Parse bandwidth from rawMedia
-        if (rawMedia.$ && rawMedia.Part && rawMedia.Part[0]) {
-            const mediaDollar = rawMedia.$;
-            const partDollar = rawMedia.Part[0].$ || {};
-            
-            const bitrate = mediaDollar.bitrate || partDollar.bitrate;
-            if (bitrate) {
-                const bw = parseInt(bitrate) / 1000; // Convert to Mbps
+        // Use the enhanced bandwidth from backend
+        if (session.bandwidth && session.bandwidth !== 'Unknown') {
+            const bandwidthMatch = session.bandwidth.match(/(\d+(?:\.\d+)?)/);
+            if (bandwidthMatch) {
+                const bw = parseFloat(bandwidthMatch[1]);
                 if (!isNaN(bw)) {
                     totalBandwidth += bw;
-                    wanBandwidth += bw; // Assume all is WAN for now
+                    // Add to WAN if not local
+                    if (session.location !== 'LAN' && !session.local) {
+                        wanBandwidth += bw;
+                    }
                 }
             }
-            
-            // Parse decision type
-            const decision = partDollar.decision || mediaDollar.decision || 'unknown';
-            
-            if (decision === 'directplay') {
-                directPlays++;
-            } else if (decision === 'directstream') {
-                directStreams++;
-            } else if (decision === 'transcode') {
-                transcodes++;
-            } else {
-                // Fallback - assume transcode if unknown
-                transcodes++;
-            }
+        }
+        
+        // Use the enhanced stream decision from backend
+        const decision = session.streamingDecision || session.transcodeDecision || 'unknown';
+        
+        if (decision.toLowerCase().includes('directplay') || decision.toLowerCase().includes('direct play')) {
+            directPlays++;
+        } else if (decision.toLowerCase().includes('directstream') || decision.toLowerCase().includes('direct stream')) {
+            directStreams++;
+        } else if (decision.toLowerCase().includes('transcode')) {
+            transcodes++;
         } else {
-            // No debug data available, assume transcode
+            // Unknown - assume transcode for safety
             transcodes++;
         }
     });
@@ -1442,35 +1518,27 @@ generateSessionSummary(sessions) {
     }
     
     if (totalBandwidth > 0) {
-        summary += ` | <strong>Bandwidth:</strong> ${totalBandwidth.toFixed(1)} Mbps (WAN: ${wanBandwidth.toFixed(1)} Mbps)`;
+        summary += ` | <strong>Bandwidth:</strong> ${totalBandwidth.toFixed(1)} Mbps`;
+        if (wanBandwidth > 0) {
+            summary += ` (WAN: ${wanBandwidth.toFixed(1)} Mbps)`;
+        }
     }
     
     return summary;
 },
 
-// COMPLETE REPLACEMENT FOR createTautulliSessionCard function in app.js
-// This goes in your public/js/app.js file - replace the existing createTautulliSessionCard function
+// COMPLETE REPLACEMENT for createTautulliSessionCard function in public/js/app.js
+// This version moves progress to bottom and fixes the subtitle issue
 
 createTautulliSessionCard(session) {
-    console.log('🎬 Creating Tautulli-style card for:', session.title);
+    console.log('🎬 Creating redesigned session card for:', session.title);
     
-    // FIXED: Better poster URL handling
+    // Enhanced poster URL handling
     let posterUrl = '';
 
-    // Debug: Log what URLs we have
-    console.log('📸 Poster data for', session.title, ':', {
-        thumb: session.thumb,
-        art: session.art,
-        grandparentThumb: session.grandparentThumb,
-        serverUrl: session.serverUrl,
-        token: !!session.token
-    });
-
-    // Create proxy URL for HTTP images to bypass mixed content blocking
     const createProxyImageUrl = (originalUrl) => {
         if (!originalUrl) return '';
         
-        // If we're on HTTPS and image is HTTP, use our proxy
         if (window.location.protocol === 'https:' && originalUrl.startsWith('http://')) {
             return `/api/dashboard/plex-image?url=${encodeURIComponent(originalUrl)}`;
         }
@@ -1478,245 +1546,244 @@ createTautulliSessionCard(session) {
         return originalUrl;
     };
 
-    // FIXED: Prioritize grandparentThumb (show poster) over thumb (episode screenshot) for TV shows
-    if (session.grandparentThumb && session.grandparentThumb.includes('http')) {
-        // For TV shows, ALWAYS use the show poster first
+    // Better poster priority - TV shows use show poster, not episode screenshot
+    if (session.type === 'episode' && session.grandparentThumb) {
         posterUrl = createProxyImageUrl(session.grandparentThumb);
-        console.log('📸 Using grandparentThumb (show poster):', posterUrl);
-    } else if (session.thumb && session.thumb.includes('http')) {
+    } else if (session.thumb) {
         posterUrl = createProxyImageUrl(session.thumb);
-        console.log('📸 Using thumb:', posterUrl);
-    } else if (session.art && session.art.includes('http')) {
+    } else if (session.art) {
         posterUrl = createProxyImageUrl(session.art);
-        console.log('📸 Using art:', posterUrl);
-    } else {
-        // Fallback: try to build URL if needed
-        if (session.thumb && session.serverUrl && session.token) {
-            const thumbPath = session.thumb.startsWith('/') ? session.thumb : '/' + session.thumb;
-            const fullUrl = `${session.serverUrl}${thumbPath}?X-Plex-Token=${session.token}`;
-            posterUrl = createProxyImageUrl(fullUrl);
-            console.log('📸 Built poster URL:', posterUrl);
-        }
-    }
-
-    if (!posterUrl) {
-        console.log('⚠️ No poster URL available for:', session.title);
     }
     
-    const posterStyle = posterUrl ? `style="background-image: url('${posterUrl}')"` : '';
-    
-    // Parse quality for badge
-    const quality = session.quality || session.videoResolution || session.resolution || '';
-    const qualityBadge = quality.includes('4K') || quality.includes('2160') ? '4K' :
-                        quality.includes('1080') ? '1080p' :
-                        quality.includes('720') ? '720p' : 
-                        quality || 'SD';
-    
-    // Quality badge color
-    const qualityClass = qualityBadge === '4K' ? 'quality-4k' : 
-                        qualityBadge === '1080p' ? 'quality-1080p' :
-                        qualityBadge === '720p' ? 'quality-720p' : 'quality-sd';
-    
-    // Parse stream decision for metadata
-    const streamDecision = session.streamingDecision === 'transcode' ? 'Transcode' :
-                          session.streamingDecision === 'directstream' ? 'Direct Stream' :
-                          session.streamingDecision === 'directplay' ? 'Direct Play' : 'Unknown';
-    
-    // Progress calculation
+    // Enhanced progress calculation
     const viewOffset = parseInt(session.viewOffset) || 0;
     const duration = parseInt(session.duration) || 1;
     const progressPercent = Math.round((viewOffset / duration) * 100);
-    const progressWidth = Math.min(progressPercent, 100);
+    const progressWidth = Math.min(Math.max(progressPercent, 0), 100);
     
-    // Format time display
-    const formatTime = (ms) => {
-        const seconds = Math.floor(ms / 1000);
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        const secs = seconds % 60;
-        
-        if (hours > 0) {
-            return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-        return `${minutes}:${secs.toString().padStart(2, '0')}`;
-    };
+    // Use formatted times from backend
+    const currentTime = session.elapsedTime || this.formatDuration(viewOffset);
+    const totalTime = session.durationFormatted || this.formatDuration(duration);
     
-    const currentTime = formatTime(viewOffset);
-    const totalTime = formatTime(duration);
-    
-    // Build title and subtitle based on content type
+    // FIXED: Enhanced title and subtitle building
     let displayTitle = session.title || 'Unknown';
     let displaySubtitle = '';
     
+    // Build subtitle based on content type
     if (session.type === 'episode') {
+        // For TV episodes, show the show name as title, episode info as subtitle
         displayTitle = session.grandparentTitle || session.title;
+        
         const seasonNum = session.parentIndex ? String(session.parentIndex).padStart(2, '0') : '00';
         const episodeNum = session.index ? String(session.index).padStart(2, '0') : '00';
-        displaySubtitle = `S${seasonNum}E${episodeNum} - ${session.title}`;
-        if (session.year) displaySubtitle += ` (${session.year})`;
+        const episodeTitle = session.title || '';
+        
+        displaySubtitle = `S${seasonNum}E${episodeNum}`;
+        if (episodeTitle && episodeTitle !== displayTitle) {
+            displaySubtitle += ` • ${episodeTitle}`;
+        }
+        if (session.year) {
+            displaySubtitle += ` (${session.year})`;
+        }
+        
     } else if (session.type === 'movie') {
+        // For movies, show movie title and year/studio
         displayTitle = session.title;
-        displaySubtitle = session.year ? `(${session.year})` : '';
-        if (session.studio) displaySubtitle += displaySubtitle ? ` • ${session.studio}` : session.studio;
+        
+        const yearPart = session.year ? `(${session.year})` : '';
+        const studioPart = session.studio ? session.studio : '';
+        
+        if (yearPart && studioPart) {
+            displaySubtitle = `${yearPart} • ${studioPart}`;
+        } else if (yearPart) {
+            displaySubtitle = yearPart;
+        } else if (studioPart) {
+            displaySubtitle = studioPart;
+        }
+        
     } else if (session.type === 'track') {
+        // For music tracks
         displayTitle = session.title;
-        displaySubtitle = session.grandparentTitle || session.parentTitle || '';
+        const artist = session.grandparentTitle || '';
+        const album = session.parentTitle || '';
+        
+        if (artist && album && artist !== album) {
+            displaySubtitle = `${artist} • ${album}`;
+        } else if (artist) {
+            displaySubtitle = artist;
+        } else if (album) {
+            displaySubtitle = album;
+        }
     }
     
-    // Extract key Tautulli metadata fields using the EXACT field names from routes-dashboard.js
+    // If we still don't have a subtitle and the backend provided one, use it
+    if (!displaySubtitle && session.subtitle && session.subtitle !== 'None') {
+        displaySubtitle = session.subtitle;
+    }
+    
+    // Use the EXACT metadata fields from enhanced backend
     const user = this.escapeHtml(session.user || 'Unknown User');
-    const player = session.playerTitle || session.playerProduct || session.player || 'Unknown Player';
-    const location = session.location || 'Unknown Location';
-    const ipAddress = session.ipAddress || 'Unknown IP';
-    
-    // Use the exact bandwidth field from your session structure
-    let bandwidth = 'Unknown';
-    if (session.bandwidth && session.bandwidth !== 'Unknown') {
-        bandwidth = session.bandwidth;
-    } else if (session.bitrate && typeof session.bitrate === 'number') {
-        bandwidth = `${Math.round(session.bitrate / 1000)} Mbps`;
-    }
-    
-    // Use the EXACT field names from your routes-dashboard.js sessionData structure
+    const product = session.product || 'Unknown Product';
+    const player = session.player || 'Unknown Player';
+    const quality = session.quality || 'Unknown';
+    const stream = session.stream || 'Unknown';
     const container = session.container || 'Unknown';
-    const videoCodec = session.videoCodec || 'Unknown';
-    const audioCodec = session.audioCodec || 'Unknown';
-    const audioChannels = session.audioChannels || '';
+    const video = session.video || 'Unknown';
+    const audio = session.audio || 'Unknown';
+    const subtitle = session.subtitle || 'None';
+    const location = session.location || 'Unknown';
+    const bandwidth = session.bandwidth || 'Unknown';
     
-    // For subtitle, check multiple possible sources
-    const subtitleCodec = session.subtitleCodec || session.subtitle || 'None';
-    
-    // Enhanced stream decision - check the exact field names from your session
-    let streamType = 'Unknown';
-    if (session.streamingDecision) {
-        streamType = session.streamingDecision === 'transcode' ? 'Transcode' :
-                    session.streamingDecision === 'directstream' ? 'Direct Stream' :
-                    session.streamingDecision === 'directplay' ? 'Direct Play' : 
-                    session.streamingDecision;
-    } else if (session.transcodeDecision) {
-        streamType = session.transcodeDecision;
-    } else if (session.decision) {
-        streamType = session.decision;
-    }
-    
-    // Enhanced debug logging - show actual values instead of just "Object"
-    console.log('🔍 Complete Session data for', session.title, ':', JSON.stringify({
-        // Basic info
-        title: session.title,
-        type: session.type,
-        user: session.user,
-        
-        // Technical metadata we need
-        container: session.container,
-        videoCodec: session.videoCodec,
-        audioCodec: session.audioCodec,
-        bandwidth: session.bandwidth,
-        bitrate: session.bitrate,
-        streamingDecision: session.streamingDecision,
-        transcodeDecision: session.transcodeDecision,
-        decision: session.decision,
-        
-        // Player info
-        playerTitle: session.playerTitle,
-        playerProduct: session.playerProduct,
-        location: session.location,
-        
-        // All available keys for reference
-        availableKeys: Object.keys(session)
-    }, null, 2));
-    
-    console.log('🔍 Extracted metadata:', JSON.stringify({
-        container,
-        videoCodec,
-        audioCodec,
-        streamType,
-        bandwidth,
-        subtitleCodec,
-        audioChannels,
-        user,
-        player
-    }, null, 2));
+    console.log('🔍 Redesigned metadata for', session.title, ':', {
+        displayTitle,
+        displaySubtitle,
+        product,
+        player,
+        quality,
+        stream
+    });
     
     const cardHtml = `
-        <div class="tautulli-session-card" data-type="${session.type || 'unknown'}">
-            <!-- Poster Section with multiple fallback approaches -->
-            <div class="session-poster-large" data-poster-url="${posterUrl}">
+        <div class="tautulli-session-card redesigned" data-type="${session.type || 'unknown'}">
+            <!-- Poster Section - NO QUALITY BADGE -->
+            <div class="session-poster-redesigned" data-poster-url="${posterUrl}">
                 ${posterUrl ? `
                     <img src="${posterUrl}" 
                          alt="${this.escapeHtml(displayTitle)}" 
                          class="poster-image" 
                          crossorigin="anonymous"
-                         onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'poster-icon\\'>🎬</div><div class=\\'poster-text\\'>${this.escapeHtml(displayTitle.substring(0, 10))}...</div>';" />
+                         onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'poster-icon\\'>🎬</div>';" />
                 ` : '<div class="poster-icon">🎬</div>'}
-                
-                <!-- Quality Badge - top left like Tautulli -->
-                <div class="quality-badge ${qualityClass}">${qualityBadge}</div>
             </div>
             
-            <!-- Session Details Section -->
-            <div class="session-details">
+            <!-- Session Details Section - REDESIGNED LAYOUT -->
+            <div class="session-details-redesigned">
                 <!-- Header with title and subtitle -->
-                <div class="session-header">
-                    <div class="session-title-large" title="${this.escapeHtml(displayTitle)}">${this.escapeHtml(displayTitle)}</div>
-                    ${displaySubtitle ? `<div class="session-subtitle-large" title="${this.escapeHtml(displaySubtitle)}">${this.escapeHtml(displaySubtitle)}</div>` : ''}
+                <div class="session-header-redesigned">
+                    <div class="session-title-redesigned" title="${this.escapeHtml(displayTitle)}">${this.escapeHtml(displayTitle)}</div>
+                    ${displaySubtitle ? `<div class="session-subtitle-redesigned" title="${this.escapeHtml(displaySubtitle)}">${this.escapeHtml(displaySubtitle)}</div>` : ''}
                 </div>
                 
-                <!-- Progress Section -->
-                <div class="progress-section">
-                    <div class="progress-bar-large">
-                        <div class="progress-fill-large" style="width: ${progressWidth}%"></div>
+                <!-- COMPACT Tautulli Metadata Grid - ALL 10 FIELDS -->
+                <div class="session-metadata-redesigned">
+                    <div class="metadata-row-compact">
+                        <span class="metadata-label-compact">Product:</span>
+                        <span class="metadata-value-compact">${product}</span>
                     </div>
-                    <div class="progress-text">${currentTime} / ${totalTime} (${progressPercent}%)</div>
-                </div>
-                
-                <!-- Exact Tautulli Metadata Layout -->
-                <div class="session-metadata">
-                    <div class="metadata-row">
-                        <span class="metadata-label">User:</span>
-                        <span class="metadata-value">${user}</span>
+                    <div class="metadata-row-compact">
+                        <span class="metadata-label-compact">Player:</span>
+                        <span class="metadata-value-compact">${player}</span>
                     </div>
-                    <div class="metadata-row">
-                        <span class="metadata-label">Player:</span>
-                        <span class="metadata-value">${player}</span>
+                    <div class="metadata-row-compact">
+                        <span class="metadata-label-compact">Quality:</span>
+                        <span class="metadata-value-compact">${quality}</span>
                     </div>
-                    <div class="metadata-row">
-                        <span class="metadata-label">Stream:</span>
-                        <span class="metadata-value">${streamType}</span>
+                    <div class="metadata-row-compact">
+                        <span class="metadata-label-compact">Stream:</span>
+                        <span class="metadata-value-compact">${stream}</span>
                     </div>
-                    <div class="metadata-row">
-                        <span class="metadata-label">Location:</span>
-                        <span class="metadata-value">${location}</span>
+                    <div class="metadata-row-compact">
+                        <span class="metadata-label-compact">Container:</span>
+                        <span class="metadata-value-compact">${container}</span>
                     </div>
-                    <div class="metadata-row">
-                        <span class="metadata-label">Container:</span>
-                        <span class="metadata-value">${container}</span>
+                    <div class="metadata-row-compact">
+                        <span class="metadata-label-compact">Video:</span>
+                        <span class="metadata-value-compact">${video}</span>
                     </div>
-                    <div class="metadata-row">
-                        <span class="metadata-label">Bandwidth:</span>
-                        <span class="metadata-value">${bandwidth}</span>
+                    <div class="metadata-row-compact">
+                        <span class="metadata-label-compact">Audio:</span>
+                        <span class="metadata-value-compact">${audio}</span>
                     </div>
-                    <div class="metadata-row">
-                        <span class="metadata-label">Video:</span>
-                        <span class="metadata-value">${videoCodec}</span>
+                    <div class="metadata-row-compact">
+                        <span class="metadata-label-compact">Subtitle:</span>
+                        <span class="metadata-value-compact">${subtitle}</span>
                     </div>
-                    <div class="metadata-row">
-                        <span class="metadata-label">Audio:</span>
-                        <span class="metadata-value">${audioCodec}${audioChannels ? ` ${audioChannels}` : ''}</span>
+                    <div class="metadata-row-compact">
+                        <span class="metadata-label-compact">Location:</span>
+                        <span class="metadata-value-compact">${location}</span>
                     </div>
-                    <div class="metadata-row">
-                        <span class="metadata-label">Subtitle:</span>
-                        <span class="metadata-value">${subtitleCodec}</span>
-                    </div>
-                    <div class="metadata-row">
-                        <span class="metadata-label">Quality:</span>
-                        <span class="metadata-value">${qualityBadge}</span>
+                    <div class="metadata-row-compact">
+                        <span class="metadata-label-compact">Bandwidth:</span>
+                        <span class="metadata-value-compact">${bandwidth}</span>
                     </div>
                 </div>
+            </div>
+            
+            <!-- Progress Bar - MOVED TO BOTTOM -->
+            <div class="progress-section-bottom">
+                <div class="progress-bar-bottom">
+                    <div class="progress-fill-bottom" style="width: ${progressWidth}%"></div>
+                </div>
+                <div class="progress-text-bottom">${currentTime} / ${totalTime} (${progressPercent}%)</div>
             </div>
         </div>
     `;
 
     return cardHtml;
+},
+
+// Fixed generateSessionSummary to use the enhanced backend data
+generateSessionSummary(sessions) {
+    const totalSessions = sessions.length;
+    
+    // Count by stream decision using enhanced backend data
+    let directPlays = 0;
+    let directStreams = 0; 
+    let transcodes = 0;
+    let totalBandwidth = 0;
+    let wanBandwidth = 0;
+    
+    sessions.forEach(session => {
+        // Use the enhanced bandwidth from backend
+        if (session.bandwidth && session.bandwidth !== 'Unknown') {
+            const bandwidthMatch = session.bandwidth.match(/(\d+(?:\.\d+)?)/);
+            if (bandwidthMatch) {
+                const bw = parseFloat(bandwidthMatch[1]);
+                if (!isNaN(bw)) {
+                    totalBandwidth += bw;
+                    // Add to WAN if not local
+                    if (!session.local && session.location && session.location.includes('WAN')) {
+                        wanBandwidth += bw;
+                    }
+                }
+            }
+        }
+        
+        // Use the enhanced stream decision from backend
+        const stream = session.stream || 'Unknown';
+        
+        if (stream.toLowerCase().includes('direct play')) {
+            directPlays++;
+        } else if (stream.toLowerCase().includes('direct stream')) {
+            directStreams++;
+        } else if (stream.toLowerCase().includes('transcode')) {
+            transcodes++;
+        } else {
+            // Unknown - assume transcode for safety
+            transcodes++;
+        }
+    });
+    
+    // Format the summary similar to Tautulli
+    let summary = `<strong>Sessions:</strong> ${totalSessions} stream${totalSessions !== 1 ? 's' : ''}`;
+    
+    const streamTypes = [];
+    if (directPlays > 0) streamTypes.push(`${directPlays} direct play${directPlays !== 1 ? 's' : ''}`);
+    if (directStreams > 0) streamTypes.push(`${directStreams} direct stream${directStreams !== 1 ? 's' : ''}`);
+    if (transcodes > 0) streamTypes.push(`${transcodes} transcode${transcodes !== 1 ? 's' : ''}`);
+    
+    if (streamTypes.length > 0) {
+        summary += ` (${streamTypes.join(', ')})`;
+    }
+    
+    if (totalBandwidth > 0) {
+        summary += ` | <strong>Bandwidth:</strong> ${totalBandwidth.toFixed(1)} Mbps`;
+        if (wanBandwidth > 0) {
+            summary += ` (WAN: ${wanBandwidth.toFixed(1)} Mbps)`;
+        }
+    }
+    
+    return summary;
 },
 
 // ADD this new method (completely new):
@@ -1844,17 +1911,30 @@ async preloadLiveData() {
             }
         }
         
-        if (plexResponse.status === 'fulfilled') {
-            this.cachedPlexData = await plexResponse.value.json();
-            console.log('✅ Plex live data cached');
-            
-            // NEW: Set initial count
-            const plexCountElement = document.getElementById('plexSessionCount');
-            if (plexCountElement && this.cachedPlexData.sessions) {
-                plexCountElement.textContent = this.cachedPlexData.sessions.length.toString();
-            }
+if (plexResponse.status === 'fulfilled') {
+    this.cachedPlexData = await plexResponse.value.json();
+    console.log('✅ Plex live data cached');
+    
+    // NEW: Set initial count
+    const plexCountElement = document.getElementById('plexSessionCount');
+    if (plexCountElement && this.cachedPlexData.sessions) {
+        plexCountElement.textContent = this.cachedPlexData.sessions.length.toString();
+    }
+    
+    // ADD THIS: Set initial session summary
+    const plexSummaryElement = document.getElementById('plexSessionSummary');
+    if (plexSummaryElement) {
+        if (this.cachedPlexData.sessions && this.cachedPlexData.sessions.length > 0) {
+            const summaryStats = this.generateSessionSummary(this.cachedPlexData.sessions);
+            plexSummaryElement.innerHTML = summaryStats;
+            plexSummaryElement.style.display = 'block';
+        } else {
+            plexSummaryElement.style.display = 'none';
         }
+    }
+}
         
+		
         
     } catch (error) {
         console.error('❌ Error preloading live data:', error);

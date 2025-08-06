@@ -838,210 +838,388 @@ async function parseSessionsXML(xmlData, serverConfig, serverName) {
   }
 }
 
-// REPLACE the parseVideoSession function in routes-dashboard.js with this enhanced version:
+// COMPLETE REPLACEMENT for parseVideoSession function in routes-dashboard.js
+// This version fixes the missing metadata fields and organizes them exactly like Tautulli
 
 function parseVideoSession(video, serverConfig, serverName) {
   try {
     const attrs = video.$ || {};
-    const user = video.User && video.User[0] && video.User[0].$ ? video.User[0].$.title : 'Unknown User';
-    const player = video.Player && video.Player[0] && video.Player[0].$ ? video.Player[0] : {};
     
-    // Enhanced media parsing
-    const media = video.Media && video.Media[0] && video.Media[0].$ ? video.Media[0] : {};
-    const part = media.Part && media.Part && media.Part[0] ? media.Part[0] : {};
-    const stream = part.Stream && part.Stream[0] && part.Stream[0].$ ? part.Stream[0] : {};
+    // Enhanced user parsing
+    const userInfo = video.User && video.User[0] && video.User[0].$ ? video.User[0].$ : {};
+    const user = userInfo.title || 'Unknown User';
+    const userId = userInfo.id || null;
     
-    console.log(`🎬 Parsing session for: ${attrs.title} - User: ${user}`);
-    console.log(`📊 Raw video attrs:`, Object.keys(attrs));
-    console.log(`📊 Raw media:`, Object.keys(media));
-    console.log(`📊 Raw player:`, Object.keys(player));
+    // Enhanced player parsing
+    const playerInfo = video.Player && video.Player[0] && video.Player[0].$ ? video.Player[0].$ : {};
+    const playerTitle = playerInfo.title || playerInfo.product || 'Unknown Player';
+    const playerProduct = playerInfo.product || 'Unknown Product';
+    const playerState = playerInfo.state || 'unknown';
+    const playerAddress = playerInfo.address || playerInfo.remotePublicAddress || 'Unknown';
+    const playerLocal = playerInfo.local === '1';
+    const playerDevice = playerInfo.device || 'Unknown Device';
+    const playerPlatform = playerInfo.platform || 'Unknown Platform';
+    
+    // Enhanced media parsing with multiple streams
+    const mediaArray = video.Media || [];
+    const media = mediaArray[0] || {};
+    const mediaAttrs = media.$ || {};
+    
+    // Parse Media Part (container and file info)
+    const partArray = media.Part || [];
+    const part = partArray[0] || {};
+    const partAttrs = part.$ || {};
+    
+    // Parse all streams (video, audio, subtitle) - ENHANCED VERSION
+    const streamArray = part.Stream || [];
+    let videoStream = null;
+    let audioStream = null;
+    let subtitleStream = null;
+    
+    // Separate streams by type
+    streamArray.forEach(stream => {
+      const streamAttrs = stream.$ || {};
+      const streamType = streamAttrs.streamType;
+      
+      if (streamType === '1') { // Video stream
+        videoStream = streamAttrs;
+      } else if (streamType === '2') { // Audio stream  
+        audioStream = streamAttrs;
+      } else if (streamType === '3') { // Subtitle stream
+        subtitleStream = streamAttrs;
+      }
+    });
+    
+    console.log(`🎬 Enhanced parsing for: ${attrs.title} - User: ${user}`);
+    console.log(`📊 Streams found:`, {
+      video: !!videoStream,
+      audio: !!audioStream,
+      subtitle: !!subtitleStream,
+      player: playerProduct,
+      platform: playerPlatform
+    });
     
     // Enhanced progress calculation
     const viewOffset = parseInt(attrs.viewOffset) || 0;
     const duration = parseInt(attrs.duration) || 1;
     const progress = duration > 0 ? Math.round((viewOffset / duration) * 100) : 0;
     
-    // Enhanced quality information
+    // Format time displays
+    const formatTime = (ms) => {
+      const seconds = Math.floor(ms / 1000);
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+      
+      if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      }
+      return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    };
+    
+    const elapsedTime = formatTime(viewOffset);
+    const remainingTime = formatTime(duration - viewOffset);
+    const durationFormatted = formatTime(duration);
+    
+    // ENHANCED quality and metadata parsing
     let quality = 'Unknown';
     let resolution = 'Unknown';
-    let bitrate = null;
+    let videoCodec = 'Unknown';
+    let audioCodec = 'Unknown';
+    let audioChannels = '';
+    let subtitleCodec = 'None';
+    let container = 'Unknown';
+    let bandwidth = 'Unknown';
+    let streamDecision = 'Unknown';
     
-    if (media.videoResolution) {
-      resolution = media.videoResolution.toUpperCase();
-      quality = resolution;
-      
-      if (media.bitrate) {
-        bitrate = parseInt(media.bitrate);
-        quality += ` (${Math.round(bitrate / 1000)}Mbps)`;
+    // Parse QUALITY field (like "Original (2.2 Mbps)")
+    if (mediaAttrs.bitrate) {
+      const bitrateMbps = (parseInt(mediaAttrs.bitrate) / 1000).toFixed(1);
+      quality = `Original (${bitrateMbps} Mbps)`;
+    } else if (partAttrs.bitrate) {
+      const bitrateMbps = (parseInt(partAttrs.bitrate) / 1000).toFixed(1);
+      quality = `Original (${bitrateMbps} Mbps)`;
+    } else {
+      quality = 'Original';
+    }
+    
+    // Parse STREAM DECISION (most important field)
+    if (partAttrs.decision) {
+      const decision = partAttrs.decision.toLowerCase();
+      if (decision === 'directplay') {
+        streamDecision = 'Direct Play';
+      } else if (decision === 'directstream') {
+        streamDecision = 'Direct Stream';
+      } else if (decision === 'transcode') {
+        streamDecision = 'Transcode';
+        // Check if throttled
+        if (partAttrs.throttled === '1') {
+          streamDecision = 'Transcode (Throttled)';
+        }
+      } else {
+        streamDecision = partAttrs.decision;
       }
-    } else if (stream.displayTitle) {
-      quality = stream.displayTitle;
-      resolution = stream.displayTitle;
     }
     
-// Enhanced thumbnail handling - BUILD FULL URLs
-let thumbUrl = '';
-let artUrl = '';
-let grandparentThumbUrl = '';
-
-// Build thumb URL
-if (attrs.thumb) {
-  if (attrs.thumb.startsWith('/')) {
-    // Local thumbnail - construct full URL
-    thumbUrl = `${serverConfig.url}${attrs.thumb}?X-Plex-Token=${serverConfig.token}`;
-  } else if (attrs.thumb.startsWith('http')) {
-    // External thumbnail - use as is but add token if needed
-    thumbUrl = attrs.thumb;
-    if (!thumbUrl.includes('X-Plex-Token')) {
-      thumbUrl += (thumbUrl.includes('?') ? '&' : '?') + `X-Plex-Token=${serverConfig.token}`;
+    // Parse CONTAINER
+    if (partAttrs.container) {
+      container = partAttrs.container.toUpperCase();
+    } else if (mediaAttrs.container) {
+      container = mediaAttrs.container.toUpperCase();
     }
-  } else {
-    // Relative path
-    thumbUrl = `${serverConfig.url}${attrs.thumb.startsWith('/') ? '' : '/'}${attrs.thumb}?X-Plex-Token=${serverConfig.token}`;
-  }
-}
-
-// Build art URL
-if (attrs.art) {
-  if (attrs.art.startsWith('/')) {
-    artUrl = `${serverConfig.url}${attrs.art}?X-Plex-Token=${serverConfig.token}`;
-  } else if (attrs.art.startsWith('http')) {
-    artUrl = attrs.art;
-    if (!artUrl.includes('X-Plex-Token')) {
-      artUrl += (artUrl.includes('?') ? '&' : '?') + `X-Plex-Token=${serverConfig.token}`;
-    }
-  } else {
-    artUrl = `${serverConfig.url}${attrs.art.startsWith('/') ? '' : '/'}${attrs.art}?X-Plex-Token=${serverConfig.token}`;
-  }
-}
-
-// Build grandparentThumb URL (for TV shows)
-if (attrs.grandparentThumb) {
-  if (attrs.grandparentThumb.startsWith('/')) {
-    grandparentThumbUrl = `${serverConfig.url}${attrs.grandparentThumb}?X-Plex-Token=${serverConfig.token}`;
-  } else if (attrs.grandparentThumb.startsWith('http')) {
-    grandparentThumbUrl = attrs.grandparentThumb;
-    if (!grandparentThumbUrl.includes('X-Plex-Token')) {
-      grandparentThumbUrl += (grandparentThumbUrl.includes('?') ? '&' : '?') + `X-Plex-Token=${serverConfig.token}`;
-    }
-  } else {
-    grandparentThumbUrl = `${serverConfig.url}${attrs.grandparentThumb.startsWith('/') ? '' : '/'}${attrs.grandparentThumb}?X-Plex-Token=${serverConfig.token}`;
-  }
-}
-
-// Fallback: if no thumb but has art, use art as thumb
-if (!thumbUrl && artUrl) {
-  thumbUrl = artUrl;
-}
-
-// For TV shows, if no thumb, use grandparent thumb
-if (!thumbUrl && grandparentThumbUrl) {
-  thumbUrl = grandparentThumbUrl;
-}
     
-    // Enhanced content type and subtitle handling
+    // Check for converting container
+    if (streamDecision.includes('Transcode') && container !== (partAttrs.targetContainer || '').toUpperCase()) {
+      if (partAttrs.targetContainer) {
+        container = `Converting (${container} ➞ ${partAttrs.targetContainer.toUpperCase()})`;
+      } else {
+        container = `Converting (${container} ➞ MPEGTS)`;
+      }
+    }
+    
+    // Parse VIDEO information
+    if (videoStream) {
+      // Video codec with resolution
+      if (videoStream.codec) {
+        const codec = videoStream.codec.toLowerCase();
+        if (codec === 'h264') {
+          videoCodec = 'H.264';
+        } else if (codec === 'hevc' || codec === 'h265') {
+          videoCodec = 'HEVC';
+        } else {
+          videoCodec = videoStream.codec.toUpperCase();
+        }
+      }
+      
+      // Add resolution to video codec
+      if (videoStream.height) {
+        const height = parseInt(videoStream.height);
+        if (height >= 2160) {
+          resolution = '4K';
+        } else if (height >= 1080) {
+          resolution = '1080p';
+        } else if (height >= 720) {
+          resolution = '720p';
+        } else {
+          resolution = `${height}p`;
+        }
+        videoCodec += ` ${resolution}`;
+      }
+      
+      // Check for transcoding
+      if (streamDecision.includes('Transcode') && videoStream.decision === 'transcode') {
+        if (videoStream.codec && partAttrs.targetVideoCodec) {
+          videoCodec = `Transcode (${videoStream.codec.toUpperCase()} ➞ ${partAttrs.targetVideoCodec.toUpperCase()} ${resolution})`;
+        } else {
+          videoCodec = `Transcode (${videoCodec})`;
+        }
+      } else if (streamDecision === 'Direct Stream' && videoStream.decision === 'copy') {
+        videoCodec = `Direct Stream (${videoCodec})`;
+      } else if (streamDecision === 'Direct Play') {
+        videoCodec = `Direct Play (${videoCodec})`;
+      }
+    }
+    
+    // Parse AUDIO information
+    if (audioStream) {
+      // Audio codec
+      if (audioStream.codec) {
+        const codec = audioStream.codec.toLowerCase();
+        if (codec === 'aac') {
+          audioCodec = 'AAC';
+        } else if (codec === 'ac3') {
+          audioCodec = 'AC3';
+        } else if (codec === 'eac3') {
+          audioCodec = 'EAC3';
+        } else if (codec === 'dts') {
+          audioCodec = 'DTS';
+        } else if (codec === 'truehd') {
+          audioCodec = 'TrueHD';
+        } else {
+          audioCodec = audioStream.codec.toUpperCase();
+        }
+      }
+      
+      // Audio channels
+      if (audioStream.channels) {
+        const channels = parseInt(audioStream.channels);
+        if (channels === 1) {
+          audioChannels = ' Mono';
+        } else if (channels === 2) {
+          audioChannels = ' Stereo';
+        } else if (channels === 6) {
+          audioChannels = ' 5.1';
+        } else if (channels === 8) {
+          audioChannels = ' 7.1';
+        } else {
+          audioChannels = ` ${channels}.0`;
+        }
+      }
+      
+      // Add language if available
+      const language = audioStream.languageTag || audioStream.language || '';
+      const languageCode = language ? ` - ${language}` : '';
+      
+      // Check for audio transcoding
+      if (streamDecision.includes('Transcode') && audioStream.decision === 'transcode') {
+        if (audioStream.codec && partAttrs.targetAudioCodec) {
+          audioCodec = `Transcode (${languageCode.replace(' - ', '')}${languageCode ? ' - ' : ''}${audioStream.codec.toUpperCase()} ➞ ${partAttrs.targetAudioCodec.toUpperCase()}${audioChannels})`;
+        } else {
+          audioCodec = `Transcode (${languageCode.replace(' - ', '')}${languageCode ? ' - ' : ''}${audioCodec}${audioChannels})`;
+        }
+      } else {
+        audioCodec = `Direct Play (${languageCode.replace(' - ', '')}${languageCode ? ' - ' : ''}${audioCodec}${audioChannels})`;
+      }
+    }
+    
+    // Parse SUBTITLE information
+    if (subtitleStream) {
+      let subtitleLang = '';
+      if (subtitleStream.languageTag || subtitleStream.language) {
+        subtitleLang = subtitleStream.languageTag || subtitleStream.language;
+      }
+      
+      if (subtitleStream.codec) {
+        const codec = subtitleStream.codec.toLowerCase();
+        if (codec === 'srt') {
+          subtitleCodec = 'SRT';
+        } else if (codec === 'ass' || codec === 'ssa') {
+          subtitleCodec = 'ASS';
+        } else if (codec === 'pgs') {
+          subtitleCodec = 'PGS';
+        } else if (codec === 'vobsub') {
+          subtitleCodec = 'VobSub';
+        } else {
+          subtitleCodec = subtitleStream.codec.toUpperCase();
+        }
+        
+        // Add language
+        if (subtitleLang) {
+          subtitleCodec = `${subtitleLang} - ${subtitleCodec}`;
+        }
+        
+        // Check if external
+        if (subtitleStream.key && subtitleStream.key.includes('external')) {
+          subtitleCodec += ' (External)';
+        }
+      } else if (subtitleLang) {
+        subtitleCodec = subtitleLang;
+      }
+    }
+    
+    // Parse BANDWIDTH
+    if (mediaAttrs.bitrate) {
+      const bitrateMbps = (parseInt(mediaAttrs.bitrate) / 1000).toFixed(1);
+      bandwidth = `${bitrateMbps} Mbps`;
+    } else if (partAttrs.bitrate) {
+      const bitrateMbps = (parseInt(partAttrs.bitrate) / 1000).toFixed(1);
+      bandwidth = `${bitrateMbps} Mbps`;
+    }
+    
+    // Parse LOCATION with IP
+    let location = 'WAN';
+    let ipAddress = playerAddress || 'Unknown';
+    
+    if (playerLocal) {
+      location = 'LAN';
+    }
+    
+    // Format IP address
+    if (ipAddress && ipAddress !== 'Unknown') {
+      // Clean up IPv6 mapped IPv4 addresses
+      if (ipAddress.includes('::ffff:')) {
+        ipAddress = ipAddress.split('::ffff:')[1];
+      }
+      location = `${location}: ${ipAddress}`;
+    }
+    
+    // Enhanced thumbnail handling
+    let thumbUrl = '';
+    let artUrl = '';
+    let grandparentThumbUrl = '';
+    
+    const buildImageUrl = (imagePath) => {
+      if (!imagePath) return '';
+      
+      if (imagePath.startsWith('/')) {
+        return `${serverConfig.url}${imagePath}?X-Plex-Token=${serverConfig.token}`;
+      } else if (imagePath.startsWith('http')) {
+        if (!imagePath.includes('X-Plex-Token')) {
+          return imagePath + (imagePath.includes('?') ? '&' : '?') + `X-Plex-Token=${serverConfig.token}`;
+        }
+        return imagePath;
+      } else {
+        return `${serverConfig.url}/${imagePath}?X-Plex-Token=${serverConfig.token}`;
+      }
+    };
+    
+    // Build all image URLs
+    if (attrs.thumb) thumbUrl = buildImageUrl(attrs.thumb);
+    if (attrs.art) artUrl = buildImageUrl(attrs.art);
+    if (attrs.grandparentThumb) grandparentThumbUrl = buildImageUrl(attrs.grandparentThumb);
+    
+    // Build content type and subtitle
+    const contentType = attrs.type || 'unknown';
     let subtitle = '';
-    let contentType = attrs.type || 'unknown';
     
     if (contentType === 'episode') {
-      // TV Show Episode
+      // TV Episode format: "Show Name - S01E05 (2023)"
       const showTitle = attrs.grandparentTitle || 'Unknown Show';
       const seasonNum = attrs.parentIndex ? String(attrs.parentIndex).padStart(2, '0') : '00';
       const episodeNum = attrs.index ? String(attrs.index).padStart(2, '0') : '00';
-      const episodeTitle = attrs.title || 'Unknown Episode';
       
       subtitle = `${showTitle} - S${seasonNum}E${episodeNum}`;
-      
-      // If there's a year, add it
       if (attrs.year) {
         subtitle += ` (${attrs.year})`;
       }
     } else if (contentType === 'movie') {
-      // Movie
+      // Movie format: "(2023)" or "(2023) • Studio"
+      const parts = [];
       if (attrs.year) {
-        subtitle = `(${attrs.year})`;
+        parts.push(`(${attrs.year})`);
       }
       if (attrs.studio) {
-        subtitle += subtitle ? ` • ${attrs.studio}` : attrs.studio;
+        parts.push(attrs.studio);
       }
+      subtitle = parts.join(' • ');
     } else if (contentType === 'track') {
-      // Music Track
-      const artist = attrs.grandparentTitle || attrs.parentTitle || 'Unknown Artist';
-      const album = attrs.parentTitle || 'Unknown Album';
-      subtitle = `${artist} - ${album}`;
-    }
-    
-    // Enhanced technical information
-    const videoCodec = stream.codec || media.videoCodec || 'Unknown';
-    const audioCodec = media.audioCodec || 'Unknown';  
-    const container = media.container || part.container || 'Unknown';
-    
-    // Enhanced bandwidth calculation
-    let bandwidth = 'Unknown';
-    if (media.bitrate) {
-      bandwidth = `${Math.round(media.bitrate / 1000)} Mbps`;
-    } else if (part.bitrate) {
-      bandwidth = `${Math.round(part.bitrate / 1000)} Mbps`;
-    }
-    
-    // Enhanced player information
-    const playerTitle = player.title || player.device || 'Unknown Player';
-    const playerAddress = player.address || player.remotePublicAddress || 'Unknown Location';
-    const playerProduct = player.product || 'Unknown Client';
-    
-    // Enhanced state detection
-    let state = player.state || 'unknown';
-    if (!['playing', 'paused', 'buffering', 'stopped'].includes(state)) {
-      state = 'unknown';
-    }
-    
-    // Format durations
-    const formatDuration = (ms) => {
-      if (!ms || ms <= 0) return '0:00';
-      const totalSeconds = Math.floor(ms / 1000);
-      const hours = Math.floor(totalSeconds / 3600);
-      const minutes = Math.floor((totalSeconds % 3600) / 60);
-      const seconds = totalSeconds % 60;
-      
-      if (hours > 0) {
-        return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-      } else {
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      // Music track format: "Artist - Album"
+      const parts = [];
+      if (attrs.grandparentTitle) {
+        parts.push(attrs.grandparentTitle);
       }
-    };
+      if (attrs.parentTitle && attrs.parentTitle !== attrs.grandparentTitle) {
+        parts.push(attrs.parentTitle);
+      }
+      subtitle = parts.join(' - ');
+    }
     
-    const durationFormatted = formatDuration(duration);
-    const remainingTime = formatDuration(duration - viewOffset);
-    const elapsedTime = formatDuration(viewOffset);
-    
-    // Enhanced session object with all the data Tautulli shows
+    // Build the complete session object with EXACT Tautulli metadata structure
     const sessionData = {
       // Basic identification
-      sessionKey: attrs.sessionKey || attrs.key,
-      ratingKey: attrs.ratingKey,
-      
-      // User information
+      sessionKey: attrs.sessionKey || null,
+      ratingKey: attrs.ratingKey || null,
+      userId: userId,
       user: user,
-      userId: video.User && video.User[0] && video.User[0].$.id ? video.User[0].$.id : null,
       
       // Content information
       title: attrs.title || 'Unknown Title',
-      subtitle: subtitle,
+      subtitle: subtitle || undefined, 
       type: contentType,
       year: attrs.year || null,
       
       // For TV shows
-      grandparentTitle: attrs.grandparentTitle || null, // Show name
-      parentTitle: attrs.parentTitle || null, // Season name
-      parentIndex: attrs.parentIndex || null, // Season number
-      index: attrs.index || null, // Episode number
+      grandparentTitle: attrs.grandparentTitle || null,
+      parentTitle: attrs.parentTitle || null,
+      parentIndex: attrs.parentIndex || null,
+      index: attrs.index || null,
       
-// Media information
-thumb: thumbUrl,
-art: artUrl,  // CHANGED from attrs.art to artUrl
-grandparentThumb: grandparentThumbUrl,  // ADD this line
-duration: duration,
-durationFormatted: durationFormatted,
+      // Media information with full URLs
+      thumb: thumbUrl,
+      art: artUrl,
+      grandparentThumb: grandparentThumbUrl,
+      duration: duration,
+      durationFormatted: durationFormatted,
       
       // Progress information
       viewOffset: viewOffset,
@@ -1049,20 +1227,26 @@ durationFormatted: durationFormatted,
       elapsedTime: elapsedTime,
       remainingTime: remainingTime,
       
-      // Quality and technical information
-      quality: quality,
-      resolution: resolution,
-      bitrate: bitrate,
-      bandwidth: bandwidth,
-      videoCodec: videoCodec.toUpperCase(),
-      audioCodec: audioCodec.toUpperCase(),
-      container: container.toUpperCase(),
+      // EXACT Tautulli metadata fields
+      product: playerProduct,           // "Plex for Roku"
+      player: playerTitle,              // "Roku Streaming Stick+"  
+      quality: quality,                 // "Original (2.2 Mbps)"
+      stream: streamDecision,           // "Direct Play" / "Transcode" / "Direct Stream"
+      container: container,             // "MP4" / "Converting (MP4 ➞ MPEGTS)"
+      video: videoCodec,               // "Direct Play (H.264 1080p)" / "Transcode (H.264 ➞ H.264 SD)"
+      audio: audioCodec,               // "Direct Play (English - AAC Stereo)" / "Transcode (English - AAC 5.1 ➞ AAC Stereo)"
+      subtitle: subtitleCodec,         // "English - SRT" / "None"
+      location: location,              // "WAN: 97.125.53.106" / "LAN: 192.168.1.100"
+      bandwidth: bandwidth,            // "3.4 Mbps"
       
-      // Player information
-      state: state,
+      // Legacy fields for compatibility
+      state: playerState,
       playerTitle: playerTitle,
       playerProduct: playerProduct,
-      location: playerAddress,
+      device: playerDevice,
+      platform: playerPlatform,
+      ipAddress: ipAddress,
+      local: playerLocal,
       
       // Server information
       serverUrl: serverConfig.url,
@@ -1078,30 +1262,36 @@ durationFormatted: durationFormatted,
       addedAt: attrs.addedAt ? new Date(parseInt(attrs.addedAt) * 1000).toISOString() : null,
       updatedAt: new Date().toISOString(),
       
-      // Raw data for debugging
+      // Enhanced debug data
       _debug: {
         rawAttrs: attrs,
-        rawMedia: media,
-        rawPlayer: player,
-        hasThumb: !!attrs.thumb,
-        hasArt: !!attrs.art,
-        thumbUrl: thumbUrl
+        rawMedia: mediaAttrs,
+        rawPart: partAttrs,
+        rawPlayer: playerInfo,
+        rawVideoStream: videoStream,
+        rawAudioStream: audioStream,
+        rawSubtitleStream: subtitleStream,
+        streamCount: streamArray.length
       }
     };
     
-    console.log(`✅ Parsed session for ${sessionData.title}:`, {
-      user: sessionData.user,
-      state: sessionData.state,
-      progress: `${sessionData.progress}%`,
+    console.log(`✅ Enhanced session data for ${sessionData.title}:`, {
+      product: sessionData.product,
+      player: sessionData.player,
       quality: sessionData.quality,
-      hasThumb: !!sessionData.thumb
+      stream: sessionData.stream,
+      container: sessionData.container,
+      video: sessionData.video,
+      audio: sessionData.audio,
+      location: sessionData.location,
+      bandwidth: sessionData.bandwidth
     });
     
     return sessionData;
     
   } catch (error) {
-    console.error('❌ Error parsing video session:', error);
-    console.error('❌ Raw video data:', video);
+    console.error('❌ Error parsing enhanced video session:', error);
+    console.error('❌ Raw video data keys:', video ? Object.keys(video) : 'No video data');
     return null;
   }
 }
