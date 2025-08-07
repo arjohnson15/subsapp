@@ -1527,6 +1527,9 @@ generateSessionSummary(sessions) {
     return summary;
 },
 
+// FIXED createTautulliSessionCard function - Removes badges and fixes metadata
+// Replace the entire function in your app.js
+
 createTautulliSessionCard(session) {
     console.log('🎬 Creating Tautulli-style card for:', session.title);
     
@@ -1660,8 +1663,39 @@ createTautulliSessionCard(session) {
         }
     }
     
-    // Location info - use enhanced session data
+    // FIXED: Location info - Extract only IP address  
     const location = session.location || 'Unknown';
+    let ipAddress = 'Unknown';
+    
+    if (location && location !== 'Unknown') {
+        console.log('🔍 Raw location data:', location);
+        
+        // Use regex to extract IP address pattern directly
+        const ipPattern = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/;
+        const ipMatch = location.match(ipPattern);
+        
+        if (ipMatch) {
+            ipAddress = ipMatch[1]; // Use the first captured IP address
+            console.log('✅ Extracted IP:', ipAddress);
+        } else {
+            // Fallback: aggressive cleaning
+            ipAddress = location
+                .replace(/WAN\s*:\s*/gi, '') // Remove WAN: (case insensitive)
+                .replace(/LAN\s*:\s*/gi, '') // Remove LAN: (case insensitive)
+                .replace(/[^\w\s\.:]/g, '') // Remove special characters except alphanumeric, space, dot, colon
+                .trim();
+            
+            // If it still doesn't look like an IP, keep as 'Unknown'
+            if (!ipAddress.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)) {
+                ipAddress = 'Unknown';
+            }
+            
+            console.log('🔧 Cleaned location:', ipAddress);
+        }
+    } else {
+        console.log('⚠️ No location data available');
+    }
+    
     const bandwidth = session.bandwidth || 'Unknown';
     const user = session.user || session.username || 'Unknown';
     const subtitleCodec = session.subtitle || session.subtitleCodec || 'None';
@@ -1675,12 +1709,16 @@ createTautulliSessionCard(session) {
         streamDecision,
         containerDisplay,
         videoDisplay,
-        audioDisplay
+        audioDisplay,
+        ipAddress // Log the extracted IP
     });
     
     const cardHtml = `
         <div class="tautulli-session-card" data-type="${session.type || 'unknown'}">
-            <!-- Poster Section - NO BADGES -->
+            <!-- Username Badge - Top Right -->
+            <div class="username-badge">${this.escapeHtml(user)}</div>
+            
+            <!-- Poster Section - NO OTHER BADGES -->
             <div class="session-poster-large">
                 ${posterUrl ? `
                     <img src="${posterUrl}" 
@@ -1691,8 +1729,6 @@ createTautulliSessionCard(session) {
                 ` : ''}
                 <div class="poster-icon" style="${posterUrl ? 'display:none' : ''}">🎬</div>
                 <div class="poster-text" style="${posterUrl ? 'display:none' : ''}">${this.escapeHtml(displayTitle.substring(0, 12))}...</div>
-                
-                <!-- NO QUALITY OR SERVER BADGES -->
             </div>
             
             <!-- Session Details Section -->
@@ -1755,7 +1791,7 @@ createTautulliSessionCard(session) {
                     
                     <div class="metadata-row">
                         <span class="metadata-label">LOCATION</span>
-                        <span class="metadata-value location">🔒 ${this.escapeHtml(location)}</span>
+                        <span class="metadata-value location">${this.escapeHtml(ipAddress)}</span>
                     </div>
                     
                     <div class="metadata-row">
@@ -1763,15 +1799,15 @@ createTautulliSessionCard(session) {
                         <span class="metadata-value bandwidth">${this.escapeHtml(bandwidth)}</span>
                     </div>
                 </div>
-                
-                <!-- Progress Section -->
-                <div class="progress-section">
-                    <div class="progress-bar-large">
-                        <div class="progress-fill-large" style="width: ${progressWidth}%"></div>
-                    </div>
-                    <div class="progress-text">
-                        ${currentTime} / ${totalTime} (${progressPercent}%)
-                    </div>
+            </div>
+            
+            <!-- Progress Bar - MOVED TO BOTTOM OF ENTIRE CARD -->
+            <div class="progress-section">
+                <div class="progress-bar-large">
+                    <div class="progress-fill-large" style="width: ${progressWidth}%"></div>
+                </div>
+                <div class="progress-text">
+                    ${currentTime} / ${totalTime} (${progressPercent}%)
                 </div>
             </div>
         </div>
