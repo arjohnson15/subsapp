@@ -1902,6 +1902,8 @@ updateIPTVViewers(iptvData) {
     const container = document.getElementById('iptvViewersContainer');
     const countElement = document.getElementById('iptvViewerCount');
     
+    console.log('🐛 Frontend received IPTV data:', iptvData);
+    
     if (!container) {
         console.warn('IPTV viewers container not found');
         return;
@@ -1923,7 +1925,9 @@ updateIPTVViewers(iptvData) {
     }
     
     const viewersHtml = iptvData.viewers.map(viewer => {
-        // Build streams list for this viewer
+        console.log('🐛 Processing viewer:', viewer.username, 'speedColor:', viewer.speedColor);
+        
+        // Build streams list (no individual speed indicators)
         let streamsHtml = '';
         if (viewer.connections && viewer.connections.length > 0) {
             streamsHtml = viewer.connections.map(stream => `
@@ -1934,11 +1938,20 @@ updateIPTVViewers(iptvData) {
             `).join('');
         }
         
+        const speedColor = viewer.speedColor || 'gray';
+        const speedText = this.getSpeedText(speedColor);
+        
+        console.log('🎨 Using speed color:', speedColor, 'for user:', viewer.username);
+        
         return `
             <div class="iptv-viewer-card">
                 <div class="viewer-header">
                     <span class="viewer-username">${this.escapeHtml(viewer.username)}</span>
-                    <span class="viewer-connections">${viewer.totalConnections}/${viewer.maxConnections}</span>
+                    <span class="viewer-connections">
+                        ${viewer.totalConnections}/${viewer.maxConnections}
+                        <div class="speed-indicator speed-${speedColor}" 
+                             title="Connection Speed: ${speedText}"></div>
+                    </span>
                 </div>
                 <div class="viewer-details">
                     <div class="viewer-ip">${viewer.userIP} (${viewer.geoCountry})</div>
@@ -1976,12 +1989,47 @@ setLiveDataError(type) {
     }
 },
     
-    escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    },
+escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+},
+
+// ADD this method:
+getSpeedText(color) {
+    switch (color) {
+        case 'green': return 'Good';
+        case 'yellow': return 'Fair';
+        case 'red': return 'Poor';
+        case 'gray': return 'Unknown';
+        default: return 'Unknown';
+    }
+},
+
+/**
+ * Calculate overall user speed color based on their connections
+ * @param {Array} connections - User's active connections
+ * @returns {string} - Overall speed color
+ */
+calculateUserSpeedColor(connections) {
+    if (!connections || connections.length === 0) {
+        return 'gray';
+    }
+    
+    // Count each speed type
+    const speeds = { red: 0, yellow: 0, green: 0, gray: 0 };
+    connections.forEach(conn => {
+        const speed = conn.speedColor || 'gray';
+        speeds[speed]++;
+    });
+    
+    // Priority: if any red, show red; if any yellow, show yellow; otherwise green or gray
+    if (speeds.red > 0) return 'red';
+    if (speeds.yellow > 0) return 'yellow';
+    if (speeds.green > 0) return 'green';
+    return 'gray';
+},
     
 
 // NEW METHOD 1: Preload live data on dashboard init

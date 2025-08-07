@@ -6,6 +6,47 @@ const { spawn } = require('child_process');
 const iptvService = require('./iptv-service');
 const xml2js = require('xml2js');
 
+// ADD THE SPEED PARSING FUNCTION HERE:
+/**
+ * Parse speed color from HTML progress bar string
+ * @param {string} speedHtml - HTML string containing progress bar with color
+ * @returns {string} - Color name (green, yellow, red, gray)
+ */
+function parseSpeedColor(speedHtml) {
+  if (!speedHtml || typeof speedHtml !== 'string') {
+    console.log('🔍 Speed parsing: No speed HTML or not string:', typeof speedHtml);
+    return 'gray';
+  }
+  
+  console.log('🔍 Speed parsing input:', speedHtml.substring(0, 200));
+  
+  // Try multiple patterns to extract the color
+  const patterns = [
+    /background-color:\s*([^;]+)/i,
+    /background:\s*([^;]+)/i,
+    /color:\s*([^;]+)/i
+  ];
+  
+  for (const pattern of patterns) {
+    const colorMatch = speedHtml.match(pattern);
+    if (colorMatch) {
+      const color = colorMatch[1].trim().toLowerCase();
+      console.log('🎨 Found color:', color);
+      
+      if (color === 'green' || color === '#4caf50' || color === '#008000') {
+        return 'green';
+      } else if (color === 'orange' || color === '#ff9800' || color === '#ffa500') {
+        return 'yellow';
+      } else if (color === 'red' || color === '#f44336' || color === '#ff0000') {
+        return 'red';
+      }
+    }
+  }
+  
+  console.log('🔍 No color match found, defaulting to gray');
+  return 'gray';
+}
+
 // GET /api/dashboard/stats - Combined endpoint for all dashboard data
 router.get('/stats', async (req, res) => {
   try {
@@ -584,7 +625,7 @@ async function getIPTVLiveViewers() {
         timeout: 15000
       }),
       
-      // Get user account data for connection limits
+      // Get user account data for connection limits AND speed data
       axios.post('https://panel.pinkpony.lol/lines/data', {
         draw: 1,
         start: 0,
@@ -640,6 +681,39 @@ async function getIPTVLiveViewers() {
       const username = conn.username;
       
       if (!userConnections[username]) {
+        // Get speed data from usersData for this user
+        const userData = usersData.find(user => user.username === username);
+        let userSpeedColor = 'gray';
+        
+        if (userData) {
+          // Debug: log userData fields for first user only
+          if (Object.keys(userConnections).length === 0) {
+            console.log('🔍 userData fields for', username, ':', Object.keys(userData));
+            
+            // Look for speed field
+            Object.keys(userData).forEach(key => {
+              const value = userData[key];
+              if (typeof value === 'string' && (
+                value.includes('background-color') || 
+                value.includes('progress') ||
+                value.includes('bar')
+              )) {
+                console.log(`🎯 FOUND SPEED FIELD "${key}":`, value?.substring(0, 150));
+              }
+            });
+          }
+          
+          // Try to find speed field in userData
+          const possibleSpeedFields = ['speed', 'connection_speed', 'bandwidth', 'quality', 'progress', 'status'];
+          for (const fieldName of possibleSpeedFields) {
+            if (userData[fieldName] !== undefined) {
+              console.log(`✅ Found speed in "${fieldName}":`, userData[fieldName]?.substring(0, 100));
+              userSpeedColor = parseSpeedColor(userData[fieldName]);
+              break;
+            }
+          }
+        }
+        
         userConnections[username] = {
           username: username,
           connections: [],
@@ -650,11 +724,12 @@ async function getIPTVLiveViewers() {
           isOwner: conn.owner === 'johnsonflix',
           userIP: conn.user_ip,
           geoCountry: conn.geoip_country_code,
-          isp: conn.isp
+          isp: conn.isp,
+          speedColor: userSpeedColor // USER-level speed color
         };
       }
       
-      // Add this connection/stream to the user
+      // Add connection (no individual speed needed)
       userConnections[username].connections.push({
         streamName: conn.stream_display_name || 'Unknown Stream',
         userAgent: conn.user_agent || 'Unknown',
@@ -662,6 +737,7 @@ async function getIPTVLiveViewers() {
         totalOnlineTime: conn.total_time_online || '0s',
         container: conn.container || 'unknown',
         serverId: conn.server_id
+        // NO speedColor here - it's at user level
       });
       
       userConnections[username].totalConnections = userConnections[username].connections.length;
@@ -678,7 +754,8 @@ async function getIPTVLiveViewers() {
         username: activeViewers[0].username,
         connections: `${activeViewers[0].totalConnections}/${activeViewers[0].maxConnections}`,
         streams: activeViewers[0].connections.length,
-        firstStream: activeViewers[0].connections[0]?.streamName
+        firstStream: activeViewers[0].connections[0]?.streamName,
+        speedColor: activeViewers[0].speedColor
       });
     }
     
