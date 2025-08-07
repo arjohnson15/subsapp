@@ -3941,3 +3941,27 @@ table tbody td:last-child .btn-small:nth-child(4) {
     flex-shrink: 0;
     margin-left: 8px;
 }
+
+.cpu-low { color: #4caf50 !important; }      /* Green: 0-30% */
+.cpu-medium { color: #ff9800 !important; }   /* Orange: 31-60% */
+.cpu-high { color: #f44336 !important; }     /* Red: 61%+ */
+.cpu-offline { color: #666 !important; }     /* Gray: Offline */
+
+/* Responsive design for server resources */
+@media (max-width: 768px) {
+    .server-resources-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+    
+    .server-resource-item {
+        padding: 6px;
+    }
+}
+
+@media (max-width: 480px) {
+    .server-resources-grid {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+}

@@ -911,10 +911,11 @@ window.Dashboard = {
     backgroundRefreshInterval: null,
     cachedIPTVData: null,
     cachedPlexData: null,
+	cachedResourceData: null,
     
     refreshStartTime: null,
     maxRefreshDuration: 30 * 60 * 1000, // 30 minutes
-    refreshInterval: 15000, // 15 seconds (instead of 30000)
+    refreshInterval: 15000, // 15 seconds 
 
     // NEW: Debug control - SET TO FALSE FOR PRODUCTION
     debugMode: false, // Change to true only when debugging
@@ -2056,6 +2057,8 @@ window.Dashboard = {
         if (speeds.green > 0) return 'green';
         return 'gray';
     },
+	
+	
         
 
     // NEW METHOD 1: Preload live data on dashboard init

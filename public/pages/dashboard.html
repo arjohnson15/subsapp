@@ -169,6 +169,124 @@
                     <div class="stat-label">Audio Books</div>
                 </div>
             </div>
+			<!-- Plex Server Resource Usage -->
+<div class="plex-server-resources" style="
+    padding: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(78, 205, 196, 0.03);
+    margin-top: 10px;
+">
+    <div style="
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+    ">
+        <i class="fas fa-server" style="color: #4ecdc4; margin-right: 8px; font-size: 0.8rem;"></i>
+        <span style="color: #4ecdc4; font-weight: 600; font-size: 0.8rem;">Server Resources</span>
+    </div>
+    
+    <div class="server-resources-grid" style="
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+    ">
+        <!-- Plex 1 Server -->
+        <div class="server-resource-item" style="
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 8px;
+            text-align: center;
+        ">
+            <div style="color: #4ecdc4; font-size: 0.7rem; font-weight: 600; margin-bottom: 4px;">
+                Plex 1
+            </div>
+            <div style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 4px;
+            ">
+                <i class="fas fa-microchip" style="color: #666; font-size: 0.6rem;"></i>
+                <span id="plex1Cpu" style="color: #fff; font-size: 0.75rem; font-weight: 500;">
+                    --
+                </span>
+            </div>
+        </div>
+        
+        <!-- Plex 1 4K Server -->
+        <div class="server-resource-item" style="
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 8px;
+            text-align: center;
+        ">
+            <div style="color: #4ecdc4; font-size: 0.7rem; font-weight: 600; margin-bottom: 4px;">
+                Plex 1 4K
+            </div>
+            <div style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 4px;
+            ">
+                <i class="fas fa-microchip" style="color: #666; font-size: 0.6rem;"></i>
+                <span id="plex1FourkCpu" style="color: #fff; font-size: 0.75rem; font-weight: 500;">
+                    --
+                </span>
+            </div>
+        </div>
+        
+        <!-- Plex 2 Server -->
+        <div class="server-resource-item" style="
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 8px;
+            text-align: center;
+        ">
+            <div style="color: #4ecdc4; font-size: 0.7rem; font-weight: 600; margin-bottom: 4px;">
+                Plex 2
+            </div>
+            <div style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 4px;
+            ">
+                <i class="fas fa-microchip" style="color: #666; font-size: 0.6rem;"></i>
+                <span id="plex2Cpu" style="color: #fff; font-size: 0.75rem; font-weight: 500;">
+                    --
+                </span>
+            </div>
+        </div>
+        
+        <!-- Plex 2 4K Server -->
+        <div class="server-resource-item" style="
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 8px;
+            text-align: center;
+        ">
+            <div style="color: #4ecdc4; font-size: 0.7rem; font-weight: 600; margin-bottom: 4px;">
+                Plex 2 4K
+            </div>
+            <div style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 4px;
+            ">
+                <i class="fas fa-microchip" style="color: #666; font-size: 0.6rem;"></i>
+                <span id="plex2FourkCpu" style="color: #fff; font-size: 0.75rem; font-weight: 500;">
+                    --
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
         </div>
 
 <!-- Plex Now Playing Collapsible Section -->
