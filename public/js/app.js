@@ -933,45 +933,47 @@ window.Dashboard = {
         console.error(...args); // Always show errors
     },
     
-    async init() {
-        this.info('📊 Initializing enhanced dashboard with background refresh...');
-        
-        // CRITICAL: Set refresh start time AND reset any existing intervals
-        this.refreshStartTime = Date.now();
-        
-        // IMPORTANT: Stop any existing refresh intervals first
-        if (this.backgroundRefreshInterval) {
-            clearInterval(this.backgroundRefreshInterval);
-            this.backgroundRefreshInterval = null;
+async init() {
+    this.info('📊 Initializing enhanced dashboard with server resource monitoring...');
+    
+    // CRITICAL: Set refresh start time AND reset any existing intervals
+    this.refreshStartTime = Date.now();
+    
+    // IMPORTANT: Stop any existing refresh intervals first
+    if (this.backgroundRefreshInterval) {
+        clearInterval(this.backgroundRefreshInterval);
+        this.backgroundRefreshInterval = null;
+    }
+    if (this.autoRefreshInterval) {
+        clearInterval(this.autoRefreshInterval);
+        this.autoRefreshInterval = null;
+    }
+    
+    // Load users first if they're not already loaded
+    if (!window.AppState.users || window.AppState.users.length === 0) {
+        this.debug('📊 Dashboard: Loading users for stats...');
+        try {
+            const users = await API.User.getAll();
+            window.AppState.users = users;
+            window.AppState.allUsers = users;
+            this.debug(`📊 Dashboard: Loaded ${users.length} users for stats`);
+        } catch (error) {
+            this.error('📊 Dashboard: Error loading users:', error);
+            window.AppState.users = [];
         }
-        if (this.autoRefreshInterval) {
-            clearInterval(this.autoRefreshInterval);
-            this.autoRefreshInterval = null;
-        }
-        
-        // Load users first if they're not already loaded (KEEP YOUR EXISTING CODE)
-        if (!window.AppState.users || window.AppState.users.length === 0) {
-            this.debug('📊 Dashboard: Loading users for stats...'); // Debug only
-            try {
-                const users = await API.User.getAll();
-                window.AppState.users = users;
-                window.AppState.allUsers = users;
-                this.debug(`📊 Dashboard: Loaded ${users.length} users for stats`); // Debug only
-            } catch (error) {
-                this.error('📊 Dashboard: Error loading users:', error);
-                window.AppState.users = [];
-            }
-        }
-        
-        await this.loadStats();
-        await this.loadContentStats();
-        
-        this.debug('🚀 Starting background live data refresh...'); // Debug only
-        await this.preloadLiveData();
-        this.startBackgroundRefresh();
-        
-        this.info('✅ Dashboard fully initialized with background refresh active');
-    },
+    }
+    
+    // Load all dashboard data in parallel
+    await this.loadStats();
+    await this.loadContentStats();
+    await this.loadServerResources(); // NEW: Load server resources
+    
+    this.debug('🚀 Starting background live data refresh...');
+    await this.preloadLiveData();
+    this.startBackgroundRefresh();
+    
+    this.info('✅ Dashboard fully initialized with server resource monitoring active');
+},
 
     stopBackgroundRefresh() {
         if (this.backgroundRefreshInterval) {
@@ -2058,7 +2060,112 @@ window.Dashboard = {
         return 'gray';
     },
 	
-	
+	// Load server resource data
+async loadServerResources() {
+    try {
+        this.debug('📊 Loading Plex server resources...');
+        const response = await fetch('/api/plex/dashboard-resources');
+        const data = await response.json();
+        
+        this.debug('📊 Server resources data:', data);
+        this.cachedResourceData = data;
+        
+        // Update the dashboard display immediately
+        this.updateServerResourceDisplay(data);
+        
+    } catch (error) {
+        this.error('❌ Error loading server resources:', error);
+        // Show default/error state
+        this.updateServerResourceDisplay(this.getDefaultResourceData());
+    }
+},
+
+// Update the server resource display in the dashboard
+updateServerResourceDisplay(resourceData) {
+    console.log('🔍 DEBUG: updateServerResourceDisplay called with:', resourceData);
+    
+    this.debug('🎨 Updating server CPU display with data:', resourceData);
+    
+    // Update each server's CPU display
+    this.updateSingleServerCpu('plex1', 'regular', resourceData.plex1?.regular);
+    this.updateSingleServerCpu('plex1', 'fourk', resourceData.plex1?.fourk);
+    this.updateSingleServerCpu('plex2', 'regular', resourceData.plex2?.regular);
+    this.updateSingleServerCpu('plex2', 'fourk', resourceData.plex2?.fourk);
+},
+
+// Update individual server CPU display
+updateSingleServerCpu(serverGroup, serverType, serverData) {
+    // Generate element ID (plex1Cpu, plex1FourkCpu, plex2Cpu, plex2FourkCpu)
+    const elementId = serverGroup + (serverType === 'fourk' ? 'FourkCpu' : 'Cpu');
+    const element = document.getElementById(elementId);
+    
+    // ADD THIS DEBUG LINE
+    console.log(`🔍 DEBUG: Looking for element ID: ${elementId}, found:`, !!element);
+    
+    if (!element) {
+        this.debug(`⚠️ CPU element not found: ${elementId}`);
+        return;
+    }
+    
+    // Default data if server data is missing
+    const data = serverData || { cpuUsage: 0, status: 'unknown', success: false };
+    
+    // ADD THIS DEBUG LINE
+    console.log(`🔍 DEBUG: Server data for ${elementId}:`, data);
+    
+    let displayValue = '--';
+    let cssClass = 'cpu-offline';
+    
+    if (data.success && data.status === 'online') {
+        const cpuUsage = data.cpuUsage || 0;
+        displayValue = `${cpuUsage}%`;
+        
+        // Color code based on CPU usage
+        if (cpuUsage <= 30) {
+            cssClass = 'cpu-low';      // Green
+        } else if (cpuUsage <= 60) {
+            cssClass = 'cpu-medium';   // Orange  
+        } else {
+            cssClass = 'cpu-high';     // Red
+        }
+    } else {
+        // Server offline or error
+        displayValue = data.status === 'error' ? 'ERR' : 'OFF';
+        cssClass = 'cpu-offline';
+    }
+    
+    // Update the display
+    element.textContent = displayValue;
+    element.className = element.className.replace(/cpu-\w+/g, '').trim();
+    element.classList.add(cssClass);
+    
+    // ADD THIS DEBUG LINE
+    console.log(`🔍 DEBUG: Updated ${elementId} - Text: "${displayValue}", Class: "${cssClass}", Element classes: "${element.className}"`);
+},
+
+
+// Get default resource data structure
+getDefaultResourceData() {
+    const defaultServer = {
+        cpuUsage: 0,
+        memoryUsage: 0,
+        activeSessions: 0,
+        status: 'unknown',
+        success: false
+    };
+    
+    return {
+        plex1: { 
+            regular: { ...defaultServer },
+            fourk: { ...defaultServer }
+        },
+        plex2: { 
+            regular: { ...defaultServer },
+            fourk: { ...defaultServer }
+        },
+        lastUpdate: 'No data'
+    };
+},
         
 
     // NEW METHOD 1: Preload live data on dashboard init
@@ -2068,7 +2175,8 @@ window.Dashboard = {
             
             const [iptvResponse, plexResponse] = await Promise.allSettled([
                 fetch('/api/dashboard/iptv-live'),
-                fetch('/api/dashboard/plex-now-playing')
+                fetch('/api/dashboard/plex-now-playing'),
+				fetch('/api/plex/dashboard-resources')
             ]);
             
             if (iptvResponse.status === 'fulfilled') {
@@ -2110,81 +2218,118 @@ window.Dashboard = {
         }
     },
 
-    // Updated startBackgroundRefresh method with optimized logging
-    startBackgroundRefresh() {
-        if (this.backgroundRefreshInterval) {
-            this.debug('📊 Background refresh already running'); // Debug only
+startBackgroundRefresh() {
+    if (this.backgroundRefreshInterval) {
+        clearInterval(this.backgroundRefreshInterval);
+    }
+    
+    // Reset start time when starting
+    if (!this.refreshStartTime) {
+        this.refreshStartTime = Date.now();
+    }
+    
+    this.info(`📊 Starting background refresh (${this.refreshInterval/1000}s intervals, 30min max)`);
+    
+    this.backgroundRefreshInterval = setInterval(async () => {
+        // CRITICAL: Double-check current page before ANY processing
+        if (!window.AppState || window.AppState.currentPage !== 'dashboard') {
+            this.debug('🚫 Not on dashboard page - stopping background refresh');
+            this.stopBackgroundRefresh();
             return;
         }
         
-        // CRITICAL: Ensure we have a start time
-        if (!this.refreshStartTime) {
-            this.refreshStartTime = Date.now();
+        // Check if 30 minutes have passed
+        const elapsedTime = Date.now() - this.refreshStartTime;
+        if (elapsedTime >= this.maxRefreshDuration) {
+            this.info('⏰ Dashboard auto-refresh stopped after 30 minutes');
+            this.stopBackgroundRefresh();
+            return;
         }
         
-        this.info(`📊 Starting background refresh (${this.refreshInterval/1000}s intervals, 30min max)`);
-        
-        this.backgroundRefreshInterval = setInterval(async () => {
-            // CRITICAL: Double-check current page before ANY processing
-            if (!window.AppState || window.AppState.currentPage !== 'dashboard') {
-                this.debug('🚫 Not on dashboard page - stopping background refresh'); // Debug only
-                this.stopBackgroundRefresh();
-                return;
-            }
+        try {
+            const [iptvResponse, plexResponse, resourcesResponse] = await Promise.allSettled([
+                fetch('/api/dashboard/iptv-live'),
+                fetch('/api/dashboard/plex-now-playing'),
+                fetch('/api/plex/dashboard-resources') // NEW: Server resources
+            ]);
             
-            // Check if 30 minutes have passed
-            const elapsedTime = Date.now() - this.refreshStartTime;
-            if (elapsedTime >= this.maxRefreshDuration) {
-                this.info('⏰ Dashboard auto-refresh stopped after 30 minutes');
-                this.stopBackgroundRefresh();
-                return;
-            }
-            
-            try {
-                // REMOVED: console.log('🔄 Background refresh: Updating live data...');
+            // Update IPTV data (silent unless error)
+            if (iptvResponse.status === 'fulfilled' && iptvResponse.value.ok) {
+                this.cachedIPTVData = await iptvResponse.value.json();
                 
-                const [iptvResponse, plexResponse] = await Promise.allSettled([
-                    fetch('/api/dashboard/iptv-live'),
-                    fetch('/api/dashboard/plex-now-playing')
-                ]);
-                
-                // Update IPTV data (silent unless error)
-                if (iptvResponse.status === 'fulfilled' && iptvResponse.value.ok) {
-                    this.cachedIPTVData = await iptvResponse.value.json();
-                    
-                    const iptvCountElement = document.getElementById('iptvViewerCount');
-                    if (iptvCountElement && this.cachedIPTVData.viewers) {
-                        iptvCountElement.textContent = this.cachedIPTVData.viewers.length.toString();
-                    }
-                    
-                    if (this.expandedSections.has('iptv')) {
-                        this.updateIPTVViewers(this.cachedIPTVData);
-                    }
-                } else {
-                    this.error('❌ IPTV background refresh failed');
+                const iptvCountElement = document.getElementById('iptvViewerCount');
+                if (iptvCountElement && this.cachedIPTVData.viewers) {
+                    iptvCountElement.textContent = this.cachedIPTVData.viewers.length.toString();
                 }
                 
-                // Update Plex data (silent unless error)
-                if (plexResponse.status === 'fulfilled' && plexResponse.value.ok) {
-                    this.cachedPlexData = await plexResponse.value.json();
-                    
-                    const plexCountElement = document.getElementById('plexSessionCount');
-                    if (plexCountElement && this.cachedPlexData.sessions) {
-                        plexCountElement.textContent = this.cachedPlexData.sessions.length.toString();
-                    }
-                    
-                    if (this.expandedSections.has('plex')) {
-                        this.updatePlexSessions(this.cachedPlexData);
-                    }
-                } else {
-                    this.error('❌ Plex background refresh failed');
+                if (this.expandedSections.has('iptv')) {
+                    this.updateIPTVViewers(this.cachedIPTVData);
                 }
-                
-            } catch (error) {
-                this.error('❌ Background refresh failed:', error);
+            } else {
+                this.error('❌ IPTV background refresh failed');
             }
-        }, this.refreshInterval); // 15 seconds instead of 30000
-    },
+            
+            // Update Plex data (silent unless error)  
+            if (plexResponse.status === 'fulfilled' && plexResponse.value.ok) {
+                this.cachedPlexData = await plexResponse.value.json();
+                this.updatePlexSessionsSummary(); // This was the missing function!
+                
+                if (this.expandedSections.has('plex')) {
+                    this.updatePlexSessions(this.cachedPlexData);
+                }
+            } else {
+                this.error('❌ Plex background refresh failed');
+            }
+            
+            // NEW: Update server resources (silent unless error)
+            if (resourcesResponse.status === 'fulfilled' && resourcesResponse.value.ok) {
+                this.cachedResourceData = await resourcesResponse.value.json();
+                this.updateServerResourceDisplay(this.cachedResourceData);
+                this.debug('✅ Server resources updated in background');
+            } else {
+                this.error('❌ Server resources background refresh failed');
+            }
+            
+        } catch (error) {
+            this.error('❌ Background refresh failed:', error);
+        }
+    }, this.refreshInterval); // 15 seconds
+},
+
+updatePlexSessionsSummary() {
+    this.debug('🎬 Updating Plex sessions summary...');
+    
+    const plexCountElement = document.getElementById('plexSessionCount');
+    const summaryElement = document.getElementById('plexSessionSummary');
+    
+    if (!this.cachedPlexData || !this.cachedPlexData.sessions) {
+        if (plexCountElement) plexCountElement.textContent = '0';
+        if (summaryElement) summaryElement.style.display = 'none';
+        return;
+    }
+    
+    const sessionCount = this.cachedPlexData.sessions.length;
+    
+    // Update session count
+    if (plexCountElement) {
+        plexCountElement.textContent = sessionCount.toString();
+    }
+    
+    // Update summary if there are sessions
+    if (summaryElement) {
+        if (sessionCount > 0) {
+            const summaryStats = this.generateSessionSummary(this.cachedPlexData.sessions);
+            summaryElement.innerHTML = summaryStats;
+            summaryElement.style.display = 'block';
+        } else {
+            summaryElement.style.display = 'none';
+        }
+    }
+    
+    this.debug(`🎬 Updated session summary: ${sessionCount} sessions`);
+},
+
+
 
     destroy() {
         this.info('📊 Dashboard destroyed - stopping ALL refreshes and cleaning up');

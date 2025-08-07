@@ -594,11 +594,14 @@ router.get('/dashboard-resources', async (req, res) => {
     console.log('📊 Getting cached Plex server resources for dashboard...');
     
     // Get all cached resource data
-    const [allResources] = await db.query(`
-      SELECT server_group, server_type, resource_data, last_updated 
-      FROM plex_server_resources 
-      ORDER BY server_group, server_type
-    `);
+const allResources = await db.query(`
+  SELECT server_group, server_type, resource_data, last_updated 
+  FROM plex_server_resources 
+  ORDER BY server_group, server_type
+`);
+	
+	    console.log('🔍 DEBUG: Number of records returned:', allResources ? allResources.length : 0);
+    console.log('🔍 DEBUG: All records:', allResources);
     
     // Check if cache is fresh (less than 2 minutes old)
     const cacheExpiry = 2 * 60 * 1000; // 2 minutes
@@ -750,10 +753,13 @@ async function cacheServerResources(resources) {
     // Insert new resource data
     for (const [serverGroup, servers] of Object.entries(resources)) {
       for (const [serverType, resourceData] of Object.entries(servers)) {
-        await db.query(`
-          INSERT INTO plex_server_resources (server_group, server_type, resource_data, last_updated) 
-          VALUES (?, ?, ?, NOW())
-        `, [serverGroup, serverType, JSON.stringify(resourceData)]);
+await db.query(`
+  INSERT INTO plex_server_resources (server_group, server_type, resource_data, last_updated) 
+  VALUES (?, ?, ?, NOW())
+  ON DUPLICATE KEY UPDATE 
+    resource_data = VALUES(resource_data),
+    last_updated = NOW()
+`, [serverGroup, serverType, JSON.stringify(resourceData)]);
       }
     }
     
@@ -766,6 +772,7 @@ async function cacheServerResources(resources) {
 
 // Helper function to format resources for dashboard display
 function formatDashboardResources(cachedResources) {
+	 console.log('🔍 DEBUG: formatDashboardResources called with:', cachedResources);
   const defaultResource = {
     serverName: 'Unknown',
     status: 'unknown',
@@ -791,7 +798,7 @@ function formatDashboardResources(cachedResources) {
     
     cachedResources.forEach(row => {
       try {
-        const resourceData = JSON.parse(row.resource_data);
+        const resourceData = row.resource_data;
         const serverGroup = row.server_group;
         const serverType = row.server_type;
         
