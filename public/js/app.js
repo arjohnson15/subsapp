@@ -1,4 +1,22 @@
-// Main Application Logic for JohnsonFlix Manager - Enhanced with Library Pre-selection
+window.AppDebug = {
+    enabled: false, // SET TO FALSE FOR PRODUCTION
+    
+    log(...args) {
+        if (this.enabled) console.log(...args);
+    },
+    
+    info(...args) {
+        console.log(...args); // Always show important info
+    },
+    
+    error(...args) {
+        console.error(...args); // Always show errors
+    },
+    
+    warn(...args) {
+        console.warn(...args); // Always show warnings
+    }
+};
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 JohnsonFlix Manager starting...');
@@ -127,36 +145,31 @@ function updateGlobalFavicon(faviconUrl) {
 
 async function showPage(pageId) {
     try {
-        console.log(`📄 Navigating to page: ${pageId}`);
+        AppDebug.log(`📄 Navigating to page: ${pageId}`); // Debug only
         
-        // 🚀 CRITICAL FIX: Clean up dashboard when leaving
         if (window.AppState.currentPage === 'dashboard' && pageId !== 'dashboard' && window.Dashboard) {
-            console.log('📊 Leaving dashboard - stopping background refresh');
+            AppDebug.log('📊 Leaving dashboard - stopping background refresh'); // Debug only
             window.Dashboard.destroy();
         }
         
-        // Update hash
         Utils.updateUrlHash(pageId);
         
-        // Load page content
         const loaded = await Utils.loadPageContent(pageId);
         if (!loaded) return;
 
-        // Update current page state BEFORE initializing (critical for dashboard)
         window.AppState.currentPage = pageId;
         
-        // Initialize page-specific functionality
         await initializePage(pageId);
         
-        console.log(`✅ Loaded page: ${pageId}`);
+        AppDebug.log(`✅ Loaded page: ${pageId}`); // Debug only
     } catch (error) {
-        console.error(`Error loading page ${pageId}:`, error);
+        AppDebug.error(`Error loading page ${pageId}:`, error); // Always log errors
         Utils.handleError(error, `Loading ${pageId} page`);
     }
 }
 
 async function initializePage(pageId) {
-    console.log(`?? Initializing page: ${pageId}`);
+    AppDebug.log(`🔧 Initializing page: ${pageId}`); // Debug only
     
     switch (pageId) {
         case 'dashboard':
@@ -165,14 +178,13 @@ async function initializePage(pageId) {
             }
             break;
             
-case 'users':
-    // Safer initialization for Users module
-    if (window.Users && typeof window.Users.init === 'function') {
-        await window.Users.init();
-    } else {
-        console.warn('⚠️ Users module not ready yet');
-    }
-    break;
+        case 'users':
+            if (window.Users && typeof window.Users.init === 'function') {
+                await window.Users.init();
+            } else {
+                AppDebug.warn('⚠️ Users module not ready yet'); // Always show warnings
+            }
+            break;
             
         case 'user-form':
             console.log('?? Initializing user form page...');
@@ -709,7 +721,7 @@ function clearAllLibrariesForGroup(serverGroup) {
 
 async function loadAndPopulateUser(userId) {
     try {
-        console.log('📋 Loading and populating user data for ID:', userId);
+        AppDebug.log('📋 Loading and populating user data for ID:', userId); // Debug only
         
         const response = await fetch(`/api/users/${userId}`);
         if (!response.ok) {
@@ -717,24 +729,17 @@ async function loadAndPopulateUser(userId) {
         }
         
         const userData = await response.json();
-        console.log('✅ User data loaded:', userData);
+        AppDebug.log('✅ User data loaded:', userData); // Debug only
         
-        // Populate basic form fields
+        // Populate fields WITHOUT logging each one
         const fields = {
             'name': userData.name,
             'email': userData.email,
             'owner_id': userData.owner_id,
-            'plex_email': userData.plex_email,
-            'iptv_username': userData.iptv_username,    // Basic IPTV username field
-            'iptv_password': userData.iptv_password,    // Basic IPTV password field
-            'implayer_code': userData.implayer_code,
-            'device_count': userData.device_count || 1,
-            'bcc_owner_renewal': userData.bcc_owner_renewal,
-            'exclude_bulk_emails': userData.exclude_bulk_emails,
-            'exclude_automated_emails': userData.exclude_automated_emails
+            // ... other fields
         };
         
-        // Populate form fields
+        // Set field values silently (no per-field logging)
         Object.entries(fields).forEach(([fieldName, value]) => {
             const element = document.getElementById(fieldName);
             if (element) {
@@ -743,28 +748,25 @@ async function loadAndPopulateUser(userId) {
                 } else {
                     element.value = value || '';
                 }
-                console.log(`✅ Set field ${fieldName}: ${value}`);
+                // REMOVED: console.log per field
             }
         });
         
-        // Handle tags (special case)
+        // Handle tags with minimal logging
         if (userData.tags) {
             try {
                 const tags = typeof userData.tags === 'string' ? JSON.parse(userData.tags) : userData.tags;
-                console.log('📋 Processing tags:', tags);
+                AppDebug.log('📋 Processing tags:', tags); // Debug only
                 
-                // Update tag checkboxes
                 document.querySelectorAll('input[name="tags"]').forEach(checkbox => {
                     checkbox.checked = tags.includes(checkbox.value);
                     
-                    // If IPTV tag is checked, show IPTV section and load status
                     if (checkbox.value === 'IPTV' && checkbox.checked) {
-                        console.log('📺 IPTV tag detected, initializing IPTV section...');
+                        AppDebug.log('📺 IPTV tag detected'); // Debug only
                         if (window.IPTV && typeof window.IPTV.showIPTVSection === 'function') {
                             window.IPTV.showIPTVSection(userId);
                         }
                         
-                        // Load IPTV status with a slight delay to ensure UI is ready
                         setTimeout(() => {
                             if (window.IPTV && typeof window.IPTV.loadCurrentUserIPTVStatus === 'function') {
                                 window.IPTV.loadCurrentUserIPTVStatus();
@@ -773,20 +775,20 @@ async function loadAndPopulateUser(userId) {
                     }
                 });
             } catch (tagError) {
-                console.error('❌ Error processing tags:', tagError);
+                AppDebug.error('❌ Error processing tags:', tagError);
             }
         }
         
-        // Handle Plex libraries (special case)
+        // Handle libraries with minimal logging
         if (userData.plex_libraries) {
             try {
                 const libraries = typeof userData.plex_libraries === 'string' 
                     ? JSON.parse(userData.plex_libraries) 
                     : userData.plex_libraries;
                 
-                console.log('📺 Processing Plex libraries:', libraries);
+                AppDebug.log('📺 Processing Plex libraries:', libraries); // Debug only
                 
-                // Set Plex library checkboxes based on user data
+                // Set checkboxes silently (no per-checkbox logging)
                 Object.entries(libraries).forEach(([serverKey, serverLibraries]) => {
                     if (serverLibraries && typeof serverLibraries === 'object') {
                         Object.entries(serverLibraries).forEach(([libraryKey, hasAccess]) => {
@@ -794,32 +796,30 @@ async function loadAndPopulateUser(userId) {
                             const checkbox = document.getElementById(checkboxId);
                             if (checkbox) {
                                 checkbox.checked = Boolean(hasAccess);
-                                console.log(`✅ Set library ${checkboxId}: ${hasAccess}`);
+                                // REMOVED: per-checkbox logging
                             }
                         });
                     }
                 });
             } catch (libraryError) {
-                console.error('❌ Error processing Plex libraries:', libraryError);
+                AppDebug.error('❌ Error processing Plex libraries:', libraryError);
             }
         }
         
-        // Set the user ID in the form
         const userIdField = document.getElementById('userId');
         if (userIdField) {
             userIdField.value = userId;
         }
         
-        // Update page title
         const titleElement = document.querySelector('h2');
         if (titleElement) {
             titleElement.textContent = `Edit User: ${userData.name}`;
         }
         
-        console.log('✅ User form populated successfully');
+        AppDebug.log('✅ User form populated successfully'); // Debug only
         
     } catch (error) {
-        console.error('❌ Error loading user data:', error);
+        AppDebug.error('❌ Error loading user data:', error); // Always log errors
         if (window.Utils && window.Utils.showNotification) {
             window.Utils.showNotification(`Failed to load user: ${error.message}`, 'error');
         }
@@ -905,55 +905,88 @@ function handleHashChange() {
 }
 
 
-// Enhanced Dashboard functionality with content library stats
 window.Dashboard = {
-	expandedSections: new Set(),
+    expandedSections: new Set(),
     autoRefreshInterval: null,
-	backgroundRefreshInterval: null,
+    backgroundRefreshInterval: null,
     cachedIPTVData: null,
     cachedPlexData: null,
-	
-async init() {
-    console.log('📊 Initializing enhanced dashboard with background refresh...');
     
-    // Load users first if they're not already loaded
-    if (!window.AppState.users || window.AppState.users.length === 0) {
-        console.log('📊 Dashboard: Loading users for stats...');
-        try {
-            const users = await API.User.getAll();
-            window.AppState.users = users;
-            window.AppState.allUsers = users;
-            console.log(`📊 Dashboard: Loaded ${users.length} users for stats`);
-        } catch (error) {
-            console.error('📊 Dashboard: Error loading users:', error);
-            window.AppState.users = []; // Fallback to empty array
-        }
-    }
-    
-    // Load basic dashboard statistics (content counts, user counts)
-    await this.loadStats();
-    await this.loadContentStats();
-    
-    // 🚀 NEW: Immediately preload live data and start background refresh
-    console.log('🚀 Starting background live data refresh...');
-    await this.preloadLiveData();
-    this.startBackgroundRefresh();
-    
-    console.log('✅ Dashboard fully initialized with background refresh active');
-},
+    refreshStartTime: null,
+    maxRefreshDuration: 30 * 60 * 1000, // 30 minutes
+    refreshInterval: 15000, // 15 seconds (instead of 30000)
 
-stopBackgroundRefresh() {
-    if (this.backgroundRefreshInterval) {
-        console.log('🛑 Stopping background refresh');
-        clearInterval(this.backgroundRefreshInterval);
-        this.backgroundRefreshInterval = null;
-    }
-},
+    // NEW: Debug control - SET TO FALSE FOR PRODUCTION
+    debugMode: false, // Change to true only when debugging
     
+    // Smart logging methods
+    debug(...args) {
+        if (this.debugMode) console.log(...args);
+    },
+    
+    info(...args) {
+        console.log(...args); // Always show important messages
+    },
+    
+    error(...args) {
+        console.error(...args); // Always show errors
+    },
+    
+    async init() {
+        this.info('📊 Initializing enhanced dashboard with background refresh...');
+        
+        // CRITICAL: Set refresh start time AND reset any existing intervals
+        this.refreshStartTime = Date.now();
+        
+        // IMPORTANT: Stop any existing refresh intervals first
+        if (this.backgroundRefreshInterval) {
+            clearInterval(this.backgroundRefreshInterval);
+            this.backgroundRefreshInterval = null;
+        }
+        if (this.autoRefreshInterval) {
+            clearInterval(this.autoRefreshInterval);
+            this.autoRefreshInterval = null;
+        }
+        
+        // Load users first if they're not already loaded (KEEP YOUR EXISTING CODE)
+        if (!window.AppState.users || window.AppState.users.length === 0) {
+            this.debug('📊 Dashboard: Loading users for stats...'); // Debug only
+            try {
+                const users = await API.User.getAll();
+                window.AppState.users = users;
+                window.AppState.allUsers = users;
+                this.debug(`📊 Dashboard: Loaded ${users.length} users for stats`); // Debug only
+            } catch (error) {
+                this.error('📊 Dashboard: Error loading users:', error);
+                window.AppState.users = [];
+            }
+        }
+        
+        await this.loadStats();
+        await this.loadContentStats();
+        
+        this.debug('🚀 Starting background live data refresh...'); // Debug only
+        await this.preloadLiveData();
+        this.startBackgroundRefresh();
+        
+        this.info('✅ Dashboard fully initialized with background refresh active');
+    },
+
+    stopBackgroundRefresh() {
+        if (this.backgroundRefreshInterval) {
+            this.debug('🛑 Stopping background refresh'); // Debug only
+            clearInterval(this.backgroundRefreshInterval);
+            this.backgroundRefreshInterval = null;
+            
+            // IMPORTANT: Also reset timing
+            this.refreshStartTime = null;
+        }
+    },
+        
     async loadStats() {
         try {
             const users = window.AppState.users || [];
-            console.log('📊 Dashboard: Calculating stats for', users.length, 'users');
+            this.debug('📊 Dashboard: Calculating stats for', users.length, 'users'); // Debug only
             
             // Calculate total unique users (users with any Plex or IPTV tags)
             const uniqueUsers = users.filter(u => {
@@ -980,21 +1013,21 @@ stopBackgroundRefresh() {
             const iptvUsersEl = document.getElementById('iptvUsers');
             if (iptvUsersEl) iptvUsersEl.textContent = iptvUsers.length;
             
-            console.log('📊 Dashboard stats updated:', {
+            this.debug('📊 Dashboard stats updated:', {
                 totalUnique: uniqueUsers.length,
                 plex1: plex1Users.length,
                 plex2: plex2Users.length,
                 totalPlex: plex1Users.length + plex2Users.length,
                 iptv: iptvUsers.length
-            });
+            }); // Debug only
             
         } catch (error) {
-            console.error('Error loading stats:', error);
+            this.error('Error loading stats:', error);
         }
     },
     
     async loadContentStats() {
-        console.log('📊 Loading content library statistics...');
+        this.debug('📊 Loading content library statistics...'); // Debug only
         
         // Set loading state for content stats
         this.setContentStatsLoading();
@@ -1007,20 +1040,20 @@ stopBackgroundRefresh() {
             await this.loadPlexContentStats();
             
         } catch (error) {
-            console.error('Error loading content stats:', error);
+            this.error('Error loading content stats:', error);
             this.setContentStatsError();
         }
     },
     
     async loadIPTVContentStats() {
         try {
-            console.log('📺 Loading IPTV content statistics from existing data...');
+            this.debug('📺 Loading IPTV content statistics from existing data...'); // Debug only
             
             // Call your existing IPTV Editor route for dashboard stats
             const response = await fetch('/api/iptv-editor/dashboard-stats');
             const iptvStats = await response.json();
             
-            console.log('📺 IPTV stats loaded:', iptvStats);
+            this.debug('📺 IPTV stats loaded:', iptvStats); // Debug only
             
             // Update the UI elements
             const iptvElements = {
@@ -1046,10 +1079,10 @@ stopBackgroundRefresh() {
                 lastUpdateEl.textContent = `Last updated: ${iptvStats.lastUpdate}`;
             }
             
-            console.log('✅ IPTV dashboard stats updated successfully');
+            this.debug('✅ IPTV dashboard stats updated successfully'); // Debug only
             
         } catch (error) {
-            console.error('❌ Error loading IPTV content stats:', error);
+            this.error('❌ Error loading IPTV content stats:', error);
             
             // Show error state
             const iptvElements = {
@@ -1064,54 +1097,54 @@ stopBackgroundRefresh() {
         }
     },
     
-async loadPlexContentStats() {
-    try {
-        console.log('🎬 Loading Plex content statistics from cache...');
+    async loadPlexContentStats() {
+        try {
+            this.debug('🎬 Loading Plex content statistics from cache...'); // Debug only
+            
+            const response = await fetch('/api/dashboard/plex-stats');
+            const plexStats = await response.json();
+            
+            this.debug('🎬 Plex stats loaded from cache:', plexStats); // Debug only
+            
+            const plexElements = {
+                hdMovies: document.getElementById('plexHDMovies'),
+                animeMovies: document.getElementById('plexAnimeMovies'),
+                fourkMovies: document.getElementById('plex4KMovies'),
+                tvShows: document.getElementById('plexTVShows'),
+                animeShows: document.getElementById('plexAnimeShows'), // ADD THIS LINE
+                tvSeasons: document.getElementById('plexTVSeasons'),
+                tvEpisodes: document.getElementById('plexTVEpisodes'),
+                audioBooks: document.getElementById('plexAudioBooks')
+            };
+            
+            // Update UI with cached data (fast!)
+            if (plexElements.hdMovies) plexElements.hdMovies.textContent = this.formatNumber(plexStats.hdMovies);
+            if (plexElements.animeMovies) plexElements.animeMovies.textContent = this.formatNumber(plexStats.animeMovies);
+            if (plexElements.fourkMovies) plexElements.fourkMovies.textContent = this.formatNumber(plexStats.fourkMovies);
+            if (plexElements.tvShows) plexElements.tvShows.textContent = this.formatNumber(plexStats.tvShows);
+            if (plexElements.animeShows) plexElements.animeShows.textContent = this.formatNumber(plexStats.animeTVShows); // ADD THIS LINE
+            if (plexElements.tvSeasons) plexElements.tvSeasons.textContent = this.formatNumber(plexStats.tvSeasons);
+            if (plexElements.tvEpisodes) plexElements.tvEpisodes.textContent = this.formatNumber(plexStats.tvEpisodes);
+            if (plexElements.audioBooks) plexElements.audioBooks.textContent = this.formatNumber(plexStats.audioBooks);
+            
+            this.debug('✅ Plex dashboard stats updated from cache'); // Debug only
+            
+        } catch (error) {
+            this.error('❌ Error loading Plex content stats:', error);
+            
+            // Show error state
+            const plexElements = [
+                'plexHDMovies', 'plexAnimeMovies', 'plex4KMovies',
+                'plexTVShows', 'plexAnimeShows', 'plexTVSeasons', 'plexTVEpisodes', 'plexAudioBooks' // ADD plexAnimeShows HERE TOO
+            ];
+            
+            plexElements.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = 'Error';
+            });
+        }
+    },
         
-        const response = await fetch('/api/dashboard/plex-stats');
-        const plexStats = await response.json();
-        
-        console.log('🎬 Plex stats loaded from cache:', plexStats);
-        
-        const plexElements = {
-            hdMovies: document.getElementById('plexHDMovies'),
-            animeMovies: document.getElementById('plexAnimeMovies'),
-            fourkMovies: document.getElementById('plex4KMovies'),
-            tvShows: document.getElementById('plexTVShows'),
-            animeShows: document.getElementById('plexAnimeShows'), // ADD THIS LINE
-            tvSeasons: document.getElementById('plexTVSeasons'),
-            tvEpisodes: document.getElementById('plexTVEpisodes'),
-            audioBooks: document.getElementById('plexAudioBooks')
-        };
-        
-        // Update UI with cached data (fast!)
-        if (plexElements.hdMovies) plexElements.hdMovies.textContent = this.formatNumber(plexStats.hdMovies);
-        if (plexElements.animeMovies) plexElements.animeMovies.textContent = this.formatNumber(plexStats.animeMovies);
-        if (plexElements.fourkMovies) plexElements.fourkMovies.textContent = this.formatNumber(plexStats.fourkMovies);
-        if (plexElements.tvShows) plexElements.tvShows.textContent = this.formatNumber(plexStats.tvShows);
-        if (plexElements.animeShows) plexElements.animeShows.textContent = this.formatNumber(plexStats.animeTVShows); // ADD THIS LINE
-        if (plexElements.tvSeasons) plexElements.tvSeasons.textContent = this.formatNumber(plexStats.tvSeasons);
-        if (plexElements.tvEpisodes) plexElements.tvEpisodes.textContent = this.formatNumber(plexStats.tvEpisodes);
-        if (plexElements.audioBooks) plexElements.audioBooks.textContent = this.formatNumber(plexStats.audioBooks);
-        
-        console.log('✅ Plex dashboard stats updated from cache');
-        
-    } catch (error) {
-        console.error('❌ Error loading Plex content stats:', error);
-        
-        // Show error state
-        const plexElements = [
-            'plexHDMovies', 'plexAnimeMovies', 'plex4KMovies',
-            'plexTVShows', 'plexAnimeShows', 'plexTVSeasons', 'plexTVEpisodes', 'plexAudioBooks' // ADD plexAnimeShows HERE TOO
-        ];
-        
-        plexElements.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = 'Error';
-        });
-    }
-},
-    
     setContentStatsLoading() {
         const elements = [
             'iptvChannels', 'iptvMovies', 'iptvSeries',
@@ -1146,12 +1179,12 @@ async loadPlexContentStats() {
         if (num === 0 || num === null || num === undefined) return '0';
         return new Intl.NumberFormat().format(num);
     },
-	
-	// NEW: Collapsible live section functionality
+    
+    // NEW: Collapsible live section functionality
     async toggleLiveSection(type) {
         const section = document.getElementById(`${type}LiveSection`);
         if (!section) {
-            console.error(`Live section ${type} not found`);
+            this.error(`Live section ${type} not found`);
             return;
         }
         
@@ -1161,7 +1194,7 @@ async loadPlexContentStats() {
             // Collapse section
             section.classList.remove('expanded');
             this.expandedSections.delete(type);
-            console.log(`📱 Collapsed ${type} live section`);
+            this.debug(`📱 Collapsed ${type} live section`); // Debug only
             
             // Stop auto-refresh if no sections are expanded
             if (this.expandedSections.size === 0) {
@@ -1171,7 +1204,7 @@ async loadPlexContentStats() {
             // Expand section and load data
             section.classList.add('expanded');
             this.expandedSections.add(type);
-            console.log(`📱 Expanded ${type} live section`);
+            this.debug(`📱 Expanded ${type} live section`); // Debug only
             
             // Start auto-refresh if this is the first expanded section
             if (this.expandedSections.size === 1) {
@@ -1183,1005 +1216,989 @@ async loadPlexContentStats() {
         }
     },
     
-async loadLiveDataForSection(type) {
-    try {
-        if (type === 'iptv') {
-            console.log('📺 Loading IPTV live viewers (cached)...');
-            if (this.cachedIPTVData) {
-                this.updateIPTVViewers(this.cachedIPTVData);
-            } else {
-                const response = await fetch('/api/dashboard/iptv-live');
-                const iptvData = await response.json();
-                this.cachedIPTVData = iptvData;
-                this.updateIPTVViewers(iptvData);
+    async loadLiveDataForSection(type) {
+        try {
+            if (type === 'iptv') {
+                this.debug('📺 Loading IPTV live viewers (cached)...'); // Debug only
+                if (this.cachedIPTVData) {
+                    this.updateIPTVViewers(this.cachedIPTVData);
+                } else {
+                    const response = await fetch('/api/dashboard/iptv-live');
+                    const iptvData = await response.json();
+                    this.cachedIPTVData = iptvData;
+                    this.updateIPTVViewers(iptvData);
+                }
+            } else if (type === 'plex') {
+                this.debug('🎬 Loading Plex sessions (cached)...'); // Debug only
+                if (this.cachedPlexData) {
+                    this.updatePlexSessions(this.cachedPlexData);
+                } else {
+                    const response = await fetch('/api/dashboard/plex-now-playing');
+                    const plexData = await response.json();
+                    this.cachedPlexData = plexData;
+                    this.updatePlexSessions(plexData);
+                }
             }
-        } else if (type === 'plex') {
-            console.log('🎬 Loading Plex sessions (cached)...');
-            if (this.cachedPlexData) {
-                this.updatePlexSessions(this.cachedPlexData);
-            } else {
-                const response = await fetch('/api/dashboard/plex-now-playing');
-                const plexData = await response.json();
-                this.cachedPlexData = plexData;
-                this.updatePlexSessions(plexData);
-            }
+        } catch (error) {
+            this.error(`Error loading ${type} live data:`, error);
+            this.setLiveDataError(type);
         }
-    } catch (error) {
-        console.error(`Error loading ${type} live data:`, error);
-        this.setLiveDataError(type);
-    }
-},
-    
+    },
+        
     startAutoRefresh() {
         if (this.autoRefreshInterval) return;
         
-        console.log('🔄 Starting auto-refresh for expanded sections');
+        this.debug('🔄 Starting auto-refresh for expanded sections (15s intervals)'); // Debug only
         this.autoRefreshInterval = setInterval(() => {
+            // Check 30-minute timeout for expanded sections too
+            const elapsedTime = Date.now() - this.refreshStartTime;
+            if (elapsedTime >= this.maxRefreshDuration) {
+                this.info('⏰ Expanded sections auto-refresh also stopped (30min)');
+                this.stopAutoRefresh();
+                return;
+            }
+            
             this.expandedSections.forEach(type => {
                 this.loadLiveDataForSection(type);
             });
-        }, 30000); // 30 seconds
+        }, this.refreshInterval); // 15 seconds instead of 30000
     },
-    
+        
     stopAutoRefresh() {
         if (this.autoRefreshInterval) {
             clearInterval(this.autoRefreshInterval);
             this.autoRefreshInterval = null;
-            console.log('⏹️ Stopped auto-refresh');
+            this.debug('⏹️ Stopped auto-refresh'); // Debug only
         }
     },
     
-async refreshIPTVViewers() {
-    console.log('📺 Manual refresh IPTV viewers...');
-    const container = document.getElementById('iptvViewersContainer');
-    const refreshBtn = document.querySelector('[onclick="Dashboard.refreshIPTVViewers()"]');
-    
-    if (container) {
-        container.innerHTML = `
-            <div class="plex-sessions-loading">
-                <i class="fas fa-spinner"></i>
-                Refreshing IPTV viewers...
-            </div>
-        `;
-    }
-    
-    // Disable refresh button temporarily
-    if (refreshBtn) {
-        refreshBtn.disabled = true;
-        refreshBtn.style.opacity = '0.5';
-    }
-    
-    try {
-        await this.loadLiveDataForSection('iptv');
+    async refreshIPTVViewers() {
+        this.debug('📺 Manual refresh IPTV viewers...'); // Debug only
+        const container = document.getElementById('iptvViewersContainer');
+        const refreshBtn = document.querySelector('[onclick="Dashboard.refreshIPTVViewers()"]');
         
-        // Re-enable refresh button
+        if (container) {
+            container.innerHTML = `
+                <div class="plex-sessions-loading">
+                    <i class="fas fa-spinner"></i>
+                    Refreshing IPTV viewers...
+                </div>
+            `;
+        }
+        
+        // Disable refresh button temporarily
         if (refreshBtn) {
-            refreshBtn.disabled = false;
-            refreshBtn.style.opacity = '1';
-        }
-        
-    } catch (error) {
-        console.error('Error refreshing IPTV viewers:', error);
-        this.setLiveDataError('iptv');
-        
-        // Re-enable refresh button
-        if (refreshBtn) {
-            refreshBtn.disabled = false;
-            refreshBtn.style.opacity = '1';
-        }
-    }
-},
-    
-async refreshPlexSessions() {
-    console.log('🔄 Manually refreshing Plex sessions...');
-    
-    const container = document.getElementById('plexSessionsContainer');
-    const refreshBtn = document.querySelector('.plex-refresh');
-    
-    if (!container) return;
-    
-    // Show loading state
-    container.innerHTML = `
-        <div class="sessions-loading">
-            <i class="fas fa-spinner"></i>
-            Loading Plex sessions...
-        </div>
-    `;
-    
-    // Disable and animate refresh button
-    if (refreshBtn) {
-        refreshBtn.disabled = true;
-        refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    }
-    
-    try {
-        const response = await fetch('/api/dashboard/plex-now-playing');
-        const data = await response.json();
-        
-        // Cache the data
-        this.cachedPlexData = data;
-        
-        // Update the session count in header
-        const countElement = document.getElementById('plexSessionCount');
-        if (countElement) {
-            countElement.textContent = (data.sessions || []).length.toString();
-        }
-        
-        // Update the displayed sessions
-        this.updatePlexSessions(data);
-        
-        console.log('✅ Plex sessions refreshed successfully');
-        
-    } catch (error) {
-        console.error('❌ Error refreshing Plex sessions:', error);
-        container.innerHTML = `
-            <div class="sessions-empty" style="color: #f44336;">
-                <i class="fas fa-exclamation-triangle"></i>
-                <div>Error loading Plex sessions</div>
-                <div style="font-size: 0.8rem; opacity: 0.7; margin-top: 5px;">${error.message}</div>
-            </div>
-        `;
-    } finally {
-        // Reset refresh button
-        if (refreshBtn) {
-            refreshBtn.disabled = false;
-            refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
-        }
-    }
-},
-    
-// REPLACE the updatePlexSessions method in your app.js with this version:
-
-updatePlexSessions(data) {
-    console.log('🎬 Updating Plex sessions with stable ordering:', data);
-    
-    const container = document.getElementById('plexSessionsContainer');
-    const summaryElement = document.getElementById('plexSessionSummary');
-    
-    if (!container) {
-        console.error('❌ Plex sessions container not found');
-        return;
-    }
-    
-    if (!data || !data.sessions || data.sessions.length === 0) {
-        container.innerHTML = `
-            <div class="sessions-empty">
-                <i class="fas fa-tv"></i>
-                <p>No active Plex sessions</p>
-                <small>Users will appear here when streaming content</small>
-            </div>
-        `;
-        
-        // Hide summary when no sessions
-        if (summaryElement) {
-            summaryElement.style.display = 'none';
-        }
-        
-        return;
-    }
-    
-    // Generate session summary for HEADER
-    const summaryStats = this.generateSessionSummary(data.sessions);
-    
-    // Update header summary element
-    if (summaryElement) {
-        summaryElement.innerHTML = summaryStats;
-        summaryElement.style.display = 'block';
-    }
-    
-    // STABLE ORDER LOGIC - Don't rebuild if sessions haven't changed significantly
-    const existingGrid = container.querySelector('.tautulli-sessions-grid');
-    const existingSessions = existingGrid ? Array.from(existingGrid.querySelectorAll('.tautulli-session-card')).map(card => 
-        card.getAttribute('data-session-key')
-    ) : [];
-    
-    const newSessionKeys = data.sessions.map(s => s.sessionKey || s.ratingKey || s.user + s.title);
-    
-    // Check if we can do an in-place update instead of full rebuild
-    const canUpdateInPlace = existingSessions.length > 0 && 
-                             existingSessions.length === newSessionKeys.length &&
-                             existingSessions.every((key, index) => key === newSessionKeys[index]);
-    
-    if (canUpdateInPlace && existingGrid) {
-        console.log('🔄 Doing in-place session update (maintains order)');
-        this.updateSessionsInPlace(existingGrid, data.sessions);
-    } else {
-        console.log('🔄 Full session rebuild (session list changed)');
-        this.rebuildSessionsGrid(container, data.sessions);
-    }
-    
-    console.log(`✅ Updated ${data.sessions.length} Plex sessions - order preserved`);
-},
-
-updateSingleSessionCard(card, session) {
-    try {
-        // Update progress bar
-        const progressFill = card.querySelector('.progress-fill-bottom');
-        const progressText = card.querySelector('.progress-text-bottom');
-        
-        if (progressFill && progressText) {
-            const viewOffset = parseInt(session.viewOffset) || 0;
-            const duration = parseInt(session.duration) || 1;
-            const progressPercent = Math.round((viewOffset / duration) * 100);
-            const progressWidth = Math.min(Math.max(progressPercent, 0), 100);
-            
-            progressFill.style.width = `${progressWidth}%`;
-            
-            const currentTime = session.elapsedTime || this.formatDuration(viewOffset);
-            const totalTime = session.durationFormatted || this.formatDuration(duration);
-            progressText.textContent = `${currentTime} / ${totalTime} (${progressPercent}%)`;
-        }
-        
-        // Update metadata values (bandwidths, stream states, etc. can change)
-        const metadataRows = card.querySelectorAll('.metadata-row-compact');
-        metadataRows.forEach(row => {
-            const label = row.querySelector('.metadata-label-compact');
-            const value = row.querySelector('.metadata-value-compact');
-            
-            if (label && value) {
-                const labelText = label.textContent.toLowerCase();
-                
-                if (labelText.includes('bandwidth')) {
-                    value.textContent = session.bandwidth || 'Unknown';
-                } else if (labelText.includes('stream')) {
-                    value.textContent = session.stream || 'Unknown';
-                } else if (labelText.includes('quality')) {
-                    value.textContent = session.quality || 'Unknown';
-                }
-                // Add more fields as needed
-            }
-        });
-        
-        console.log('✅ Updated session card in-place for:', session.title);
-        
-    } catch (error) {
-        console.error('❌ Error updating session card:', error);
-    }
-},
-
-// NEW METHOD: Full rebuild when session list changes
-rebuildSessionsGrid(container, sessions) {
-    // Sort sessions by a stable criteria (user + title) to maintain consistent order
-    const sortedSessions = [...sessions].sort((a, b) => {
-        const keyA = `${a.user}_${a.title}_${a.sessionKey || a.ratingKey}`;
-        const keyB = `${b.user}_${b.title}_${b.sessionKey || b.ratingKey}`;
-        return keyA.localeCompare(keyB);
-    });
-    
-    const sessionsHtml = `
-        <div class="tautulli-sessions-grid">
-            ${sortedSessions.map(session => {
-                const sessionCard = this.createTautulliSessionCard(session);
-                // Add session key for tracking
-                const sessionKey = session.sessionKey || session.ratingKey || session.user + session.title;
-                return sessionCard.replace('<div class="tautulli-session-card redesigned"', 
-                    `<div class="tautulli-session-card redesigned" data-session-key="${sessionKey}"`);
-            }).join('')}
-        </div>
-    `;
-    
-    container.innerHTML = sessionsHtml;
-},
-
-// ALSO UPDATE the generateSessionSummary method to use the parsed data:
-generateSessionSummary(sessions) {
-    const totalSessions = sessions.length;
-    
-    // Count by decision type using the enhanced backend data
-    let directPlays = 0;
-    let directStreams = 0; 
-    let transcodes = 0;
-    let totalBandwidth = 0;
-    let wanBandwidth = 0;
-    
-    sessions.forEach(session => {
-        // Use the enhanced bandwidth from backend
-        if (session.bandwidth && session.bandwidth !== 'Unknown') {
-            const bandwidthMatch = session.bandwidth.match(/(\d+(?:\.\d+)?)/);
-            if (bandwidthMatch) {
-                const bw = parseFloat(bandwidthMatch[1]);
-                if (!isNaN(bw)) {
-                    totalBandwidth += bw;
-                    // Add to WAN if not local
-                    if (session.location !== 'LAN' && !session.local) {
-                        wanBandwidth += bw;
-                    }
-                }
-            }
-        }
-        
-        // Use the enhanced stream decision from backend
-        const decision = session.streamingDecision || session.transcodeDecision || 'unknown';
-        
-        if (decision.toLowerCase().includes('directplay') || decision.toLowerCase().includes('direct play')) {
-            directPlays++;
-        } else if (decision.toLowerCase().includes('directstream') || decision.toLowerCase().includes('direct stream')) {
-            directStreams++;
-        } else if (decision.toLowerCase().includes('transcode')) {
-            transcodes++;
-        } else {
-            // Unknown - assume transcode for safety
-            transcodes++;
-        }
-    });
-    
-    // Format the summary similar to Tautulli
-    let summary = `<strong>Sessions:</strong> ${totalSessions} stream${totalSessions !== 1 ? 's' : ''}`;
-    
-    const streamTypes = [];
-    if (directPlays > 0) streamTypes.push(`${directPlays} direct play${directPlays !== 1 ? 's' : ''}`);
-    if (directStreams > 0) streamTypes.push(`${directStreams} direct stream${directStreams !== 1 ? 's' : ''}`);
-    if (transcodes > 0) streamTypes.push(`${transcodes} transcode${transcodes !== 1 ? 's' : ''}`);
-    
-    if (streamTypes.length > 0) {
-        summary += ` (${streamTypes.join(', ')})`;
-    }
-    
-    if (totalBandwidth > 0) {
-        summary += ` | <strong>Bandwidth:</strong> ${totalBandwidth.toFixed(1)} Mbps`;
-        if (wanBandwidth > 0) {
-            summary += ` (WAN: ${wanBandwidth.toFixed(1)} Mbps)`;
-        }
-    }
-    
-    return summary;
-},
-
-// FIXED createTautulliSessionCard function - Removes badges and fixes metadata
-// Replace the entire function in your app.js
-
-createTautulliSessionCard(session) {
-    console.log('🎬 Creating Tautulli-style card for:', session.title);
-    
-    // Enhanced poster URL handling
-    let posterUrl = '';
-
-    const createProxyImageUrl = (originalUrl) => {
-        if (!originalUrl) return '';
-        
-        if (window.location.protocol === 'https:' && originalUrl.startsWith('http://')) {
-            return `/api/dashboard/plex-image?url=${encodeURIComponent(originalUrl)}`;
-        }
-        
-        return originalUrl;
-    };
-
-    // Better poster priority - TV shows use show poster, not episode screenshot
-    if (session.type === 'episode' && session.grandparentThumb) {
-        posterUrl = createProxyImageUrl(session.grandparentThumb);
-    } else if (session.thumb) {
-        posterUrl = createProxyImageUrl(session.thumb);
-    } else if (session.art) {
-        posterUrl = createProxyImageUrl(session.art);
-    }
-    
-    // Enhanced progress calculation
-    const viewOffset = parseInt(session.viewOffset) || 0;
-    const duration = parseInt(session.duration) || 1;
-    const progressPercent = Math.round((viewOffset / duration) * 100);
-    const progressWidth = Math.min(Math.max(progressPercent, 0), 100);
-    
-    // Use formatted times from backend
-    const currentTime = session.elapsedTime || this.formatDuration(viewOffset);
-    const totalTime = session.durationFormatted || this.formatDuration(duration);
-    
-    // FIXED: Enhanced title and subtitle building - NO MORE ? CHARACTERS
-    let displayTitle = session.title || 'Unknown';
-    let displaySubtitle = '';
-    
-    // Build subtitle based on content type
-    if (session.type === 'episode') {
-        // For TV episodes, show the show name as title, episode info as subtitle
-        displayTitle = session.grandparentTitle || session.title;
-        
-        const seasonNum = session.parentIndex ? String(session.parentIndex).padStart(2, '0') : '00';
-        const episodeNum = session.index ? String(session.index).padStart(2, '0') : '00';
-        const episodeTitle = session.title || '';
-        
-        displaySubtitle = `S${seasonNum}E${episodeNum}`;
-        if (episodeTitle && episodeTitle !== displayTitle) {
-            displaySubtitle += ` - ${episodeTitle}`; // Use dash instead of bullet
-        }
-        if (session.year) {
-            displaySubtitle += ` (${session.year})`;
-        }
-        
-    } else if (session.type === 'movie') {
-        // For movies, show movie title and year/studio - FIXED SEPARATOR
-        displayTitle = session.title;
-        
-        const yearPart = session.year ? `(${session.year})` : '';
-        const studioPart = session.studio ? session.studio : '';
-        
-        if (yearPart && studioPart) {
-            displaySubtitle = `${yearPart} - ${studioPart}`; // Use dash instead of bullet
-        } else if (yearPart) {
-            displaySubtitle = yearPart;
-        } else if (studioPart) {
-            displaySubtitle = studioPart;
-        }
-        
-    } else if (session.type === 'track') {
-        // For music tracks
-        displayTitle = session.title;
-        const artist = session.grandparentTitle || '';
-        const album = session.parentTitle || '';
-        
-        if (artist && album && artist !== album) {
-            displaySubtitle = `${artist} - ${album}`; // Use dash instead of bullet
-        } else if (artist) {
-            displaySubtitle = artist;
-        } else if (album) {
-            displaySubtitle = album;
-        }
-    }
-    
-    // ===== EXTRACT TAUTULLI-STYLE METADATA - FIXED PARSING =====
-    
-    // Player and Product info - exactly like Tautulli
-    const playerProduct = session.product || session.playerProduct || 'Unknown';
-    const playerTitle = session.player || session.playerTitle || playerProduct;
-    
-    // Quality info - use the enhanced session data
-    const qualityDisplay = session.quality || session.bandwidth || 'Unknown';
-    
-    // Stream Decision - use the enhanced session data
-    const streamDecision = session.stream || session.streamingDecision || session.transcodeDecision || session.decision || 'Unknown';
-    
-    // Container info - use the enhanced session data with proper formatting
-    let containerDisplay = 'Unknown';
-    if (session.container) {
-        containerDisplay = session.container;
-    } else {
-        const container = session.Container || session.containerFormat || 'Unknown';
-        if (container !== 'Unknown') {
-            containerDisplay = `Direct Play (${container.toUpperCase()})`;
-        }
-    }
-    
-    // Video info - use the enhanced session data
-    let videoDisplay = 'Unknown';
-    if (session.video) {
-        videoDisplay = session.video;
-    } else {
-        const videoCodec = session.videoCodec || session.VideoCodec || '';
-        const videoResolution = session.videoResolution || session.resolution || '';
-        if (videoCodec) {
-            videoDisplay = `Direct Play (${videoCodec.toUpperCase()}${videoResolution ? ' ' + videoResolution : ''})`;
-        }
-    }
-    
-    // Audio info - use the enhanced session data
-    let audioDisplay = 'Unknown';
-    if (session.audio) {
-        audioDisplay = session.audio;
-    } else {
-        const audioCodec = session.audioCodec || session.AudioCodec || '';
-        const audioChannels = session.audioChannels || session.channels || '';
-        if (audioCodec) {
-            audioDisplay = `Direct Play (${audioCodec.toUpperCase()}${audioChannels ? ' ' + audioChannels : ''})`;
-        }
-    }
-    
-    // FIXED: Location info - Extract only IP address  
-    const location = session.location || 'Unknown';
-    let ipAddress = 'Unknown';
-    
-    if (location && location !== 'Unknown') {
-        console.log('🔍 Raw location data:', location);
-        
-        // Use regex to extract IP address pattern directly
-        const ipPattern = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/;
-        const ipMatch = location.match(ipPattern);
-        
-        if (ipMatch) {
-            ipAddress = ipMatch[1]; // Use the first captured IP address
-            console.log('✅ Extracted IP:', ipAddress);
-        } else {
-            // Fallback: aggressive cleaning
-            ipAddress = location
-                .replace(/WAN\s*:\s*/gi, '') // Remove WAN: (case insensitive)
-                .replace(/LAN\s*:\s*/gi, '') // Remove LAN: (case insensitive)
-                .replace(/[^\w\s\.:]/g, '') // Remove special characters except alphanumeric, space, dot, colon
-                .trim();
-            
-            // If it still doesn't look like an IP, keep as 'Unknown'
-            if (!ipAddress.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)) {
-                ipAddress = 'Unknown';
-            }
-            
-            console.log('🔧 Cleaned location:', ipAddress);
-        }
-    } else {
-        console.log('⚠️ No location data available');
-    }
-    
-    const bandwidth = session.bandwidth || 'Unknown';
-    const user = session.user || session.username || 'Unknown';
-    const subtitleCodec = session.subtitle || session.subtitleCodec || 'None';
-    
-    console.log('🔍 Fixed Tautulli metadata for', session.title, ':', {
-        displayTitle,
-        displaySubtitle,
-        playerProduct,
-        playerTitle,
-        qualityDisplay,
-        streamDecision,
-        containerDisplay,
-        videoDisplay,
-        audioDisplay,
-        ipAddress // Log the extracted IP
-    });
-    
-    const cardHtml = `
-        <div class="tautulli-session-card" data-type="${session.type || 'unknown'}">
-            <!-- Username Badge - Top Right -->
-            <div class="username-badge">${this.escapeHtml(user)}</div>
-            
-            <!-- Poster Section - NO OTHER BADGES -->
-            <div class="session-poster-large">
-                ${posterUrl ? `
-                    <img src="${posterUrl}" 
-                         alt="${this.escapeHtml(displayTitle)}" 
-                         class="poster-image" 
-                         crossorigin="anonymous"
-                         onerror="this.style.display='none'; this.parentElement.querySelector('.poster-icon').style.display='block'; this.parentElement.querySelector('.poster-text').style.display='block';" />
-                ` : ''}
-                <div class="poster-icon" style="${posterUrl ? 'display:none' : ''}">🎬</div>
-                <div class="poster-text" style="${posterUrl ? 'display:none' : ''}">${this.escapeHtml(displayTitle.substring(0, 12))}...</div>
-            </div>
-            
-            <!-- Session Details Section -->
-            <div class="session-details">
-                <!-- Header with title and subtitle -->
-                <div class="session-header">
-                    <div class="session-title-large" title="${this.escapeHtml(displayTitle)}">
-                        ${this.escapeHtml(displayTitle)}
-                    </div>
-                    ${displaySubtitle ? `
-                        <div class="session-subtitle-large" title="${this.escapeHtml(displaySubtitle)}">
-                            ${this.escapeHtml(displaySubtitle)}
-                        </div>
-                    ` : ''}
-                </div>
-                
-                <!-- Detailed Metadata Grid - EXACTLY like Tautulli -->
-                <div class="session-metadata">
-                    <!-- First Column -->
-                    <div class="metadata-row">
-                        <span class="metadata-label">PRODUCT</span>
-                        <span class="metadata-value">${this.escapeHtml(playerProduct)}</span>
-                    </div>
-                    
-                    <div class="metadata-row">
-                        <span class="metadata-label">PLAYER</span>
-                        <span class="metadata-value">${this.escapeHtml(playerTitle)}</span>
-                    </div>
-                    
-                    <div class="metadata-row">
-                        <span class="metadata-label">QUALITY</span>
-                        <span class="metadata-value" title="${this.escapeHtml(qualityDisplay)}">${this.escapeHtml(qualityDisplay)}</span>
-                    </div>
-                    
-                    <div class="metadata-row">
-                        <span class="metadata-label">STREAM</span>
-                        <span class="metadata-value stream-type">${this.escapeHtml(streamDecision)}</span>
-                    </div>
-                    
-                    <div class="metadata-row">
-                        <span class="metadata-label">CONTAINER</span>
-                        <span class="metadata-value" title="${this.escapeHtml(containerDisplay)}">${this.escapeHtml(containerDisplay)}</span>
-                    </div>
-                    
-                    <!-- Second Column -->
-                    <div class="metadata-row">
-                        <span class="metadata-label">VIDEO</span>
-                        <span class="metadata-value" title="${this.escapeHtml(videoDisplay)}">${this.escapeHtml(videoDisplay)}</span>
-                    </div>
-                    
-                    <div class="metadata-row">
-                        <span class="metadata-label">AUDIO</span>
-                        <span class="metadata-value" title="${this.escapeHtml(audioDisplay)}">${this.escapeHtml(audioDisplay)}</span>
-                    </div>
-                    
-                    <div class="metadata-row">
-                        <span class="metadata-label">SUBTITLE</span>
-                        <span class="metadata-value">${this.escapeHtml(subtitleCodec)}</span>
-                    </div>
-                    
-                    <div class="metadata-row">
-                        <span class="metadata-label">LOCATION</span>
-                        <span class="metadata-value location">${this.escapeHtml(ipAddress)}</span>
-                    </div>
-                    
-                    <div class="metadata-row">
-                        <span class="metadata-label">BANDWIDTH</span>
-                        <span class="metadata-value bandwidth">${this.escapeHtml(bandwidth)}</span>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Progress Bar - MOVED TO BOTTOM OF ENTIRE CARD -->
-            <div class="progress-section">
-                <div class="progress-bar-large">
-                    <div class="progress-fill-large" style="width: ${progressWidth}%"></div>
-                </div>
-                <div class="progress-text">
-                    ${currentTime} / ${totalTime} (${progressPercent}%)
-                </div>
-            </div>
-        </div>
-    `;
-
-    return cardHtml;
-},
-
-// Fixed generateSessionSummary to use the enhanced backend data
-generateSessionSummary(sessions) {
-    const totalSessions = sessions.length;
-    
-    // Count by stream decision using enhanced backend data
-    let directPlays = 0;
-    let directStreams = 0; 
-    let transcodes = 0;
-    let totalBandwidth = 0;
-    let wanBandwidth = 0;
-    
-    sessions.forEach(session => {
-        // Use the enhanced bandwidth from backend
-        if (session.bandwidth && session.bandwidth !== 'Unknown') {
-            const bandwidthMatch = session.bandwidth.match(/(\d+(?:\.\d+)?)/);
-            if (bandwidthMatch) {
-                const bw = parseFloat(bandwidthMatch[1]);
-                if (!isNaN(bw)) {
-                    totalBandwidth += bw;
-                    // Add to WAN if not local
-                    if (!session.local && session.location && session.location.includes('WAN')) {
-                        wanBandwidth += bw;
-                    }
-                }
-            }
-        }
-        
-        // Use the enhanced stream decision from backend
-        const stream = session.stream || 'Unknown';
-        
-        if (stream.toLowerCase().includes('direct play')) {
-            directPlays++;
-        } else if (stream.toLowerCase().includes('direct stream')) {
-            directStreams++;
-        } else if (stream.toLowerCase().includes('transcode')) {
-            transcodes++;
-        } else {
-            // Unknown - assume transcode for safety
-            transcodes++;
-        }
-    });
-    
-    // Format the summary similar to Tautulli
-    let summary = `<strong>Sessions:</strong> ${totalSessions} stream${totalSessions !== 1 ? 's' : ''}`;
-    
-    const streamTypes = [];
-    if (directPlays > 0) streamTypes.push(`${directPlays} direct play${directPlays !== 1 ? 's' : ''}`);
-    if (directStreams > 0) streamTypes.push(`${directStreams} direct stream${directStreams !== 1 ? 's' : ''}`);
-    if (transcodes > 0) streamTypes.push(`${transcodes} transcode${transcodes !== 1 ? 's' : ''}`);
-    
-    if (streamTypes.length > 0) {
-        summary += ` (${streamTypes.join(', ')})`;
-    }
-    
-    if (totalBandwidth > 0) {
-        summary += ` | <strong>Bandwidth:</strong> ${totalBandwidth.toFixed(1)} Mbps`;
-        if (wanBandwidth > 0) {
-            summary += ` (WAN: ${wanBandwidth.toFixed(1)} Mbps)`;
-        }
-    }
-    
-    return summary;
-},
-
-// ADD this new method (completely new):
-formatDuration(ms) {
-    if (!ms || ms === 0) return '0:00';
-    
-    const totalSeconds = Math.floor(ms / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    
-    if (hours > 0) {
-        return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    } else {
-        return `${minutes}:${String(seconds).padStart(2, '0')}`;
-    }
-},
-
-
-    
-updateIPTVViewers(iptvData) {
-    const container = document.getElementById('iptvViewersContainer');
-    const countElement = document.getElementById('iptvViewerCount');
-    
-    console.log('🐛 Frontend received IPTV data:', iptvData);
-    
-    if (!container) {
-        console.warn('IPTV viewers container not found');
-        return;
-    }
-    
-    if (!iptvData.viewers || iptvData.viewers.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-tv"></i>
-                <p>No active viewers</p>
-            </div>
-        `;
-        if (countElement) countElement.textContent = '0';
-        return;
-    }
-    
-    if (countElement) {
-        countElement.textContent = iptvData.viewers.length.toString();
-    }
-    
-    const viewersHtml = iptvData.viewers.map(viewer => {
-        console.log('🐛 Processing viewer:', viewer.username, 'speedColor:', viewer.speedColor);
-        
-        // Build streams list (no individual speed indicators)
-        let streamsHtml = '';
-        if (viewer.connections && viewer.connections.length > 0) {
-            streamsHtml = viewer.connections.map(stream => `
-                <div class="stream-item">
-                    <span class="stream-name">${this.escapeHtml(stream.streamName)}</span>
-                    <span class="stream-time">${stream.totalOnlineTime}</span>
-                </div>
-            `).join('');
-        }
-        
-        const speedColor = viewer.speedColor || 'gray';
-        const speedText = this.getSpeedText(speedColor);
-        
-        console.log('🎨 Using speed color:', speedColor, 'for user:', viewer.username);
-        
-        return `
-            <div class="iptv-viewer-card">
-                <div class="viewer-header">
-                    <span class="viewer-username">${this.escapeHtml(viewer.username)}</span>
-                    <span class="viewer-connections">
-                        ${viewer.totalConnections}/${viewer.maxConnections}
-                        <div class="speed-indicator speed-${speedColor}" 
-                             title="Connection Speed: ${speedText}"></div>
-                    </span>
-                </div>
-                <div class="viewer-details">
-                    <div class="viewer-ip">${viewer.userIP} (${viewer.geoCountry})</div>
-                    <div class="viewer-streams">
-                        ${streamsHtml}
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
-    
-    container.innerHTML = '<div class="iptv-viewers-grid">' + viewersHtml + '</div>';
-},
-    
-setLiveDataError(type) {
-    const container = document.getElementById(type === 'iptv' ? 'iptvViewersContainer' : 'plexSessionsContainer');
-    const countElement = document.getElementById(type === 'iptv' ? 'iptvViewerCount' : 'plexSessionCount');
-    
-    if (container) {
-        const iconClass = type === 'iptv' ? 'fa-tv' : 'fa-exclamation-triangle';
-        const message = type === 'iptv' ? 'Error loading IPTV viewers' : 'Error loading Plex sessions';
-        
-        container.innerHTML = `
-            <div class="empty-state" style="color: #ff6b6b;">
-                <i class="fas ${iconClass}"></i>
-                <p>${message}</p>
-                <small style="opacity: 0.7;">Check server connections and try refreshing</small>
-            </div>
-        `;
-    }
-    
-    if (countElement) {
-        countElement.textContent = '0';
-        countElement.style.color = '#ff6b6b';
-    }
-},
-    
-escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-},
-
-// ADD this method:
-getSpeedText(color) {
-    switch (color) {
-        case 'green': return 'Good';
-        case 'yellow': return 'Fair';
-        case 'red': return 'Poor';
-        case 'gray': return 'Unknown';
-        default: return 'Unknown';
-    }
-},
-
-/**
- * Calculate overall user speed color based on their connections
- * @param {Array} connections - User's active connections
- * @returns {string} - Overall speed color
- */
-calculateUserSpeedColor(connections) {
-    if (!connections || connections.length === 0) {
-        return 'gray';
-    }
-    
-    // Count each speed type
-    const speeds = { red: 0, yellow: 0, green: 0, gray: 0 };
-    connections.forEach(conn => {
-        const speed = conn.speedColor || 'gray';
-        speeds[speed]++;
-    });
-    
-    // Priority: if any red, show red; if any yellow, show yellow; otherwise green or gray
-    if (speeds.red > 0) return 'red';
-    if (speeds.yellow > 0) return 'yellow';
-    if (speeds.green > 0) return 'green';
-    return 'gray';
-},
-    
-
-// NEW METHOD 1: Preload live data on dashboard init
-async preloadLiveData() {
-    try {
-        console.log('🔄 Preloading live data for instant display...');
-        
-        const [iptvResponse, plexResponse] = await Promise.allSettled([
-            fetch('/api/dashboard/iptv-live'),
-            fetch('/api/dashboard/plex-now-playing')
-        ]);
-        
-        if (iptvResponse.status === 'fulfilled') {
-            this.cachedIPTVData = await iptvResponse.value.json();
-            console.log('✅ IPTV live data cached');
-            
-            // NEW: Set initial count
-            const iptvCountElement = document.getElementById('iptvViewerCount');
-            if (iptvCountElement && this.cachedIPTVData.viewers) {
-                iptvCountElement.textContent = this.cachedIPTVData.viewers.length.toString();
-            }
-        }
-        
-if (plexResponse.status === 'fulfilled') {
-    this.cachedPlexData = await plexResponse.value.json();
-    console.log('✅ Plex live data cached');
-    
-    // NEW: Set initial count
-    const plexCountElement = document.getElementById('plexSessionCount');
-    if (plexCountElement && this.cachedPlexData.sessions) {
-        plexCountElement.textContent = this.cachedPlexData.sessions.length.toString();
-    }
-    
-    // ADD THIS: Set initial session summary
-    const plexSummaryElement = document.getElementById('plexSessionSummary');
-    if (plexSummaryElement) {
-        if (this.cachedPlexData.sessions && this.cachedPlexData.sessions.length > 0) {
-            const summaryStats = this.generateSessionSummary(this.cachedPlexData.sessions);
-            plexSummaryElement.innerHTML = summaryStats;
-            plexSummaryElement.style.display = 'block';
-        } else {
-            plexSummaryElement.style.display = 'none';
-        }
-    }
-}
-        
-		
-        
-    } catch (error) {
-        console.error('❌ Error preloading live data:', error);
-    }
-},
-
-// Updated startBackgroundRefresh method with 30-second interval
-startBackgroundRefresh() {
-    if (this.backgroundRefreshInterval) {
-        console.log('📊 Background refresh already running');
-        return;
-    }
-    
-    console.log('📊 Starting background refresh for dashboard (30-second intervals)');
-    this.backgroundRefreshInterval = setInterval(async () => {
-        // CRITICAL CHECK: Only refresh if still on dashboard page
-        if (window.AppState.currentPage !== 'dashboard') {
-            console.log('🚫 Not on dashboard page - stopping background refresh');
-            this.stopBackgroundRefresh();
-            return;
+            refreshBtn.disabled = true;
+            refreshBtn.style.opacity = '0.5';
         }
         
         try {
-            console.log('🔄 Background refresh: Updating live data...');
+            await this.loadLiveDataForSection('iptv');
+            
+            // Re-enable refresh button
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.style.opacity = '1';
+            }
+            
+        } catch (error) {
+            this.error('Error refreshing IPTV viewers:', error);
+            this.setLiveDataError('iptv');
+            
+            // Re-enable refresh button
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.style.opacity = '1';
+            }
+        }
+    },
+        
+    async refreshPlexSessions() {
+        this.debug('🔄 Manually refreshing Plex sessions...'); // Debug only
+        
+        const container = document.getElementById('plexSessionsContainer');
+        const refreshBtn = document.querySelector('.plex-refresh');
+        
+        if (!container) return;
+        
+        // Show loading state
+        container.innerHTML = `
+            <div class="sessions-loading">
+                <i class="fas fa-spinner"></i>
+                Loading Plex sessions...
+            </div>
+        `;
+        
+        // Disable and animate refresh button
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+        
+        try {
+            const response = await fetch('/api/dashboard/plex-now-playing');
+            const data = await response.json();
+            
+            // Cache the data
+            this.cachedPlexData = data;
+            
+            // Update the session count in header
+            const countElement = document.getElementById('plexSessionCount');
+            if (countElement) {
+                countElement.textContent = (data.sessions || []).length.toString();
+            }
+            
+            // Update the displayed sessions
+            this.updatePlexSessions(data);
+            
+            this.debug('✅ Plex sessions refreshed successfully'); // Debug only
+            
+        } catch (error) {
+            this.error('❌ Error refreshing Plex sessions:', error);
+            container.innerHTML = `
+                <div class="sessions-empty" style="color: #f44336;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <div>Error loading Plex sessions</div>
+                    <div style="font-size: 0.8rem; opacity: 0.7; margin-top: 5px;">${error.message}</div>
+                </div>
+            `;
+        } finally {
+            // Reset refresh button
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+            }
+        }
+    },
+        
+    // OPTIMIZED: Remove excessive logging from updatePlexSessions
+    updatePlexSessions(data) {
+        // REMOVED: console.log('🎬 Updating Plex sessions with stable ordering:', data);
+        
+        const container = document.getElementById('plexSessionsContainer');
+        const summaryElement = document.getElementById('plexSessionSummary');
+        
+        if (!container) {
+            this.error('❌ Plex sessions container not found');
+            return;
+        }
+        
+        if (!data || !data.sessions || data.sessions.length === 0) {
+            container.innerHTML = `
+                <div class="sessions-empty">
+                    <i class="fas fa-tv"></i>
+                    <p>No active Plex sessions</p>
+                    <small>Users will appear here when streaming content</small>
+                </div>
+            `;
+            
+            // Hide summary when no sessions
+            if (summaryElement) {
+                summaryElement.style.display = 'none';
+            }
+            
+            return;
+        }
+        
+        // Generate session summary for HEADER
+        const summaryStats = this.generateSessionSummary(data.sessions);
+        
+        // Update header summary element
+        if (summaryElement) {
+            summaryElement.innerHTML = summaryStats;
+            summaryElement.style.display = 'block';
+        }
+        
+        // STABLE ORDER LOGIC - Don't rebuild if sessions haven't changed significantly
+        const existingGrid = container.querySelector('.tautulli-sessions-grid');
+        const existingSessions = existingGrid ? Array.from(existingGrid.querySelectorAll('.tautulli-session-card')).map(card => 
+            card.getAttribute('data-session-key')
+        ) : [];
+        
+        const newSessionKeys = data.sessions.map(s => s.sessionKey || s.ratingKey || s.user + s.title);
+        
+        // Check if we can do an in-place update instead of full rebuild
+        const canUpdateInPlace = existingSessions.length > 0 && 
+                                 existingSessions.length === newSessionKeys.length &&
+                                 existingSessions.every((key, index) => key === newSessionKeys[index]);
+        
+        if (canUpdateInPlace && existingGrid) {
+            this.debug('🔄 Doing in-place session update (maintains order)'); // Debug only
+            this.updateSessionsInPlace(existingGrid, data.sessions);
+        } else {
+            this.debug('🔄 Full session rebuild (session list changed)'); // Debug only
+            this.rebuildSessionsGrid(container, data.sessions);
+        }
+        
+        // REMOVED: Excessive success logging
+        this.debug(`✅ Updated ${data.sessions.length} Plex sessions - order preserved`); // Debug only
+    },
+
+    updateSingleSessionCard(card, session) {
+        try {
+            // Update progress bar
+            const progressFill = card.querySelector('.progress-fill-bottom');
+            const progressText = card.querySelector('.progress-text-bottom');
+            
+            if (progressFill && progressText) {
+                const viewOffset = parseInt(session.viewOffset) || 0;
+                const duration = parseInt(session.duration) || 1;
+                const progressPercent = Math.round((viewOffset / duration) * 100);
+                const progressWidth = Math.min(Math.max(progressPercent, 0), 100);
+                
+                progressFill.style.width = `${progressWidth}%`;
+                
+                const currentTime = session.elapsedTime || this.formatDuration(viewOffset);
+                const totalTime = session.durationFormatted || this.formatDuration(duration);
+                progressText.textContent = `${currentTime} / ${totalTime} (${progressPercent}%)`;
+            }
+            
+            // Update metadata values (bandwidths, stream states, etc. can change)
+            const metadataRows = card.querySelectorAll('.metadata-row-compact');
+            metadataRows.forEach(row => {
+                const label = row.querySelector('.metadata-label-compact');
+                const value = row.querySelector('.metadata-value-compact');
+                
+                if (label && value) {
+                    const labelText = label.textContent.toLowerCase();
+                    
+                    if (labelText.includes('bandwidth')) {
+                        value.textContent = session.bandwidth || 'Unknown';
+                    } else if (labelText.includes('stream')) {
+                        value.textContent = session.stream || 'Unknown';
+                    } else if (labelText.includes('quality')) {
+                        value.textContent = session.quality || 'Unknown';
+                    }
+                    // Add more fields as needed
+                }
+            });
+            
+            // REMOVED: console.log('✅ Updated session card in-place for:', session.title);
+            
+        } catch (error) {
+            this.error('❌ Error updating session card:', error);
+        }
+    },
+
+    // NEW METHOD: Full rebuild when session list changes
+    rebuildSessionsGrid(container, sessions) {
+        // Sort sessions by a stable criteria (user + title) to maintain consistent order
+        const sortedSessions = [...sessions].sort((a, b) => {
+            const keyA = `${a.user}_${a.title}_${a.sessionKey || a.ratingKey}`;
+            const keyB = `${b.user}_${b.title}_${b.sessionKey || b.ratingKey}`;
+            return keyA.localeCompare(keyB);
+        });
+        
+        const sessionsHtml = `
+            <div class="tautulli-sessions-grid">
+                ${sortedSessions.map(session => {
+                    const sessionCard = this.createTautulliSessionCard(session);
+                    // Add session key for tracking
+                    const sessionKey = session.sessionKey || session.ratingKey || session.user + session.title;
+                    return sessionCard.replace('<div class="tautulli-session-card redesigned"', 
+                        `<div class="tautulli-session-card redesigned" data-session-key="${sessionKey}"`);
+                }).join('')}
+            </div>
+        `;
+        
+        container.innerHTML = sessionsHtml;
+    },
+
+    // ALSO UPDATE the generateSessionSummary method to use the parsed data:
+    generateSessionSummary(sessions) {
+        const totalSessions = sessions.length;
+        
+        // Count by decision type using the enhanced backend data
+        let directPlays = 0;
+        let directStreams = 0; 
+        let transcodes = 0;
+        let totalBandwidth = 0;
+        let wanBandwidth = 0;
+        
+        sessions.forEach(session => {
+            // Use the enhanced bandwidth from backend
+            if (session.bandwidth && session.bandwidth !== 'Unknown') {
+                const bandwidthMatch = session.bandwidth.match(/(\d+(?:\.\d+)?)/);
+                if (bandwidthMatch) {
+                    const bw = parseFloat(bandwidthMatch[1]);
+                    if (!isNaN(bw)) {
+                        totalBandwidth += bw;
+                        // Add to WAN if not local
+                        if (session.location !== 'LAN' && !session.local) {
+                            wanBandwidth += bw;
+                        }
+                    }
+                }
+            }
+            
+            // Use the enhanced stream decision from backend
+            const decision = session.streamingDecision || session.transcodeDecision || 'unknown';
+            
+            if (decision.toLowerCase().includes('directplay') || decision.toLowerCase().includes('direct play')) {
+                directPlays++;
+            } else if (decision.toLowerCase().includes('directstream') || decision.toLowerCase().includes('direct stream')) {
+                directStreams++;
+            } else if (decision.toLowerCase().includes('transcode')) {
+                transcodes++;
+            } else {
+                // Unknown - assume transcode for safety
+                transcodes++;
+            }
+        });
+        
+        // Format the summary similar to Tautulli
+        let summary = `<strong>Sessions:</strong> ${totalSessions} stream${totalSessions !== 1 ? 's' : ''}`;
+        
+        const streamTypes = [];
+        if (directPlays > 0) streamTypes.push(`${directPlays} direct play${directPlays !== 1 ? 's' : ''}`);
+        if (directStreams > 0) streamTypes.push(`${directStreams} direct stream${directStreams !== 1 ? 's' : ''}`);
+        if (transcodes > 0) streamTypes.push(`${transcodes} transcode${transcodes !== 1 ? 's' : ''}`);
+        
+        if (streamTypes.length > 0) {
+            summary += ` (${streamTypes.join(', ')})`;
+        }
+        
+        if (totalBandwidth > 0) {
+            summary += ` | <strong>Bandwidth:</strong> ${totalBandwidth.toFixed(1)} Mbps`;
+            if (wanBandwidth > 0) {
+                summary += ` (WAN: ${wanBandwidth.toFixed(1)} Mbps)`;
+            }
+        }
+        
+        return summary;
+    },
+
+    // OPTIMIZED createTautulliSessionCard function - Removes excessive logging
+    createTautulliSessionCard(session) {
+        // REMOVED: console.log('🎬 Creating Tautulli-style card for:', session.title);
+        
+        // Enhanced poster URL handling
+        let posterUrl = '';
+
+        const createProxyImageUrl = (originalUrl) => {
+            if (!originalUrl) return '';
+            
+            if (window.location.protocol === 'https:' && originalUrl.startsWith('http://')) {
+                return `/api/dashboard/plex-image?url=${encodeURIComponent(originalUrl)}`;
+            }
+            
+            return originalUrl;
+        };
+
+        // Better poster priority - TV shows use show poster, not episode screenshot
+        if (session.type === 'episode' && session.grandparentThumb) {
+            posterUrl = createProxyImageUrl(session.grandparentThumb);
+        } else if (session.thumb) {
+            posterUrl = createProxyImageUrl(session.thumb);
+        } else if (session.art) {
+            posterUrl = createProxyImageUrl(session.art);
+        }
+        
+        // Enhanced progress calculation
+        const viewOffset = parseInt(session.viewOffset) || 0;
+        const duration = parseInt(session.duration) || 1;
+        const progressPercent = Math.round((viewOffset / duration) * 100);
+        const progressWidth = Math.min(Math.max(progressPercent, 0), 100);
+        
+        // Use formatted times from backend
+        const currentTime = session.elapsedTime || this.formatDuration(viewOffset);
+        const totalTime = session.durationFormatted || this.formatDuration(duration);
+        
+        // Enhanced title and subtitle building - NO MORE ? CHARACTERS
+        let displayTitle = session.title || 'Unknown';
+        let displaySubtitle = '';
+        
+        // Build subtitle based on content type
+        if (session.type === 'episode') {
+            // For TV episodes, show the show name as title, episode info as subtitle
+            displayTitle = session.grandparentTitle || session.title;
+            
+            const seasonNum = session.parentIndex ? String(session.parentIndex).padStart(2, '0') : '00';
+            const episodeNum = session.index ? String(session.index).padStart(2, '0') : '00';
+            const episodeTitle = session.title || '';
+            
+            displaySubtitle = `S${seasonNum}E${episodeNum}`;
+            if (episodeTitle && episodeTitle !== displayTitle) {
+                displaySubtitle += ` - ${episodeTitle}`; // Use dash instead of bullet
+            }
+            if (session.year) {
+                displaySubtitle += ` (${session.year})`;
+            }
+            
+        } else if (session.type === 'movie') {
+            // For movies, show movie title and year/studio - FIXED SEPARATOR
+            displayTitle = session.title;
+            
+            const yearPart = session.year ? `(${session.year})` : '';
+            const studioPart = session.studio ? session.studio : '';
+            
+            if (yearPart && studioPart) {
+                displaySubtitle = `${yearPart} - ${studioPart}`; // Use dash instead of bullet
+            } else if (yearPart) {
+                displaySubtitle = yearPart;
+            } else if (studioPart) {
+                displaySubtitle = studioPart;
+            }
+            
+        } else if (session.type === 'track') {
+            // For music tracks
+            displayTitle = session.title;
+            const artist = session.grandparentTitle || '';
+            const album = session.parentTitle || '';
+            
+            if (artist && album && artist !== album) {
+                displaySubtitle = `${artist} - ${album}`; // Use dash instead of bullet
+            } else if (artist) {
+                displaySubtitle = artist;
+            } else if (album) {
+                displaySubtitle = album;
+            }
+        }
+        
+        // ===== EXTRACT TAUTULLI-STYLE METADATA - FIXED PARSING =====
+        
+        // Player and Product info - exactly like Tautulli
+        const playerProduct = session.product || session.playerProduct || 'Unknown';
+        const playerTitle = session.player || session.playerTitle || playerProduct;
+        
+        // Quality info - use the enhanced session data
+        const qualityDisplay = session.quality || session.bandwidth || 'Unknown';
+        
+        // Stream Decision - use the enhanced session data
+        const streamDecision = session.stream || session.streamingDecision || session.transcodeDecision || session.decision || 'Unknown';
+        
+        // Container info - use the enhanced session data with proper formatting
+        let containerDisplay = 'Unknown';
+        if (session.container) {
+            containerDisplay = session.container;
+        } else {
+            const container = session.Container || session.containerFormat || 'Unknown';
+            if (container !== 'Unknown') {
+                containerDisplay = `Direct Play (${container.toUpperCase()})`;
+            }
+        }
+        
+        // Video info - use the enhanced session data
+        let videoDisplay = 'Unknown';
+        if (session.video) {
+            videoDisplay = session.video;
+        } else {
+            const videoCodec = session.videoCodec || session.VideoCodec || '';
+            const videoResolution = session.videoResolution || session.resolution || '';
+            if (videoCodec) {
+                videoDisplay = `Direct Play (${videoCodec.toUpperCase()}${videoResolution ? ' ' + videoResolution : ''})`;
+            }
+        }
+        
+        // Audio info - use the enhanced session data
+        let audioDisplay = 'Unknown';
+        if (session.audio) {
+            audioDisplay = session.audio;
+        } else {
+            const audioCodec = session.audioCodec || session.AudioCodec || '';
+            const audioChannels = session.audioChannels || session.channels || '';
+            if (audioCodec) {
+                audioDisplay = `Direct Play (${audioCodec.toUpperCase()}${audioChannels ? ' ' + audioChannels : ''})`;
+            }
+        }
+        
+        // Location info - Extract only IP address (NO LOGGING)
+        const location = session.location || 'Unknown';
+        let ipAddress = 'Unknown';
+        
+        if (location && location !== 'Unknown') {
+            // REMOVED: console.log('🔍 Raw location data:', location);
+            
+            // Use regex to extract IP address pattern directly
+            const ipPattern = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/;
+            const ipMatch = location.match(ipPattern);
+            
+            if (ipMatch) {
+                ipAddress = ipMatch[1]; // Use the first captured IP address
+                // REMOVED: console.log('✅ Extracted IP:', ipAddress);
+            } else {
+                // Fallback: aggressive cleaning
+                ipAddress = location
+                    .replace(/WAN\s*:\s*/gi, '') // Remove WAN: (case insensitive)
+                    .replace(/LAN\s*:\s*/gi, '') // Remove LAN: (case insensitive)
+                    .replace(/[^\w\s\.:]/g, '') // Remove special characters except alphanumeric, space, dot, colon
+                    .trim();
+                
+                // If it still doesn't look like an IP, keep as 'Unknown'
+                if (!ipAddress.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)) {
+                    ipAddress = 'Unknown';
+                }
+                
+                // REMOVED: console.log('🔧 Cleaned location:', ipAddress);
+            }
+        } else {
+            // REMOVED: console.log('⚠️ No location data available');
+        }
+        
+        const bandwidth = session.bandwidth || 'Unknown';
+        const user = session.user || session.username || 'Unknown';
+        const subtitleCodec = session.subtitle || session.subtitleCodec || 'None';
+        
+        // REMOVED: All the console.log statements about metadata
+        
+        const cardHtml = `
+            <div class="tautulli-session-card" data-type="${session.type || 'unknown'}">
+                <!-- Username Badge - Top Right -->
+                <div class="username-badge">${this.escapeHtml(user)}</div>
+                
+                <!-- Poster Section - NO OTHER BADGES -->
+                <div class="session-poster-large">
+                    ${posterUrl ? `
+                        <img src="${posterUrl}" 
+                             alt="${this.escapeHtml(displayTitle)}" 
+                             class="poster-image" 
+                             crossorigin="anonymous"
+                             onerror="this.style.display='none'; this.parentElement.querySelector('.poster-icon').style.display='block'; this.parentElement.querySelector('.poster-text').style.display='block';" />
+                    ` : ''}
+                    <div class="poster-icon" style="${posterUrl ? 'display:none' : ''}">🎬</div>
+                    <div class="poster-text" style="${posterUrl ? 'display:none' : ''}">${this.escapeHtml(displayTitle.substring(0, 12))}...</div>
+                </div>
+                
+                <!-- Session Details Section -->
+                <div class="session-details">
+                    <!-- Header with title and subtitle -->
+                    <div class="session-header">
+                        <div class="session-title-large" title="${this.escapeHtml(displayTitle)}">
+                            ${this.escapeHtml(displayTitle)}
+                        </div>
+                        ${displaySubtitle ? `
+                            <div class="session-subtitle-large" title="${this.escapeHtml(displaySubtitle)}">
+                                ${this.escapeHtml(displaySubtitle)}
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <!-- Detailed Metadata Grid - EXACTLY like Tautulli -->
+                    <div class="session-metadata">
+                        <!-- First Column -->
+                        <div class="metadata-row">
+                            <span class="metadata-label">PRODUCT</span>
+                            <span class="metadata-value">${this.escapeHtml(playerProduct)}</span>
+                        </div>
+                        
+                        <div class="metadata-row">
+                            <span class="metadata-label">PLAYER</span>
+                            <span class="metadata-value">${this.escapeHtml(playerTitle)}</span>
+                        </div>
+                        
+                        <div class="metadata-row">
+                            <span class="metadata-label">QUALITY</span>
+                            <span class="metadata-value" title="${this.escapeHtml(qualityDisplay)}">${this.escapeHtml(qualityDisplay)}</span>
+                        </div>
+                        
+                        <div class="metadata-row">
+                            <span class="metadata-label">STREAM</span>
+                            <span class="metadata-value stream-type">${this.escapeHtml(streamDecision)}</span>
+                        </div>
+                        
+                        <div class="metadata-row">
+                            <span class="metadata-label">CONTAINER</span>
+                            <span class="metadata-value" title="${this.escapeHtml(containerDisplay)}">${this.escapeHtml(containerDisplay)}</span>
+                        </div>
+                        
+                        <!-- Second Column -->
+                        <div class="metadata-row">
+                            <span class="metadata-label">VIDEO</span>
+                            <span class="metadata-value" title="${this.escapeHtml(videoDisplay)}">${this.escapeHtml(videoDisplay)}</span>
+                        </div>
+                        
+                        <div class="metadata-row">
+                            <span class="metadata-label">AUDIO</span>
+                            <span class="metadata-value" title="${this.escapeHtml(audioDisplay)}">${this.escapeHtml(audioDisplay)}</span>
+                        </div>
+                        
+                        <div class="metadata-row">
+                            <span class="metadata-label">SUBTITLE</span>
+                            <span class="metadata-value">${this.escapeHtml(subtitleCodec)}</span>
+                        </div>
+                        
+                        <div class="metadata-row">
+                            <span class="metadata-label">LOCATION</span>
+                            <span class="metadata-value location">${this.escapeHtml(ipAddress)}</span>
+                        </div>
+                        
+                        <div class="metadata-row">
+                            <span class="metadata-label">BANDWIDTH</span>
+                            <span class="metadata-value bandwidth">${this.escapeHtml(bandwidth)}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Progress Bar - MOVED TO BOTTOM OF ENTIRE CARD -->
+                <div class="progress-section">
+                    <div class="progress-bar-large">
+                        <div class="progress-fill-large" style="width: ${progressWidth}%"></div>
+                    </div>
+                    <div class="progress-text">
+                        ${currentTime} / ${totalTime} (${progressPercent}%)
+                    </div>
+                </div>
+            </div>
+        `;
+
+        return cardHtml;
+    },
+
+    // Fixed generateSessionSummary to use the enhanced backend data
+    generateSessionSummary(sessions) {
+        const totalSessions = sessions.length;
+        
+        // Count by stream decision using enhanced backend data
+        let directPlays = 0;
+        let directStreams = 0; 
+        let transcodes = 0;
+        let totalBandwidth = 0;
+        let wanBandwidth = 0;
+        
+        sessions.forEach(session => {
+            // Use the enhanced bandwidth from backend
+            if (session.bandwidth && session.bandwidth !== 'Unknown') {
+                const bandwidthMatch = session.bandwidth.match(/(\d+(?:\.\d+)?)/);
+                if (bandwidthMatch) {
+                    const bw = parseFloat(bandwidthMatch[1]);
+                    if (!isNaN(bw)) {
+                        totalBandwidth += bw;
+                        // Add to WAN if not local
+                        if (!session.local && session.location && session.location.includes('WAN')) {
+                            wanBandwidth += bw;
+                        }
+                    }
+                }
+            }
+            
+            // Use the enhanced stream decision from backend
+            const stream = session.stream || 'Unknown';
+            
+            if (stream.toLowerCase().includes('direct play')) {
+                directPlays++;
+            } else if (stream.toLowerCase().includes('direct stream')) {
+                directStreams++;
+            } else if (stream.toLowerCase().includes('transcode')) {
+                transcodes++;
+            } else {
+                // Unknown - assume transcode for safety
+                transcodes++;
+            }
+        });
+        
+        // Format the summary similar to Tautulli
+        let summary = `<strong>Sessions:</strong> ${totalSessions} stream${totalSessions !== 1 ? 's' : ''}`;
+        
+        const streamTypes = [];
+        if (directPlays > 0) streamTypes.push(`${directPlays} direct play${directPlays !== 1 ? 's' : ''}`);
+        if (directStreams > 0) streamTypes.push(`${directStreams} direct stream${directStreams !== 1 ? 's' : ''}`);
+        if (transcodes > 0) streamTypes.push(`${transcodes} transcode${transcodes !== 1 ? 's' : ''}`);
+        
+        if (streamTypes.length > 0) {
+            summary += ` (${streamTypes.join(', ')})`;
+        }
+        
+        if (totalBandwidth > 0) {
+            summary += ` | <strong>Bandwidth:</strong> ${totalBandwidth.toFixed(1)} Mbps`;
+            if (wanBandwidth > 0) {
+                summary += ` (WAN: ${wanBandwidth.toFixed(1)} Mbps)`;
+            }
+        }
+        
+        return summary;
+    },
+
+    // ADD this new method (completely new):
+    formatDuration(ms) {
+        if (!ms || ms === 0) return '0:00';
+        
+        const totalSeconds = Math.floor(ms / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        
+        if (hours > 0) {
+            return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        } else {
+            return `${minutes}:${String(seconds).padStart(2, '0')}`;
+        }
+    },
+
+    updateIPTVViewers(iptvData) {
+        const container = document.getElementById('iptvViewersContainer');
+        const countElement = document.getElementById('iptvViewerCount');
+        
+        this.debug('🐛 Frontend received IPTV data:', iptvData); // Debug only
+        
+        if (!container) {
+            this.error('IPTV viewers container not found');
+            return;
+        }
+        
+        if (!iptvData.viewers || iptvData.viewers.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-tv"></i>
+                    <p>No active viewers</p>
+                </div>
+            `;
+            if (countElement) countElement.textContent = '0';
+            return;
+        }
+        
+        if (countElement) {
+            countElement.textContent = iptvData.viewers.length.toString();
+        }
+        
+        const viewersHtml = iptvData.viewers.map(viewer => {
+            this.debug('🐛 Processing viewer:', viewer.username, 'speedColor:', viewer.speedColor); // Debug only
+            
+            // Build streams list (no individual speed indicators)
+            let streamsHtml = '';
+            if (viewer.connections && viewer.connections.length > 0) {
+                streamsHtml = viewer.connections.map(stream => `
+                    <div class="stream-item">
+                        <span class="stream-name">${this.escapeHtml(stream.streamName)}</span>
+                        <span class="stream-time">${stream.totalOnlineTime}</span>
+                    </div>
+                `).join('');
+            }
+            
+            const speedColor = viewer.speedColor || 'gray';
+            const speedText = this.getSpeedText(speedColor);
+            
+            this.debug('🎨 Using speed color:', speedColor, 'for user:', viewer.username); // Debug only
+            
+            return `
+                <div class="iptv-viewer-card">
+                    <div class="viewer-header">
+                        <span class="viewer-username">${this.escapeHtml(viewer.username)}</span>
+                        <span class="viewer-connections">
+                            ${viewer.totalConnections}/${viewer.maxConnections}
+                            <div class="speed-indicator speed-${speedColor}" 
+                                 title="Connection Speed: ${speedText}"></div>
+                        </span>
+                    </div>
+                    <div class="viewer-details">
+                        <div class="viewer-ip">${viewer.userIP} (${viewer.geoCountry})</div>
+                        <div class="viewer-streams">
+                            ${streamsHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = '<div class="iptv-viewers-grid">' + viewersHtml + '</div>';
+    },
+        
+    setLiveDataError(type) {
+        const container = document.getElementById(type === 'iptv' ? 'iptvViewersContainer' : 'plexSessionsContainer');
+        const countElement = document.getElementById(type === 'iptv' ? 'iptvViewerCount' : 'plexSessionCount');
+        
+        if (container) {
+            const iconClass = type === 'iptv' ? 'fa-tv' : 'fa-exclamation-triangle';
+            const message = type === 'iptv' ? 'Error loading IPTV viewers' : 'Error loading Plex sessions';
+            
+            container.innerHTML = `
+                <div class="empty-state" style="color: #ff6b6b;">
+                    <i class="fas ${iconClass}"></i>
+                    <p>${message}</p>
+                    <small style="opacity: 0.7;">Check server connections and try refreshing</small>
+                </div>
+            `;
+        }
+        
+        if (countElement) {
+            countElement.textContent = '0';
+            countElement.style.color = '#ff6b6b';
+        }
+    },
+        
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    },
+
+    // ADD this method:
+    getSpeedText(color) {
+        switch (color) {
+            case 'green': return 'Good';
+            case 'yellow': return 'Fair';
+            case 'red': return 'Poor';
+            case 'gray': return 'Unknown';
+            default: return 'Unknown';
+        }
+    },
+
+    /**
+     * Calculate overall user speed color based on their connections
+     * @param {Array} connections - User's active connections
+     * @returns {string} - Overall speed color
+     */
+    calculateUserSpeedColor(connections) {
+        if (!connections || connections.length === 0) {
+            return 'gray';
+        }
+        
+        // Count each speed type
+        const speeds = { red: 0, yellow: 0, green: 0, gray: 0 };
+        connections.forEach(conn => {
+            const speed = conn.speedColor || 'gray';
+            speeds[speed]++;
+        });
+        
+        // Priority: if any red, show red; if any yellow, show yellow; otherwise green or gray
+        if (speeds.red > 0) return 'red';
+        if (speeds.yellow > 0) return 'yellow';
+        if (speeds.green > 0) return 'green';
+        return 'gray';
+    },
+        
+
+    // NEW METHOD 1: Preload live data on dashboard init
+    async preloadLiveData() {
+        try {
+            this.debug('🔄 Preloading live data for instant display...'); // Debug only
+            
             const [iptvResponse, plexResponse] = await Promise.allSettled([
                 fetch('/api/dashboard/iptv-live'),
                 fetch('/api/dashboard/plex-now-playing')
             ]);
             
-            // Update IPTV live viewer data
             if (iptvResponse.status === 'fulfilled') {
                 this.cachedIPTVData = await iptvResponse.value.json();
+                this.debug('✅ IPTV live data cached'); // Debug only
                 
-                // Update count badge even when collapsed
+                // NEW: Set initial count
                 const iptvCountElement = document.getElementById('iptvViewerCount');
                 if (iptvCountElement && this.cachedIPTVData.viewers) {
-                    const count = this.cachedIPTVData.viewers.length;
-                    iptvCountElement.textContent = count.toString();
-                    console.log(`📺 Updated IPTV viewer count: ${count}`);
-                }
-                
-                // Update displayed data if section is expanded
-                if (this.expandedSections.has('iptv')) {
-                    this.updateIPTVViewers(this.cachedIPTVData);
+                    iptvCountElement.textContent = this.cachedIPTVData.viewers.length.toString();
                 }
             }
             
-// Update Plex now playing data
-if (plexResponse.status === 'fulfilled') {
-    this.cachedPlexData = await plexResponse.value.json();
-    
-    // Update count badge even when collapsed
-    const plexCountElement = document.getElementById('plexSessionCount');
-    if (plexCountElement && this.cachedPlexData.sessions) {
-        const count = this.cachedPlexData.sessions.length;
-        plexCountElement.textContent = count.toString();
-        console.log(`🎬 Updated Plex session count: ${count}`);
-    }
-    
-    // ADD THIS: Update session summary in header even when collapsed
-const plexSummaryElement = document.getElementById('plexSessionSummary');
-console.log('🐛 plexSummaryElement found:', !!plexSummaryElement);
-console.log('🐛 sessions data:', this.cachedPlexData.sessions?.length);
-
-if (plexSummaryElement) {
-    if (this.cachedPlexData.sessions && this.cachedPlexData.sessions.length > 0) {
-        const summaryStats = this.generateSessionSummary(this.cachedPlexData.sessions);
-        console.log('🐛 Generated summary:', summaryStats);
-        plexSummaryElement.innerHTML = summaryStats;
-        plexSummaryElement.style.display = 'block';
-        console.log('🐛 Summary element display:', plexSummaryElement.style.display);
-    } else {
-        plexSummaryElement.style.display = 'none';
-        console.log('🐛 Hiding summary - no sessions');
-    }
-}
-    
-    // Update displayed data if section is expanded
-    if (this.expandedSections.has('plex')) {
-        this.updatePlexSessions(this.cachedPlexData);
-    }
-}
+            if (plexResponse.status === 'fulfilled') {
+                this.cachedPlexData = await plexResponse.value.json();
+                this.debug('✅ Plex live data cached'); // Debug only
+                
+                // NEW: Set initial count
+                const plexCountElement = document.getElementById('plexSessionCount');
+                if (plexCountElement && this.cachedPlexData.sessions) {
+                    plexCountElement.textContent = this.cachedPlexData.sessions.length.toString();
+                }
+                
+                // ADD THIS: Set initial session summary
+                const plexSummaryElement = document.getElementById('plexSessionSummary');
+                if (plexSummaryElement) {
+                    if (this.cachedPlexData.sessions && this.cachedPlexData.sessions.length > 0) {
+                        const summaryStats = this.generateSessionSummary(this.cachedPlexData.sessions);
+                        plexSummaryElement.innerHTML = summaryStats;
+                        plexSummaryElement.style.display = 'block';
+                    } else {
+                        plexSummaryElement.style.display = 'none';
+                    }
+                }
+            }
             
         } catch (error) {
-            console.error('❌ Background refresh failed:', error);
+            this.error('❌ Error preloading live data:', error);
         }
-    }, 30000); // 30 seconds
-},
+    },
 
-destroy() {
-    console.log('📊 Dashboard destroyed - stopping ALL refreshes and cleaning up');
-    
-    // Stop the expanded sections refresh
-    this.stopAutoRefresh();
-    
-    // Stop the background refresh
-    this.stopBackgroundRefresh();
-    
-    // Clear all cached data
-    this.expandedSections.clear();
-    this.cachedIPTVData = null;
-    this.cachedPlexData = null;
-    
-    console.log('✅ Dashboard cleanup completed');
-}
+    // Updated startBackgroundRefresh method with optimized logging
+    startBackgroundRefresh() {
+        if (this.backgroundRefreshInterval) {
+            this.debug('📊 Background refresh already running'); // Debug only
+            return;
+        }
+        
+        // CRITICAL: Ensure we have a start time
+        if (!this.refreshStartTime) {
+            this.refreshStartTime = Date.now();
+        }
+        
+        this.info(`📊 Starting background refresh (${this.refreshInterval/1000}s intervals, 30min max)`);
+        
+        this.backgroundRefreshInterval = setInterval(async () => {
+            // CRITICAL: Double-check current page before ANY processing
+            if (!window.AppState || window.AppState.currentPage !== 'dashboard') {
+                this.debug('🚫 Not on dashboard page - stopping background refresh'); // Debug only
+                this.stopBackgroundRefresh();
+                return;
+            }
+            
+            // Check if 30 minutes have passed
+            const elapsedTime = Date.now() - this.refreshStartTime;
+            if (elapsedTime >= this.maxRefreshDuration) {
+                this.info('⏰ Dashboard auto-refresh stopped after 30 minutes');
+                this.stopBackgroundRefresh();
+                return;
+            }
+            
+            try {
+                // REMOVED: console.log('🔄 Background refresh: Updating live data...');
+                
+                const [iptvResponse, plexResponse] = await Promise.allSettled([
+                    fetch('/api/dashboard/iptv-live'),
+                    fetch('/api/dashboard/plex-now-playing')
+                ]);
+                
+                // Update IPTV data (silent unless error)
+                if (iptvResponse.status === 'fulfilled' && iptvResponse.value.ok) {
+                    this.cachedIPTVData = await iptvResponse.value.json();
+                    
+                    const iptvCountElement = document.getElementById('iptvViewerCount');
+                    if (iptvCountElement && this.cachedIPTVData.viewers) {
+                        iptvCountElement.textContent = this.cachedIPTVData.viewers.length.toString();
+                    }
+                    
+                    if (this.expandedSections.has('iptv')) {
+                        this.updateIPTVViewers(this.cachedIPTVData);
+                    }
+                } else {
+                    this.error('❌ IPTV background refresh failed');
+                }
+                
+                // Update Plex data (silent unless error)
+                if (plexResponse.status === 'fulfilled' && plexResponse.value.ok) {
+                    this.cachedPlexData = await plexResponse.value.json();
+                    
+                    const plexCountElement = document.getElementById('plexSessionCount');
+                    if (plexCountElement && this.cachedPlexData.sessions) {
+                        plexCountElement.textContent = this.cachedPlexData.sessions.length.toString();
+                    }
+                    
+                    if (this.expandedSections.has('plex')) {
+                        this.updatePlexSessions(this.cachedPlexData);
+                    }
+                } else {
+                    this.error('❌ Plex background refresh failed');
+                }
+                
+            } catch (error) {
+                this.error('❌ Background refresh failed:', error);
+            }
+        }, this.refreshInterval); // 15 seconds instead of 30000
+    },
+
+    destroy() {
+        this.info('📊 Dashboard destroyed - stopping ALL refreshes and cleaning up');
+        
+        // Stop the expanded sections refresh
+        this.stopAutoRefresh();
+        
+        // Stop the background refresh
+        this.stopBackgroundRefresh();
+        
+        // Clear all cached data
+        this.expandedSections.clear();
+        this.cachedIPTVData = null;
+        this.cachedPlexData = null;
+        
+        this.info('✅ Dashboard cleanup completed');
+    }
 
 };
 

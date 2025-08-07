@@ -588,6 +588,311 @@ router.post('/refresh-stats', async (req, res) => {
   }
 });
 
+// GET /api/plex/dashboard-resources - Get cached server resources for dashboard
+router.get('/dashboard-resources', async (req, res) => {
+  try {
+    console.log('📊 Getting cached Plex server resources for dashboard...');
+    
+    // Get all cached resource data
+    const [allResources] = await db.query(`
+      SELECT server_group, server_type, resource_data, last_updated 
+      FROM plex_server_resources 
+      ORDER BY server_group, server_type
+    `);
+    
+    // Check if cache is fresh (less than 2 minutes old)
+    const cacheExpiry = 2 * 60 * 1000; // 2 minutes
+    const now = new Date();
+    let useCachedData = false;
+    
+    if (allResources && allResources.length > 0) {
+      const lastUpdate = new Date(allResources[0].last_updated);
+      const cacheAge = now.getTime() - lastUpdate.getTime();
+      useCachedData = cacheAge < cacheExpiry;
+    }
+    
+    if (!useCachedData) {
+      console.log('📊 Cache is stale, refreshing server resources in background...');
+      // Refresh in background, don't wait
+      refreshPlexServerResources().catch(err => 
+        console.error('Background resource refresh failed:', err)
+      );
+    }
+    
+    const formattedResources = formatDashboardResources(allResources || []);
+    res.json(formattedResources);
+    
+  } catch (error) {
+    console.error('❌ Error getting dashboard resources:', error);
+    res.json(getDefaultResourceData());
+  }
+});
+
+// GET /api/plex/server-resources - Get real-time server resource usage
+router.get('/server-resources', async (req, res) => {
+  try {
+    console.log('📊 Getting real-time Plex server resource usage...');
+    
+    const resources = await getPlexServerResources();
+    
+    res.json({
+      success: true,
+      resources: resources,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Error getting Plex server resources:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get server resources',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// POST /api/plex/refresh-resources - Force refresh server resources
+router.post('/refresh-resources', async (req, res) => {
+  try {
+    console.log('🔄 Force refreshing Plex server resources...');
+    
+    const resources = await getPlexServerResources();
+    
+    // Cache the results
+    await cacheServerResources(resources);
+    
+    const formattedResources = formatDashboardResourcesFromLive(resources);
+    
+    res.json({
+      success: true,
+      message: 'Plex server resources refreshed successfully',
+      resources: formattedResources,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Error refreshing Plex resources:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to refresh server resources',
+      message: error.message
+    });
+  }
+});
+
+// Helper function to get live server resources using Python
+async function getPlexServerResources() {
+  return new Promise((resolve, reject) => {
+    console.log('🐍 Executing Python script for Plex server resources...');
+    
+    const python = spawn('python3', ['plex_resource_monitor.py'], {
+      cwd: __dirname,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    let dataString = '';
+    let errorString = '';
+    
+    python.stdout.on('data', (data) => {
+      dataString += data.toString();
+    });
+    
+    python.stderr.on('data', (data) => {
+      errorString += data.toString();
+      console.log('🐍 Python resource debug:', data.toString().trim());
+    });
+    
+    python.on('close', async (code) => {
+      if (code !== 0) {
+        console.error('❌ Python resource script failed:', errorString);
+        reject(new Error(`Python resource script failed: ${errorString}`));
+        return;
+      }
+      
+      try {
+        const resources = JSON.parse(dataString);
+        console.log('📊 Parsed server resources from Python');
+        resolve(resources);
+        
+      } catch (parseError) {
+        console.error('❌ Error parsing Python resource output:', parseError);
+        reject(parseError);
+      }
+    });
+    
+    python.on('error', (err) => {
+      console.error('❌ Failed to spawn Python process for resources:', err);
+      reject(err);
+    });
+  });
+}
+
+// Helper function to refresh and cache server resources
+async function refreshPlexServerResources() {
+  try {
+    const resources = await getPlexServerResources();
+    await cacheServerResources(resources);
+    console.log('✅ Server resources refreshed and cached');
+    return resources;
+  } catch (error) {
+    console.error('❌ Error refreshing server resources:', error);
+    throw error;
+  }
+}
+
+// Helper function to cache server resources in database
+async function cacheServerResources(resources) {
+  try {
+    // Clear old resource data
+    await db.query('DELETE FROM plex_server_resources');
+    
+    // Insert new resource data
+    for (const [serverGroup, servers] of Object.entries(resources)) {
+      for (const [serverType, resourceData] of Object.entries(servers)) {
+        await db.query(`
+          INSERT INTO plex_server_resources (server_group, server_type, resource_data, last_updated) 
+          VALUES (?, ?, ?, NOW())
+        `, [serverGroup, serverType, JSON.stringify(resourceData)]);
+      }
+    }
+    
+    console.log('✅ Server resources cached in database');
+  } catch (error) {
+    console.error('❌ Error caching server resources:', error);
+    throw error;
+  }
+}
+
+// Helper function to format resources for dashboard display
+function formatDashboardResources(cachedResources) {
+  const defaultResource = {
+    serverName: 'Unknown',
+    status: 'unknown',
+    cpuUsage: 0,
+    memoryUsage: 0,
+    activeSessions: 0,
+    transcodingSessions: 0,
+    directPlaySessions: 0,
+    libraryCount: 0,
+    serverVersion: 'Unknown',
+    platform: 'Unknown',
+    success: false
+  };
+  
+  const formatted = {
+    plex1: { regular: { ...defaultResource }, fourk: { ...defaultResource } },
+    plex2: { regular: { ...defaultResource }, fourk: { ...defaultResource } },
+    lastUpdate: 'No data'
+  };
+  
+  if (cachedResources && cachedResources.length > 0) {
+    formatted.lastUpdate = new Date(cachedResources[0].last_updated).toLocaleString();
+    
+    cachedResources.forEach(row => {
+      try {
+        const resourceData = JSON.parse(row.resource_data);
+        const serverGroup = row.server_group;
+        const serverType = row.server_type;
+        
+        if (formatted[serverGroup] && formatted[serverGroup][serverType]) {
+          formatted[serverGroup][serverType] = {
+            serverName: resourceData.server_name || 'Unknown',
+            status: resourceData.resources?.server_status || 'unknown',
+            cpuUsage: resourceData.resources?.cpu_usage_percent || 0,
+            memoryUsage: resourceData.resources?.memory_usage_percent || 0,
+            activeSessions: resourceData.resources?.active_sessions || 0,
+            transcodingSessions: resourceData.resources?.transcoding_sessions || 0,
+            directPlaySessions: resourceData.resources?.direct_play_sessions || 0,
+            libraryCount: resourceData.resources?.library_count || 0,
+            serverVersion: resourceData.server_version || 'Unknown',
+            platform: resourceData.platform || 'Unknown',
+            success: resourceData.success || false
+          };
+        }
+      } catch (error) {
+        console.error('Error parsing cached resource data:', error);
+      }
+    });
+  }
+  
+  return formatted;
+}
+
+// Helper function to format live resources for dashboard
+function formatDashboardResourcesFromLive(resources) {
+  const defaultResource = {
+    serverName: 'Unknown',
+    status: 'unknown',
+    cpuUsage: 0,
+    memoryUsage: 0,
+    activeSessions: 0,
+    transcodingSessions: 0,
+    directPlaySessions: 0,
+    libraryCount: 0,
+    serverVersion: 'Unknown',
+    platform: 'Unknown',
+    success: false
+  };
+  
+  const formatted = {
+    plex1: { regular: { ...defaultResource }, fourk: { ...defaultResource } },
+    plex2: { regular: { ...defaultResource }, fourk: { ...defaultResource } },
+    lastUpdate: new Date().toLocaleString()
+  };
+  
+  for (const [serverGroup, servers] of Object.entries(resources)) {
+    for (const [serverType, resourceData] of Object.entries(servers)) {
+      if (formatted[serverGroup] && formatted[serverGroup][serverType]) {
+        formatted[serverGroup][serverType] = {
+          serverName: resourceData.server_name || 'Unknown',
+          status: resourceData.resources?.server_status || 'unknown',
+          cpuUsage: resourceData.resources?.cpu_usage_percent || 0,
+          memoryUsage: resourceData.resources?.memory_usage_percent || 0,
+          activeSessions: resourceData.resources?.active_sessions || 0,
+          transcodingSessions: resourceData.resources?.transcoding_sessions || 0,
+          directPlaySessions: resourceData.resources?.direct_play_sessions || 0,
+          libraryCount: resourceData.resources?.library_count || 0,
+          serverVersion: resourceData.server_version || 'Unknown',
+          platform: resourceData.platform || 'Unknown',
+          success: resourceData.success || false
+        };
+      }
+    }
+  }
+  
+  return formatted;
+}
+
+// Helper function to get default resource data
+function getDefaultResourceData() {
+  const defaultServer = {
+    serverName: 'Unknown',
+    status: 'unknown',
+    cpuUsage: 0,
+    memoryUsage: 0,
+    activeSessions: 0,
+    transcodingSessions: 0,
+    directPlaySessions: 0,
+    libraryCount: 0,
+    serverVersion: 'Unknown',
+    platform: 'Unknown',
+    success: false
+  };
+  
+  return {
+    plex1: { 
+      regular: { ...defaultServer },
+      fourk: { ...defaultServer }
+    },
+    plex2: { 
+      regular: { ...defaultServer },
+      fourk: { ...defaultServer }
+    },
+    lastUpdate: 'No data'
+  };
+}
+
 // Helper function to refresh Plex statistics
 async function refreshPlexStats() {
   return new Promise((resolve, reject) => {
