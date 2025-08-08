@@ -1029,24 +1029,27 @@ async init() {
         }
     },
     
-    async loadContentStats() {
-        this.debug('📊 Loading content library statistics...'); // Debug only
+async loadContentStats() {
+    this.debug('📊 Loading content library statistics...'); // Debug only
+    
+    // Set loading state for content stats
+    this.setContentStatsLoading();
+    
+    try {
+        // Load IPTV content stats
+        await this.loadIPTVContentStats();
         
-        // Set loading state for content stats
-        this.setContentStatsLoading();
+        // Load Plex content stats
+        await this.loadPlexContentStats();
         
-        try {
-            // Load IPTV content stats
-            await this.loadIPTVContentStats();
-            
-            // Load Plex content stats
-            await this.loadPlexContentStats();
-            
-        } catch (error) {
-            this.error('Error loading content stats:', error);
-            this.setContentStatsError();
-        }
-    },
+        // NEW: Load IPTV credits
+        await this.loadIPTVCredits();
+        
+    } catch (error) {
+        this.error('Error loading content stats:', error);
+        this.setContentStatsError();
+    }
+},
     
     async loadIPTVContentStats() {
         try {
@@ -1147,6 +1150,44 @@ async init() {
             });
         }
     },
+	
+	async loadIPTVCredits() {
+    try {
+        this.debug('💳 Loading IPTV credit balance for dashboard...'); // Debug only
+        
+        const response = await fetch('/api/settings');
+        const data = await response.json();
+        
+        let credits = 0;
+        
+        // Handle different response formats (same logic as IPTV module)
+        if (data.iptv_credits_balance !== undefined) {
+            credits = parseInt(data.iptv_credits_balance) || 0;
+        } else if (data.success && data.settings && Array.isArray(data.settings)) {
+            const creditSetting = data.settings.find(s => s.setting_key === 'iptv_credits_balance');
+            credits = creditSetting ? parseInt(creditSetting.setting_value) || 0 : 0;
+        } else if (data.settings && Array.isArray(data.settings)) {
+            const creditSetting = data.settings.find(s => s.setting_key === 'iptv_credits_balance');
+            credits = creditSetting ? parseInt(creditSetting.setting_value) || 0 : 0;
+        }
+        
+        // Update the display using existing formatNumber function
+        const creditsEl = document.getElementById('iptvCredits');
+        if (creditsEl) {
+            creditsEl.textContent = this.formatNumber(credits);
+        }
+        
+        this.debug(`💳 Dashboard IPTV credits loaded: ${credits}`); // Debug only
+        
+    } catch (error) {
+        this.error('❌ Error loading IPTV credits for dashboard:', error);
+        const creditsEl = document.getElementById('iptvCredits');
+        if (creditsEl) {
+            creditsEl.textContent = '-';
+        }
+    }
+},
+
         
     setContentStatsLoading() {
         const elements = [

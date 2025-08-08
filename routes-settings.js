@@ -5,6 +5,36 @@ const fs = require('fs');
 const db = require('./database-config');
 const router = express.Router();
 
+function safeJsonParse(data, defaultValue = []) {
+    // If data is null or undefined, return default
+    if (!data || data === null || data === 'null') {
+        return defaultValue;
+    }
+    
+    // If data is already an array, return it
+    if (Array.isArray(data)) {
+        return data;
+    }
+    
+    // If data is a string, try to parse it
+    if (typeof data === 'string') {
+        if (data.trim() === '') {
+            return defaultValue;
+        }
+        try {
+            const parsed = JSON.parse(data);
+            return Array.isArray(parsed) ? parsed : defaultValue;
+        } catch (e) {
+            console.warn(`⚠️ Invalid JSON found: "${data}", using default:`, defaultValue);
+            return defaultValue;
+        }
+    }
+    
+    // For any other data type, return default
+    console.warn(`⚠️ Unexpected data type for JSON parsing:`, typeof data, data);
+    return defaultValue;
+}
+
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'public', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -218,13 +248,13 @@ router.get('/channel-groups', async (req, res) => {
             ORDER BY name ASC
         `);
         
-        // Parse JSON fields
+        // Parse JSON fields SAFELY - prevents crashes from malformed JSON
         const channelGroups = rows.map(group => ({
             ...group,
-            bouquet_ids: JSON.parse(group.bouquet_ids || '[]'),
-            iptv_editor_channels: JSON.parse(group.iptv_editor_channels || '[]'),
-            iptv_editor_movies: JSON.parse(group.iptv_editor_movies || '[]'),
-            iptv_editor_series: JSON.parse(group.iptv_editor_series || '[]')
+            bouquet_ids: safeJsonParse(group.bouquet_ids, []),
+            iptv_editor_channels: safeJsonParse(group.iptv_editor_channels, []),
+            iptv_editor_movies: safeJsonParse(group.iptv_editor_movies, []),
+            iptv_editor_series: safeJsonParse(group.iptv_editor_series, [])
         }));
         
         console.log(`✅ Retrieved ${channelGroups.length} channel groups with IPTV Editor categories`);
@@ -256,18 +286,21 @@ router.post('/channel-groups', async (req, res) => {
             });
         }
         
-        // Check if name already exists
-        const existing = await db.query(
-            'SELECT id FROM iptv_channel_groups WHERE name = ? AND is_active = true',
-            [name.trim()]
-        );
-        
-        if (existing.length > 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'A channel group with this name already exists'
-            });
-        }
+// Check if name already exists  
+const existing = await db.query(
+    'SELECT id FROM iptv_channel_groups WHERE name = ? AND is_active = true',
+    [name.trim()]
+);
+
+console.log(`🔍 CREATE - Name check for "${name}": found ${existing.length} existing groups`);
+if (existing.length > 0) {
+    console.log(`❌ Duplicate name found - existing group ID: ${existing[0].id}, name: "${existing[0].name || 'unknown'}"`);
+    return res.status(400).json({
+        success: false,
+        message: `A channel group with this name already exists (ID: ${existing[0].id})`
+    });
+}
+console.log(`✅ Name "${name}" is available for creation`);
         
         // Insert new channel group with IPTV Editor categories
         const result = await db.query(`
@@ -326,11 +359,10 @@ router.put('/channel-groups/:id', async (req, res) => {
         }
         
         // FIXED: Check if name already exists (excluding current record)
-        // Convert id to integer for comparison
-        const existing = await db.query(
-            'SELECT id FROM iptv_channel_groups WHERE name = ? AND id != ? AND is_active = true',
-            [name.trim(), parseInt(id)]
-        );
+const existing = await db.query(
+    'SELECT id, name FROM iptv_channel_groups WHERE name = ? AND id != ? AND is_active = true',
+    [name.trim(), parseInt(id)]  // ← Make sure this parseInt(id) is there!
+);
         
         if (existing.length > 0) {
             console.log(`❌ Name validation failed - existing group found:`, existing[0]);
@@ -402,6 +434,8 @@ router.get('/channel-groups/:id', async (req, res) => {
     try {
         const { id } = req.params;
         
+        console.log(`🔍 Getting channel group by ID: ${id}`);
+        
         const rows = await db.query(`
             SELECT id, name, description, bouquet_ids, 
                    iptv_editor_channels, iptv_editor_movies, iptv_editor_series,
@@ -411,20 +445,40 @@ router.get('/channel-groups/:id', async (req, res) => {
         `, [id]);
         
         if (rows.length === 0) {
+            console.log(`❌ Channel group ${id} not found`);
             return res.status(404).json({
                 success: false,
                 message: 'Channel group not found'
             });
         }
         
-        // Parse JSON fields
+        const rawGroup = rows[0];
+        console.log(`📋 Raw group data:`, {
+            id: rawGroup.id,
+            name: rawGroup.name,
+            bouquet_ids: rawGroup.bouquet_ids,
+            iptv_editor_channels: rawGroup.iptv_editor_channels,
+            iptv_editor_movies: rawGroup.iptv_editor_movies,
+            iptv_editor_series: rawGroup.iptv_editor_series
+        });
+        
+        // Parse JSON fields SAFELY - THIS IS THE FIX
         const group = {
-            ...rows[0],
-            bouquet_ids: JSON.parse(rows[0].bouquet_ids || '[]'),
-            iptv_editor_channels: JSON.parse(rows[0].iptv_editor_channels || '[]'),
-            iptv_editor_movies: JSON.parse(rows[0].iptv_editor_movies || '[]'),
-            iptv_editor_series: JSON.parse(rows[0].iptv_editor_series || '[]')
+            ...rawGroup,
+            bouquet_ids: safeJsonParse(rawGroup.bouquet_ids, []),
+            iptv_editor_channels: safeJsonParse(rawGroup.iptv_editor_channels, []),
+            iptv_editor_movies: safeJsonParse(rawGroup.iptv_editor_movies, []),
+            iptv_editor_series: safeJsonParse(rawGroup.iptv_editor_series, [])
         };
+        
+        console.log(`✅ Successfully parsed group data:`, {
+            id: group.id,
+            name: group.name,
+            bouquet_count: group.bouquet_ids.length,
+            editor_channels: group.iptv_editor_channels.length,
+            editor_movies: group.iptv_editor_movies.length,
+            editor_series: group.iptv_editor_series.length
+        });
         
         res.json({
             success: true,

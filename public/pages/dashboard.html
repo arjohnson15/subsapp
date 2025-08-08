@@ -45,20 +45,24 @@
                     <p class="library-subtitle">Live Channels / Movies / Series</p>
                 </div>
             </div>
-            <div class="library-stats">
-                <div class="stat-item">
-                    <div class="stat-value" id="iptvChannels" style="color: #ff6b6b;">5,690</div>
-                    <div class="stat-label">Live Channels</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="iptvMovies" style="color: #ff6b6b;">19,776</div>
-                    <div class="stat-label">VOD Movies</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="iptvSeries" style="color: #ff6b6b;">7,395</div>
-                    <div class="stat-label">TV Series</div>
-                </div>
-            </div>
+<div class="library-stats">
+    <div class="stat-item">
+        <div class="stat-value" id="iptvChannels" style="color: #ff6b6b;">5,690</div>
+        <div class="stat-label">Live Channels</div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-value" id="iptvMovies" style="color: #ff6b6b;">19,776</div>
+        <div class="stat-label">VOD Movies</div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-value" id="iptvSeries" style="color: #ff6b6b;">7,395</div>
+        <div class="stat-label">TV Series</div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-value" id="iptvCredits" style="color: #ff6b6b;">-</div>
+        <div class="stat-label">Available Credits</div>
+    </div>
+</div>
         </div>
 
         <!-- IPTV Live Viewers Collapsible Section -->
@@ -710,6 +714,16 @@ window.Dashboard = {
     destroy() {
         this.expandedSections.clear();
         console.log('📊 Dashboard destroyed');
+    }
+	
+Dashboard.updateIPTVStats = function(iptvStats) {
+    this.updateElement('iptvChannels', this.formatNumber(iptvStats.channels));
+    this.updateElement('iptvMovies', this.formatNumber(iptvStats.movies));
+    this.updateElement('iptvSeries', this.formatNumber(iptvStats.series));
+    
+    // NEW: Update IPTV credits display
+    if (iptvStats.credits !== undefined) {
+        this.updateElement('iptvCredits', this.formatNumber(iptvStats.credits));
     }
 };
 </script>
