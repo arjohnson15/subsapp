@@ -10,6 +10,9 @@ const Settings = {
     availableTags: [], 
 	iptvEditorSettings: {},
     iptvEditorUsers: [],
+	iptvEditorChannels: [],
+    iptvEditorMovies: [],
+    iptvEditorSeries: [],
 	
     
 async init() {
@@ -1457,28 +1460,445 @@ async saveAllSettings() {
     },
     
     // IPTV Channel Groups Functions (moved from IPTV.js for settings page)
-    async showChannelGroupForm() {
-        console.log('📋 Opening channel group form...');
+showChannelGroupForm(groupData = null) {
+    console.log('📝 Showing channel group form...', groupData);
+    
+    const form = document.getElementById('channelGroupForm');
+    if (!form) {
+        console.error('❌ Channel group form not found');
+        return;
+    }
+    
+    // Show the form
+    form.style.display = 'block';
+    
+    // Update title and ID
+    const title = document.getElementById('channelGroupFormTitle');
+    const idField = document.getElementById('channelGroupId');
+    
+    if (groupData) {
+        if (title) title.textContent = 'Edit Channel Group';
+        if (idField) idField.value = groupData.id;
         
-        const form = document.getElementById('channelGroupForm');
-        if (form) {
-            form.style.display = 'block';
-            document.getElementById('channelGroupFormTitle').textContent = 'Create New Channel Group';
-            
-            // Clear the form
-            document.getElementById('channelGroupName').value = '';
-            document.getElementById('channelGroupDescription').value = '';
-            
-            // Load bouquets for selection
-            await this.loadBouquetsForSelection();
-            
-            // Scroll to form
-            form.scrollIntoView({ behavior: 'smooth' });
+        // Fill form fields
+        const nameField = document.getElementById('channelGroupName');
+        const descField = document.getElementById('channelGroupDescription');
+        if (nameField) nameField.value = groupData.name || '';
+        if (descField) descField.value = groupData.description || '';
+    } else {
+        if (title) title.textContent = 'Create New Channel Group';
+        if (idField) idField.value = '';
+        
+        // Clear form fields
+        const nameField = document.getElementById('channelGroupName');
+        const descField = document.getElementById('channelGroupDescription');
+        if (nameField) nameField.value = '';
+        if (descField) descField.value = '';
+    }
+    
+    // Load all categories
+    this.loadBouquetsForSelection();
+    this.loadEditorChannels();
+    this.loadEditorMovies();
+    this.loadEditorSeries();
+    
+    // If editing, populate selections after categories load
+    if (groupData) {
+        setTimeout(() => {
+            this.populateEditorSelections(groupData);
+        }, 1500); // Longer timeout to ensure categories load
+    }
+    
+    // Scroll to form
+    form.scrollIntoView({ behavior: 'smooth' });
+},
+
+// IPTV Editor category loading functions
+async loadEditorChannels() {
+    try {
+        const response = await fetch('/api/iptv-editor/categories/channels');
+        const result = await response.json();
+        
+        if (result.success) {
+            this.iptvEditorChannels = result.data;
+            this.renderEditorChannels();
         } else {
-            console.error('❌ Channel group form not found in settings page');
-            Utils.showNotification('Channel group form not found', 'error');
+            const container = document.getElementById('editorChannelsList');
+            if (container) {
+                container.innerHTML = `<div style="text-align: center; color: #f44336; padding: 20px;">${result.message}</div>`;
+            }
         }
-    },
+    } catch (error) {
+        console.error('Error loading IPTV Editor channels:', error);
+        const container = document.getElementById('editorChannelsList');
+        if (container) {
+            container.innerHTML = '<div style="text-align: center; color: #f44336; padding: 20px;">Failed to load channels</div>';
+        }
+    }
+},
+
+async loadEditorMovies() {
+    try {
+        const response = await fetch('/api/iptv-editor/categories/movies');
+        const result = await response.json();
+        
+        if (result.success) {
+            this.iptvEditorMovies = result.data;
+            this.renderEditorMovies();
+        } else {
+            const container = document.getElementById('editorMoviesList');
+            if (container) {
+                container.innerHTML = `<div style="text-align: center; color: #f44336; padding: 20px;">${result.message}</div>`;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading IPTV Editor movies:', error);
+        const container = document.getElementById('editorMoviesList');
+        if (container) {
+            container.innerHTML = '<div style="text-align: center; color: #f44336; padding: 20px;">Failed to load movies</div>';
+        }
+    }
+},
+
+async loadEditorSeries() {
+    try {
+        const response = await fetch('/api/iptv-editor/categories/series');
+        const result = await response.json();
+        
+        if (result.success) {
+            this.iptvEditorSeries = result.data;
+            this.renderEditorSeries();
+        } else {
+            const container = document.getElementById('editorSeriesList');
+            if (container) {
+                container.innerHTML = `<div style="text-align: center; color: #f44336; padding: 20px;">${result.message}</div>`;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading IPTV Editor series:', error);
+        const container = document.getElementById('editorSeriesList');
+        if (container) {
+            container.innerHTML = '<div style="text-align: center; color: #f44336; padding: 20px;">Failed to load series</div>';
+        }
+    }
+},
+
+// Render functions
+renderEditorChannels() {
+    const container = document.getElementById('editorChannelsList');
+    if (!container) return;
+    
+    if (this.iptvEditorChannels.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">No channels found</div>';
+        return;
+    }
+    
+    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px;">';
+    
+    this.iptvEditorChannels.forEach(channel => {
+        html += `
+            <div style="background: rgba(76, 175, 80, 0.1); border: 1px solid #4caf50; border-radius: 5px; padding: 10px;">
+                <label style="display: flex; align-items: center; cursor: pointer; color: #4fc3f7;">
+                    <input type="checkbox" 
+                           class="editor-channel-checkbox" 
+                           value="${channel.id}" 
+                           style="margin-right: 10px; transform: scale(1.2);">
+                    <div>
+                        <div style="font-weight: bold;">${channel.name}</div>
+                        <div style="font-size: 0.8rem; color: #888;">ID: ${channel.id}</div>
+                    </div>
+                </label>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+},
+
+renderEditorMovies() {
+    const container = document.getElementById('editorMoviesList');
+    if (!container) return;
+    
+    if (this.iptvEditorMovies.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">No movies found</div>';
+        return;
+    }
+    
+    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;">';
+    
+    this.iptvEditorMovies.forEach(movie => {
+        html += `
+            <div style="background: rgba(156, 39, 176, 0.1); border: 1px solid #9c27b0; border-radius: 5px; padding: 10px;">
+                <label style="display: flex; align-items: center; cursor: pointer; color: #4fc3f7;">
+                    <input type="checkbox" 
+                           class="editor-movie-checkbox" 
+                           value="${movie.id}" 
+                           style="margin-right: 10px; transform: scale(1.2);">
+                    <div>
+                        <div style="font-weight: bold;">${movie.name}</div>
+                        <div style="font-size: 0.8rem; color: #888;">ID: ${movie.id}</div>
+                    </div>
+                </label>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+},
+
+renderEditorSeries() {
+    const container = document.getElementById('editorSeriesList');
+    if (!container) return;
+    
+    if (this.iptvEditorSeries.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">No series found</div>';
+        return;
+    }
+    
+    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;">';
+    
+    this.iptvEditorSeries.forEach(series => {
+        html += `
+            <div style="background: rgba(255, 152, 0, 0.1); border: 1px solid #ff9800; border-radius: 5px; padding: 10px;">
+                <label style="display: flex; align-items: center; cursor: pointer; color: #4fc3f7;">
+                    <input type="checkbox" 
+                           class="editor-series-checkbox" 
+                           value="${series.id}" 
+                           style="margin-right: 10px; transform: scale(1.2);">
+                    <div>
+                        <div style="font-weight: bold;">${series.name}</div>
+                        <div style="font-size: 0.8rem; color: #888;">ID: ${series.id}</div>
+                    </div>
+                </label>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+},
+
+
+// Selection helper functions
+selectAllEditorChannels() {
+    const checkboxes = document.querySelectorAll('.editor-channel-checkbox');
+    checkboxes.forEach(cb => cb.checked = true);
+},
+
+clearAllEditorChannels() {
+    const checkboxes = document.querySelectorAll('.editor-channel-checkbox');
+    checkboxes.forEach(cb => cb.checked = false);
+},
+
+selectAllEditorMovies() {
+    const checkboxes = document.querySelectorAll('.editor-movie-checkbox');
+    checkboxes.forEach(cb => cb.checked = true);
+},
+
+clearAllEditorMovies() {
+    const checkboxes = document.querySelectorAll('.editor-movie-checkbox');
+    checkboxes.forEach(cb => cb.checked = false);
+},
+
+selectAllEditorSeries() {
+    const checkboxes = document.querySelectorAll('.editor-series-checkbox');
+    checkboxes.forEach(cb => cb.checked = true);
+},
+
+clearAllEditorSeries() {
+    const checkboxes = document.querySelectorAll('.editor-series-checkbox');
+    checkboxes.forEach(cb => cb.checked = false);
+},
+
+// Refresh functions
+refreshEditorChannels() {
+    const container = document.getElementById('editorChannelsList');
+    if (container) {
+        container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">Refreshing channels...</div>';
+    }
+    this.loadEditorChannels();
+},
+
+refreshEditorMovies() {
+    const container = document.getElementById('editorMoviesList');
+    if (container) {
+        container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">Refreshing movies...</div>';
+    }
+    this.loadEditorMovies();
+},
+
+refreshEditorSeries() {
+    const container = document.getElementById('editorSeriesList');
+    if (container) {
+        container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">Refreshing series...</div>';
+    }
+    this.loadEditorSeries();
+},
+
+// Populate selections when editing
+populateEditorSelections(groupData) {
+    // Populate channel selections
+    if (groupData.iptv_editor_channels && groupData.iptv_editor_channels.length > 0) {
+        setTimeout(() => {
+            const channelCheckboxes = document.querySelectorAll('.editor-channel-checkbox');
+            channelCheckboxes.forEach(cb => {
+                cb.checked = groupData.iptv_editor_channels.includes(parseInt(cb.value));
+            });
+        }, 500);
+    }
+    
+    // Populate movie selections
+    if (groupData.iptv_editor_movies && groupData.iptv_editor_movies.length > 0) {
+        setTimeout(() => {
+            const movieCheckboxes = document.querySelectorAll('.editor-movie-checkbox');
+            movieCheckboxes.forEach(cb => {
+                cb.checked = groupData.iptv_editor_movies.includes(parseInt(cb.value));
+            });
+        }, 500);
+    }
+    
+    // Populate series selections
+    if (groupData.iptv_editor_series && groupData.iptv_editor_series.length > 0) {
+        setTimeout(() => {
+            const seriesCheckboxes = document.querySelectorAll('.editor-series-checkbox');
+            seriesCheckboxes.forEach(cb => {
+                cb.checked = groupData.iptv_editor_series.includes(parseInt(cb.value));
+            });
+        }, 500);
+    }
+},
+
+// View all IPTV Editor Categories function
+async viewIPTVEditorCategories() {
+    try {
+        console.log('📺 Loading IPTV Editor categories overview...');
+        
+        // Load all categories
+        const [channelsResponse, moviesResponse, seriesResponse] = await Promise.all([
+            fetch('/api/iptv-editor/categories/channels'),
+            fetch('/api/iptv-editor/categories/movies'),
+            fetch('/api/iptv-editor/categories/series')
+        ]);
+        
+        const channelsData = await channelsResponse.json();
+        const moviesData = await moviesResponse.json();
+        const seriesData = await seriesResponse.json();
+        
+        const channels = channelsData.success ? channelsData.data : [];
+        const movies = moviesData.success ? moviesData.data : [];
+        const series = seriesData.success ? seriesData.data : [];
+        
+        // Build modal content
+        let modalHTML = `
+            <div id="iptvEditorCategoriesModal" style="
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.8); z-index: 10000; display: flex; 
+                justify-content: center; align-items: center; padding: 20px;
+            " onclick="this.remove()">
+                <div style="
+                    background: linear-gradient(135deg, #1a1a1a, #2d2d2d); 
+                    border-radius: 15px; max-width: 90%; max-height: 90%; 
+                    overflow-y: auto; border: 2px solid #4fc3f7; box-shadow: 0 0 30px rgba(79, 195, 247, 0.3);
+                " onclick="event.stopPropagation()">
+                    
+                    <div style="padding: 25px; border-bottom: 2px solid #333;">
+                        <h3 style="color: #4fc3f7; margin: 0; text-align: center;">
+                            <i class="fas fa-tv"></i> IPTV Editor Categories Overview
+                        </h3>
+                        <button onclick="document.getElementById('iptvEditorCategoriesModal').remove()" 
+                                style="position: absolute; top: 15px; right: 20px; background: none; border: none; 
+                                       color: #f44336; font-size: 24px; cursor: pointer;">×</button>
+                    </div>
+                    
+                    <div style="padding: 25px;">
+        `;
+        
+        // Channels section
+        modalHTML += `
+            <div style="margin-bottom: 30px;">
+                <h4 style="color: #4caf50; margin-bottom: 15px;">
+                    <i class="fas fa-broadcast-tower"></i> Channels (${channels.length} total)
+                </h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; max-height: 300px; overflow-y: auto; padding: 10px; background: rgba(76, 175, 80, 0.05); border-radius: 8px;">
+        `;
+        
+        channels.forEach(channel => {
+            modalHTML += `
+                <div style="background: rgba(76, 175, 80, 0.1); border: 1px solid #4caf50; border-radius: 5px; padding: 8px;">
+                    <div style="color: #4fc3f7; font-weight: bold; font-size: 0.9rem;">${channel.name}</div>
+                    <div style="color: #888; font-size: 0.8rem;">ID: ${channel.id}</div>
+                </div>
+            `;
+        });
+        
+        modalHTML += '</div></div>';
+        
+        // Movies section
+        modalHTML += `
+            <div style="margin-bottom: 30px;">
+                <h4 style="color: #9c27b0; margin-bottom: 15px;">
+                    <i class="fas fa-film"></i> Movies/VOD (${movies.length} total)
+                </h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; max-height: 200px; overflow-y: auto; padding: 10px; background: rgba(156, 39, 176, 0.05); border-radius: 8px;">
+        `;
+        
+        movies.forEach(movie => {
+            modalHTML += `
+                <div style="background: rgba(156, 39, 176, 0.1); border: 1px solid #9c27b0; border-radius: 5px; padding: 8px;">
+                    <div style="color: #4fc3f7; font-weight: bold; font-size: 0.9rem;">${movie.name}</div>
+                    <div style="color: #888; font-size: 0.8rem;">ID: ${movie.id}</div>
+                </div>
+            `;
+        });
+        
+        modalHTML += '</div></div>';
+        
+        // Series section
+        modalHTML += `
+            <div style="margin-bottom: 20px;">
+                <h4 style="color: #ff9800; margin-bottom: 15px;">
+                    <i class="fas fa-tv"></i> Series (${series.length} total)
+                </h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; max-height: 200px; overflow-y: auto; padding: 10px; background: rgba(255, 152, 0, 0.05); border-radius: 8px;">
+        `;
+        
+        series.forEach(s => {
+            modalHTML += `
+                <div style="background: rgba(255, 152, 0, 0.1); border: 1px solid #ff9800; border-radius: 5px; padding: 8px;">
+                    <div style="color: #4fc3f7; font-weight: bold; font-size: 0.9rem;">${s.name}</div>
+                    <div style="color: #888; font-size: 0.8rem;">ID: ${s.id}</div>
+                </div>
+            `;
+        });
+        
+        modalHTML += `
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center; padding: 20px; border-top: 2px solid #333;">
+                        <button class="btn" onclick="document.getElementById('iptvEditorCategoriesModal').remove()" 
+                                style="background: linear-gradient(45deg, #616161, #424242); padding: 10px 30px;">
+                            <i class="fas fa-times"></i> Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Remove existing modal and add new one
+        const existingModal = document.getElementById('iptvEditorCategoriesModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+    } catch (error) {
+        console.error('❌ Failed to load IPTV Editor categories:', error);
+        Utils.showNotification('Failed to load IPTV Editor categories', 'error');
+    }
+},
 
     hideChannelGroupForm() {
         const form = document.getElementById('channelGroupForm');
@@ -1643,77 +2063,65 @@ clearAllBouquets() {
 },
 
 async saveChannelGroup(event) {
-    if (event) {
-        event.preventDefault();
-    }
+    event.preventDefault();
     
     try {
-        const form = document.getElementById('channelGroupForm');
-        const editingId = form.getAttribute('data-editing-id');
-        const isEditing = !!editingId;
+        const formData = new FormData(event.target);
+        const groupId = document.getElementById('channelGroupId').value;
+        const isEdit = groupId && groupId !== '';
         
-        const name = document.getElementById('channelGroupName').value.trim();
-        const description = document.getElementById('channelGroupDescription').value.trim();
+        // Get selected bouquets (existing logic)
+        const selectedBouquets = Array.from(document.querySelectorAll('input[name="bouquets"]:checked'))
+            .map(cb => cb.value);
         
-        // Fixed: Changed from #bouquetSelectionContainer to #bouquetSelector
-        const selectedCheckboxes = document.querySelectorAll('#bouquetSelector input[type="checkbox"]:checked');
-        const bouquetIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+        // Get selected IPTV Editor categories
+        const selectedEditorChannels = Array.from(document.querySelectorAll('.editor-channel-checkbox:checked'))
+            .map(cb => parseInt(cb.value));
         
-        // Debug logging
-        console.log('🔍 Debug info:', {
-            container: document.getElementById('bouquetSelector'),
-            allCheckboxes: document.querySelectorAll('#bouquetSelector input[type="checkbox"]').length,
-            selectedCheckboxes: selectedCheckboxes.length,
-            bouquetIds: bouquetIds
-        });
+        const selectedEditorMovies = Array.from(document.querySelectorAll('.editor-movie-checkbox:checked'))
+            .map(cb => parseInt(cb.value));
         
-        // Validation
-        if (!name) {
-            Utils.showNotification('Please enter a group name', 'error');
-            return;
+        const selectedEditorSeries = Array.from(document.querySelectorAll('.editor-series-checkbox:checked'))
+            .map(cb => parseInt(cb.value));
+        
+        const data = {
+            name: document.getElementById('channelGroupName').value,
+            description: document.getElementById('channelGroupDescription').value,
+            bouquet_ids: selectedBouquets,
+            iptv_editor_channels: selectedEditorChannels,
+            iptv_editor_movies: selectedEditorMovies,
+            iptv_editor_series: selectedEditorSeries
+        };
+        
+        console.log('💾 Saving channel group:', data);
+        
+        let response;
+        if (isEdit) {
+            response = await fetch(`/api/settings/channel-groups/${groupId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+        } else {
+            response = await fetch('/api/settings/channel-groups', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
         }
-        
-        if (bouquetIds.length === 0) {
-            Utils.showNotification('Please select at least one bouquet', 'error');
-            return;
-        }
-        
-        console.log(`💾 ${isEditing ? 'Updating' : 'Creating'} channel group:`, { 
-            name, 
-            description, 
-            bouquet_count: bouquetIds.length,
-            bouquet_ids: bouquetIds 
-        });
-        
-        const url = isEditing ? `/api/iptv/channel-groups/${editingId}` : '/api/iptv/channel-groups';
-        const method = isEditing ? 'PUT' : 'POST';
-        
-        const response = await fetch(url, {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                name: name,
-                description: description,
-                bouquet_ids: bouquetIds,
-                is_active: true
-            })
-        });
         
         const result = await response.json();
         
         if (result.success) {
-            Utils.showNotification(`Channel group ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
+            Utils.showNotification(`Channel group ${isEdit ? 'updated' : 'created'} successfully!`, 'success');
             this.hideChannelGroupForm();
-            await this.loadChannelGroups(); // Refresh the table
+            this.loadChannelGroups();
         } else {
-            throw new Error(result.message || 'Failed to save channel group');
+            Utils.showNotification(result.message || `Failed to ${isEdit ? 'update' : 'create'} channel group`, 'error');
         }
-        
     } catch (error) {
-        console.error('❌ Failed to save channel group:', error);
-        Utils.showNotification('Failed to save channel group: ' + error.message, 'error');
+        console.error('❌ Error saving channel group:', error);
+        Utils.showNotification('Failed to save channel group', 'error');
     }
 },
 
@@ -1821,61 +2229,70 @@ async saveChannelGroup(event) {
         }
     },
 
-    renderChannelGroupsTable(groups, tableBody) {
-        if (groups.length === 0) {
-            tableBody.innerHTML = `
-                <tr>
-                    <td colspan="6" style="text-align: center; color: #666;">
-                        <p>No channel groups created yet.</p>
-                        <button class="btn btn-primary" onclick="Settings.showChannelGroupForm()">
-                            <i class="fas fa-plus"></i> Create Your First Group
+renderChannelGroupsTable(groups, tableBody) {
+    if (groups.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; color: #666;">
+                    <p>No channel groups created yet.</p>
+                    <button class="btn btn-primary" onclick="Settings.showChannelGroupForm()">
+                        <i class="fas fa-plus"></i> Create Your First Group
+                    </button>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    const rows = groups.map(group => {
+        const bouquetIds = Array.isArray(group.bouquet_ids) ? 
+            group.bouquet_ids : 
+            (typeof group.bouquet_ids === 'string' ? JSON.parse(group.bouquet_ids || '[]') : []);
+        
+        const bouquetCount = bouquetIds.length;
+        
+        // Calculate IPTV Editor category counts
+        const channelCount = group.iptv_editor_channels ? group.iptv_editor_channels.length : 0;
+        const movieCount = group.iptv_editor_movies ? group.iptv_editor_movies.length : 0;
+        const seriesCount = group.iptv_editor_series ? group.iptv_editor_series.length : 0;
+        
+        const status = group.is_active ? 
+            '<span class="badge badge-success">Active</span>' : 
+            '<span class="badge badge-secondary">Inactive</span>';
+        
+        const createdDate = new Date(group.created_at).toLocaleDateString();
+        
+        return `
+            <tr>
+                <td style="font-weight: bold; color: #4fc3f7;">${group.name}</td>
+                <td>${group.description || 'No description'}</td>
+                <td>
+                    <div style="font-size: 0.9rem;">
+                        <div><strong>Panel:</strong> ${bouquetCount} bouquets</div>
+                        <div><strong>Editor:</strong> ${channelCount} channels, ${movieCount} movies, ${seriesCount} series</div>
+                    </div>
+                </td>
+                <td>${status}</td>
+                <td>${createdDate}</td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-info" onclick="Settings.viewChannelGroup(${group.id})" title="View">
+                            <i class="fas fa-eye"></i>
                         </button>
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-        
-        const rows = groups.map(group => {
-            const bouquetIds = Array.isArray(group.bouquet_ids) ? 
-                group.bouquet_ids : 
-                (typeof group.bouquet_ids === 'string' ? JSON.parse(group.bouquet_ids || '[]') : []);
-            
-            const bouquetCount = bouquetIds.length;
-            const status = group.is_active ? 
-                '<span class="badge badge-success">Active</span>' : 
-                '<span class="badge badge-secondary">Inactive</span>';
-            
-            const createdDate = new Date(group.created_at).toLocaleDateString();
-            
-            return `
-                <tr>
-                    <td style="font-weight: bold; color: #4fc3f7;">${group.name}</td>
-                    <td>${group.description || 'No description'}</td>
-                    <td>
-                        <span class="badge badge-info">${bouquetCount} bouquets</span>
-                    </td>
-                    <td>${status}</td>
-                    <td>${createdDate}</td>
-                    <td>
-                        <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-info" onclick="Settings.viewChannelGroup(${group.id})" title="View">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <button class="btn btn-outline-warning" onclick="Settings.editChannelGroup(${group.id})" title="Edit">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-outline-danger" onclick="Settings.deleteChannelGroup(${group.id})" title="Delete">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }).join('');
-        
-        tableBody.innerHTML = rows;
-    },
+                        <button class="btn btn-outline-warning" onclick="Settings.editChannelGroup(${group.id})" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="Settings.deleteChannelGroup(${group.id})" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    tableBody.innerHTML = rows;
+},
 
 
 async viewChannelGroup(groupId) {

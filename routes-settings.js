@@ -202,4 +202,278 @@ async function deleteOldBrandingFile(settingKey) {
   }
 }
 
+// ========================================
+// IPTV CHANNEL GROUPS ENDPOINTS
+// ========================================
+
+// Get all channel groups
+router.get('/channel-groups', async (req, res) => {
+    try {
+        const rows = await db.query(`
+            SELECT id, name, description, bouquet_ids, 
+                   iptv_editor_channels, iptv_editor_movies, iptv_editor_series,
+                   is_active, created_at, updated_at
+            FROM iptv_channel_groups 
+            WHERE is_active = true 
+            ORDER BY name ASC
+        `);
+        
+        // Parse JSON fields
+        const channelGroups = rows.map(group => ({
+            ...group,
+            bouquet_ids: JSON.parse(group.bouquet_ids || '[]'),
+            iptv_editor_channels: JSON.parse(group.iptv_editor_channels || '[]'),
+            iptv_editor_movies: JSON.parse(group.iptv_editor_movies || '[]'),
+            iptv_editor_series: JSON.parse(group.iptv_editor_series || '[]')
+        }));
+        
+        console.log(`✅ Retrieved ${channelGroups.length} channel groups with IPTV Editor categories`);
+        
+        res.json({
+            success: true,
+            data: channelGroups,
+            message: `Retrieved ${channelGroups.length} channel groups`
+        });
+        
+    } catch (error) {
+        console.error('❌ Error getting channel groups:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get channel groups: ' + error.message
+        });
+    }
+});
+
+// Create new channel group
+router.post('/channel-groups', async (req, res) => {
+    try {
+        const { name, description, bouquet_ids = [], iptv_editor_channels = [], iptv_editor_movies = [], iptv_editor_series = [] } = req.body;
+        
+        if (!name || !name.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Group name is required'
+            });
+        }
+        
+        // Check if name already exists
+        const existing = await db.query(
+            'SELECT id FROM iptv_channel_groups WHERE name = ? AND is_active = true',
+            [name.trim()]
+        );
+        
+        if (existing.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'A channel group with this name already exists'
+            });
+        }
+        
+        // Insert new channel group with IPTV Editor categories
+        const result = await db.query(`
+            INSERT INTO iptv_channel_groups 
+            (name, description, bouquet_ids, iptv_editor_channels, iptv_editor_movies, iptv_editor_series, is_active) 
+            VALUES (?, ?, ?, ?, ?, ?, true)
+        `, [
+            name.trim(),
+            description || '',
+            JSON.stringify(bouquet_ids),
+            JSON.stringify(iptv_editor_channels),
+            JSON.stringify(iptv_editor_movies),
+            JSON.stringify(iptv_editor_series)
+        ]);
+        
+        console.log(`✅ Created channel group: ${name} (ID: ${result.insertId})`);
+        console.log(`   - Bouquets: ${bouquet_ids.length}`);
+        console.log(`   - IPTV Editor Channels: ${iptv_editor_channels.length}`);
+        console.log(`   - IPTV Editor Movies: ${iptv_editor_movies.length}`);
+        console.log(`   - IPTV Editor Series: ${iptv_editor_series.length}`);
+        
+        res.json({
+            success: true,
+            message: 'Channel group created successfully',
+            data: {
+                id: result.insertId,
+                name: name.trim(),
+                description,
+                bouquet_ids,
+                iptv_editor_channels,
+                iptv_editor_movies,
+                iptv_editor_series
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Error creating channel group:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to create channel group: ' + error.message
+        });
+    }
+});
+
+// Update channel group
+router.put('/channel-groups/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, description, bouquet_ids = [], iptv_editor_channels = [], iptv_editor_movies = [], iptv_editor_series = [] } = req.body;
+        
+        if (!name || !name.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Group name is required'
+            });
+        }
+        
+        // FIXED: Check if name already exists (excluding current record)
+        // Convert id to integer for comparison
+        const existing = await db.query(
+            'SELECT id FROM iptv_channel_groups WHERE name = ? AND id != ? AND is_active = true',
+            [name.trim(), parseInt(id)]
+        );
+        
+        if (existing.length > 0) {
+            console.log(`❌ Name validation failed - existing group found:`, existing[0]);
+            console.log(`   Current ID: ${id} (type: ${typeof id})`);
+            console.log(`   Existing ID: ${existing[0].id} (type: ${typeof existing[0].id})`);
+            return res.status(400).json({
+                success: false,
+                message: 'A channel group with this name already exists'
+            });
+        }
+        
+        console.log(`✅ Name validation passed for group ID: ${id}, name: "${name}"`);
+        
+        // Update channel group with IPTV Editor categories
+        const result = await db.query(`
+            UPDATE iptv_channel_groups 
+            SET name = ?, description = ?, bouquet_ids = ?, 
+                iptv_editor_channels = ?, iptv_editor_movies = ?, iptv_editor_series = ?,
+                updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ? AND is_active = true
+        `, [
+            name.trim(),
+            description || '',
+            JSON.stringify(bouquet_ids),
+            JSON.stringify(iptv_editor_channels),
+            JSON.stringify(iptv_editor_movies),
+            JSON.stringify(iptv_editor_series),
+            parseInt(id)
+        ]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Channel group not found'
+            });
+        }
+        
+        console.log(`✅ Updated channel group: ${name} (ID: ${id})`);
+        console.log(`   - Bouquets: ${bouquet_ids.length}`);
+        console.log(`   - IPTV Editor Channels: ${iptv_editor_channels.length}`);
+        console.log(`   - IPTV Editor Movies: ${iptv_editor_movies.length}`);
+        console.log(`   - IPTV Editor Series: ${iptv_editor_series.length}`);
+        
+        res.json({
+            success: true,
+            message: 'Channel group updated successfully',
+            data: {
+                id: parseInt(id),
+                name: name.trim(),
+                description,
+                bouquet_ids,
+                iptv_editor_channels,
+                iptv_editor_movies,
+                iptv_editor_series
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Error updating channel group:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update channel group: ' + error.message
+        });
+    }
+});
+
+// Get single channel group by ID
+router.get('/channel-groups/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const rows = await db.query(`
+            SELECT id, name, description, bouquet_ids, 
+                   iptv_editor_channels, iptv_editor_movies, iptv_editor_series,
+                   is_active, created_at, updated_at
+            FROM iptv_channel_groups 
+            WHERE id = ? AND is_active = true
+        `, [id]);
+        
+        if (rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Channel group not found'
+            });
+        }
+        
+        // Parse JSON fields
+        const group = {
+            ...rows[0],
+            bouquet_ids: JSON.parse(rows[0].bouquet_ids || '[]'),
+            iptv_editor_channels: JSON.parse(rows[0].iptv_editor_channels || '[]'),
+            iptv_editor_movies: JSON.parse(rows[0].iptv_editor_movies || '[]'),
+            iptv_editor_series: JSON.parse(rows[0].iptv_editor_series || '[]')
+        };
+        
+        res.json({
+            success: true,
+            data: group,
+            message: 'Channel group retrieved successfully'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error getting channel group:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get channel group: ' + error.message
+        });
+    }
+});
+
+// Delete channel group
+router.delete('/channel-groups/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Soft delete - set is_active to false
+        const result = await db.query(`
+            UPDATE iptv_channel_groups 
+            SET is_active = false, updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ? AND is_active = true
+        `, [id]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Channel group not found'
+            });
+        }
+        
+        console.log(`✅ Deleted channel group ID: ${id}`);
+        
+        res.json({
+            success: true,
+            message: 'Channel group deleted successfully'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error deleting channel group:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete channel group: ' + error.message
+        });
+    }
+});
+
 module.exports = router;

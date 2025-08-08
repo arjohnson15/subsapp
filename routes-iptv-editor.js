@@ -2014,5 +2014,188 @@ router.get('/dashboard-stats', async (req, res) => {
     }
 });
 
+// Get IPTV Editor channel categories
+router.get('/categories/channels', async (req, res) => {
+    try {
+        console.log('📺 Fetching IPTV Editor channel categories...');
+        
+        // Get settings
+        const settings = await iptvEditorService.getAllSettings();
+        
+        if (!settings.bearer_token || !settings.default_playlist_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'IPTV Editor is not properly configured'
+            });
+        }
+        
+        // Make API call to get channel categories
+        const response = await fetch('https://editor.iptveditor.com/api/category/channel/get-data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${settings.bearer_token}`,
+                'Origin': 'https://cloud.iptveditor.com'
+            },
+            body: JSON.stringify({
+                playlist: settings.default_playlist_id
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Filter out deleted categories and format for frontend
+        const activeCategories = data.items
+            .filter(cat => !cat.is_deleted && !cat.hidden)
+            .map(cat => ({
+                id: cat.id,
+                name: cat.name,
+                position: cat.position
+            }))
+            .sort((a, b) => a.position - b.position);
+        
+        console.log(`✅ Retrieved ${activeCategories.length} active channel categories`);
+        
+        res.json({
+            success: true,
+            data: activeCategories,
+            message: `Retrieved ${activeCategories.length} channel categories`
+        });
+        
+    } catch (error) {
+        console.error('❌ Error fetching IPTV Editor channel categories:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch channel categories: ' + error.message
+        });
+    }
+});
+
+// Get IPTV Editor series categories
+router.get('/categories/series', async (req, res) => {
+    try {
+        console.log('📺 Fetching IPTV Editor series categories...');
+        
+        // Get settings
+        const settings = await iptvEditorService.getAllSettings();
+        
+        if (!settings.bearer_token || !settings.default_playlist_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'IPTV Editor is not properly configured'
+            });
+        }
+        
+        // Make API call to get series categories
+        const response = await fetch('https://editor.iptveditor.com/api/category/series/get-data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${settings.bearer_token}`,
+                'Origin': 'https://cloud.iptveditor.com'
+            },
+            body: JSON.stringify({
+                playlist: settings.default_playlist_id
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Filter out deleted categories and format for frontend
+        const activeCategories = data.items
+            .filter(cat => !cat.is_deleted && !cat.hidden)
+            .map(cat => ({
+                id: cat.id,
+                name: cat.name,
+                position: cat.position
+            }))
+            .sort((a, b) => a.position - b.position);
+        
+        console.log(`✅ Retrieved ${activeCategories.length} active series categories`);
+        
+        res.json({
+            success: true,
+            data: activeCategories,
+            message: `Retrieved ${activeCategories.length} series categories`
+        });
+        
+    } catch (error) {
+        console.error('❌ Error fetching IPTV Editor series categories:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch series categories: ' + error.message
+        });
+    }
+});
+
+// Get IPTV Editor movie/VOD categories
+router.get('/categories/movies', async (req, res) => {
+    try {
+        console.log('📺 Fetching IPTV Editor movie categories...');
+        
+        // Get settings
+        const settings = await iptvEditorService.getAllSettings();
+        
+        if (!settings.bearer_token || !settings.default_playlist_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'IPTV Editor is not properly configured'
+            });
+        }
+        
+        // Make API call to get movie categories
+        const response = await fetch('https://editor.iptveditor.com/api/category/movie/get-data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${settings.bearer_token}`,
+                'Origin': 'https://cloud.iptveditor.com'
+            },
+            body: JSON.stringify({
+                playlist: settings.default_playlist_id
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Filter out deleted categories and format for frontend
+        const activeCategories = data.items
+            .filter(cat => !cat.is_deleted && !cat.hidden)
+            .map(cat => ({
+                id: cat.id,
+                name: cat.name,
+                position: cat.position
+            }))
+            .sort((a, b) => a.position - b.position);
+        
+        console.log(`✅ Retrieved ${activeCategories.length} active movie categories`);
+        
+        res.json({
+            success: true,
+            data: activeCategories,
+            message: `Retrieved ${activeCategories.length} movie categories`
+        });
+        
+    } catch (error) {
+        console.error('❌ Error fetching IPTV Editor movie categories:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch movie categories: ' + error.message
+        });
+    }
+});
+
 
 module.exports = router;

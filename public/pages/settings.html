@@ -188,6 +188,8 @@
     <div id="channelGroupForm" style="display: none; background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 8px; border: 1px solid #333; margin-bottom: 20px;">
         <h4 style="color: #4fc3f7; margin-bottom: 15px;" id="channelGroupFormTitle">Create New Channel Group</h4>
         <form onsubmit="Settings.saveChannelGroup(event)">
+            <input type="hidden" id="channelGroupId" value="">
+            
             <div class="form-grid">
                 <div class="form-group">
                     <label for="channelGroupName">Group Name:</label>
@@ -199,10 +201,79 @@
                 </div>
             </div>
             
-            <div class="form-group">
-                <label>Select Bouquets:</label>
+            <!-- IPTV Panel Bouquets (existing) -->
+            <div class="form-group" style="margin-bottom: 25px;">
+                <label style="color: #4fc3f7; font-weight: bold; margin-bottom: 10px; display: block;">Select IPTV Panel Bouquets:</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button type="button" class="btn" onclick="Settings.selectAllBouquets()" style="background: linear-gradient(45deg, #4caf50, #8bc34a); font-size: 0.9rem; padding: 8px 16px;">
+                        <i class="fas fa-check-square"></i> Select All
+                    </button>
+                    <button type="button" class="btn" onclick="Settings.clearAllBouquets()" style="background: linear-gradient(45deg, #f44336, #ff5722); font-size: 0.9rem; padding: 8px 16px;">
+                        <i class="fas fa-times"></i> Clear All
+                    </button>
+                </div>
                 <div id="bouquetSelector" style="background: rgba(0,0,0,0.5); border: 1px solid #333; border-radius: 4px; padding: 10px; max-height: 300px; overflow-y: auto;">
                     <p style="color: #666; text-align: center;">Loading bouquets...</p>
+                </div>
+            </div>
+
+            <!-- IPTV Editor Channels -->
+            <div class="form-group" style="margin-bottom: 25px;">
+                <label style="color: #4fc3f7; font-weight: bold; margin-bottom: 10px; display: block;">Select IPTV Editor Channels:</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button type="button" class="btn" onclick="Settings.selectAllEditorChannels()" style="background: linear-gradient(45deg, #4caf50, #8bc34a); font-size: 0.9rem; padding: 8px 16px;">
+                        <i class="fas fa-check-square"></i> Select All
+                    </button>
+                    <button type="button" class="btn" onclick="Settings.clearAllEditorChannels()" style="background: linear-gradient(45deg, #f44336, #ff5722); font-size: 0.9rem; padding: 8px 16px;">
+                        <i class="fas fa-times"></i> Clear All
+                    </button>
+                    <button type="button" class="btn" onclick="Settings.refreshEditorChannels()" style="background: linear-gradient(45deg, #9c27b0, #e91e63); font-size: 0.9rem; padding: 8px 16px;">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+                
+                <div id="editorChannelsList" style="background: rgba(0,0,0,0.5); border: 1px solid #4caf50; border-radius: 4px; padding: 15px; max-height: 300px; overflow-y: auto;">
+                    <div style="text-align: center; color: #666; padding: 20px;">Loading IPTV Editor channels...</div>
+                </div>
+            </div>
+
+            <!-- IPTV Editor Movies/VOD -->
+            <div class="form-group" style="margin-bottom: 25px;">
+                <label style="color: #4fc3f7; font-weight: bold; margin-bottom: 10px; display: block;">Select IPTV Editor Movies/VOD:</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button type="button" class="btn" onclick="Settings.selectAllEditorMovies()" style="background: linear-gradient(45deg, #4caf50, #8bc34a); font-size: 0.9rem; padding: 8px 16px;">
+                        <i class="fas fa-check-square"></i> Select All
+                    </button>
+                    <button type="button" class="btn" onclick="Settings.clearAllEditorMovies()" style="background: linear-gradient(45deg, #f44336, #ff5722); font-size: 0.9rem; padding: 8px 16px;">
+                        <i class="fas fa-times"></i> Clear All
+                    </button>
+                    <button type="button" class="btn" onclick="Settings.refreshEditorMovies()" style="background: linear-gradient(45deg, #9c27b0, #e91e63); font-size: 0.9rem; padding: 8px 16px;">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+                
+                <div id="editorMoviesList" style="background: rgba(0,0,0,0.5); border: 1px solid #9c27b0; border-radius: 4px; padding: 15px; max-height: 200px; overflow-y: auto;">
+                    <div style="text-align: center; color: #666; padding: 20px;">Loading IPTV Editor movies...</div>
+                </div>
+            </div>
+
+            <!-- IPTV Editor Series -->
+            <div class="form-group" style="margin-bottom: 25px;">
+                <label style="color: #4fc3f7; font-weight: bold; margin-bottom: 10px; display: block;">Select IPTV Editor Series:</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button type="button" class="btn" onclick="Settings.selectAllEditorSeries()" style="background: linear-gradient(45deg, #4caf50, #8bc34a); font-size: 0.9rem; padding: 8px 16px;">
+                        <i class="fas fa-check-square"></i> Select All
+                    </button>
+                    <button type="button" class="btn" onclick="Settings.clearAllEditorSeries()" style="background: linear-gradient(45deg, #f44336, #ff5722); font-size: 0.9rem; padding: 8px 16px;">
+                        <i class="fas fa-times"></i> Clear All
+                    </button>
+                    <button type="button" class="btn" onclick="Settings.refreshEditorSeries()" style="background: linear-gradient(45deg, #9c27b0, #e91e63); font-size: 0.9rem; padding: 8px 16px;">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+                
+                <div id="editorSeriesList" style="background: rgba(0,0,0,0.5); border: 1px solid #ff9800; border-radius: 4px; padding: 15px; max-height: 200px; overflow-y: auto;">
+                    <div style="text-align: center; color: #666; padding: 20px;">Loading IPTV Editor series...</div>
                 </div>
             </div>
             
@@ -213,7 +284,7 @@
         </form>
     </div>
     
-    <!-- Channel Groups Table Controls -->
+<!-- Channel Groups Table Controls -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
             <button class="btn" onclick="Settings.showChannelGroupForm()" style="background: linear-gradient(45deg, #4caf50, #8bc34a);">
@@ -221,6 +292,9 @@
             </button>
             <button type="button" class="btn" onclick="Settings.viewBouquetDetails()" style="background: linear-gradient(45deg, #9c27b0, #e91e63); font-size: 0.9rem; padding: 8px 16px;">
                 <i class="fas fa-list"></i> View All Bouquets
+            </button>
+            <button type="button" class="btn" onclick="Settings.viewIPTVEditorCategories()" style="background: linear-gradient(45deg, #ff9800, #ffc107); font-size: 0.9rem; padding: 8px 16px;">
+                <i class="fas fa-tv"></i> View IPTV Editor Categories
             </button>
         </div>
         <button type="button" class="btn" onclick="Settings.loadChannelGroups()" style="padding: 8px 16px; font-size: 0.9rem;">
@@ -235,7 +309,7 @@
                 <tr>
                     <th>Name</th>
                     <th>Description</th>
-                    <th>Bouquets</th>
+                    <th>Content</th>
                     <th>Status</th>
                     <th>Created</th>
                     <th>Actions</th>
