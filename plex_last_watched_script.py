@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Plex All Users Last Watched Date Script
-Gets the last watched date for EVERY user, no matter how far back
+Plex Daily Sync Script - Optimized for Database Updates
+Two approaches: Individual calls (reliable) vs Bulk history (faster but risky)
 """
 
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
+import argparse
 
 try:
     from plexapi.server import PlexServer
@@ -37,205 +38,209 @@ PLEX_SERVERS = {
     }
 }
 
-def get_all_users_last_watched(server_config):
-    """Get last watched date for ALL users on a server - no time limits"""
+def approach_1_individual_calls(server_config):
+    """APPROACH 1: Individual API calls per user (RELIABLE but slower)"""
     try:
-        print(f"[INFO] Connecting to {server_config['name']}...", file=sys.stderr)
+        print(f"[APPROACH 1] Using individual API calls for {server_config['name']}", file=sys.stderr)
         plex = PlexServer(server_config['url'], server_config['token'], timeout=15)
         
-        result = {
-            'server_name': server_config['name'],
-            'server_url': server_config['url'],
-            'success': True,
-            'users': {},
-            'total_history_items': 0
-        }
+        # Get all users
+        accounts = plex.systemAccounts()
+        print(f"[INFO] Found {len(accounts)} accounts", file=sys.stderr)
         
-        # First, get all user accounts
-        print(f"[INFO] Getting all user accounts...", file=sys.stderr)
-        try:
-            accounts = plex.systemAccounts()
-            account_info = {}
-            for account in accounts:
-                account_info[account.id] = {
-                    'name': getattr(account, 'name', f'User {account.id}'),
-                    'email': getattr(account, 'email', None),
-                    'id': account.id
+        results = {}
+        
+        for i, account in enumerate(accounts, 1):
+            try:
+                account_id = account.id
+                account_name = getattr(account, 'name', f'User {account_id}')
+                
+                if i % 25 == 0:
+                    print(f"[PROGRESS] {i}/{len(accounts)} users processed", file=sys.stderr)
+                
+                # Get most recent item for this user
+                history = plex.history(accountID=account_id, maxresults=1)
+                
+                if history and len(history) > 0:
+                    latest_item = history[0]
+                    viewed_at = getattr(latest_item, 'viewedAt', None) or getattr(latest_item, 'lastViewedAt', None)
+                    
+                    if viewed_at:
+                        days_since = (datetime.now() - viewed_at.replace(tzinfo=None)).days
+                        results[account_id] = {
+                            'account_id': account_id,
+                            'account_name': account_name,
+                            'days_since_last_watch': days_since,
+                            'last_watched_date': viewed_at.isoformat(),
+                            'last_watched_title': getattr(latest_item, 'title', 'Unknown')
+                        }
+                        continue
+                
+                # No watch history
+                results[account_id] = {
+                    'account_id': account_id,
+                    'account_name': account_name,
+                    'days_since_last_watch': None,
+                    'last_watched_date': None,
+                    'last_watched_title': None
                 }
-            print(f"[INFO] Found {len(account_info)} user accounts", file=sys.stderr)
-        except Exception as e:
-            print(f"[ERROR] Could not load user accounts: {e}", file=sys.stderr)
-            account_info = {}
+                
+            except Exception as e:
+                print(f"[ERROR] Failed for user {account.id}: {e}", file=sys.stderr)
+                results[account.id] = {
+                    'account_id': account.id,
+                    'account_name': getattr(account, 'name', f'User {account.id}'),
+                    'days_since_last_watch': None,
+                    'last_watched_date': None,
+                    'last_watched_title': None,
+                    'error': str(e)
+                }
         
-        # Get ALL watch history - no date restrictions
-        print(f"[INFO] Getting complete watch history (this may take a while)...", file=sys.stderr)
+        return results
         
-        # Use history() with no mindate to get everything
-        try:
-            history = plex.history()  # Gets everything, no date limit
-            print(f"[INFO] Retrieved {len(history)} total history entries", file=sys.stderr)
-            result['total_history_items'] = len(history)
-        except Exception as e:
-            print(f"[ERROR] Could not get history: {e}", file=sys.stderr)
-            result['success'] = False
-            result['error'] = str(e)
-            return result
+    except Exception as e:
+        print(f"[ERROR] Approach 1 failed: {e}", file=sys.stderr)
+        return {}
+
+def approach_2_bulk_recent_history(server_config, days_back=30):
+    """APPROACH 2: Get recent history in bulk, then process (FASTER but limited)"""
+    try:
+        print(f"[APPROACH 2] Using bulk history for {server_config['name']} (last {days_back} days)", file=sys.stderr)
+        plex = PlexServer(server_config['url'], server_config['token'], timeout=15)
         
-        # Process all history to find each user's most recent watch
+        # Get all users first
+        accounts = plex.systemAccounts()
+        account_lookup = {acc.id: getattr(acc, 'name', f'User {acc.id}') for acc in accounts}
+        print(f"[INFO] Found {len(accounts)} accounts", file=sys.stderr)
+        
+        # Get recent history in bulk (much faster for recent activity)
+        min_date = datetime.now() - timedelta(days=days_back)
+        print(f"[INFO] Getting bulk history since {min_date.strftime('%Y-%m-%d')}", file=sys.stderr)
+        
+        history = plex.history(mindate=min_date)
+        print(f"[INFO] Retrieved {len(history)} recent history entries", file=sys.stderr)
+        
+        # Process bulk history to find most recent per user
         user_last_watched = {}
-        processed_items = 0
-        
-        print(f"[INFO] Processing history to find last watched dates...", file=sys.stderr)
         
         for item in history:
             try:
-                processed_items += 1
-                if processed_items % 1000 == 0:
-                    print(f"[PROGRESS] Processed {processed_items}/{len(history)} history items", file=sys.stderr)
+                account_id = getattr(item, 'accountID', None)
+                viewed_at = getattr(item, 'viewedAt', None) or getattr(item, 'lastViewedAt', None)
                 
-                # Get the account ID from the history item
-                if hasattr(item, 'accountID'):
-                    item_account_id = item.accountID
-                else:
-                    continue
-                
-                # Get the viewed date
-                viewed_at = None
-                if hasattr(item, 'viewedAt') and item.viewedAt:
-                    viewed_at = item.viewedAt
-                elif hasattr(item, 'lastViewedAt') and item.lastViewedAt:
-                    viewed_at = item.lastViewedAt
-                else:
-                    continue
-                
-                # Track the most recent view for each user
-                if item_account_id not in user_last_watched or viewed_at > user_last_watched[item_account_id]['last_watched']:
-                    user_last_watched[item_account_id] = {
-                        'last_watched': viewed_at,
-                        'last_item_title': getattr(item, 'title', 'Unknown'),
-                        'last_item_type': getattr(item, 'type', 'Unknown'),
-                        'account_id': item_account_id,
-                        'last_item_year': getattr(item, 'year', None),
-                        'last_item_rating_key': getattr(item, 'ratingKey', None)
-                    }
-                    
-            except Exception as e:
-                # Don't let one bad item stop the whole process
+                if account_id and viewed_at:
+                    # Keep only the most recent for each user
+                    if account_id not in user_last_watched or viewed_at > user_last_watched[account_id]['viewed_at']:
+                        user_last_watched[account_id] = {
+                            'viewed_at': viewed_at,
+                            'title': getattr(item, 'title', 'Unknown')
+                        }
+            except:
                 continue
         
-        print(f"[INFO] Finished processing {processed_items} history items", file=sys.stderr)
+        # Build results for all users
+        results = {}
         
-        # Create results for all known users
-        for account_id, account_data in account_info.items():
-            user_result = {
-                'account_id': account_id,
-                'name': account_data['name'],
-                'email': account_data['email'],
-                'has_watch_history': account_id in user_last_watched
-            }
-            
+        for account_id, account_name in account_lookup.items():
             if account_id in user_last_watched:
                 watch_data = user_last_watched[account_id]
-                user_result.update({
-                    'last_watched_date': watch_data['last_watched'].isoformat() if watch_data['last_watched'] else None,
-                    'last_watched_title': watch_data['last_item_title'],
-                    'last_watched_type': watch_data['last_item_type'],
-                    'last_watched_year': watch_data['last_item_year'],
-                    'days_since_last_watch': (datetime.now() - watch_data['last_watched'].replace(tzinfo=None)).days if watch_data['last_watched'] else None
-                })
-            else:
-                user_result.update({
-                    'last_watched_date': None,
-                    'last_watched_title': None,
-                    'last_watched_type': None,
-                    'last_watched_year': None,
-                    'days_since_last_watch': None
-                })
-            
-            result['users'][str(account_id)] = user_result
-        
-        # Also add any users found in history but not in accounts (shouldn't happen but just in case)
-        for account_id, watch_data in user_last_watched.items():
-            if account_id not in account_info:
-                result['users'][str(account_id)] = {
+                days_since = (datetime.now() - watch_data['viewed_at'].replace(tzinfo=None)).days
+                
+                results[account_id] = {
                     'account_id': account_id,
-                    'name': f'Unknown User {account_id}',
-                    'email': None,
-                    'has_watch_history': True,
-                    'last_watched_date': watch_data['last_watched'].isoformat() if watch_data['last_watched'] else None,
-                    'last_watched_title': watch_data['last_item_title'],
-                    'last_watched_type': watch_data['last_item_type'],
-                    'last_watched_year': watch_data['last_item_year'],
-                    'days_since_last_watch': (datetime.now() - watch_data['last_watched'].replace(tzinfo=None)).days if watch_data['last_watched'] else None
+                    'account_name': account_name,
+                    'days_since_last_watch': days_since,
+                    'last_watched_date': watch_data['viewed_at'].isoformat(),
+                    'last_watched_title': watch_data['title']
+                }
+            else:
+                # No recent activity (or never watched)
+                results[account_id] = {
+                    'account_id': account_id,
+                    'account_name': account_name,
+                    'days_since_last_watch': None,  # Could be >30 days or never
+                    'last_watched_date': None,
+                    'last_watched_title': None
                 }
         
-        users_with_history = len([u for u in result['users'].values() if u['has_watch_history']])
-        users_without_history = len(result['users']) - users_with_history
+        users_with_recent_activity = len([r for r in results.values() if r['days_since_last_watch'] is not None])
+        print(f"[SUCCESS] Found recent activity for {users_with_recent_activity}/{len(results)} users", file=sys.stderr)
         
-        print(f"[SUCCESS] Found {len(result['users'])} total users:", file=sys.stderr)
-        print(f"[SUCCESS] - {users_with_history} users with watch history", file=sys.stderr)
-        print(f"[SUCCESS] - {users_without_history} users with no watch history", file=sys.stderr)
-        
-        return result
+        return results
         
     except Exception as e:
-        print(f"[ERROR] Error getting watch history from {server_config['name']}: {e}", file=sys.stderr)
-        return {
-            'server_name': server_config['name'],
-            'success': False,
-            'error': str(e),
-            'users': {}
-        }
+        print(f"[ERROR] Approach 2 failed: {e}", file=sys.stderr)
+        return {}
 
-def get_all_servers_user_data():
-    """Get last watched data from all Plex servers"""
-    all_results = {}
+def sync_to_database_format(server_results):
+    """Convert results to format suitable for database sync"""
+    sync_data = []
     
-    for server_group, servers in PLEX_SERVERS.items():
-        print(f"[INFO] Checking {server_group} servers...", file=sys.stderr)
-        all_results[server_group] = {}
-        
-        # Check regular server (skip 4K servers to avoid duplicates)
-        if 'regular' in servers:
-            regular_result = get_all_users_last_watched(servers['regular'])
-            all_results[server_group]['regular'] = regular_result
+    for server_name, users in server_results.items():
+        for account_id, user_data in users.items():
+            sync_data.append({
+                'server': server_name,
+                'plex_account_id': account_id,
+                'plex_account_name': user_data['account_name'],
+                'days_since_last_watch': user_data['days_since_last_watch'],
+                'last_watched_date': user_data['last_watched_date'],
+                'last_watched_title': user_data['last_watched_title'],
+                'sync_timestamp': datetime.now().isoformat(),
+                'has_recent_activity': user_data['days_since_last_watch'] is not None
+            })
     
-    return all_results
+    return sync_data
 
 def main():
-    """Main function"""
+    parser = argparse.ArgumentParser(description='Plex Daily Sync - Get last watched data for database updates')
+    parser.add_argument('--approach', choices=['individual', 'bulk'], default='individual',
+                       help='individual = slower but gets all data, bulk = faster but only recent activity')
+    parser.add_argument('--days', type=int, default=30,
+                       help='For bulk approach: how many days back to check (default: 30)')
+    parser.add_argument('--output', choices=['json', 'database'], default='database',
+                       help='Output format: json for debugging, database for app integration')
+    
+    args = parser.parse_args()
+    
     try:
-        print(f"[START] Getting complete last watched data for ALL users (no time limits)...", file=sys.stderr)
-        print(f"[WARNING] This may take several minutes for servers with lots of history...", file=sys.stderr)
+        start_time = datetime.now()
+        print(f"[START] Plex Daily Sync - {args.approach.upper()} approach", file=sys.stderr)
         
-        results = get_all_servers_user_data()
+        all_server_results = {}
         
-        # Output JSON to stdout for consumption
-        print(json.dumps(results, indent=2))
+        for server_group, servers in PLEX_SERVERS.items():
+            if 'regular' in servers:
+                server_config = servers['regular']
+                
+                if args.approach == 'individual':
+                    results = approach_1_individual_calls(server_config)
+                else:  # bulk
+                    results = approach_2_bulk_recent_history(server_config, args.days)
+                
+                all_server_results[server_config['name']] = results
         
-        # Summary to stderr
-        total_users = 0
-        total_with_history = 0
-        total_history_items = 0
+        end_time = datetime.now()
+        processing_time = (end_time - start_time).total_seconds()
         
-        for server_group, group_data in results.items():
-            for server_type, server_data in group_data.items():
-                if server_data.get('success'):
-                    server_users = server_data.get('users', {})
-                    total_users += len(server_users)
-                    total_with_history += len([u for u in server_users.values() if u.get('has_watch_history')])
-                    total_history_items += server_data.get('total_history_items', 0)
+        if args.output == 'json':
+            # Full JSON output for debugging
+            print(json.dumps(all_server_results, indent=2))
+        else:
+            # Database-ready format
+            sync_data = sync_to_database_format(all_server_results)
+            print(json.dumps(sync_data, indent=2))
         
-        print(f"[FINAL] Complete summary:", file=sys.stderr)
-        print(f"[FINAL] - Total users found: {total_users}", file=sys.stderr)
-        print(f"[FINAL] - Users with watch history: {total_with_history}", file=sys.stderr)
-        print(f"[FINAL] - Users never watched anything: {total_users - total_with_history}", file=sys.stderr)
-        print(f"[FINAL] - Total history items processed: {total_history_items}", file=sys.stderr)
+        # Stats to stderr
+        total_users = sum(len(users) for users in all_server_results.values())
+        users_with_data = sum(len([u for u in users.values() if u['days_since_last_watch'] is not None]) 
+                             for users in all_server_results.values())
+        
+        print(f"[COMPLETE] Sync finished in {processing_time:.2f} seconds", file=sys.stderr)
+        print(f"[STATS] {total_users} total users, {users_with_data} with watch history", file=sys.stderr)
+        print(f"[STATS] Average: {processing_time/max(total_users,1):.3f} seconds per user", file=sys.stderr)
         
     except Exception as e:
-        print(f"[FATAL] Fatal error: {str(e)}", file=sys.stderr)
-        error_output = {'error': str(e)}
-        print(json.dumps(error_output))
+        print(f"[FATAL] Sync failed: {e}", file=sys.stderr)
         sys.exit(1)
 
 if __name__ == '__main__':

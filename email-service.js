@@ -283,13 +283,13 @@ async processIndividualSchedule(schedule) {
     let shouldRun = false;
     let targetUsers = [];
 
-    // Helper function to safely parse target_tags
-    const parseTargetTags = (targetTags) => {
-      if (!targetTags) return null;
+    // Helper function to safely parse JSON fields
+    const parseTargetData = (targetData) => {
+      if (!targetData) return null;
       try {
-        return JSON.parse(targetTags);
+        return JSON.parse(targetData);
       } catch (e) {
-        console.log(`⚠️ Invalid target_tags JSON for schedule ${schedule.id}:`, targetTags);
+        console.log(`⚠️ Invalid JSON for schedule ${schedule.id}:`, targetData);
         return null;
       }
     };
@@ -300,7 +300,9 @@ async processIndividualSchedule(schedule) {
       targetUsers = await this.getExpiringUsers(
         schedule.days_before_expiration,
         schedule.subscription_type,
-        parseTargetTags(schedule.target_tags),
+        parseTargetData(schedule.target_tags),
+        parseTargetData(schedule.target_owners),           // NEW
+        parseTargetData(schedule.target_subscription_types), // NEW
         schedule.exclude_users_with_setting
       );
       
@@ -317,7 +319,9 @@ async processIndividualSchedule(schedule) {
         
         if (shouldRun) {
           targetUsers = await this.getAllTargetUsers(
-            parseTargetTags(schedule.target_tags),
+            parseTargetData(schedule.target_tags),
+            parseTargetData(schedule.target_owners),           // NEW
+            parseTargetData(schedule.target_subscription_types), // NEW
             schedule.exclude_users_with_setting
           );
           console.log(`   → Found ${targetUsers.length} target users`);
@@ -327,8 +331,9 @@ async processIndividualSchedule(schedule) {
       }
     }
 
-if (shouldRun && targetUsers.length > 0) {
+    if (shouldRun && targetUsers.length > 0) {
       console.log(`📤 Running schedule: ${schedule.name} for ${targetUsers.length} users`);
+      let sentCount = 0;
       
       if (schedule.schedule_type === 'specific_date') {
         // FIXED: For specific date emails, send ONE email with all users as BCC (NO OWNER BCC)
@@ -362,6 +367,7 @@ if (shouldRun && targetUsers.length > 0) {
           const result = await this.sendEmail(senderEmail, personalizedSubject, personalizedBody, emailOptions);
           
           if (result.success) {
+            sentCount = allUserEmails.length;
             console.log(`✅ Specific date email sent to ${allUserEmails.length} users via BCC`);
             
             // Log email for each user
@@ -376,7 +382,6 @@ if (shouldRun && targetUsers.length > 0) {
         
       } else if (schedule.schedule_type === 'expiration_reminder') {
         // For expiration reminders, send individual emails with owner BCC if enabled
-        let sentCount = 0;
         for (const user of targetUsers) {
           try {
             const personalizedBody = await this.replacePlaceholders(schedule.body, user);
@@ -422,66 +427,97 @@ if (shouldRun && targetUsers.length > 0) {
   }
 }
 
-  async getExpiringUsers(daysBefore, subscriptionType, targetTags, excludeAutomated) {
-    try {
-      console.log(`   🔍 Getting expiring users: ${daysBefore} days, type: ${subscriptionType}, excludeAutomated: ${excludeAutomated}`);
-      
-      let query = `
-        SELECT 
-          u.*, 
-          s.expiration_date,
-          st.name as subscription_name,
-          st.type as subscription_type,
-          st.price as renewal_price,
-          o.name as owner_name,
-          o.email as owner_email,
-          DATEDIFF(s.expiration_date, CURDATE()) as days_until_expiration
-        FROM users u
-        JOIN subscriptions s ON u.id = s.user_id
-        JOIN subscription_types st ON s.subscription_type_id = st.id
-        LEFT JOIN owners o ON u.owner_id = o.id
-        WHERE s.status = 'active' 
-          AND s.subscription_type_id IS NOT NULL
-          AND s.expiration_date = DATE_ADD(CURDATE(), INTERVAL ? DAY)
-      `;
+async getExpiringUsers(daysBefore, subscriptionType, targetTags = null, targetOwners = null, targetSubscriptionTypes = null, excludeWithSetting = true) {
+  console.log(`🔍 Finding users expiring in ${daysBefore} days (type: ${subscriptionType})`);
+  console.log(`   → Target tags: ${targetTags ? JSON.stringify(targetTags) : 'none'}`);
+  console.log(`   → Target owners: ${targetOwners ? JSON.stringify(targetOwners) : 'none'}`);
+  console.log(`   → Target subscription types: ${targetSubscriptionTypes ? JSON.stringify(targetSubscriptionTypes) : 'none'}`);
+  
+  try {
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + daysBefore);
+    const targetDateStr = targetDate.toISOString().split('T')[0];
 
-      const params = [daysBefore];
-
-      // Add subscription type filter
-      if (subscriptionType && subscriptionType !== 'both') {
-        query += ' AND st.type = ?';
-        params.push(subscriptionType);
-      }
-
-      // Add automated email exclusion filter
-      if (excludeAutomated) {
-        query += ' AND u.exclude_automated_emails = FALSE';
-      }
-
-      const users = await db.query(query, params);
-      console.log(`   📊 Database returned ${users.length} users before tag filtering`);
-
-      // Filter by tags if specified
-      if (targetTags && targetTags.length > 0) {
-        const filteredUsers = users.filter(user => {
-          if (!user.tags) return false;
-          try {
-            const userTags = JSON.parse(user.tags);
-            return targetTags.some(tag => userTags.includes(tag));
-          } catch (e) {
-            return false;
-          }
-        });
-        console.log(`   🏷️ After tag filtering: ${filteredUsers.length} users`);
-        return filteredUsers;
-      }
-
-      return users;
-    } catch (error) {
-      console.error('❌ Error getting expiring users:', error);
-      return [];
+    let query = `
+      SELECT DISTINCT u.id, u.name, u.email, u.tags, u.owner_id,
+             s.expiration_date, s.subscription_type_id,
+             CASE 
+               WHEN s.subscription_type_id IS NULL THEN 'FREE Plex Access'
+               ELSE st.name 
+             END as subscription_name,
+             CASE 
+               WHEN s.subscription_type_id IS NULL THEN 'plex'
+               ELSE st.type 
+             END as subscription_type,
+             o.name as owner_name
+      FROM users u
+      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
+      LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
+      LEFT JOIN owners o ON u.owner_id = o.id
+      WHERE 1=1
+    `;
+    
+    const params = [];
+    
+    // Date filtering
+    if (subscriptionType === 'plex') {
+      query += ` AND st.type = 'plex' AND DATE(s.expiration_date) = ?`;
+      params.push(targetDateStr);
+    } else if (subscriptionType === 'iptv') {
+      query += ` AND st.type = 'iptv' AND DATE(s.expiration_date) = ?`;
+      params.push(targetDateStr);
+    } else if (subscriptionType === 'both') {
+      query += ` AND st.type IN ('plex', 'iptv') AND DATE(s.expiration_date) = ?`;
+      params.push(targetDateStr);
     }
+    
+    // Exclude users with setting
+    if (excludeWithSetting) {
+      query += ` AND u.exclude_automated_emails = FALSE`;
+    }
+    
+    const allUsers = await db.query(query, params);
+    console.log(`   → Found ${allUsers.length} users matching date criteria`);
+    
+    // Apply additional filtering
+    let filteredUsers = allUsers;
+    
+    // Filter by tags
+    if (targetTags && targetTags.length > 0) {
+      filteredUsers = filteredUsers.filter(user => {
+        const userTags = this.safeJsonParse(user.tags, []);
+        return targetTags.some(tag => userTags.includes(tag));
+      });
+      console.log(`   → After tag filtering: ${filteredUsers.length} users`);
+    }
+    
+    // NEW: Filter by owners
+    if (targetOwners && targetOwners.length > 0) {
+      filteredUsers = filteredUsers.filter(user => {
+        return targetOwners.includes(user.owner_id);
+      });
+      console.log(`   → After owner filtering: ${filteredUsers.length} users`);
+    }
+    
+    // NEW: Filter by subscription types
+    if (targetSubscriptionTypes && targetSubscriptionTypes.length > 0) {
+      filteredUsers = filteredUsers.filter(user => {
+        // Handle both NULL (free) and specific subscription type IDs
+        if (targetSubscriptionTypes.includes('free') && user.subscription_type_id === null) {
+          return true;
+        }
+        return targetSubscriptionTypes.includes(user.subscription_type_id);
+      });
+      console.log(`   → After subscription type filtering: ${filteredUsers.length} users`);
+    }
+    
+    return filteredUsers;
+    
+  } catch (error) {
+    console.error('❌ Error finding expiring users:', error);
+    return [];
   }
+}
 
   async getAllTargetUsers(targetTags, excludeAutomated) {
     try {

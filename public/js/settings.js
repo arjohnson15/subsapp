@@ -406,29 +406,46 @@ async init() {
         });
     },
 
-    showScheduleForm(schedule = null) {
-        // Schedule form management logic
-        const container = document.getElementById('scheduleFormContainer');
-        const title = document.getElementById('scheduleFormTitle');
-        const form = document.getElementById('scheduleForm');
+async showScheduleForm(schedule = null) {
+    // Schedule form management logic
+    const container = document.getElementById('scheduleFormContainer');
+    const title = document.getElementById('scheduleFormTitle');
+    const form = document.getElementById('scheduleForm');
 
-        if (schedule) {
-            title.textContent = 'Edit Email Schedule';
-            this.populateScheduleForm(schedule);
-        } else {
-            title.textContent = 'Add New Email Schedule';
-            form.reset();
-            document.getElementById('scheduleId').value = '';
-        }
+    if (schedule) {
+        title.textContent = 'Edit Email Schedule';
+    } else {
+        title.textContent = 'Add New Email Schedule';
+        form.reset();
+        document.getElementById('scheduleId').value = '';
+    }
 
-        container.style.display = 'block';
-        container.scrollIntoView({ behavior: 'smooth' });
-        this.toggleScheduleFields();
-    },
+    container.style.display = 'block';
+    container.scrollIntoView({ behavior: 'smooth' });
+    
+    // Load all necessary data for the form
+    await Promise.all([
+        this.loadEmailTemplates(),
+        this.loadAvailableTags(),
+        this.loadOwnersForFiltering(),
+        this.loadSubscriptionTypesForFiltering()
+    ]);
+    
+    // Populate tags container after loading
+    this.populateTagsContainer();
+    
+    // Populate form if editing
+    if (schedule) {
+        this.populateScheduleForm(schedule);
+    }
+    
+    this.toggleScheduleFields();
+},
 
     hideScheduleForm() {
         document.getElementById('scheduleFormContainer').style.display = 'none';
     },
+	
 
     toggleScheduleFields() {
         const scheduleType = document.getElementById('scheduleType').value;
@@ -475,13 +492,20 @@ async init() {
                 scheduleData.scheduled_time = formData.get('scheduled_time');
             }
             
-            // Collect selected target tags
-            const targetTags = [];
-            const tagCheckboxes = document.querySelectorAll('#targetTagsContainer input[type="checkbox"]:checked');
-            tagCheckboxes.forEach(checkbox => {
-                targetTags.push(checkbox.value);
-            });
-            scheduleData.target_tags = targetTags;
+// Collect selected target tag (UPDATED for single dropdown)
+const targetTagsSelect = document.getElementById('targetTags');
+const targetTag = targetTagsSelect ? targetTagsSelect.value : '';
+scheduleData.target_tags = targetTag ? [targetTag] : [];
+
+// Collect selected target owner (UPDATED for single dropdown)
+const targetOwnersSelect = document.getElementById('targetOwners');
+const targetOwner = targetOwnersSelect ? targetOwnersSelect.value : '';
+scheduleData.target_owners = targetOwner ? [parseInt(targetOwner)] : [];
+
+// Collect selected target subscription type (UPDATED for single dropdown)
+const targetSubTypesSelect = document.getElementById('targetSubscriptionTypes');
+const targetSubType = targetSubTypesSelect ? targetSubTypesSelect.value : '';
+scheduleData.target_subscription_types = targetSubType ? [targetSubType === 'free' ? 'free' : parseInt(targetSubType)] : [];
             
             console.log('📅 Saving schedule data:', scheduleData);
             
@@ -551,10 +575,25 @@ async init() {
                 details = `${schedule.days_before_expiration} days before ${schedule.subscription_type} expiration`;
             }
 
-            let targetInfo = '';
-            if (schedule.target_tags && schedule.target_tags.length > 0) {
-                targetInfo = ` (Tags: ${schedule.target_tags.join(', ')})`;
-            }
+let targetInfo = '';
+const filters = [];
+
+if (schedule.target_tags && schedule.target_tags.length > 0) {
+    filters.push(`Tag: ${schedule.target_tags[0]}`);
+}
+
+if (schedule.target_owners && schedule.target_owners.length > 0) {
+    filters.push(`Owner: ID ${schedule.target_owners[0]}`);
+}
+
+if (schedule.target_subscription_types && schedule.target_subscription_types.length > 0) {
+    const subType = schedule.target_subscription_types[0];
+    filters.push(`Sub Type: ${subType === 'free' ? 'FREE' : `ID ${subType}`}`);
+}
+
+if (filters.length > 0) {
+    targetInfo = ` (${filters.join(', ')})`;
+}
 
             return `
                 <tr>
@@ -648,13 +687,30 @@ async init() {
             document.getElementById('scheduledTime').value = schedule.scheduled_time;
         }
 
-        // Set target tags if they exist
-        if (schedule.target_tags && schedule.target_tags.length > 0) {
-            const checkboxes = document.querySelectorAll('#targetTagsContainer input[type="checkbox"]');
-            checkboxes.forEach(checkbox => {
-                checkbox.checked = schedule.target_tags.includes(checkbox.value);
-            });
-        }
+// Set target tag if it exists (UPDATED for single dropdown)
+if (schedule.target_tags && schedule.target_tags.length > 0) {
+    const targetTagsSelect = document.getElementById('targetTags');
+    if (targetTagsSelect) {
+        targetTagsSelect.value = schedule.target_tags[0] || '';
+    }
+}
+
+// Set target owner if it exists (UPDATED for single dropdown)
+if (schedule.target_owners && schedule.target_owners.length > 0) {
+    const targetOwnersSelect = document.getElementById('targetOwners');
+    if (targetOwnersSelect) {
+        targetOwnersSelect.value = schedule.target_owners[0] || '';
+    }
+}
+
+// Set target subscription type if it exists (UPDATED for single dropdown)
+if (schedule.target_subscription_types && schedule.target_subscription_types.length > 0) {
+    const targetSubTypesSelect = document.getElementById('targetSubscriptionTypes');
+    if (targetSubTypesSelect) {
+        const value = schedule.target_subscription_types[0];
+        targetSubTypesSelect.value = value === 'free' ? 'free' : value.toString();
+    }
+}
     },
 
     async loadAvailableTags() {
@@ -676,30 +732,80 @@ async init() {
             this.populateTagsContainer();
         }
     },
+	
+// Load owners for filtering (UPDATED for single dropdown)
+async loadOwnersForFiltering() {
+    try {
+        const owners = await API.Owner.getAll();
+        const select = document.getElementById('targetOwners');
+        
+        if (!select) return;
+        
+        // Keep the "All Owners" option and add owners
+        select.innerHTML = '<option value="">All Owners</option>';
+        
+        owners.forEach(owner => {
+            const option = document.createElement('option');
+            option.value = owner.id;
+            option.textContent = owner.name;
+            select.appendChild(option);
+        });
+        
+        console.log(`✅ Loaded ${owners.length} owners into dropdown`);
+    } catch (error) {
+        console.error('Error loading owners:', error);
+    }
+},
 
-    populateTagsContainer() {
-        const container = document.getElementById('targetTagsContainer');
-        if (!container) return;
+// Load subscription types for filtering (UPDATED for single dropdown)
+async loadSubscriptionTypesForFiltering() {
+    try {
+        const subscriptionTypes = await API.Subscription.getAll();
+        const select = document.getElementById('targetSubscriptionTypes');
+        
+        if (!select) return;
+        
+        // Keep the "All Subscription Types" option
+        select.innerHTML = '<option value="">All Subscription Types</option>';
+        
+        // Add FREE option
+        const freeOption = document.createElement('option');
+        freeOption.value = 'free';
+        freeOption.textContent = 'FREE Plex Access';
+        select.appendChild(freeOption);
+        
+        // Add paid subscription types
+        subscriptionTypes.forEach(subType => {
+            const option = document.createElement('option');
+            option.value = subType.id;
+            option.textContent = `${subType.name} (${subType.type?.toUpperCase() || 'PLEX'})`;
+            select.appendChild(option);
+        });
+        
+        console.log(`✅ Loaded ${subscriptionTypes.length + 1} subscription types into dropdown`);
+    } catch (error) {
+        console.error('Error loading subscription types:', error);
+    }
+},
 
-        // Define available tags with nice display names
-        const availableTags = [
-            { value: 'IPTV', label: 'IPTV', class: 'tag-iptv' },
-            { value: 'Plex 1', label: 'Plex 1', class: 'tag-plex1' },
-            { value: 'Plex 2', label: 'Plex 2', class: 'tag-plex2' }
-        ];
+// Update tags dropdown (UPDATED for single dropdown)
+populateTagsContainer() {
+    const select = document.getElementById('targetTags');
+    if (!select) return;
 
-        container.innerHTML = availableTags.map(tag => {
-            return `
-                <div class="tag-checkbox-item ${tag.class}">
-                    <input type="checkbox" 
-                           id="targetTag_${tag.value.replace(/\s+/g, '')}" 
-                           name="target_tags" 
-                           value="${tag.value}">
-                    <label for="targetTag_${tag.value.replace(/\s+/g, '')}">${tag.label}</label>
-                </div>
-            `;
-        }).join('');
-    },
+    // Keep the "All Tags" option
+    select.innerHTML = '<option value="">All Tags</option>';
+
+    // Define available tags
+    const availableTags = ['IPTV', 'Plex 1', 'Plex 2'];
+
+    availableTags.forEach(tag => {
+        const option = document.createElement('option');
+        option.value = tag;
+        option.textContent = tag;
+        select.appendChild(option);
+    });
+},
     
     renderSubscriptionsTable(subscriptions) {
         const tbody = document.getElementById('subscriptionsTableBody');

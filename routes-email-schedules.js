@@ -17,15 +17,33 @@ router.get('/', async (req, res) => {
     `);
     
     // Parse JSON fields
-    schedules.forEach(schedule => {
-      if (schedule.target_tags) {
-        try {
-          schedule.target_tags = JSON.parse(schedule.target_tags);
-        } catch (e) {
-          schedule.target_tags = [];
-        }
-      }
-    });
+schedules.forEach(schedule => {
+  if (schedule.target_tags) {
+    try {
+      schedule.target_tags = JSON.parse(schedule.target_tags);
+    } catch (e) {
+      schedule.target_tags = [];
+    }
+  }
+  
+  // NEW: Parse target_owners
+  if (schedule.target_owners) {
+    try {
+      schedule.target_owners = JSON.parse(schedule.target_owners);
+    } catch (e) {
+      schedule.target_owners = [];
+    }
+  }
+  
+  // NEW: Parse target_subscription_types
+  if (schedule.target_subscription_types) {
+    try {
+      schedule.target_subscription_types = JSON.parse(schedule.target_subscription_types);
+    } catch (e) {
+      schedule.target_subscription_types = [];
+    }
+  }
+});
     
     res.json(schedules);
   } catch (error) {
@@ -53,7 +71,11 @@ router.post('/', [
   
   // Conditional validation for specific dates
   body('scheduled_date').if(body('schedule_type').equals('specific_date')).isISO8601().withMessage('Valid date is required'),
-  body('scheduled_time').if(body('schedule_type').equals('specific_date')).matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).withMessage('Valid time is required (HH:MM format)')
+  body('scheduled_time').if(body('schedule_type').equals('specific_date')).matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).withMessage('Valid time is required (HH:MM format)'),
+  
+  // NEW: Optional validation for filtering arrays
+  body('target_owners').optional().isArray().withMessage('Target owners must be an array'),
+  body('target_subscription_types').optional().isArray().withMessage('Target subscription types must be an array')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -61,18 +83,20 @@ router.post('/', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const {
-      name,
-      schedule_type,
-      days_before_expiration,
-      subscription_type,
-      scheduled_date,
-      scheduled_time,
-      email_template_id,
-      target_tags,
-      exclude_users_with_setting,
-      active
-    } = req.body;
+  const {
+    name,
+    schedule_type,
+    days_before_expiration,
+    subscription_type,
+    scheduled_date,
+    scheduled_time,
+    email_template_id,
+    target_tags,
+    target_owners,        // NEW
+    target_subscription_types,  // NEW
+    exclude_users_with_setting,
+    active
+  } = req.body;
 
 // Calculate next_run based on schedule type  
 let next_run = null;
@@ -94,25 +118,28 @@ if (schedule_type === 'specific_date' && scheduled_date && scheduled_time) {
   console.log(`🕐 Converting Central Time ${dateOnly} ${scheduled_time} to UTC: ${next_run}`);
 }
 
-    const result = await db.query(`
-      INSERT INTO email_schedules (
-        name, schedule_type, days_before_expiration, subscription_type,
-        scheduled_date, scheduled_time, email_template_id, target_tags,
-        exclude_users_with_setting, active, next_run
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      name,
-      schedule_type,
-      days_before_expiration || null,
-      subscription_type || null,
-      scheduled_date || null,
-      scheduled_time || null,
-      email_template_id,
-      target_tags ? JSON.stringify(target_tags) : null,
-      exclude_users_with_setting !== false,
-      active !== false,
-      next_run
-    ]);
+  const result = await db.query(`
+    INSERT INTO email_schedules (
+      name, schedule_type, days_before_expiration, subscription_type,
+      scheduled_date, scheduled_time, email_template_id, target_tags,
+      target_owners, target_subscription_types,
+      exclude_users_with_setting, active, next_run
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    name,
+    schedule_type,
+    days_before_expiration || null,
+    subscription_type || null,
+    scheduled_date || null,
+    scheduled_time || null,
+    email_template_id,
+    target_tags ? JSON.stringify(target_tags) : null,
+    target_owners ? JSON.stringify(target_owners) : null,        // NEW
+    target_subscription_types ? JSON.stringify(target_subscription_types) : null,  // NEW
+    exclude_users_with_setting || false,
+    active || false,
+    next_run
+  ]);
 
     res.json({ 
       message: 'Email schedule created successfully',
@@ -123,6 +150,8 @@ if (schedule_type === 'specific_date' && scheduled_date && scheduled_time) {
     res.status(500).json({ error: 'Failed to create email schedule' });
   }
 });
+
+
 
 // Update email schedule
 router.put('/:id', [
@@ -195,6 +224,80 @@ router.put('/:id', [
       active !== false,
       next_run,
       req.params.id
+    ]);
+
+    res.json({ message: 'Email schedule updated successfully' });
+  } catch (error) {
+    console.error('Error updating email schedule:', error);
+    res.status(500).json({ error: 'Failed to update email schedule' });
+  }
+});
+
+// Update existing email schedule
+router.put('/:id', [
+  body('name').notEmpty().trim().withMessage('Name is required'),
+  body('schedule_type').isIn(['expiration_reminder', 'specific_date']).withMessage('Invalid schedule type'),
+  body('email_template_id').isInt().withMessage('Valid template is required'),
+  body('target_owners').optional().isArray().withMessage('Target owners must be an array'),
+  body('target_subscription_types').optional().isArray().withMessage('Target subscription types must be an array')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const scheduleId = req.params.id;
+    const {
+      name,
+      schedule_type,
+      days_before_expiration,
+      subscription_type,
+      scheduled_date,
+      scheduled_time,
+      email_template_id,
+      target_tags,
+      target_owners,
+      target_subscription_types,
+      exclude_users_with_setting,
+      active
+    } = req.body;
+
+    // Calculate next_run (same logic as POST)
+    let next_run = null;
+    if (schedule_type === 'specific_date' && scheduled_date && scheduled_time) {
+      const dateOnly = scheduled_date.split('T')[0];
+      const centralDateTime = `${dateOnly}T${scheduled_time}:00`;
+      const centralDate = new Date(centralDateTime);
+      const now = new Date();
+      const isDST = now.getMonth() >= 2 && now.getMonth() <= 10;
+      const offsetHours = isDST ? 5 : 6;
+      const utcDate = new Date(centralDate.getTime() + (offsetHours * 60 * 60 * 1000));
+      next_run = utcDate.toISOString().slice(0, 19).replace('T', ' ');
+    }
+
+    await db.query(`
+      UPDATE email_schedules SET
+        name = ?, schedule_type = ?, days_before_expiration = ?, subscription_type = ?,
+        scheduled_date = ?, scheduled_time = ?, email_template_id = ?, target_tags = ?,
+        target_owners = ?, target_subscription_types = ?,
+        exclude_users_with_setting = ?, active = ?, next_run = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [
+      name,
+      schedule_type,
+      days_before_expiration || null,
+      subscription_type || null,
+      scheduled_date || null,
+      scheduled_time || null,
+      email_template_id,
+      target_tags ? JSON.stringify(target_tags) : null,
+      target_owners ? JSON.stringify(target_owners) : null,
+      target_subscription_types ? JSON.stringify(target_subscription_types) : null,
+      exclude_users_with_setting || false,
+      active || false,
+      next_run,
+      scheduleId
     ]);
 
     res.json({ message: 'Email schedule updated successfully' });

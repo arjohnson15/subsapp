@@ -635,13 +635,32 @@
                 </select>
             </div>
 
-            <div class="form-group">
-                <label for="targetTags">Target User Tags (Optional):</label>
-                <div id="targetTagsContainer" class="tags-container">
-                    <!-- Dynamic tag checkboxes will be inserted here -->
-                </div>
-                <small>Leave blank to target all users matching other criteria</small>
-            </div>
+<div class="form-group">
+    <label for="targetTags">Target User Tags (Optional):</label>
+    <select id="targetTags" name="target_tags">
+        <option value="">All Tags</option>
+        <!-- Dynamic options will be inserted here -->
+    </select>
+    <small>Select a specific tag to target, or leave as "All Tags"</small>
+</div>
+
+<div class="form-group">
+    <label for="targetOwners">Target Owners (Optional):</label>
+    <select id="targetOwners" name="target_owners">
+        <option value="">All Owners</option>
+        <!-- Dynamic options will be inserted here -->
+    </select>
+    <small>Select a specific owner to target, or leave as "All Owners"</small>
+</div>
+
+<div class="form-group">
+    <label for="targetSubscriptionTypes">Target Subscription Types (Optional):</label>
+    <select id="targetSubscriptionTypes" name="target_subscription_types">
+        <option value="">All Subscription Types</option>
+        <!-- Dynamic options will be inserted here -->
+    </select>
+    <small>Select a specific subscription type to target, or leave as "All Types"</small>
+</div>
 
             <div style="margin: 25px 0; padding: 20px; background: rgba(79, 195, 247, 0.05); border-radius: 6px;">
                 <div class="clean-checkbox-group" style="margin-bottom: 15px;">
@@ -931,5 +950,40 @@
 
 .channel-groups-table tr:hover {
     background: rgba(79, 195, 247, 0.05);
+}
+
+/* Multi-select dropdown styling */
+select[multiple] {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(79, 195, 247, 0.3);
+    border-radius: 6px;
+    color: #fff;
+    padding: 8px;
+    font-size: 0.9rem;
+    width: 100%;
+    min-height: 80px;
+}
+
+select[multiple]:focus {
+    outline: none;
+    border-color: #4fc3f7;
+    box-shadow: 0 0 0 2px rgba(79, 195, 247, 0.2);
+}
+
+select[multiple] option {
+    background: #2a2a2a;
+    color: #fff;
+    padding: 6px 8px;
+    border-radius: 3px;
+    margin: 1px 0;
+}
+
+select[multiple] option:selected {
+    background: linear-gradient(45deg, #4fc3f7, #8e24aa);
+    color: #fff;
+}
+
+select[multiple] option:hover {
+    background: rgba(79, 195, 247, 0.3);
 }
 </style>
