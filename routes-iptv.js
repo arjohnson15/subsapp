@@ -20,48 +20,184 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 async function forceSyncWithRetry(syncData, operation, user_id) {
-    const MAX_RETRIES = 5; 
-    const RETRY_DELAY = 5000; // 3 seconds between retries
+    const MAX_RETRIES = 8; // Increased from 5
+    const INITIAL_RETRY_DELAY = 2000; // Start with 2 seconds
+    const MAX_RETRY_DELAY = 10000; // Max 10 seconds
     
-    for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-            console.log(`🔄 Force-sync attempt ${attempt}/${MAX_RETRIES + 1} for ${operation}...`);
+            console.log(`🔄 Force-sync attempt ${attempt}/${MAX_RETRIES} for ${operation}...`);
+            
+            // Progressive delay: 2s, 4s, 6s, 8s, 10s, 10s, 10s, 10s
+            const delay = Math.min(INITIAL_RETRY_DELAY * attempt, MAX_RETRY_DELAY);
+            
+            if (attempt > 1) {
+                console.log(`⏳ Waiting ${delay/1000} seconds before retry ${attempt}...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
             
             const syncStartTime = Date.now();
             const syncResponse = await iptvEditorService.makeRequest('/api/reseller/force-sync', syncData);
             const syncDuration = Date.now() - syncStartTime;
             
-            console.log(`✅ Force-sync completed successfully in ${syncDuration}ms on attempt ${attempt}`);
+            console.log(`📊 Force-sync response on attempt ${attempt}:`, syncResponse);
             
-            // Log successful sync
-            await db.query(`
-                INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, duration_ms)
-                VALUES (?, ?, 'success', ?, ?, ?)
-            `, [operation, user_id, JSON.stringify(syncData), JSON.stringify(syncResponse), syncDuration]);
-            
-            return { success: true, response: syncResponse, duration: syncDuration };
+            // Enhanced verification: Check if the response contains expected data
+            if (syncResponse && (syncResponse.updated !== undefined || syncResponse.expiry)) {
+                console.log(`✅ Force-sync completed successfully in ${syncDuration}ms on attempt ${attempt}`);
+                
+                // Additional verification: Try to fetch the user to confirm sync worked
+                try {
+                    console.log(`🔍 Verifying sync by fetching user data...`);
+                    await verifyUserSyncSuccess(syncData, user_id);
+                    console.log(`✅ User verification successful after force-sync`);
+                } catch (verifyError) {
+                    console.warn(`⚠️ Verification failed but sync appeared successful: ${verifyError.message}`);
+                    // Continue anyway since sync response was positive
+                }
+                
+                // Log successful sync
+                await db.query(`
+                    INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, duration_ms)
+                    VALUES (?, ?, 'success', ?, ?, ?)
+                `, [operation, user_id, JSON.stringify(syncData), JSON.stringify(syncResponse), syncDuration]);
+                
+                return { success: true, response: syncResponse, duration: syncDuration };
+            } else {
+                throw new Error(`Invalid sync response: ${JSON.stringify(syncResponse)}`);
+            }
             
         } catch (error) {
-            const isHttp500 = error.message.includes('HTTP 500') || error.message.includes('500');
+            const errorMsg = error.message || 'Unknown error';
+            const isHttp500 = errorMsg.includes('HTTP 500') || errorMsg.includes('500');
+            const isTimeout = errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT');
+            const isNetworkError = errorMsg.includes('ECONNRESET') || errorMsg.includes('ENOTFOUND');
+            const isRetryableError = isHttp500 || isTimeout || isNetworkError || errorMsg.includes('Invalid sync response');
             
-            console.error(`❌ Force-sync attempt ${attempt} failed:`, error.message);
+            console.error(`❌ Force-sync attempt ${attempt} failed:`, errorMsg);
             
-            // If it's an HTTP 500 and we have retries left, try again
-            if (isHttp500 && attempt <= MAX_RETRIES) {
-                console.log(`⏳ HTTP 500 detected, waiting ${RETRY_DELAY/1000} seconds before retry...`);
-                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+            // Retry on any retryable error, not just HTTP 500
+            if (isRetryableError && attempt < MAX_RETRIES) {
+                console.log(`🔄 Retryable error detected, will retry...`);
                 continue; // Try again
             }
             
             // Final failure - log it and return error
+            console.error(`❌ Force-sync failed permanently after ${attempt} attempts`);
+            
             await db.query(`
                 INSERT INTO iptv_sync_logs (sync_type, user_id, status, request_data, response_data, error_message)
                 VALUES (?, ?, 'error', ?, NULL, ?)
-            `, [operation, user_id, JSON.stringify(syncData), `Failed after ${attempt} attempts: ${error.message}`]);
+            `, [operation, user_id, JSON.stringify(syncData), `Failed after ${attempt} attempts: ${errorMsg}`]);
             
-            throw error; // Re-throw the error for the calling code to handle
+            throw new Error(`Force-sync failed after ${attempt} attempts: ${errorMsg}`);
         }
     }
+    
+    // This should never be reached due to the loop logic, but just in case
+    throw new Error(`Force-sync failed after ${MAX_RETRIES} attempts`);
+}
+
+// New helper function to verify sync worked by fetching user data
+async function verifyUserSyncSuccess(syncData, user_id) {
+    try {
+        // Get the settings
+        const settings = await iptvEditorService.getAllSettings();
+        
+        if (!settings.default_playlist_id) {
+            throw new Error('No playlist ID configured');
+        }
+        
+        // Fetch all users to verify our user is there and synced
+        const apiUsers = await iptvEditorService.getAllUsers();
+        
+        // Find our user by username from the sync data
+        const targetUsername = syncData.items?.[0]?.username;
+        if (!targetUsername) {
+            throw new Error('No username in sync data to verify');
+        }
+        
+        const foundUser = apiUsers.find(user => 
+            user.username && user.username.toLowerCase() === targetUsername.toLowerCase()
+        );
+        
+        if (!foundUser) {
+            throw new Error(`User ${targetUsername} not found in IPTV Editor after sync`);
+        }
+        
+        // Check if the user has a reasonable expiry date (not default/old)
+        if (!foundUser.expiry) {
+            console.warn(`⚠️ User ${targetUsername} found but has no expiry date`);
+        } else {
+            const expiryDate = new Date(foundUser.expiry);
+            const now = new Date();
+            
+            if (expiryDate <= now) {
+                console.warn(`⚠️ User ${targetUsername} has expired/old expiry: ${foundUser.expiry}`);
+            } else {
+                console.log(`✅ User ${targetUsername} has valid expiry: ${foundUser.expiry}`);
+            }
+        }
+        
+        return foundUser;
+        
+    } catch (error) {
+        throw new Error(`Verification failed: ${error.message}`);
+    }
+}
+
+// Background sync function for failed syncs
+async function scheduleBackgroundSync(user_id, syncData) {
+    console.log(`📅 Scheduling background sync retry for user ${user_id} in 30 seconds...`);
+    
+    setTimeout(async () => {
+        try {
+            console.log(`🔄 Starting background sync retry for user ${user_id}...`);
+            
+            const retryResult = await forceSyncWithRetry(syncData, 'background_retry_sync', user_id);
+            
+            if (retryResult.success) {
+                // Update database to mark as synced
+                await db.query(`
+                    UPDATE iptv_editor_users 
+                    SET sync_status = 'synced', last_sync_time = NOW()
+                    WHERE user_id = ?
+                `, [user_id]);
+                
+                console.log(`✅ Background sync successful for user ${user_id}`);
+            }
+            
+        } catch (bgError) {
+            console.error(`❌ Background sync failed for user ${user_id}:`, bgError.message);
+            
+            // Schedule another retry in 5 minutes
+            setTimeout(async () => {
+                try {
+                    console.log(`🔄 Final background sync attempt for user ${user_id}...`);
+                    await forceSyncWithRetry(syncData, 'final_retry_sync', user_id);
+                    
+                    await db.query(`
+                        UPDATE iptv_editor_users 
+                        SET sync_status = 'synced', last_sync_time = NOW()
+                        WHERE user_id = ?
+                    `, [user_id]);
+                    
+                    console.log(`✅ Final background sync successful for user ${user_id}`);
+                    
+                } catch (finalError) {
+                    console.error(`❌ All sync attempts failed for user ${user_id}:`, finalError.message);
+                    
+                    // Mark as permanently failed
+                    await db.query(`
+                        UPDATE iptv_editor_users 
+                        SET sync_status = 'error', last_sync_time = NOW()
+                        WHERE user_id = ?
+                    `, [user_id]);
+                }
+            }, 300000); // 5 minutes
+            
+        }
+    }, 30000); // 30 seconds
 }
 
 // Initialize IPTV service on startup
@@ -459,18 +595,18 @@ router.get('/user/:id', [
     const { id } = req.params;
     
     // Get user's IPTV data from database - FIXED: Added missing fields
-    const result = await db.query(`
-      SELECT 
-        u.id, u.name, u.email, u.iptv_username, u.iptv_password, u.iptv_line_id,
-        u.iptv_package_id, u.iptv_package_name, u.iptv_expiration,
-        u.iptv_credits_used, u.iptv_channel_group_id, u.iptv_connections,
-        u.iptv_is_trial, u.iptv_m3u_url,
-        cg.name as channel_group_name,
-        cg.description as channel_group_description
-      FROM users u
-      LEFT JOIN iptv_channel_groups cg ON u.iptv_channel_group_id = cg.id
-      WHERE u.id = ?
-    `, [id]);
+const result = await db.query(`
+  SELECT 
+    u.id, u.name, u.email, u.iptv_username, u.iptv_password, u.iptv_line_id,
+    u.iptv_package_id, u.iptv_package_name, u.iptv_expiration,
+    u.iptv_credits_used, u.iptv_channel_group_id, u.iptv_connections,
+    u.iptv_is_trial, u.iptv_m3u_url, u.iptv_refresh_needed,
+    cg.name as channel_group_name,
+    cg.description as channel_group_description
+  FROM users u
+  LEFT JOIN iptv_channel_groups cg ON u.iptv_channel_group_id = cg.id
+  WHERE u.id = ?
+`, [id]);
     
     // Handle mysql2 result format - db.query() returns direct results array
     if (!result || !Array.isArray(result) || result.length === 0) {
@@ -928,6 +1064,9 @@ let syncSuccess = false;
         } catch (syncError) {
           console.error('❌ Existing user force-sync failed after all retries:', syncError.message);
           syncSuccess = false;
+          
+          // Schedule background retry for existing users too
+          scheduleBackgroundSync(user_id, forceSyncData);
         }
       
       // Check if user is already linked in our database
@@ -966,6 +1105,23 @@ let syncSuccess = false;
         action: syncSuccess ? 'found_and_synced' : 'found_no_sync',
         sync_status: syncSuccess ? 'synced' : 'error'
       };
+	  
+	        // If sync was successful, set refresh flag for existing users too
+      if (syncSuccess) {
+        try {
+          await db.query(`
+            UPDATE users SET 
+              iptv_editor_enabled = TRUE,
+              iptv_refresh_needed = TRUE,
+              updated_at = NOW()
+            WHERE id = ?
+          `, [user_id]);
+          
+          console.log('🎯 Set refresh flag for existing user sync:', user_id);
+        } catch (flagError) {
+          console.error('❌ Failed to set refresh flag:', flagError);
+        }
+      }
       
     } else {
       // User doesn't exist in IPTV Editor - Create new user
@@ -1080,15 +1236,16 @@ const creationData = {
       console.log('📤 Sending IPTV Editor creation request...');
       const createResponse = await iptvEditorService.makeRequest('/api/reseller/new-customer', creationData);
       
-      if (createResponse && createResponse.customer) {
+if (createResponse && createResponse.customer) {
         console.log('✅ IPTV Editor user created successfully');
         
-        // Enhanced force-sync for new user with proper error handling
-        console.log('🔄 Triggering force-sync for newly created IPTV Editor user...');
-		
-		console.log('⏳ Waiting 3 seconds for new credentials to activate...');
-await new Promise(resolve => setTimeout(resolve, 3000));
-
+        // ENHANCED: Wait longer for new credentials to fully activate
+        console.log('⏳ Waiting 8 seconds for new credentials to fully activate in IPTV Editor...');
+        await new Promise(resolve => setTimeout(resolve, 8000)); // Increased from 3 seconds
+        
+        // Enhanced force-sync for new user with comprehensive error handling
+        console.log('🔄 Triggering enhanced force-sync for newly created IPTV Editor user...');
+        
         const forceSyncData = {
           playlist: settings.default_playlist_id,
           items: [{
@@ -1104,16 +1261,25 @@ await new Promise(resolve => setTimeout(resolve, 3000));
           }
         };
 
-let syncSuccess = false;
+        let syncSuccess = false;
+        let syncError = null;
+        
         try {
           const syncResult = await forceSyncWithRetry(forceSyncData, 'user_create_sync', user_id);
-          console.log(`✅ New user force-sync completed successfully`);
+          console.log(`✅ Enhanced force-sync completed successfully:`, syncResult);
           syncSuccess = true;
           iptvEditorResults.iptv_editor_synced = true;
           
-        } catch (syncError) {
-          console.error('❌ New user force-sync failed after all retries:', syncError.message);
-          // Don't throw - user was created successfully, just sync failed
+        } catch (error) {
+          console.error('❌ Enhanced force-sync failed after all retries:', error.message);
+          syncError = error.message;
+          
+          // Even if sync fails, we still created the user successfully
+          // Log this as a partial success
+          console.log(`⚠️ User created but sync failed - will attempt background sync later`);
+          
+          // Schedule a background retry
+          scheduleBackgroundSync(user_id, forceSyncData);
         }
         
         // Save to our database
@@ -1135,7 +1301,7 @@ let syncSuccess = false;
         
         iptvEditorResults.iptv_editor_created = true;
         
-        iptvEditorResults.iptv_editor_data = {
+iptvEditorResults.iptv_editor_data = {
           iptv_editor_id: createResponse.customer.id,
           username: finalUsername,
           password: actualPassword,
@@ -1145,8 +1311,9 @@ let syncSuccess = false;
             `https://editor.iptveditor.com/m3u/${createResponse.customer.m3u}` : null,
           epg_url: createResponse.customer.epg ? 
             `https://editor.iptveditor.com/epg/${createResponse.customer.epg}` : null,
-          action: syncSuccess ? 'created_and_synced' : 'created_no_sync',
-          sync_status: syncSuccess ? 'synced' : 'error'
+          action: syncSuccess ? 'created_and_synced' : 'created_sync_pending',
+          sync_status: syncSuccess ? 'synced' : 'error',
+          sync_error: syncError
         };
         
       } else {
@@ -1176,6 +1343,7 @@ let syncSuccess = false;
   });
   
 // Generate M3U URL if IPTV Editor automation was successful
+// Generate M3U URL if IPTV Editor automation was successful
   if (iptvEditorResults.iptv_editor_success) {
     try {
       console.log('🔄 Generating IPTV Editor M3U URL from IPTV credentials...');
@@ -1183,10 +1351,18 @@ let syncSuccess = false;
       const m3uUrl = iptvEditorService.generateIPTVEditorM3UUrl(finalUsername, actualPassword);
       
       if (m3uUrl) {
-        // Update users table with M3U URL
-        await db.query('UPDATE users SET iptv_editor_m3u_url = ? WHERE id = ?', [m3uUrl, user_id]);
+        // Update users table with M3U URL AND trigger refresh flag
+        await db.query(`
+          UPDATE users SET 
+            iptv_editor_m3u_url = ?, 
+            iptv_editor_enabled = TRUE,
+            iptv_refresh_needed = TRUE,
+            updated_at = NOW()
+          WHERE id = ?
+        `, [m3uUrl, user_id]);
         
         console.log('✅ IPTV Editor M3U URL generated and saved:', m3uUrl);
+        console.log('🎯 Set refresh flag for user:', user_id);
         iptvEditorResults.m3u_url = m3uUrl;
       } else {
         console.warn('⚠️ Failed to generate M3U URL - missing credentials');
@@ -1197,7 +1373,7 @@ let syncSuccess = false;
   }
   
   // 🔄 TRIGGER FRONTEND REFRESH AFTER M3U URL IS GENERATED
-console.log(`FRONTEND_REFRESH_TRIGGER:${user_id}`);
+  console.log(`✅ Background automation completed - frontend should check for refresh flag`);
 
 });
 	

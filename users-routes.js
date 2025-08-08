@@ -842,7 +842,7 @@ router.put('/:id/enhanced', async (req, res) => {
 const {
   name, email, owner_id, plex_email, iptv_username, iptv_password, 
   implayer_code, device_count, bcc_owner_renewal, exclude_bulk_emails, exclude_automated_emails,
-  plex_libraries
+  plex_libraries, iptv_refresh_needed
 } = req.body;
 
     // Validate required fields
@@ -863,19 +863,19 @@ const {
     // Prepare library data
     const libraryData = plex_libraries ? JSON.stringify(plex_libraries) : null;
 
-    // Update user
+// Update user
 await db.query(`
   UPDATE users SET
     name = ?, email = ?, owner_id = ?, plex_email = ?, 
     iptv_username = ?, iptv_password = ?, implayer_code = ?, 
     device_count = ?, bcc_owner_renewal = ?, exclude_bulk_emails = ?, exclude_automated_emails = ?,
-    plex_libraries = ?, updated_at = NOW()
+    plex_libraries = ?, iptv_refresh_needed = ?, updated_at = NOW()
   WHERE id = ?
 `, [
   name, email, owner_id || null, plex_email || null,
   iptv_username || null, iptv_password || null, implayer_code || null,
   device_count || 1, bcc_owner_renewal || false, exclude_bulk_emails || false, exclude_automated_emails || false,
-  libraryData, userId
+  libraryData, iptv_refresh_needed, userId
 ]);
 
     // If user has Plex access, sync their pending invites immediately

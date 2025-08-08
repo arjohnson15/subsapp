@@ -991,9 +991,12 @@ console.log('📊 Step 3: IPTV status already refreshed, skipping full user relo
     }
 }, 3000); // Increased to 3 seconds initial delay
     
-    // Update interface state
-    this.userHasExistingIPTVData = true;
-    this.updateStatusInterface();
+// Update interface state
+        this.userHasExistingIPTVData = true;
+        this.updateStatusInterface();
+        
+        // Start checking for background updates
+        this.startBackgroundRefreshChecking(this.currentUser);
     
     // Show success message with details
     let successMessage = `${action.replace('_', ' ')} successful!`;
@@ -1557,6 +1560,69 @@ try {
     } catch (error) {
         console.error('❌ Failed to load user IPTV status:', error);
     }
+},
+
+/**
+ * Check if user needs IPTV status refresh (for background updates)
+ */
+async checkForRefreshFlag(userId) {
+    try {
+        const response = await fetch(`/api/iptv/user/${userId}`);
+        const data = await response.json();
+        
+        if (data.success && data.user && data.user.iptv_refresh_needed) {
+            console.log('🎯 Refresh flag detected - updating IPTV status...');
+            
+// Clear the refresh flag - simpler approach
+await fetch(`/api/users/${userId}`, {
+    method: 'PUT', 
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        iptv_refresh_needed: false
+    })
+});
+            
+            // Refresh the IPTV status
+            await this.loadUserStatus(userId);
+            this.updateStatusInterface();
+            
+            console.log('✅ IPTV status refreshed from background update');
+            return true;
+        }
+        
+        return false;
+    } catch (error) {
+        console.error('❌ Error checking refresh flag:', error);
+        return false;
+    }
+},
+
+/**
+ * Start checking for background refresh flag
+ */
+startBackgroundRefreshChecking(userId) {
+    console.log(`🔄 Starting background refresh checking for user ${userId}...`);
+    
+    let checkCount = 0;
+    const maxChecks = 20; // Check for up to 60 seconds
+    
+    const checkInterval = setInterval(async () => {
+        checkCount++;
+        console.log(`📊 Background check ${checkCount}/${maxChecks}...`);
+        
+        const refreshNeeded = await this.checkForRefreshFlag(userId);
+        
+        if (refreshNeeded) {
+            console.log('✅ Background refresh completed');
+            clearInterval(checkInterval);
+        } else if (checkCount >= maxChecks) {
+            console.log('⏰ Background refresh checking timeout');
+            clearInterval(checkInterval);
+        }
+    }, 3000); // Check every 3 seconds
+    
+    // Store interval so we can clear it if needed
+    this.backgroundRefreshInterval = checkInterval;
 },
 
   /**
