@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Plex Resource Monitor Script - Gets REAL CPU/Memory from Plex API
-The same data that shows in Plex web dashboard
+Using the correct PlexAPI resources() method
 """
 
 import json
@@ -53,86 +53,74 @@ PLEX_SERVERS = {
     }
 }
 
-def get_real_plex_resources(server_config):
-    """Get real CPU/Memory resources from Plex server using /statistics/resources endpoint"""
+def get_plex_resources(server_config):
+    """Get real CPU/Memory resources using PlexAPI's resources() method"""
     try:
-        # Use the documented /statistics/resources endpoint
-        url = f"{server_config['url']}/statistics/resources"
-        headers = {'X-Plex-Token': server_config['token']}
+        # Use PlexAPI to get the server object
+        plex = PlexServer(server_config['url'], server_config['token'], timeout=10)
         
-        print(f"[DEBUG] Calling /statistics/resources for {server_config['name']}", file=sys.stderr)
+        print(f"[DEBUG] Getting resource statistics for {server_config['name']}", file=sys.stderr)
         
-        response = requests.get(url, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            print(f"[SUCCESS] Got statistics/resources response", file=sys.stderr)
+        # Use the correct PlexAPI method: plex.resources()
+        try:
+            print(f"[DEBUG] Calling plex.resources() for {server_config['name']}", file=sys.stderr)
             
-            # Try to parse as JSON first
-            try:
-                data = response.json()
-                print(f"[DEBUG] JSON response: {str(data)[:300]}...", file=sys.stderr)
+            # This is the correct method from the PlexAPI documentation
+            resources = plex.resources()
+            
+            print(f"[DEBUG] plex.resources() returned: {type(resources)}", file=sys.stderr)
+            print(f"[DEBUG] Number of resource entries: {len(resources) if resources else 0}", file=sys.stderr)
+            
+            if resources and len(resources) > 0:
+                # Get the most recent resource data (last entry)
+                latest_resource = resources[-1]
                 
-                # Look for MediaContainer -> StatisticsResources structure
-                media_container = data.get('MediaContainer', {})
-                statistics_resources = media_container.get('StatisticsResources', [])
+                print(f"[DEBUG] Latest resource object: {latest_resource}", file=sys.stderr)
+                print(f"[DEBUG] Resource object type: {type(latest_resource)}", file=sys.stderr)
+                print(f"[DEBUG] Resource attributes: {[attr for attr in dir(latest_resource) if not attr.startswith('_')]}", file=sys.stderr)
                 
-                if statistics_resources and len(statistics_resources) > 0:
-                    # Get the most recent resource entry
-                    latest_stats = statistics_resources[-1]  # Last entry is most recent
-                    
-                    # Extract the values from the API response
-                    host_cpu = float(latest_stats.get('hostCpuUtilization', 0))
-                    host_memory = float(latest_stats.get('hostMemoryUtilization', 0))
-                    
-                    print(f"[REAL] {server_config['name']}: CPU {host_cpu:.1f}%, Memory {host_memory:.1f}% (from statistics/resources)", file=sys.stderr)
+                # Extract CPU and memory data using the documented attributes
+                host_cpu = getattr(latest_resource, 'hostCpuUtilization', 0)
+                host_memory = getattr(latest_resource, 'hostMemoryUtilization', 0)
+                process_cpu = getattr(latest_resource, 'processCpuUtilization', 0)
+                process_memory = getattr(latest_resource, 'processMemoryUtilization', 0)
+                timestamp = getattr(latest_resource, 'at', None)
+                
+                print(f"[DEBUG] Extracted values:", file=sys.stderr)
+                print(f"[DEBUG] - Host CPU: {host_cpu}", file=sys.stderr)
+                print(f"[DEBUG] - Host Memory: {host_memory}", file=sys.stderr)
+                print(f"[DEBUG] - Process CPU: {process_cpu}", file=sys.stderr)
+                print(f"[DEBUG] - Process Memory: {process_memory}", file=sys.stderr)
+                print(f"[DEBUG] - Timestamp: {timestamp}", file=sys.stderr)
+                
+                if host_cpu > 0 or host_memory > 0:
+                    print(f"[REAL] {server_config['name']}: CPU {host_cpu:.1f}%, Memory {host_memory:.1f}% (resources method)", file=sys.stderr)
                     
                     return {
                         'cpu_usage_percent': round(host_cpu, 1),
                         'memory_usage_percent': round(host_memory, 1),
-                        'source': 'statistics_resources_json',
+                        'source': 'plexapi_resources',
                         'found_data': True,
-                        'timestamp': latest_stats.get('at', 0)
+                        'process_cpu': round(process_cpu, 1),
+                        'process_memory': round(process_memory, 1),
+                        'timestamp': str(timestamp) if timestamp else None
                     }
                 else:
-                    print(f"[INFO] No StatisticsResources found in JSON response", file=sys.stderr)
-                    
-            except Exception as json_error:
-                print(f"[DEBUG] JSON parsing failed: {json_error}", file=sys.stderr)
+                    print(f"[INFO] {server_config['name']}: Got resource data but CPU/Memory are 0", file=sys.stderr)
+            else:
+                print(f"[INFO] {server_config['name']}: plex.resources() returned empty list", file=sys.stderr)
                 
-                # Try parsing as XML
-                try:
-                    root = ET.fromstring(response.text)
-                    print(f"[DEBUG] Parsed as XML, root tag: {root.tag}", file=sys.stderr)
-                    
-                    # Look for StatisticsResources elements
-                    for stats_elem in root.findall('.//StatisticsResources'):
-                        host_cpu = float(stats_elem.get('hostCpuUtilization', 0))
-                        host_memory = float(stats_elem.get('hostMemoryUtilization', 0))
-                        
-                        print(f"[REAL] {server_config['name']}: CPU {host_cpu:.1f}%, Memory {host_memory:.1f}% (from statistics/resources XML)", file=sys.stderr)
-                        
-                        return {
-                            'cpu_usage_percent': round(host_cpu, 1),
-                            'memory_usage_percent': round(host_memory, 1),
-                            'source': 'statistics_resources_xml',
-                            'found_data': True,
-                            'timestamp': int(stats_elem.get('at', 0))
-                        }
-                        
-                except ET.ParseError as xml_error:
-                    print(f"[ERROR] Could not parse response as JSON or XML: {xml_error}", file=sys.stderr)
-                    print(f"[DEBUG] Raw response: {response.text[:500]}...", file=sys.stderr)
+        except Exception as resources_error:
+            print(f"[ERROR] plex.resources() failed: {resources_error}", file=sys.stderr)
+            print(f"[DEBUG] Error type: {type(resources_error)}", file=sys.stderr)
+            print(f"[DEBUG] Error details: {str(resources_error)[:500]}", file=sys.stderr)
         
-        else:
-            print(f"[ERROR] /statistics/resources returned {response.status_code}", file=sys.stderr)
-            print(f"[DEBUG] Error response: {response.text[:200]}", file=sys.stderr)
-        
-        # If we get here, the endpoint didn't work
-        print(f"[INFO] Could not get resource data from {server_config['name']}", file=sys.stderr)
+        # If we get here, the resources() method didn't work
+        print(f"[INFO] Could not get resource data from {server_config['name']} using resources() method", file=sys.stderr)
         return {
             'cpu_usage_percent': 0,
             'memory_usage_percent': 0,
-            'source': 'not_available',
+            'source': 'resources_method_failed',
             'found_data': False
         }
         
@@ -145,6 +133,16 @@ def get_real_plex_resources(server_config):
             'error_message': str(e),
             'found_data': False
         }
+
+def estimate_resources_from_sessions(transcoding_sessions, direct_play_sessions):
+    """Estimate CPU/Memory usage based on active sessions"""
+    # Base estimate: 5% CPU + 15% per transcoding + 2% per direct play
+    estimated_cpu = min(95, 5 + (transcoding_sessions * 15) + (direct_play_sessions * 2))
+    
+    # Base estimate: 20% Memory + 10% per transcoding + 3% per direct play
+    estimated_memory = min(90, 20 + (transcoding_sessions * 10) + (direct_play_sessions * 3))
+    
+    return estimated_cpu, estimated_memory
 
 def get_server_resource_usage(server_config):
     """Get server resource usage information with REAL monitoring"""
@@ -221,21 +219,48 @@ def get_server_resource_usage(server_config):
         
         # GET REAL SYSTEM RESOURCES from Plex API
         print(f"[SEARCH] Looking for CPU/Memory endpoints on {server_config['name']}...", file=sys.stderr)
-        system_resources = get_real_plex_resources(server_config)
+        system_resources = get_plex_resources(server_config)
         
-        resource_data['resources']['cpu_usage_percent'] = system_resources['cpu_usage_percent']
-        resource_data['resources']['memory_usage_percent'] = system_resources['memory_usage_percent']
+        # If we got real data, use it
+        if system_resources.get('found_data'):
+            resource_data['resources']['cpu_usage_percent'] = system_resources['cpu_usage_percent']
+            resource_data['resources']['memory_usage_percent'] = system_resources['memory_usage_percent']
+            resource_data['resources']['monitoring_source'] = system_resources.get('source', 'unknown')
+            resource_data['resources']['found_real_data'] = True
+            
+            # Also include process-specific data if available
+            if 'process_cpu' in system_resources:
+                resource_data['resources']['process_cpu_percent'] = system_resources['process_cpu']
+                resource_data['resources']['process_memory_percent'] = system_resources['process_memory']
+            
+            print(f"[REAL] {server_config['name']}: CPU {system_resources['cpu_usage_percent']:.1f}%, Memory {system_resources['memory_usage_percent']:.1f}%", file=sys.stderr)
+        else:
+            # Fall back to estimation based on sessions
+            transcoding = resource_data['resources']['transcoding_sessions']
+            direct_play = resource_data['resources']['direct_play_sessions']
+            
+            estimated_cpu, estimated_memory = estimate_resources_from_sessions(transcoding, direct_play)
+            
+            resource_data['resources']['cpu_usage_percent'] = estimated_cpu
+            resource_data['resources']['memory_usage_percent'] = estimated_memory
+            resource_data['resources']['monitoring_source'] = 'session_estimation'
+            resource_data['resources']['found_real_data'] = False
+            resource_data['resources']['estimation_note'] = f'Estimates based on {transcoding} transcoding + {direct_play} direct play sessions'
+            
+            print(f"[ESTIMATE] {server_config['name']}: CPU {estimated_cpu}%, Memory {estimated_memory}% (based on sessions)", file=sys.stderr)
+        
         resource_data['resources']['server_status'] = 'online'
-        resource_data['resources']['monitoring_source'] = system_resources.get('source', 'unknown')
-        resource_data['resources']['found_real_data'] = system_resources.get('found_data', False)
         
         if 'error_message' in system_resources:
             resource_data['resources']['monitoring_error'] = system_resources['error_message']
         
-        if system_resources.get('found_data'):
-            print(f"[REAL] {server_config['name']}: CPU {system_resources['cpu_usage_percent']:.1f}%, Memory {system_resources['memory_usage_percent']:.1f}%", file=sys.stderr)
-        else:
-            print(f"[SEARCH] {server_config['name']}: Still looking for resource endpoints...", file=sys.stderr)
+        # ADD DETAILED DEBUG OF FINAL RESOURCE DATA
+        print(f"[DEBUG] Final resource data for {server_config['name']}:", file=sys.stderr)
+        print(f"[DEBUG] - CPU: {resource_data['resources']['cpu_usage_percent']}", file=sys.stderr)
+        print(f"[DEBUG] - Memory: {resource_data['resources']['memory_usage_percent']}", file=sys.stderr)
+        print(f"[DEBUG] - Status: {resource_data['resources']['server_status']}", file=sys.stderr)
+        print(f"[DEBUG] - Source: {resource_data['resources']['monitoring_source']}", file=sys.stderr)
+        print(f"[DEBUG] - Found real data: {resource_data['resources']['found_real_data']}", file=sys.stderr)
         
         return resource_data
         
