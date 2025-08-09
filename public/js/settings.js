@@ -3220,13 +3220,19 @@ async previewTargetUsers() {
         const targetSubType = document.getElementById('targetSubscriptionTypes')?.value || '';
         const excludeAutomated = document.getElementById('excludeAutomated')?.checked || false;
 
-        // Build filters object
-        const filters = {
-            target_tags: targetTag ? [targetTag] : [],
-            target_owners: targetOwner ? [parseInt(targetOwner)] : [],
-            target_subscription_types: targetSubType ? [targetSubType === 'free' ? 'free' : parseInt(targetSubType)] : [],
-            exclude_users_with_setting: excludeAutomated
-        };
+// Get schedule type fields
+const scheduleType = document.getElementById('scheduleType')?.value || '';
+const subscriptionTypeFilter = document.getElementById('subscriptionTypeFilter')?.value || '';
+
+// Build filters object
+const filters = {
+    schedule_type: scheduleType,
+    subscription_type: subscriptionTypeFilter,
+    target_tags: targetTag ? [targetTag] : [],
+    target_owners: targetOwner ? [parseInt(targetOwner)] : [],
+    target_subscription_types: targetSubType ? [targetSubType === 'free' ? 'free' : parseInt(targetSubType)] : [],
+    exclude_users_with_setting: excludeAutomated
+};
 
         console.log('🔍 Preview filters:', filters);
 
