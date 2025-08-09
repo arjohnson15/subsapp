@@ -368,81 +368,44 @@ router.get('/debug/status', async (req, res) => {
   }
 });
 
-// Preview users for schedule filters
+// Preview users for schedule filters - USES EXACT SAME LOGIC AS EMAIL SERVICE
 router.post('/preview-users', async (req, res) => {
   try {
-    const { target_tags, target_owners, target_subscription_types, exclude_users_with_setting } = req.body;
+    const { 
+      schedule_type, 
+      subscription_type,
+      days_before_expiration,
+      target_tags, 
+      target_owners, 
+      target_subscription_types, 
+      exclude_users_with_setting 
+    } = req.body;
 
     console.log('🔍 Preview request:', req.body);
 
-    // Get all users with their relationships
-let query = `
-  SELECT u.id, u.name, u.email, u.tags, u.owner_id, u.exclude_automated_emails,
-         o.name as owner_name,
-         GROUP_CONCAT(DISTINCT s.subscription_type_id) as subscription_type_ids,
-         GROUP_CONCAT(DISTINCT st.name SEPARATOR ', ') as subscription_names
-  FROM users u
-  LEFT JOIN owners o ON u.owner_id = o.id
-  LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
-  LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
-  WHERE 1=1
-`;
+    let targetUsers = [];
 
-    const params = [];
-
-    // Apply exclude automated emails filter
-    if (exclude_users_with_setting) {
-      query += ` AND u.exclude_automated_emails = FALSE`;
+    if (schedule_type === 'expiration_reminder') {
+      // IGNORE expiration dates - get ALL users with matching subscription type and filters
+      targetUsers = await emailService.getAllUsersWithSubscriptionType(
+        subscription_type || 'both',
+        target_tags,
+        target_owners,
+        target_subscription_types,
+        exclude_users_with_setting
+      );
+    } else if (schedule_type === 'specific_date') {
+      // Use EXACT same function as email service  
+      targetUsers = await emailService.getAllTargetUsers(
+        target_tags,
+        target_owners,
+        target_subscription_types,
+        exclude_users_with_setting
+      );
     }
 
-    query += ` GROUP BY u.id, u.name, u.email, u.tags, u.owner_id, u.exclude_automated_emails, o.name`;
-const allUsers = await db.query(query, params);
-    console.log(`📊 Found ${allUsers.length} users before filtering`);
-
-    // Apply client-side filtering for tags, owners, and subscription types
-    let filteredUsers = allUsers;
-
-    // Filter by tags
-    if (target_tags && target_tags.length > 0 && target_tags[0] !== '') {
-      filteredUsers = filteredUsers.filter(user => {
-        const userTags = user.tags ? JSON.parse(user.tags) : [];
-        return target_tags.some(tag => userTags.includes(tag));
-      });
-      console.log(`📊 After tag filtering: ${filteredUsers.length} users`);
-    }
-
-    // Filter by owners
-    if (target_owners && target_owners.length > 0 && target_owners[0] !== '') {
-      filteredUsers = filteredUsers.filter(user => {
-        return target_owners.includes(user.owner_id);
-      });
-      console.log(`📊 After owner filtering: ${filteredUsers.length} users`);
-    }
-
-// Filter by subscription types - FIXED for GROUP_CONCAT format
-if (target_subscription_types && target_subscription_types.length > 0 && target_subscription_types[0] !== '') {
-  filteredUsers = filteredUsers.filter(user => {
-    // Handle 'free' subscription type (no subscription_type_ids)
-    if (target_subscription_types.includes('free') && (!user.subscription_type_ids || user.subscription_type_ids === null)) {
-      return true;
-    }
-    
-    // Parse the comma-separated subscription_type_ids
-    if (user.subscription_type_ids) {
-      const userSubscriptionIds = user.subscription_type_ids.split(',').map(id => parseInt(id.trim()));
-      return target_subscription_types.some(targetId => {
-        if (targetId === 'free') return false; // Already handled above
-        return userSubscriptionIds.includes(parseInt(targetId));
-      });
-    }
-    
-    return false;
-  });
-  console.log(`📊 After subscription type filtering: ${filteredUsers.length} users`);
-}
-
-    // Parse tags for frontend display
-    filteredUsers.forEach(user => {
+    // Parse tags for display (same as email service)
+    targetUsers.forEach(user => {
       if (user.tags) {
         try {
           user.tags = JSON.parse(user.tags);
@@ -456,8 +419,8 @@ if (target_subscription_types && target_subscription_types.length > 0 && target_
 
     res.json({
       success: true,
-      users: filteredUsers,
-      total: filteredUsers.length
+      users: targetUsers,
+      total: targetUsers.length
     });
 
   } catch (error) {

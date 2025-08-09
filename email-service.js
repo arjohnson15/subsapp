@@ -519,51 +519,163 @@ async getExpiringUsers(daysBefore, subscriptionType, targetTags = null, targetOw
   }
 }
 
-  async getAllTargetUsers(targetTags, excludeAutomated) {
-    try {
-      console.log(`   🔍 Getting all target users, excludeAutomated: ${excludeAutomated}`);
-      
-      let query = `
-        SELECT 
-          u.*, 
-          o.name as owner_name, 
-          o.email as owner_email
-        FROM users u
-        LEFT JOIN owners o ON u.owner_id = o.id
-        WHERE 1=1
-      `;
-
-      const params = [];
-
-      // Add automated email exclusion filter
-      if (excludeAutomated) {
-        query += ' AND u.exclude_automated_emails = FALSE';
-      }
-
-      const users = await db.query(query, params);
-      console.log(`   📊 Database returned ${users.length} users before tag filtering`);
-
-      // Filter by tags if specified
-      if (targetTags && targetTags.length > 0) {
-        const filteredUsers = users.filter(user => {
-          if (!user.tags) return false;
-          try {
-            const userTags = JSON.parse(user.tags);
-            return targetTags.some(tag => userTags.includes(tag));
-          } catch (e) {
-            return false;
-          }
-        });
-        console.log(`   🏷️ After tag filtering: ${filteredUsers.length} users`);
-        return filteredUsers;
-      }
-
-      return users;
-    } catch (error) {
-      console.error('❌ Error getting all target users:', error);
-      return [];
+async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targetOwners = null, targetSubscriptionTypes = null, excludeWithSetting = true) {
+  console.log(`🔍 Getting ALL users with subscription type: ${subscriptionType} (ignoring expiration dates)`);
+  console.log(`   → Target tags: ${targetTags ? JSON.stringify(targetTags) : 'none'}`);
+  console.log(`   → Target owners: ${targetOwners ? JSON.stringify(targetOwners) : 'none'}`);
+  console.log(`   → Target subscription types: ${targetSubscriptionTypes ? JSON.stringify(targetSubscriptionTypes) : 'none'}`);
+  
+  try {
+    let query = `
+      SELECT DISTINCT u.id, u.name, u.email, u.tags, u.owner_id,
+             s.expiration_date, s.subscription_type_id,
+             CASE 
+               WHEN s.subscription_type_id IS NULL THEN 'FREE Plex Access'
+               ELSE st.name 
+             END as subscription_name,
+             CASE 
+               WHEN s.subscription_type_id IS NULL THEN 'plex'
+               ELSE st.type 
+             END as subscription_type,
+             o.name as owner_name, o.email as owner_email,
+             u.bcc_owner_renewal
+      FROM users u
+      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
+      LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
+      LEFT JOIN owners o ON u.owner_id = o.id
+      WHERE 1=1
+    `;
+    
+    const params = [];
+    
+    // Filter by subscription type (but ignore expiration dates)
+    if (subscriptionType === 'plex') {
+      query += ` AND st.type = 'plex'`;
+    } else if (subscriptionType === 'iptv') {
+      query += ` AND st.type = 'iptv'`;
+    } else if (subscriptionType === 'both') {
+      query += ` AND st.type IN ('plex', 'iptv')`;
     }
+    
+    // Exclude users with setting
+    if (excludeWithSetting) {
+      query += ` AND u.exclude_automated_emails = FALSE`;
+    }
+    
+    const allUsers = await db.query(query, params);
+    console.log(`   → Found ${allUsers.length} users with ${subscriptionType} subscriptions`);
+    
+    // Apply additional filtering (EXACT SAME LOGIC as getExpiringUsers)
+    let filteredUsers = allUsers;
+    
+    // Filter by tags
+    if (targetTags && targetTags.length > 0) {
+      filteredUsers = filteredUsers.filter(user => {
+        const userTags = this.safeJsonParse(user.tags, []);
+        return targetTags.some(tag => userTags.includes(tag));
+      });
+      console.log(`   → After tag filtering: ${filteredUsers.length} users`);
+    }
+    
+    // Filter by owners
+    if (targetOwners && targetOwners.length > 0) {
+      filteredUsers = filteredUsers.filter(user => {
+        return targetOwners.includes(user.owner_id);
+      });
+      console.log(`   → After owner filtering: ${filteredUsers.length} users`);
+    }
+    
+    // Filter by subscription types
+    if (targetSubscriptionTypes && targetSubscriptionTypes.length > 0) {
+      filteredUsers = filteredUsers.filter(user => {
+        // Handle both NULL (free) and specific subscription type IDs
+        if (targetSubscriptionTypes.includes('free') && user.subscription_type_id === null) {
+          return true;
+        }
+        return targetSubscriptionTypes.includes(user.subscription_type_id);
+      });
+      console.log(`   → After subscription type filtering: ${filteredUsers.length} users`);
+    }
+    
+    return filteredUsers;
+    
+  } catch (error) {
+    console.error('❌ Error finding users with subscription type:', error);
+    return [];
   }
+}
+
+  async getAllTargetUsers(targetTags = null, targetOwners = null, targetSubscriptionTypes = null, excludeAutomated = true) {
+  try {
+    console.log(`   🔍 Getting all target users, excludeAutomated: ${excludeAutomated}`);
+    console.log(`   → Target tags: ${targetTags ? JSON.stringify(targetTags) : 'none'}`);
+    console.log(`   → Target owners: ${targetOwners ? JSON.stringify(targetOwners) : 'none'}`);
+    console.log(`   → Target subscription types: ${targetSubscriptionTypes ? JSON.stringify(targetSubscriptionTypes) : 'none'}`);
+    
+    let query = `
+      SELECT DISTINCT u.id, u.name, u.email, u.tags, u.owner_id,
+             s.subscription_type_id,
+             CASE 
+               WHEN s.subscription_type_id IS NULL THEN 'FREE Plex Access'
+               ELSE st.name 
+             END as subscription_name,
+             o.name as owner_name, o.email as owner_email,
+             u.bcc_owner_renewal
+      FROM users u
+      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
+      LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
+      LEFT JOIN owners o ON u.owner_id = o.id
+      WHERE 1=1
+    `;
+
+    const params = [];
+
+    if (excludeAutomated) {
+      query += ` AND u.exclude_automated_emails = FALSE`;
+    }
+
+    const allUsers = await db.query(query, params);
+    console.log(`   → Found ${allUsers.length} users before filtering`);
+
+    // Apply filtering (EXACT SAME LOGIC)
+    let filteredUsers = allUsers;
+
+    // Filter by tags
+    if (targetTags && targetTags.length > 0) {
+      filteredUsers = filteredUsers.filter(user => {
+        const userTags = this.safeJsonParse(user.tags, []);
+        return targetTags.some(tag => userTags.includes(tag));
+      });
+      console.log(`   → After tag filtering: ${filteredUsers.length} users`);
+    }
+
+    // Filter by owners
+    if (targetOwners && targetOwners.length > 0) {
+      filteredUsers = filteredUsers.filter(user => {
+        return targetOwners.includes(user.owner_id);
+      });
+      console.log(`   → After owner filtering: ${filteredUsers.length} users`);
+    }
+
+    // Filter by subscription types
+    if (targetSubscriptionTypes && targetSubscriptionTypes.length > 0) {
+      filteredUsers = filteredUsers.filter(user => {
+        // Handle both NULL (free) and specific subscription type IDs
+        if (targetSubscriptionTypes.includes('free') && user.subscription_type_id === null) {
+          return true;
+        }
+        return targetSubscriptionTypes.includes(user.subscription_type_id);
+      });
+      console.log(`   → After subscription type filtering: ${filteredUsers.length} users`);
+    }
+
+    return filteredUsers;
+
+  } catch (error) {
+    console.error('❌ Error getting all target users:', error);
+    return [];
+  }
+}
   
   async testConnection() {
     try {
