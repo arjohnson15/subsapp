@@ -151,88 +151,6 @@ if (schedule_type === 'specific_date' && scheduled_date && scheduled_time) {
   }
 });
 
-
-
-// Update email schedule
-router.put('/:id', [
-  body('name').notEmpty().trim().withMessage('Name is required'),
-  body('schedule_type').isIn(['expiration_reminder', 'specific_date']).withMessage('Invalid schedule type'),
-  body('email_template_id').isInt().withMessage('Valid template is required'),
-  
-  // Conditional validation for expiration reminders
-  body('days_before_expiration').if(body('schedule_type').equals('expiration_reminder')).isInt({ min: 1 }).withMessage('Days before expiration must be a positive number'),
-  body('subscription_type').if(body('schedule_type').equals('expiration_reminder')).isIn(['plex', 'iptv', 'both']).withMessage('Invalid subscription type'),
-  
-  // Conditional validation for specific dates
-  body('scheduled_date').if(body('schedule_type').equals('specific_date')).isISO8601().withMessage('Valid date is required'),
-  body('scheduled_time').if(body('schedule_type').equals('specific_date')).matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).withMessage('Valid time is required (HH:MM format)')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const {
-      name,
-      schedule_type,
-      days_before_expiration,
-      subscription_type,
-      scheduled_date,
-      scheduled_time,
-      email_template_id,
-      target_tags,
-      exclude_users_with_setting,
-      active
-    } = req.body;
-
-// Calculate next_run based on schedule type
-    let next_run = null;
-    if (schedule_type === 'specific_date' && scheduled_date && scheduled_time) {
-      // Convert Central Time input to UTC for storage
-      const dateOnly = scheduled_date.split('T')[0];
-      const centralDateTime = `${dateOnly}T${scheduled_time}:00`;
-      const centralDate = new Date(centralDateTime);
-      
-      // Assume Central Time and convert to UTC
-      const now = new Date();
-      const isDST = now.getMonth() >= 2 && now.getMonth() <= 10; // Rough DST check
-      const offsetHours = isDST ? 5 : 6; // CDT = UTC-5, CST = UTC-6
-      
-      const utcDate = new Date(centralDate.getTime() + (offsetHours * 60 * 60 * 1000));
-      next_run = utcDate.toISOString().slice(0, 19).replace('T', ' ');
-      
-      console.log(`🕐 Updating - Converting Central Time ${dateOnly} ${scheduled_time} to UTC: ${next_run}`);
-    }
-
-    await db.query(`
-      UPDATE email_schedules SET
-        name = ?, schedule_type = ?, days_before_expiration = ?, subscription_type = ?,
-        scheduled_date = ?, scheduled_time = ?, email_template_id = ?, target_tags = ?,
-        exclude_users_with_setting = ?, active = ?, next_run = ?
-      WHERE id = ?
-    `, [
-      name,
-      schedule_type,
-      days_before_expiration || null,
-      subscription_type || null,
-      scheduled_date || null,
-      scheduled_time || null,
-      email_template_id,
-      target_tags ? JSON.stringify(target_tags) : null,
-      exclude_users_with_setting !== false,
-      active !== false,
-      next_run,
-      req.params.id
-    ]);
-
-    res.json({ message: 'Email schedule updated successfully' });
-  } catch (error) {
-    console.error('Error updating email schedule:', error);
-    res.status(500).json({ error: 'Failed to update email schedule' });
-  }
-});
-
 // Update existing email schedule
 router.put('/:id', [
   body('name').notEmpty().trim().withMessage('Name is required'),
@@ -447,6 +365,96 @@ router.get('/debug/status', async (req, res) => {
   } catch (error) {
     console.error('Error getting debug status:', error);
     res.status(500).json({ error: 'Failed to get debug status' });
+  }
+});
+
+// Preview users for schedule filters
+router.post('/preview-users', async (req, res) => {
+  try {
+    const { target_tags, target_owners, target_subscription_types, exclude_users_with_setting } = req.body;
+
+    console.log('🔍 Preview request:', req.body);
+
+    // Get all users with their relationships
+    let query = `
+      SELECT DISTINCT u.id, u.name, u.email, u.tags, u.owner_id, u.exclude_automated_emails,
+             o.name as owner_name,
+             s.subscription_type_id,
+             CASE 
+               WHEN s.subscription_type_id IS NULL THEN 'FREE Plex Access'
+               ELSE st.name 
+             END as subscription_name
+      FROM users u
+      LEFT JOIN owners o ON u.owner_id = o.id
+      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
+      LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
+      WHERE 1=1
+    `;
+
+    const params = [];
+
+    // Apply exclude automated emails filter
+    if (exclude_users_with_setting) {
+      query += ` AND u.exclude_automated_emails = FALSE`;
+    }
+
+    const allUsers = await db.query(query, params);
+    console.log(`📊 Found ${allUsers.length} users before filtering`);
+
+    // Apply client-side filtering for tags, owners, and subscription types
+    let filteredUsers = allUsers;
+
+    // Filter by tags
+    if (target_tags && target_tags.length > 0 && target_tags[0] !== '') {
+      filteredUsers = filteredUsers.filter(user => {
+        const userTags = user.tags ? JSON.parse(user.tags) : [];
+        return target_tags.some(tag => userTags.includes(tag));
+      });
+      console.log(`📊 After tag filtering: ${filteredUsers.length} users`);
+    }
+
+    // Filter by owners
+    if (target_owners && target_owners.length > 0 && target_owners[0] !== '') {
+      filteredUsers = filteredUsers.filter(user => {
+        return target_owners.includes(user.owner_id);
+      });
+      console.log(`📊 After owner filtering: ${filteredUsers.length} users`);
+    }
+
+    // Filter by subscription types
+    if (target_subscription_types && target_subscription_types.length > 0 && target_subscription_types[0] !== '') {
+      filteredUsers = filteredUsers.filter(user => {
+        // Handle 'free' subscription type (null subscription_type_id)
+        if (target_subscription_types.includes('free') && user.subscription_type_id === null) {
+          return true;
+        }
+        return target_subscription_types.includes(user.subscription_type_id);
+      });
+      console.log(`📊 After subscription type filtering: ${filteredUsers.length} users`);
+    }
+
+    // Parse tags for frontend display
+    filteredUsers.forEach(user => {
+      if (user.tags) {
+        try {
+          user.tags = JSON.parse(user.tags);
+        } catch (e) {
+          user.tags = [];
+        }
+      } else {
+        user.tags = [];
+      }
+    });
+
+    res.json({
+      success: true,
+      users: filteredUsers,
+      total: filteredUsers.length
+    });
+
+  } catch (error) {
+    console.error('❌ Error previewing users:', error);
+    res.status(500).json({ success: false, message: 'Failed to preview users' });
   }
 });
 

@@ -438,9 +438,11 @@ async showScheduleForm(schedule = null) {
     this.populateTagsContainer();
     
     // Populate form if editing
-    if (schedule) {
+if (schedule) {
+    setTimeout(() => {
         this.populateScheduleForm(schedule);
-    }
+    }, 500);
+}
     
     this.toggleScheduleFields();
 },
@@ -690,28 +692,38 @@ if (filters.length > 0) {
             document.getElementById('scheduledTime').value = schedule.scheduled_time;
         }
 
-// Set target tag if it exists (UPDATED for single dropdown)
-if (schedule.target_tags && schedule.target_tags.length > 0) {
-    const targetTagsSelect = document.getElementById('targetTags');
-    if (targetTagsSelect) {
-        targetTagsSelect.value = schedule.target_tags[0] || '';
+const targetTagsSelect = document.getElementById('targetTags');
+if (targetTagsSelect) {
+    if (Array.isArray(schedule.target_tags) && schedule.target_tags.length > 0) {
+        targetTagsSelect.value = schedule.target_tags[0];
+    } else if (schedule.target_tags) {
+        targetTagsSelect.value = schedule.target_tags;
+    } else {
+        targetTagsSelect.value = '';
     }
 }
 
-// Set target owner if it exists (UPDATED for single dropdown)
-if (schedule.target_owners && schedule.target_owners.length > 0) {
-    const targetOwnersSelect = document.getElementById('targetOwners');
-    if (targetOwnersSelect) {
-        targetOwnersSelect.value = schedule.target_owners[0] || '';
+// FIXED: Handle both array and single value cases
+const targetOwnersSelect = document.getElementById('targetOwners');
+if (targetOwnersSelect) {
+    if (Array.isArray(schedule.target_owners) && schedule.target_owners.length > 0) {
+        targetOwnersSelect.value = schedule.target_owners[0];
+    } else if (schedule.target_owners) {
+        targetOwnersSelect.value = schedule.target_owners;
+    } else {
+        targetOwnersSelect.value = '';
     }
 }
 
-// Set target subscription type if it exists (UPDATED for single dropdown)
-if (schedule.target_subscription_types && schedule.target_subscription_types.length > 0) {
-    const targetSubTypesSelect = document.getElementById('targetSubscriptionTypes');
-    if (targetSubTypesSelect) {
+const targetSubTypesSelect = document.getElementById('targetSubscriptionTypes');
+if (targetSubTypesSelect) {
+    if (Array.isArray(schedule.target_subscription_types) && schedule.target_subscription_types.length > 0) {
         const value = schedule.target_subscription_types[0];
-        targetSubTypesSelect.value = value === 'free' ? 'free' : value.toString();
+        targetSubTypesSelect.value = value === 'free' ? 'free' : value;
+    } else if (schedule.target_subscription_types) {
+        targetSubTypesSelect.value = schedule.target_subscription_types === 'free' ? 'free' : schedule.target_subscription_types;
+    } else {
+        targetSubTypesSelect.value = '';
     }
 }
     },
@@ -790,6 +802,8 @@ async loadSubscriptionTypesForFiltering() {
         console.error('Error loading subscription types:', error);
     }
 },
+
+
 
 // Update tags dropdown (UPDATED for single dropdown)
 populateTagsContainer() {
@@ -3196,6 +3210,140 @@ async syncIPTVEditorCategories() {
             syncBtn.disabled = false;
         }
     }
+},
+
+async previewTargetUsers() {
+    try {
+        // Get current form values
+        const targetTag = document.getElementById('targetTags')?.value || '';
+        const targetOwner = document.getElementById('targetOwners')?.value || '';
+        const targetSubType = document.getElementById('targetSubscriptionTypes')?.value || '';
+        const excludeAutomated = document.getElementById('excludeAutomated')?.checked || false;
+
+        // Build filters object
+        const filters = {
+            target_tags: targetTag ? [targetTag] : [],
+            target_owners: targetOwner ? [parseInt(targetOwner)] : [],
+            target_subscription_types: targetSubType ? [targetSubType === 'free' ? 'free' : parseInt(targetSubType)] : [],
+            exclude_users_with_setting: excludeAutomated
+        };
+
+        console.log('🔍 Preview filters:', filters);
+
+        // Call API to get filtered users
+        const response = await fetch('/api/email-schedules/preview-users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(filters)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            this.showUserPreviewModal(result.users, filters);
+        } else {
+            Utils.showNotification('Failed to load target users: ' + result.message, 'error');
+        }
+
+    } catch (error) {
+        console.error('❌ Error previewing target users:', error);
+        Utils.showNotification('Failed to preview target users', 'error');
+    }
+},
+
+showUserPreviewModal(users, filters) {
+    // Build filter description
+    const filterDescriptions = [];
+    if (filters.target_tags.length > 0) {
+        filterDescriptions.push(`Tag: ${filters.target_tags[0]}`);
+    }
+    if (filters.target_owners.length > 0) {
+        filterDescriptions.push(`Owner ID: ${filters.target_owners[0]}`);
+    }
+    if (filters.target_subscription_types.length > 0) {
+        const subType = filters.target_subscription_types[0];
+        filterDescriptions.push(`Sub Type: ${subType === 'free' ? 'FREE' : `ID ${subType}`}`);
+    }
+    if (filters.exclude_users_with_setting) {
+        filterDescriptions.push('Excluding users who opted out');
+    }
+
+    const filterText = filterDescriptions.length > 0 ? 
+        filterDescriptions.join(', ') : 
+        'No filters applied (all users)';
+
+    // Build user list HTML
+    let usersHTML = '';
+    if (users.length === 0) {
+        usersHTML = '<div style="text-align: center; color: #666; padding: 20px;">No users match the current filters</div>';
+    } else {
+        usersHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; max-height: 400px; overflow-y: auto;">
+        `;
+        
+        users.forEach(user => {
+            const tags = Array.isArray(user.tags) ? user.tags.join(', ') : (user.tags || 'No tags');
+            usersHTML += `
+                <div style="background: rgba(79, 195, 247, 0.1); padding: 12px; border-radius: 6px; border: 1px solid #4fc3f7;">
+                    <div style="font-weight: bold; color: #4fc3f7; margin-bottom: 5px;">${user.name}</div>
+                    <div style="color: #ccc; font-size: 0.9rem; margin-bottom: 3px;">${user.email}</div>
+                    <div style="color: #888; font-size: 0.8rem;">Tags: ${tags}</div>
+                    ${user.owner_name ? `<div style="color: #888; font-size: 0.8rem;">Owner: ${user.owner_name}</div>` : ''}
+                </div>
+            `;
+        });
+        usersHTML += '</div>';
+    }
+
+    // Create and show modal
+    const modalHTML = `
+        <div id="userPreviewModal" style="
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.8); z-index: 10000; display: flex; 
+            justify-content: center; align-items: center; padding: 20px;
+        " onclick="this.remove()">
+            <div style="
+                background: linear-gradient(135deg, #1a1a1a, #2d2d2d); 
+                border-radius: 15px; max-width: 800px; width: 100%; max-height: 80%; 
+                overflow: hidden; border: 2px solid #4fc3f7; 
+                box-shadow: 0 0 30px rgba(79, 195, 247, 0.3);
+            " onclick="event.stopPropagation()">
+                
+                <div style="padding: 20px; border-bottom: 2px solid #333;">
+                    <h3 style="color: #4fc3f7; margin: 0; margin-bottom: 10px;">
+                        <i class="fas fa-users"></i> Target Users Preview
+                    </h3>
+                    <div style="color: #ccc; font-size: 0.9rem; margin-bottom: 5px;">
+                        <strong>Filters:</strong> ${filterText}
+                    </div>
+                    <div style="color: #4fc3f7; font-weight: bold;">
+                        <strong>Total Users:</strong> ${users.length}
+                    </div>
+                    <button onclick="document.getElementById('userPreviewModal').remove()" 
+                            style="position: absolute; top: 15px; right: 20px; background: none; border: none; 
+                                   color: #f44336; font-size: 24px; cursor: pointer;">×</button>
+                </div>
+                
+                <div style="padding: 20px; overflow-y: auto;">
+                    ${usersHTML}
+                </div>
+                
+                <div style="text-align: center; padding: 15px; border-top: 2px solid #333;">
+                    <button class="btn" onclick="document.getElementById('userPreviewModal').remove()" 
+                            style="background: linear-gradient(45deg, #616161, #424242); padding: 10px 30px;">
+                        <i class="fas fa-times"></i> Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal and add new one
+    const existingModal = document.getElementById('userPreviewModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
 }
 };
 
