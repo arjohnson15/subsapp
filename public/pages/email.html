@@ -84,21 +84,29 @@
 You can use dynamic fields like {{name}}, {{email}}, etc. that will be replaced with actual user data."></textarea>
     </div>
 
-    <!-- IMPROVED Email Preview Section -->
-    <div class="email-preview-section" style="margin: 30px 0;">
-        <div class="preview-header">
-            <h4 style="color: #4fc3f7; margin: 0;">Email Preview:</h4>
-            <button class="btn btn-small" onclick="togglePreviewSize()">Toggle Size</button>
-        </div>
-        
-        <div id="emailPreviewContainer" class="email-preview-container">
-            <div id="emailPreview" class="template-preview-large">
-                <p class="preview-placeholder">
-                    Start typing in the email body above to see the preview...
-                </p>
-            </div>
+
+<div class="email-preview-section" style="margin: 30px 0;">
+    <div class="preview-header">
+        <h4 style="color: #4fc3f7; margin: 0;">Email Preview:</h4>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <button class="btn btn-small" onclick="updateEmailPreview()" title="Refresh Preview">
+                Refresh
+            </button>
+            <button class="btn btn-small" onclick="togglePreviewSize()" title="View Full Size">
+                Full Size
+            </button>
         </div>
     </div>
+    
+    <div id="emailPreviewContainer" class="email-preview-container">
+        <div id="emailPreview" class="template-preview-large" style="min-height: 400px; max-height: 70vh; overflow-y: auto;">
+            <p class="preview-placeholder" style="color: #666; text-align: center; padding: 40px; margin: 0;">
+                Start typing in the email body above to see the preview...
+            </p>
+        </div>
+    </div>
+    
+</div>
 
     <!-- Template Management Buttons -->
     <div style="display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap;">

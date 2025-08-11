@@ -3965,3 +3965,275 @@ table tbody td:last-child .btn-small:nth-child(4) {
         gap: 6px;
     }
 }
+
+/* =============================================================================
+   EMAIL PREVIEW SYSTEM - CLEAN REPLACEMENT
+   Replace the existing email preview CSS sections with this clean version
+   ============================================================================= */
+
+/* Email Preview Section Container */
+.email-preview-section {
+    margin: 30px 0;
+}
+
+.preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.preview-header h4 {
+    color: #4fc3f7;
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+/* Main Email Preview Container */
+.email-preview-container {
+    background: white;
+    color: black;
+    border-radius: 12px;
+    border: 2px solid rgba(79, 195, 247, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    max-width: 100%;
+    position: relative;
+}
+
+.email-preview-container:hover {
+    border-color: rgba(79, 195, 247, 0.5);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* Preview Content Area */
+#emailPreview {
+    background: white;
+    color: black;
+    min-height: 400px;
+    max-height: 70vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+/* Iframe Styles Within Preview */
+#emailPreview iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: white;
+    min-height: 400px;
+}
+
+/* Preview Placeholder */
+.preview-placeholder {
+    color: #666 !important;
+    text-align: center;
+    padding: 40px;
+    margin: 0;
+    font-style: italic;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 2px dashed #ddd;
+}
+
+/* Preview Info Section */
+.preview-info {
+    margin-top: 10px;
+    padding: 12px;
+    background: rgba(79, 195, 247, 0.1);
+    border-radius: 8px;
+    font-size: 12px;
+    color: #4fc3f7;
+    border-left: 4px solid #4fc3f7;
+}
+
+.preview-info strong {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 13px;
+}
+
+.preview-info ul {
+    margin: 5px 0 0 0;
+    padding-left: 20px;
+    line-height: 1.4;
+}
+
+.preview-info li {
+    margin: 2px 0;
+}
+
+/* Enhanced Button Styles for Preview Controls */
+.preview-header .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+    font-size: 12px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.preview-header .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Full-Size Modal for Email Preview */
+#EMAIL_MODAL_FINAL {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0, 0, 0, 0.9) !important;
+    z-index: 999999 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 20px !important;
+    box-sizing: border-box !important;
+}
+
+#EMAIL_MODAL_FINAL .modal-content {
+    width: 90vw;
+    max-width: 1200px;
+    height: 90vh;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+#EMAIL_MODAL_FINAL .modal-header {
+    background: linear-gradient(135deg, #2a2a3e 0%, #1e1e2e 100%);
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #444;
+    flex-shrink: 0;
+}
+
+#EMAIL_MODAL_FINAL .modal-header h3 {
+    margin: 0;
+    color: #4fc3f7;
+    font-size: 1.2rem;
+}
+
+#EMAIL_MODAL_FINAL .modal-header button {
+    background: #4fc3f7;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s ease;
+}
+
+#EMAIL_MODAL_FINAL .modal-header button:hover {
+    background: #3a9bd1;
+}
+
+#EMAIL_MODAL_FINAL .iframe-container {
+    flex: 1;
+    overflow: hidden;
+    background: white;
+}
+
+#EMAIL_MODAL_FINAL iframe {
+    width: 100% !important;
+    height: 100% !important;
+    border: none !important;
+    background: white !important;
+}
+
+/* Loading State Animation */
+.email-preview-container.updating {
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.email-preview-container.updating::after {
+    content: 'Updating...';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(79, 195, 247, 0.9);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    z-index: 100;
+    pointer-events: none;
+}
+
+/* Scrollbar Styling for Preview */
+#emailPreview::-webkit-scrollbar {
+    width: 8px;
+}
+
+#emailPreview::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+#emailPreview::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+#emailPreview::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .preview-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .preview-header > div {
+        align-self: stretch;
+        justify-content: center;
+    }
+    
+    #EMAIL_MODAL_FINAL {
+        padding: 10px !important;
+    }
+    
+    #EMAIL_MODAL_FINAL .modal-content {
+        width: 95vw;
+        height: 95vh;
+    }
+    
+    #EMAIL_MODAL_FINAL .modal-header {
+        padding: 12px 15px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    #EMAIL_MODAL_FINAL .modal-header h3 {
+        font-size: 1rem;
+    }
+    
+    .preview-info {
+        font-size: 11px;
+    }
+    
+    #emailPreview {
+        min-height: 300px;
+        max-height: 60vh;
+    }
+}

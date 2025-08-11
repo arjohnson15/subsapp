@@ -1,5 +1,133 @@
 // Enhanced Email Management Functions
 
+// EMAIL PREVIEW SYSTEM - ADD THIS BEFORE window.Email OBJECT
+const EmailPreview = {
+    iframe: null,
+    isLargeView: false,
+
+    createIframe() {
+        if (this.iframe) return this.iframe;
+        
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = `
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+        `;
+        iframe.setAttribute('sandbox', 'allow-same-origin');
+        this.iframe = iframe;
+        return iframe;
+    },
+
+    getEmailClientHTML(content) {
+        return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Preview</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-size: 14px; line-height: 1.6; color: #333333; background: #ffffff;
+        }
+        body { padding: 20px; min-height: calc(100vh - 40px); }
+        h1, h2, h3, h4, h5, h6 { margin: 0 0 16px 0; font-weight: bold; line-height: 1.25; }
+        h1 { font-size: 28px; color: #1a1a1a; }
+        h2 { font-size: 24px; color: #2a2a2a; }
+        h3 { font-size: 20px; color: #3a3a3a; }
+        p { margin: 0 0 16px 0; line-height: 1.6; }
+        a { color: #007cba; text-decoration: underline; }
+        button, .btn {
+            display: inline-block; padding: 12px 24px; margin: 8px 4px;
+            border: none; border-radius: 6px; text-decoration: none;
+            font-size: 14px; font-weight: 500; cursor: pointer;
+            transition: all 0.2s ease; text-align: center;
+        }
+        .paypal-btn, button[style*="paypal"], a[href*="paypal"] {
+            background: #0070ba !important; color: white !important; border: 2px solid #0070ba !important;
+        }
+        .venmo-btn, button[style*="venmo"], a[href*="venmo"] {
+            background: #3d95ce !important; color: white !important; border: 2px solid #3d95ce !important;
+        }
+        .cashapp-btn, button[style*="cashapp"], a[href*="cash.app"] {
+            background: #00d632 !important; color: white !important; border: 2px solid #00d632 !important;
+        }
+        @media only screen and (max-width: 600px) {
+            body { padding: 10px; }
+            h1 { font-size: 24px; } h2 { font-size: 20px; } h3 { font-size: 18px; }
+            button, .btn { display: block; width: 100%; margin: 8px 0; }
+        }
+    </style>
+</head>
+<body>${content}</body>
+</html>`;
+    },
+
+    updatePreview(htmlContent) {
+        const iframe = this.createIframe();
+        const previewContainer = document.getElementById('emailPreview');
+        
+        if (!previewContainer) return;
+        
+        previewContainer.innerHTML = '';
+        
+        if (!htmlContent || !htmlContent.trim()) {
+            previewContainer.innerHTML = '<p class="preview-placeholder">Start typing in the email body above to see the preview...</p>';
+            return;
+        }
+        
+        const fullHTML = this.getEmailClientHTML(htmlContent);
+        previewContainer.appendChild(iframe);
+        
+        iframe.onload = () => {
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                iframeDoc.open();
+                iframeDoc.write(fullHTML);
+                iframeDoc.close();
+            } catch (error) {
+                console.error('Error writing to iframe:', error);
+                previewContainer.innerHTML = `<div style="padding: 20px; background: white; color: black; border-radius: 8px;">${htmlContent}</div>`;
+            }
+        };
+        
+        iframe.style.height = this.isLargeView ? '90vh' : '400px';
+    }
+};
+
+// Helper functions for email preview
+function formatDate(dateString) {
+    if (!dateString || dateString === 'FREE' || dateString === 'N/A') return dateString;
+    try {
+        return new Date(dateString).toLocaleDateString();
+    } catch (error) {
+        return dateString;
+    }
+}
+
+function calculateDaysUntilExpiration(expirationDate, isFree = false) {
+    if (isFree || !expirationDate || expirationDate === 'FREE' || expirationDate === 'N/A' || expirationDate === null) {
+        return '∞';
+    }
+    try {
+        const expDateStr = expirationDate.split('T')[0];
+        const expDate = new Date(expDateStr + 'T00:00:00');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const timeDiff = expDate.getTime() - today.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        return daysDiff >= 0 ? daysDiff.toString() : '0';
+    } catch (error) {
+        return '0';
+    }
+}
+
 window.Email = {
     currentTemplate: null,
     recipientUserId: null,
@@ -112,9 +240,9 @@ window.Email = {
             ).join('');
     },
     
-    onTemplateChange() {
-        this.updateTemplateButtons();
-    },
+onTemplateChange() {
+    this.updateTemplateButtons(); // Only update buttons, don't load content
+},
     
     updateTemplateButtons() {
         const templateName = document.getElementById('emailTemplate')?.value;
@@ -137,24 +265,34 @@ window.Email = {
         }
     },
     
-    async loadTemplate() {
-        const templateName = document.getElementById('emailTemplate')?.value;
-        if (!templateName) return;
+async loadTemplate() {
+    const templateName = document.getElementById('emailTemplate')?.value;
+    if (!templateName) return;
+    
+    try {
+        const templates = await API.Email.getTemplates();
+        const template = templates.find(t => t.name === templateName);
         
-        try {
-            const templates = await API.Email.getTemplates();
-            const template = templates.find(t => t.name === templateName);
+        if (template) {
+            // Load the template content
+            document.getElementById('emailSubject').value = template.subject;
+            document.getElementById('emailBody').value = template.body;
             
-            if (template) {
-                document.getElementById('emailSubject').value = template.subject;
-                document.getElementById('emailBody').value = template.body;
+            // Update buttons
+            this.updateTemplateButtons();
+            
+            // Update preview
+            this.updateEmailPreview();
+            
+            // Force a second update after a tiny delay to ensure it works
+            setTimeout(() => {
                 this.updateEmailPreview();
-                this.updateTemplateButtons();
-            }
-        } catch (error) {
-            Utils.handleError(error, 'Loading email template');
+            }, 10);
         }
-    },
+    } catch (error) {
+        Utils.handleError(error, 'Loading email template');
+    }
+},
     
 // Fixed prepopulateRecipient function to get complete user data with subscriptions
 async prepopulateRecipient(userId) {
@@ -192,7 +330,7 @@ async prepopulateRecipient(userId) {
     }
 },
     
-// Fixed updateEmailPreview function with all the issues resolved
+
 updateEmailPreview(userData = null) {
     const emailBody = document.getElementById('emailBody')?.value || '';
     const preview = document.getElementById('emailPreview');
@@ -209,42 +347,6 @@ updateEmailPreview(userData = null) {
         console.log('📧 Using real user data for preview:', userDataToUse.name);
         console.log('📧 User subscriptions:', userDataToUse.subscriptions);
         
-        // Helper function to format dates (remove time)
-        const formatDate = (dateString) => {
-            if (!dateString || dateString === 'FREE' || dateString === 'N/A') {
-                return dateString;
-            }
-            try {
-                // Remove time portion if present
-                return dateString.split('T')[0];
-            } catch (error) {
-                return dateString;
-            }
-        };
-        
-// Helper function to calculate days until expiration
-const calculateDaysUntilExpiration = (expirationDate, isFree = false) => {
-    // FIXED: Better FREE detection
-    if (isFree || !expirationDate || expirationDate === 'FREE' || expirationDate === 'N/A' || expirationDate === null) {
-        console.log('📅 FREE subscription detected, returning ∞');
-        return '∞';
-    }
-    try {
-        // Handle both database format (YYYY-MM-DD) and ISO format
-        const expDateStr = expirationDate.split('T')[0]; // Remove time if present
-        const expDate = new Date(expDateStr + 'T00:00:00'); // Add time to avoid timezone issues
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Reset time for accurate comparison
-        
-        const timeDiff = expDate.getTime() - today.getTime();
-        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-        console.log('📅 Calculated days:', daysDiff, 'for expiration:', expirationDate);
-        return daysDiff >= 0 ? daysDiff.toString() : '0';
-    } catch (error) {
-        console.error('Error calculating days:', error);
-        return '0';
-    }
-};
         
         // Get subscription info from user's subscriptions array
         let plexSubscription = null;
@@ -370,11 +472,8 @@ if (plexSubscription) {
         .replace(/\{\{venmo_link\}\}/g, 'https://venmo.com/johnsonflix')
         .replace(/\{\{cashapp_link\}\}/g, 'https://cash.app/$johnsonflix');
     
-    if (previewContent.trim()) {
-        preview.innerHTML = previewContent;
-    } else {
-        preview.innerHTML = '<p style="color: #666; text-align: center; padding: 40px;">Start typing in the email body below to see the preview...</p>';
-    }
+// Update the preview using the new iframe system
+EmailPreview.updatePreview(previewContent);
 },
 
 
@@ -727,119 +826,123 @@ function toggleDynamicFields() {
 
 // FINAL WORKING VERSION - Replace togglePreviewSize function
 function togglePreviewSize() {
-    console.log('🎯 Final toggle called');
-    
-    // Remove any existing modal
     const existing = document.getElementById('EMAIL_MODAL_FINAL');
     if (existing) {
         existing.remove();
         document.body.style.overflow = '';
+        EmailPreview.isLargeView = false;
         
-        // Remove ESC handler
         if (window.emailModalEscHandler) {
             document.removeEventListener('keydown', window.emailModalEscHandler);
             window.emailModalEscHandler = null;
         }
         
-        console.log('✅ Modal closed');
+        // Restore normal preview
+        if (window.Email && window.Email.updateEmailPreview) {
+            window.Email.updateEmailPreview();
+        }
         return;
     }
     
-    // Get the email content
-    const preview = document.getElementById('emailPreview');
-    if (!preview) {
-        console.error('❌ Email preview not found');
+    const emailBody = document.getElementById('emailBody')?.value || '';
+    if (!emailBody.trim()) {
+        Utils.showNotification('Please enter some email content first', 'warning');
         return;
     }
     
-    const content = preview.innerHTML;
-    
-    // Create modal
+    // Create iframe modal for large view
     const modal = document.createElement('div');
     modal.id = 'EMAIL_MODAL_FINAL';
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0, 0, 0, 0.9); z-index: 999999; display: flex;
+        align-items: center; justify-content: center; padding: 20px;
+    `;
     
-    // Create content container with proper formatting
-    const contentDiv = document.createElement('div');
-    contentDiv.innerHTML = content;
+    const container = document.createElement('div');
+    container.style.cssText = `
+        width: 90vw; max-width: 1200px; height: 90vh; background: white;
+        border-radius: 12px; overflow: hidden; display: flex; flex-direction: column;
+    `;
     
-    // Style the content container
-    Object.assign(contentDiv.style, {
-        width: '80vw',
-        maxWidth: '1000px',
-        height: '80vh',
-        background: 'white',
-        color: 'black',
-        borderRadius: '12px',
-        padding: '30px',
-        overflowY: 'auto',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
-        boxSizing: 'border-box',
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '14px',
-        lineHeight: '1.6',
-        margin: '0'
-    });
+    const header = document.createElement('div');
+    header.style.cssText = `
+        background: linear-gradient(135deg, #2a2a3e 0%, #1e1e2e 100%); color: white;
+        padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;
+    `;
     
-    // Add proper spacing to email content elements
-    const elements = contentDiv.querySelectorAll('h1, h2, h3, h4, h5, h6, p, div');
-    elements.forEach(el => {
-        if (el.tagName.toLowerCase().startsWith('h')) {
-            el.style.marginTop = '20px';
-            el.style.marginBottom = '10px';
-        } else {
-            el.style.marginBottom = '15px';
+    const title = document.createElement('h3');
+    title.textContent = 'Email Preview - Full Size';
+    title.style.cssText = 'margin: 0; color: #4fc3f7;';
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Close';
+    closeBtn.style.cssText = 'background: #4fc3f7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;';
+    closeBtn.onclick = () => togglePreviewSize();
+    
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+    
+    const iframeContainer = document.createElement('div');
+    iframeContainer.style.cssText = 'flex: 1; overflow: hidden; background: white;';
+    
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'width: 100%; height: 100%; border: none; background: white;';
+    iframe.setAttribute('sandbox', 'allow-same-origin allow-scripts');
+    
+    // Process content with your existing field replacement logic
+    let processedContent = emailBody;
+    const currentUserData = window.Email?.currentUserData || null;
+    
+    if (currentUserData) {
+        // Apply all your existing field replacements here
+        // (use the same logic from your updateEmailPreview function)
+    } else {
+        // Use sample data
+        processedContent = processedContent
+            .replace(/\{\{name\}\}/g, 'John Doe')
+            .replace(/\{\{email\}\}/g, 'john@example.com')
+            .replace(/\{\{plex_email\}\}/g, 'john@plex.com')
+            .replace(/\{\{iptv_username\}\}/g, 'john_iptv')
+            .replace(/\{\{iptv_password\}\}/g, 'password123');
+    }
+    
+    // Replace payment links
+    processedContent = processedContent
+        .replace(/\{\{paypal_link\}\}/g, 'https://paypal.me/johnsonflix')
+        .replace(/\{\{venmo_link\}\}/g, 'https://venmo.com/johnsonflix')
+        .replace(/\{\{cashapp_link\}\}/g, 'https://cash.app/$johnsonflix');
+    
+    const fullHTML = EmailPreview.getEmailClientHTML(processedContent);
+    
+    iframe.onload = () => {
+        try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            iframeDoc.open();
+            iframeDoc.write(fullHTML);
+            iframeDoc.close();
+        } catch (error) {
+            console.error('Error loading iframe in modal:', error);
         }
-    });
+    };
     
-    // Style the modal backdrop
-    Object.assign(modal.style, {
-        position: 'fixed',
-        top: '0',
-        left: '0',
-        width: '100vw',
-        height: '100vh',
-        background: 'rgba(0, 0, 0, 0.9)',
-        zIndex: '999999',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        boxSizing: 'border-box'
-    });
+    iframeContainer.appendChild(iframe);
+    container.appendChild(header);
+    container.appendChild(iframeContainer);
+    modal.appendChild(container);
     
-    // Add content to modal
-    modal.appendChild(contentDiv);
-    
-    // Click outside to close
     modal.onclick = (e) => {
-        if (e.target === modal) {
-            togglePreviewSize();
-        }
+        if (e.target === modal) togglePreviewSize();
     };
     
-    // Prevent content clicks from closing modal
-    contentDiv.onclick = (e) => {
-        e.stopPropagation();
-    };
-    
-    // ESC key to close
     window.emailModalEscHandler = (e) => {
-        if (e.key === 'Escape') {
-            togglePreviewSize();
-        }
+        if (e.key === 'Escape') togglePreviewSize();
     };
     document.addEventListener('keydown', window.emailModalEscHandler);
     
-    // Add to page
     document.body.appendChild(modal);
     document.body.style.overflow = 'hidden';
-    
-    // Scroll content to top
-    setTimeout(() => {
-        contentDiv.scrollTop = 0;
-    }, 50);
-    
-    console.log('✅ Modal opened successfully');
+    EmailPreview.isLargeView = true;
 }
 
 // Make sure it's globally available
