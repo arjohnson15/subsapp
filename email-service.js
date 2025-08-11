@@ -32,9 +32,9 @@ class EmailService {
 
       // Test connection
       await this.transporter.verify();
-      console.log('✅ Email service initialized successfully');
+      console.log('? Email service initialized successfully');
     } catch (error) {
-      console.error('❌ Email service initialization failed:', error.message);
+      console.error('? Email service initialization failed:', error.message);
       this.transporter = null;
     }
   }
@@ -56,7 +56,7 @@ class EmailService {
 async sendEmail(to, subject, htmlBody, options = {}) {
     try {
       if (!this.transporter) {
-        console.error('❌ Email transporter not initialized');
+        console.error('? Email transporter not initialized');
         return { success: false, error: 'Email service not configured' };
       }
 
@@ -77,7 +77,7 @@ async sendEmail(to, subject, htmlBody, options = {}) {
         mailOptions.bcc = Array.isArray(options.bcc) ? options.bcc : [options.bcc];
       }
 
-      console.log('📧 Sending email with options:', {
+      console.log('?? Sending email with options:', {
         to: mailOptions.to,
         cc: mailOptions.cc || 'none',
         bcc: mailOptions.bcc || 'none',
@@ -91,10 +91,10 @@ async sendEmail(to, subject, htmlBody, options = {}) {
         await this.logEmail(options.userId, to, subject, options.templateName || 'Manual', 'sent');
       }
 
-      console.log(`✅ Email sent to ${to}: ${subject}`);
+      console.log(`? Email sent to ${to}: ${subject}`);
       return { success: true, messageId: result.messageId };
     } catch (error) {
-      console.error(`❌ Failed to send email to ${to}:`, error.message);
+      console.error(`? Failed to send email to ${to}:`, error.message);
       
       // Log failed email
       if (options.userId) {
@@ -224,7 +224,7 @@ const placeholders = {
   
 async processScheduledEmails() {
   try {
-    console.log('📧 Processing scheduled emails...');
+    console.log('?? Processing scheduled emails...');
     
     // ONLY process specific_date emails in hourly runs
     // Expiration reminders run separately in the daily job
@@ -237,21 +237,21 @@ async processScheduledEmails() {
       ORDER BY es.id
     `);
 
-    console.log(`📧 Found ${schedules.length} active specific date schedules`);
+    console.log(`?? Found ${schedules.length} active specific date schedules`);
 
     for (const schedule of schedules) {
       await this.processIndividualSchedule(schedule);
     }
 
-    console.log('✅ Finished processing specific date emails');
+    console.log('? Finished processing specific date emails');
   } catch (error) {
-    console.error('❌ Error processing scheduled emails:', error);
+    console.error('? Error processing scheduled emails:', error);
   }
 }
 
 async processExpirationReminders() {
   try {
-    console.log('📧 Processing expiration reminder schedules...');
+    console.log('?? Processing expiration reminder schedules...');
     
     // ONLY process expiration_reminder emails in daily runs
     const schedules = await db.query(`
@@ -263,124 +263,144 @@ async processExpirationReminders() {
       ORDER BY es.id
     `);
 
-    console.log(`📧 Found ${schedules.length} active expiration reminder schedules`);
+    console.log(`?? Found ${schedules.length} active expiration reminder schedules`);
 
     for (const schedule of schedules) {
       await this.processIndividualSchedule(schedule);
     }
 
-    console.log('✅ Finished processing expiration reminder emails');
+    console.log('? Finished processing expiration reminder emails');
   } catch (error) {
-    console.error('❌ Error processing expiration reminder emails:', error);
+    console.error('? Error processing expiration reminder emails:', error);
   }
 }
 
 async processIndividualSchedule(schedule) {
   try {
-    console.log(`🔍 Processing schedule: ${schedule.name} (ID: ${schedule.id})`);
+    console.log(`?? Processing schedule: ${schedule.name} (ID: ${schedule.id})`);
     
     const now = new Date();
     let shouldRun = false;
     let targetUsers = [];
 
-    // Helper function to safely parse JSON fields
+    // FIXED: Helper function that ensures arrays are returned for filtering
     const parseTargetData = (targetData) => {
       if (!targetData) return null;
+      
+      console.log(`?? Parsing target data: ${targetData} (type: ${typeof targetData})`);
+      
       try {
-        return JSON.parse(targetData);
+        let parsed;
+        
+        // If it's already an object/number, use it directly
+        if (typeof targetData === 'number') {
+          parsed = targetData;
+        } else if (typeof targetData === 'string') {
+          parsed = JSON.parse(targetData);
+        } else {
+          parsed = targetData;
+        }
+        
+        console.log(`?? Parsed result: ${JSON.stringify(parsed)} (type: ${typeof parsed}, isArray: ${Array.isArray(parsed)})`);
+        
+        // CRITICAL FIX: Always convert to array format for filtering
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter(item => item !== '' && item !== null && item !== undefined);
+          console.log(`?? Filtered array: ${JSON.stringify(filtered)}`);
+          return filtered.length > 0 ? filtered : null;
+        } else if (parsed !== null && parsed !== undefined && parsed !== '') {
+          // Convert single values to arrays
+          const arrayResult = [parsed];
+          console.log(`?? Converted single value to array: ${JSON.stringify(arrayResult)}`);
+          return arrayResult;
+        }
+        
+        return null;
       } catch (e) {
-        console.log(`⚠️ Invalid JSON for schedule ${schedule.id}:`, targetData);
+        console.log(`?? JSON parse error for schedule ${schedule.id}: ${e.message}, raw data: ${targetData}`);
         return null;
       }
     };
 
     if (schedule.schedule_type === 'expiration_reminder') {
-      console.log(`   → Expiration reminder: ${schedule.days_before_expiration} days before, type: ${schedule.subscription_type}`);
+      console.log(`   ? Expiration reminder: ${schedule.days_before_expiration} days before, type: ${schedule.subscription_type}`);
+      
+      // FIXED: Parse and convert to arrays for proper filtering
+      const targetTags = parseTargetData(schedule.target_tags);
+      const targetOwners = parseTargetData(schedule.target_owners);
+      const targetSubscriptionTypes = parseTargetData(schedule.target_subscription_types);
+      
+      console.log(`?? Final parsed values (converted to arrays):`);
+      console.log(`   ? targetTags: ${targetTags ? JSON.stringify(targetTags) : 'null'}`);
+      console.log(`   ? targetOwners: ${targetOwners ? JSON.stringify(targetOwners) : 'null'}`);
+      console.log(`   ? targetSubscriptionTypes: ${targetSubscriptionTypes ? JSON.stringify(targetSubscriptionTypes) : 'null'}`);
       
       targetUsers = await this.getExpiringUsers(
         schedule.days_before_expiration,
         schedule.subscription_type,
-        parseTargetData(schedule.target_tags),
-        parseTargetData(schedule.target_owners),           // NEW
-        parseTargetData(schedule.target_subscription_types), // NEW
+        targetTags,
+        targetOwners,
+        targetSubscriptionTypes,
         schedule.exclude_users_with_setting
       );
       
       shouldRun = targetUsers.length > 0;
-      console.log(`   → Found ${targetUsers.length} expiring users`);
+      console.log(`   ? Found ${targetUsers.length} expiring users`);
       
     } else if (schedule.schedule_type === 'specific_date') {
-      console.log(`   → Specific date schedule: ${schedule.next_run}`);
+      console.log(`   ? Specific date schedule: ${schedule.next_run}`);
       
       if (schedule.next_run) {
         const nextRun = new Date(schedule.next_run);
         shouldRun = now >= nextRun;
-        console.log(`   → Should run? ${shouldRun} (now: ${now.toISOString()}, scheduled: ${nextRun.toISOString()})`);
+        console.log(`   ? Should run? ${shouldRun} (now: ${now.toISOString()}, next: ${nextRun.toISOString()})`);
         
         if (shouldRun) {
+          const targetTags = parseTargetData(schedule.target_tags);
+          const targetOwners = parseTargetData(schedule.target_owners);
+          const targetSubscriptionTypes = parseTargetData(schedule.target_subscription_types);
+          
           targetUsers = await this.getAllTargetUsers(
-            parseTargetData(schedule.target_tags),
-            parseTargetData(schedule.target_owners),           // NEW
-            parseTargetData(schedule.target_subscription_types), // NEW
+            targetTags,
+            targetOwners, 
+            targetSubscriptionTypes,
             schedule.exclude_users_with_setting
           );
-          console.log(`   → Found ${targetUsers.length} target users`);
         }
-      } else {
-        console.log(`   → No next_run date set, skipping`);
       }
     }
 
     if (shouldRun && targetUsers.length > 0) {
-      console.log(`📤 Running schedule: ${schedule.name} for ${targetUsers.length} users`);
+      console.log(`?? Running schedule: ${schedule.name} for ${targetUsers.length} users`);
+      
       let sentCount = 0;
       
       if (schedule.schedule_type === 'specific_date') {
-        // FIXED: For specific date emails, send ONE email with all users as BCC (NO OWNER BCC)
-        try {
-          // Get sender email from settings
-          const emailSettings = await this.getEmailSettings();
-          const senderEmail = emailSettings.smtp_user;
-          
-          if (!senderEmail) {
-            console.error('❌ No sender email configured in settings');
-            return;
-          }
-          
-          // Use first user's data for template personalization
-          const templateUser = targetUsers[0];
-          const personalizedBody = await this.replacePlaceholders(schedule.body, templateUser);
-          const personalizedSubject = await this.replacePlaceholders(schedule.subject, templateUser);
-          
-          // Collect ONLY user emails for BCC (NO OWNER EMAILS)
-          const allUserEmails = targetUsers.map(user => user.email);
-          
-          console.log(`   → Sending single specific date email with ${allUserEmails.length} users in BCC`);
-          console.log(`   → NO owner BCCs for scheduled emails`);
-          
-          const emailOptions = {
-            templateName: schedule.template_name,
-            bcc: allUserEmails
-          };
-          
-          // Send ONE email TO the sender, with all users in BCC
-          const result = await this.sendEmail(senderEmail, personalizedSubject, personalizedBody, emailOptions);
-          
-          if (result.success) {
-            sentCount = allUserEmails.length;
-            console.log(`✅ Specific date email sent to ${allUserEmails.length} users via BCC`);
-            
-            // Log email for each user
-            for (const user of targetUsers) {
-              await this.logEmail(user.id, user.email, personalizedSubject, schedule.template_name, 'sent');
-            }
-          }
-          
-        } catch (error) {
-          console.error(`❌ Error sending specific date email:`, error);
-        }
+        // For specific date emails, send as bulk with BCC to all owners
+        const allOwnerEmails = [...new Set(targetUsers
+          .filter(user => user.owner_email)
+          .map(user => user.owner_email)
+        )];
         
-      } else if (schedule.schedule_type === 'expiration_reminder') {
+        const processedBody = await this.replacePlaceholders(schedule.body, {});
+        const processedSubject = await this.replacePlaceholders(schedule.subject, {});
+        
+        const result = await this.sendEmail(
+          targetUsers.map(user => user.email), 
+          processedSubject, 
+          processedBody,
+          {
+            bcc: allOwnerEmails,
+            templateName: schedule.template_name
+          }
+        );
+        
+        if (result.success) {
+          sentCount = targetUsers.length;
+        }
+        console.log(`? Specific date emails: ${sentCount}/${targetUsers.length} sent as bulk`);
+        
+      } else {
         // For expiration reminders, send individual emails with owner BCC if enabled
         for (const user of targetUsers) {
           try {
@@ -395,7 +415,7 @@ async processIndividualSchedule(schedule) {
             // ONLY add owner BCC for renewal emails if user has it enabled
             if (user.bcc_owner_renewal && user.owner_email) {
               emailOptions.bcc = [user.owner_email];
-              console.log(`   → Adding owner BCC: ${user.owner_email} for user ${user.name}`);
+              console.log(`   ? Adding owner BCC: ${user.owner_email} for user ${user.name}`);
             }
             
             const result = await this.sendEmail(user.email, personalizedSubject, personalizedBody, emailOptions);
@@ -404,10 +424,10 @@ async processIndividualSchedule(schedule) {
               sentCount++;
             }
           } catch (error) {
-            console.error(`   ❌ Error sending to ${user.name}:`, error);
+            console.error(`   ? Error sending to ${user.name}:`, error);
           }
         }
-        console.log(`✅ Expiration reminder emails: ${sentCount}/${targetUsers.length} sent individually`);
+        console.log(`? Expiration reminder emails: ${sentCount}/${targetUsers.length} sent individually`);
       }
 
       // Update schedule statistics
@@ -418,132 +438,219 @@ async processIndividualSchedule(schedule) {
         WHERE id = ?
       `, [now, schedule.id]);
 
-      console.log(`✅ Schedule "${schedule.name}" completed: ${sentCount}/${targetUsers.length} emails sent`);
+      console.log(`? Schedule "${schedule.name}" completed: ${sentCount}/${targetUsers.length} emails sent`);
     } else {
-      console.log(`   → Skipping schedule (shouldRun: ${shouldRun}, targetUsers: ${targetUsers.length})`);
+      console.log(`   ? Skipping schedule (shouldRun: ${shouldRun}, targetUsers: ${targetUsers.length})`);
     }
   } catch (error) {
-    console.error(`❌ Error processing schedule ${schedule.name}:`, error);
+    console.error(`? Error processing schedule ${schedule.name}:`, error);
   }
 }
 
-// Replace the getExpiringUsers method in email-service.js with this FIXED version
-
 async getExpiringUsers(daysBefore, subscriptionType, targetTags = null, targetOwners = null, targetSubscriptionTypes = null, excludeWithSetting = true) {
-  console.log(`🔍 Finding users expiring in ${daysBefore} days (type: ${subscriptionType})`);
-  console.log(`   → Target tags: ${targetTags ? JSON.stringify(targetTags) : 'none'}`);
-  console.log(`   → Target owners: ${targetOwners ? JSON.stringify(targetOwners) : 'none'}`);
-  console.log(`   → Target subscription types: ${targetSubscriptionTypes ? JSON.stringify(targetSubscriptionTypes) : 'none'}`);
+  console.log(`\n?? === STARTING EMAIL FILTERING PROCESS ===`);
+  console.log(`?? Finding users expiring in ${daysBefore} days (type: ${subscriptionType})`);
+  console.log(`   ? Target tags: ${targetTags ? JSON.stringify(targetTags) : 'none'}`);
+  console.log(`   ? Target owners: ${targetOwners ? JSON.stringify(targetOwners) : 'none'}`);
+  console.log(`   ? Target subscription types: ${targetSubscriptionTypes ? JSON.stringify(targetSubscriptionTypes) : 'none'}`);
+  console.log(`   ? Exclude automated emails: ${excludeWithSetting}`);
   
   try {
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() + daysBefore);
     const targetDateStr = targetDate.toISOString().split('T')[0];
+    console.log(`   ? Target expiration date: ${targetDateStr}`);
 
-    // FIXED: Use the same query structure as the preview endpoint
+    // STEP 1: Get ALL users with their subscription data (same as preview endpoint)
+    console.log(`\n?? STEP 1: Getting all users with subscription data...`);
     let query = `
       SELECT u.id, u.name, u.email, u.tags, u.owner_id, u.exclude_automated_emails,
              o.name as owner_name, o.email as owner_email, u.bcc_owner_renewal,
-             s.expiration_date, s.subscription_type_id,
-             CASE 
-               WHEN s.subscription_type_id IS NULL THEN 'FREE Plex Access'
-               ELSE st.name 
-             END as subscription_name,
-             CASE 
-               WHEN s.subscription_type_id IS NULL THEN 'plex'
-               ELSE st.type 
-             END as subscription_type,
-             -- ADDED: Get all subscription type IDs for this user (like preview endpoint)
-             (SELECT GROUP_CONCAT(DISTINCT s2.subscription_type_id) 
-              FROM subscriptions s2 
-              WHERE s2.user_id = u.id AND s2.status = 'active') as all_subscription_type_ids
+             GROUP_CONCAT(DISTINCT s.subscription_type_id) as subscription_type_ids,
+             GROUP_CONCAT(DISTINCT st.name SEPARATOR ', ') as subscription_names
       FROM users u
+      LEFT JOIN owners o ON u.owner_id = o.id
       LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
       LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
-      LEFT JOIN owners o ON u.owner_id = o.id
       WHERE 1=1
     `;
     
-    const params = [];
+    // FIXED: Use let instead of const for params array
+    let params = [];
     
-    // Date filtering - UNCHANGED
-    if (subscriptionType === 'plex') {
-      query += ` AND st.type = 'plex' AND DATE(s.expiration_date) = ?`;
-      params.push(targetDateStr);
-    } else if (subscriptionType === 'iptv') {
-      query += ` AND st.type = 'iptv' AND DATE(s.expiration_date) = ?`;
-      params.push(targetDateStr);
-    } else if (subscriptionType === 'both') {
-      query += ` AND st.type IN ('plex', 'iptv') AND DATE(s.expiration_date) = ?`;
-      params.push(targetDateStr);
-    }
-    
-    // Exclude users with setting - UNCHANGED
+    // Apply exclude automated emails filter
     if (excludeWithSetting) {
       query += ` AND u.exclude_automated_emails = FALSE`;
+      console.log(`?? Added filter: exclude_automated_emails = FALSE`);
     }
     
-    // Add GROUP BY to handle multiple subscriptions per user
     query += ` GROUP BY u.id, u.name, u.email, u.tags, u.owner_id, u.exclude_automated_emails, o.name, o.email, u.bcc_owner_renewal`;
     
     const allUsers = await db.query(query, params);
-    console.log(`   → Found ${allUsers.length} users matching date criteria`);
+    console.log(`?? Found ${allUsers.length} total users before any filtering`);
     
-    // Apply additional filtering - same logic as preview endpoint
-    let filteredUsers = allUsers;
+    // Log each user's basic info
+    allUsers.forEach(user => {
+      console.log(`   ?? ${user.name} (ID: ${user.id}, Owner: ${user.owner_id}, Sub IDs: ${user.subscription_type_ids || 'none'})`);
+    });
+
+    // STEP 2: Filter users by expiration date and subscription type
+    console.log(`\n? STEP 2: Checking for expiring subscriptions...`);
+    let usersWithExpiringSubscriptions = [];
     
-    // Filter by tags - UNCHANGED
-    if (targetTags && targetTags.length > 0) {
-      filteredUsers = filteredUsers.filter(user => {
-        const userTags = this.safeJsonParse(user.tags, []);
-        return targetTags.some(tag => userTags.includes(tag));
+    for (const user of allUsers) {
+      console.log(`\n   ?? Checking user: ${user.name} (ID: ${user.id})`);
+      
+      // Get this user's expiring subscriptions for the target date
+      let expiringSubscriptionsQuery = `
+        SELECT s.*, st.type as subscription_type, st.name as subscription_name
+        FROM subscriptions s
+        JOIN subscription_types st ON s.subscription_type_id = st.id
+        WHERE s.user_id = ? 
+          AND s.status = 'active'
+          AND DATE(s.expiration_date) = ?
+      `;
+      
+      // FIXED: Use let instead of const for params array
+      let expiringSubscriptionsParams = [user.id, targetDateStr];
+      
+      // Add subscription type filter
+      if (subscriptionType === 'plex') {
+        expiringSubscriptionsQuery += ` AND st.type = 'plex'`;
+        console.log(`   ? Looking for PLEX subscriptions expiring on ${targetDateStr}`);
+      } else if (subscriptionType === 'iptv') {
+        expiringSubscriptionsQuery += ` AND st.type = 'iptv'`;
+        console.log(`   ? Looking for IPTV subscriptions expiring on ${targetDateStr}`);
+      } else if (subscriptionType === 'both') {
+        expiringSubscriptionsQuery += ` AND st.type IN ('plex', 'iptv')`;
+        console.log(`   ? Looking for PLEX or IPTV subscriptions expiring on ${targetDateStr}`);
+      }
+      
+      const expiringSubscriptions = await db.query(expiringSubscriptionsQuery, expiringSubscriptionsParams);
+      
+      console.log(`   ? Found ${expiringSubscriptions.length} expiring subscriptions for ${user.name}`);
+      expiringSubscriptions.forEach(sub => {
+        console.log(`      ?? ${sub.subscription_name} (Type: ${sub.subscription_type}, Expires: ${sub.expiration_date})`);
       });
-      console.log(`   → After tag filtering: ${filteredUsers.length} users`);
+      
+      // If user has expiring subscriptions of the target type, add them
+      if (expiringSubscriptions.length > 0) {
+        console.log(`   ? ${user.name} HAS expiring subscriptions - INCLUDED`);
+        usersWithExpiringSubscriptions.push(user);
+      } else {
+        console.log(`   ? ${user.name} has NO expiring subscriptions - EXCLUDED`);
+      }
     }
     
-    // Filter by owners - UNCHANGED
-    if (targetOwners && targetOwners.length > 0) {
+    console.log(`\n? Found ${usersWithExpiringSubscriptions.length} users with expiring subscriptions:`);
+    usersWithExpiringSubscriptions.forEach(user => {
+      console.log(`   ? ${user.name} (ID: ${user.id})`);
+    });
+
+    // STEP 3: Apply additional filtering (EXACTLY like preview endpoint)
+    console.log(`\n?? STEP 3: Applying additional filters...`);
+    let filteredUsers = usersWithExpiringSubscriptions;
+    
+    // Filter by tags
+    if (targetTags && targetTags.length > 0 && targetTags[0] !== '') {
+      console.log(`\n???  APPLYING TAG FILTER: ${JSON.stringify(targetTags)}`);
+      const beforeTagFilter = filteredUsers.length;
+      
       filteredUsers = filteredUsers.filter(user => {
-        return targetOwners.includes(user.owner_id);
+        const userTags = user.tags ? JSON.parse(user.tags) : [];
+        const hasMatchingTag = targetTags.some(tag => userTags.includes(tag));
+        console.log(`   ?? ${user.name}: User tags = ${JSON.stringify(userTags)}, Match = ${hasMatchingTag}`);
+        return hasMatchingTag;
       });
-      console.log(`   → After owner filtering: ${filteredUsers.length} users`);
+      
+      console.log(`???  Tag filtering: ${beforeTagFilter} ? ${filteredUsers.length} users`);
+    } else {
+      console.log(`???  NO TAG FILTER applied (target_tags is empty or null)`);
     }
     
-    // FIXED: Filter by subscription types - use the same logic as preview endpoint
-    if (targetSubscriptionTypes && targetSubscriptionTypes.length > 0) {
+    // Filter by owners
+    if (targetOwners && targetOwners.length > 0 && targetOwners[0] !== '') {
+      console.log(`\n?? APPLYING OWNER FILTER: ${JSON.stringify(targetOwners)}`);
+      const beforeOwnerFilter = filteredUsers.length;
+      
       filteredUsers = filteredUsers.filter(user => {
+        const hasMatchingOwner = targetOwners.includes(user.owner_id);
+        console.log(`   ?? ${user.name}: Owner ID = ${user.owner_id}, Target owners = ${JSON.stringify(targetOwners)}, Match = ${hasMatchingOwner}`);
+        return hasMatchingOwner;
+      });
+      
+      console.log(`?? Owner filtering: ${beforeOwnerFilter} ? ${filteredUsers.length} users`);
+    } else {
+      console.log(`?? NO OWNER FILTER applied (target_owners is empty or null)`);
+    }
+    
+    // Filter by subscription types - EXACT COPY from preview endpoint
+    if (targetSubscriptionTypes && targetSubscriptionTypes.length > 0 && targetSubscriptionTypes[0] !== '') {
+      console.log(`\n?? APPLYING SUBSCRIPTION TYPE FILTER: ${JSON.stringify(targetSubscriptionTypes)}`);
+      const beforeSubFilter = filteredUsers.length;
+      
+      filteredUsers = filteredUsers.filter(user => {
+        console.log(`   ?? ${user.name}: Checking subscription type filter...`);
+        
         // Handle 'free' subscription type (no subscription_type_ids)
-        if (targetSubscriptionTypes.includes('free') && (!user.all_subscription_type_ids || user.all_subscription_type_ids === null)) {
+        if (targetSubscriptionTypes.includes('free') && (!user.subscription_type_ids || user.subscription_type_ids === null)) {
+          console.log(`      ? User has FREE subscription and 'free' is in target list`);
           return true;
         }
         
         // Parse the comma-separated subscription_type_ids
-        if (user.all_subscription_type_ids) {
-          const userSubscriptionIds = user.all_subscription_type_ids.split(',').map(id => parseInt(id.trim()));
-          return targetSubscriptionTypes.some(targetId => {
+        if (user.subscription_type_ids) {
+          const userSubscriptionIds = user.subscription_type_ids.split(',').map(id => parseInt(id.trim()));
+          console.log(`      ?? User subscription IDs: ${JSON.stringify(userSubscriptionIds)}`);
+          console.log(`      ?? Target subscription IDs: ${JSON.stringify(targetSubscriptionTypes)}`);
+          
+          const hasMatch = targetSubscriptionTypes.some(targetId => {
             if (targetId === 'free') return false; // Already handled above
-            return userSubscriptionIds.includes(parseInt(targetId));
+            const match = userSubscriptionIds.includes(parseInt(targetId));
+            console.log(`         ?? Checking if user has subscription ID ${targetId}: ${match}`);
+            return match;
           });
+          
+          console.log(`      ${hasMatch ? '?' : '?'} Final subscription type match: ${hasMatch}`);
+          return hasMatch;
         }
         
+        console.log(`      ? User has no subscription_type_ids`);
         return false;
       });
-      console.log(`   → After subscription type filtering: ${filteredUsers.length} users`);
+      
+      console.log(`?? Subscription type filtering: ${beforeSubFilter} ? ${filteredUsers.length} users`);
+    } else {
+      console.log(`?? NO SUBSCRIPTION TYPE FILTER applied (target_subscription_types is empty or null)`);
     }
+    
+    console.log(`\n?? === FINAL FILTERING RESULTS ===`);
+    console.log(`?? FINAL RESULT: ${filteredUsers.length} users will receive emails`);
+    
+    if (filteredUsers.length > 0) {
+      console.log(`?? Users who WILL receive emails:`);
+      filteredUsers.forEach(user => {
+        console.log(`   ? ${user.name} (${user.email}) - Owner: ${user.owner_id}, Subs: ${user.subscription_type_ids || 'none'}`);
+      });
+    } else {
+      console.log(`?? NO users will receive emails`);
+    }
+    
+    console.log(`?? === END FILTERING PROCESS ===\n`);
     
     return filteredUsers;
     
   } catch (error) {
-    console.error('❌ Error finding expiring users:', error);
+    console.error('? Error finding expiring users:', error);
     return [];
   }
 }
 
 async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targetOwners = null, targetSubscriptionTypes = null, excludeWithSetting = true) {
-  console.log(`🔍 Getting ALL users with subscription type: ${subscriptionType} (ignoring expiration dates)`);
-  console.log(`   → Target tags: ${targetTags ? JSON.stringify(targetTags) : 'none'}`);
-  console.log(`   → Target owners: ${targetOwners ? JSON.stringify(targetOwners) : 'none'}`);
-  console.log(`   → Target subscription types: ${targetSubscriptionTypes ? JSON.stringify(targetSubscriptionTypes) : 'none'}`);
+  console.log(`?? Getting ALL users with subscription type: ${subscriptionType} (ignoring expiration dates)`);
+  console.log(`   ? Target tags: ${targetTags ? JSON.stringify(targetTags) : 'none'}`);
+  console.log(`   ? Target owners: ${targetOwners ? JSON.stringify(targetOwners) : 'none'}`);
+  console.log(`   ? Target subscription types: ${targetSubscriptionTypes ? JSON.stringify(targetSubscriptionTypes) : 'none'}`);
   
   try {
     let query = `
@@ -583,7 +690,7 @@ async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targe
     }
     
     const allUsers = await db.query(query, params);
-    console.log(`   → Found ${allUsers.length} users with ${subscriptionType} subscriptions`);
+    console.log(`   ? Found ${allUsers.length} users with ${subscriptionType} subscriptions`);
     
     // Apply additional filtering (EXACT SAME LOGIC as getExpiringUsers)
     let filteredUsers = allUsers;
@@ -594,7 +701,7 @@ async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targe
         const userTags = this.safeJsonParse(user.tags, []);
         return targetTags.some(tag => userTags.includes(tag));
       });
-      console.log(`   → After tag filtering: ${filteredUsers.length} users`);
+      console.log(`   ? After tag filtering: ${filteredUsers.length} users`);
     }
     
     // Filter by owners
@@ -602,7 +709,7 @@ async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targe
       filteredUsers = filteredUsers.filter(user => {
         return targetOwners.includes(user.owner_id);
       });
-      console.log(`   → After owner filtering: ${filteredUsers.length} users`);
+      console.log(`   ? After owner filtering: ${filteredUsers.length} users`);
     }
     
     // Filter by subscription types
@@ -614,23 +721,23 @@ async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targe
         }
         return targetSubscriptionTypes.includes(user.subscription_type_id);
       });
-      console.log(`   → After subscription type filtering: ${filteredUsers.length} users`);
+      console.log(`   ? After subscription type filtering: ${filteredUsers.length} users`);
     }
     
     return filteredUsers;
     
   } catch (error) {
-    console.error('❌ Error finding users with subscription type:', error);
+    console.error('? Error finding users with subscription type:', error);
     return [];
   }
 }
 
   async getAllTargetUsers(targetTags = null, targetOwners = null, targetSubscriptionTypes = null, excludeAutomated = true) {
   try {
-    console.log(`   🔍 Getting all target users, excludeAutomated: ${excludeAutomated}`);
-    console.log(`   → Target tags: ${targetTags ? JSON.stringify(targetTags) : 'none'}`);
-    console.log(`   → Target owners: ${targetOwners ? JSON.stringify(targetOwners) : 'none'}`);
-    console.log(`   → Target subscription types: ${targetSubscriptionTypes ? JSON.stringify(targetSubscriptionTypes) : 'none'}`);
+    console.log(`   ?? Getting all target users, excludeAutomated: ${excludeAutomated}`);
+    console.log(`   ? Target tags: ${targetTags ? JSON.stringify(targetTags) : 'none'}`);
+    console.log(`   ? Target owners: ${targetOwners ? JSON.stringify(targetOwners) : 'none'}`);
+    console.log(`   ? Target subscription types: ${targetSubscriptionTypes ? JSON.stringify(targetSubscriptionTypes) : 'none'}`);
     
     let query = `
       SELECT DISTINCT u.id, u.name, u.email, u.tags, u.owner_id,
@@ -655,7 +762,7 @@ async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targe
     }
 
     const allUsers = await db.query(query, params);
-    console.log(`   → Found ${allUsers.length} users before filtering`);
+    console.log(`   ? Found ${allUsers.length} users before filtering`);
 
     // Apply filtering (EXACT SAME LOGIC)
     let filteredUsers = allUsers;
@@ -666,7 +773,7 @@ async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targe
         const userTags = this.safeJsonParse(user.tags, []);
         return targetTags.some(tag => userTags.includes(tag));
       });
-      console.log(`   → After tag filtering: ${filteredUsers.length} users`);
+      console.log(`   ? After tag filtering: ${filteredUsers.length} users`);
     }
 
     // Filter by owners
@@ -674,7 +781,7 @@ async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targe
       filteredUsers = filteredUsers.filter(user => {
         return targetOwners.includes(user.owner_id);
       });
-      console.log(`   → After owner filtering: ${filteredUsers.length} users`);
+      console.log(`   ? After owner filtering: ${filteredUsers.length} users`);
     }
 
     // Filter by subscription types
@@ -686,13 +793,13 @@ async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targe
         }
         return targetSubscriptionTypes.includes(user.subscription_type_id);
       });
-      console.log(`   → After subscription type filtering: ${filteredUsers.length} users`);
+      console.log(`   ? After subscription type filtering: ${filteredUsers.length} users`);
     }
 
     return filteredUsers;
 
   } catch (error) {
-    console.error('❌ Error getting all target users:', error);
+    console.error('? Error getting all target users:', error);
     return [];
   }
 }
@@ -716,11 +823,11 @@ async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targe
 
   async testEmailConnection() {
     try {
-      console.log('🧪 Testing email connection...');
+      console.log('?? Testing email connection...');
       
       // Get SMTP settings from database
       const smtpSettings = await this.getEmailSettings();
-      console.log('📧 SMTP Settings:', { 
+      console.log('?? SMTP Settings:', { 
         host: smtpSettings.smtp_host, 
         port: smtpSettings.smtp_port, 
         user: smtpSettings.smtp_user,
@@ -772,7 +879,7 @@ async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targe
       }
 
     } catch (error) {
-      console.error('❌ Email test error:', error);
+      console.error('? Email test error:', error);
       return { 
         success: false, 
         error: `Email test failed: ${error.message}` 
@@ -781,7 +888,7 @@ async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targe
   }
   
   async reinitialize() {
-  console.log('🔄 Reinitializing email service with new settings...');
+  console.log('?? Reinitializing email service with new settings...');
   this.transporter = null;
   await this.initializeTransporter();
 }
@@ -792,7 +899,7 @@ async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targe
 
   async sendBulkEmail(tags, subject, body, options = {}) {
     try {
-      console.log(`📧 Starting bulk email to tags: ${tags.join(', ')}`);
+      console.log(`?? Starting bulk email to tags: ${tags.join(', ')}`);
       
       // Get target users
       let query = 'SELECT * FROM users WHERE 1=1';
@@ -818,7 +925,7 @@ async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targe
         });
       }
 
-      console.log(`📧 Found ${targetUsers.length} target users for bulk email`);
+      console.log(`?? Found ${targetUsers.length} target users for bulk email`);
 
       // Send emails to all target users
       let sentCount = 0;
@@ -846,7 +953,7 @@ async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targe
         }
       }
 
-      console.log(`✅ Bulk email completed: ${sentCount} sent, ${failedCount} failed`);
+      console.log(`? Bulk email completed: ${sentCount} sent, ${failedCount} failed`);
 
       return {
         success: true,
