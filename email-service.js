@@ -427,6 +427,8 @@ async processIndividualSchedule(schedule) {
   }
 }
 
+// Replace the getExpiringUsers method in email-service.js with this FIXED version
+
 async getExpiringUsers(daysBefore, subscriptionType, targetTags = null, targetOwners = null, targetSubscriptionTypes = null, excludeWithSetting = true) {
   console.log(`🔍 Finding users expiring in ${daysBefore} days (type: ${subscriptionType})`);
   console.log(`   → Target tags: ${targetTags ? JSON.stringify(targetTags) : 'none'}`);
@@ -438,8 +440,10 @@ async getExpiringUsers(daysBefore, subscriptionType, targetTags = null, targetOw
     targetDate.setDate(targetDate.getDate() + daysBefore);
     const targetDateStr = targetDate.toISOString().split('T')[0];
 
+    // FIXED: Use the same query structure as the preview endpoint
     let query = `
-      SELECT DISTINCT u.id, u.name, u.email, u.tags, u.owner_id,
+      SELECT u.id, u.name, u.email, u.tags, u.owner_id, u.exclude_automated_emails,
+             o.name as owner_name, o.email as owner_email, u.bcc_owner_renewal,
              s.expiration_date, s.subscription_type_id,
              CASE 
                WHEN s.subscription_type_id IS NULL THEN 'FREE Plex Access'
@@ -449,7 +453,10 @@ async getExpiringUsers(daysBefore, subscriptionType, targetTags = null, targetOw
                WHEN s.subscription_type_id IS NULL THEN 'plex'
                ELSE st.type 
              END as subscription_type,
-             o.name as owner_name
+             -- ADDED: Get all subscription type IDs for this user (like preview endpoint)
+             (SELECT GROUP_CONCAT(DISTINCT s2.subscription_type_id) 
+              FROM subscriptions s2 
+              WHERE s2.user_id = u.id AND s2.status = 'active') as all_subscription_type_ids
       FROM users u
       LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
       LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
@@ -459,7 +466,7 @@ async getExpiringUsers(daysBefore, subscriptionType, targetTags = null, targetOw
     
     const params = [];
     
-    // Date filtering
+    // Date filtering - UNCHANGED
     if (subscriptionType === 'plex') {
       query += ` AND st.type = 'plex' AND DATE(s.expiration_date) = ?`;
       params.push(targetDateStr);
@@ -471,18 +478,21 @@ async getExpiringUsers(daysBefore, subscriptionType, targetTags = null, targetOw
       params.push(targetDateStr);
     }
     
-    // Exclude users with setting
+    // Exclude users with setting - UNCHANGED
     if (excludeWithSetting) {
       query += ` AND u.exclude_automated_emails = FALSE`;
     }
     
+    // Add GROUP BY to handle multiple subscriptions per user
+    query += ` GROUP BY u.id, u.name, u.email, u.tags, u.owner_id, u.exclude_automated_emails, o.name, o.email, u.bcc_owner_renewal`;
+    
     const allUsers = await db.query(query, params);
     console.log(`   → Found ${allUsers.length} users matching date criteria`);
     
-    // Apply additional filtering
+    // Apply additional filtering - same logic as preview endpoint
     let filteredUsers = allUsers;
     
-    // Filter by tags
+    // Filter by tags - UNCHANGED
     if (targetTags && targetTags.length > 0) {
       filteredUsers = filteredUsers.filter(user => {
         const userTags = this.safeJsonParse(user.tags, []);
@@ -491,7 +501,7 @@ async getExpiringUsers(daysBefore, subscriptionType, targetTags = null, targetOw
       console.log(`   → After tag filtering: ${filteredUsers.length} users`);
     }
     
-    // NEW: Filter by owners
+    // Filter by owners - UNCHANGED
     if (targetOwners && targetOwners.length > 0) {
       filteredUsers = filteredUsers.filter(user => {
         return targetOwners.includes(user.owner_id);
@@ -499,14 +509,24 @@ async getExpiringUsers(daysBefore, subscriptionType, targetTags = null, targetOw
       console.log(`   → After owner filtering: ${filteredUsers.length} users`);
     }
     
-    // NEW: Filter by subscription types
+    // FIXED: Filter by subscription types - use the same logic as preview endpoint
     if (targetSubscriptionTypes && targetSubscriptionTypes.length > 0) {
       filteredUsers = filteredUsers.filter(user => {
-        // Handle both NULL (free) and specific subscription type IDs
-        if (targetSubscriptionTypes.includes('free') && user.subscription_type_id === null) {
+        // Handle 'free' subscription type (no subscription_type_ids)
+        if (targetSubscriptionTypes.includes('free') && (!user.all_subscription_type_ids || user.all_subscription_type_ids === null)) {
           return true;
         }
-        return targetSubscriptionTypes.includes(user.subscription_type_id);
+        
+        // Parse the comma-separated subscription_type_ids
+        if (user.all_subscription_type_ids) {
+          const userSubscriptionIds = user.all_subscription_type_ids.split(',').map(id => parseInt(id.trim()));
+          return targetSubscriptionTypes.some(targetId => {
+            if (targetId === 'free') return false; // Already handled above
+            return userSubscriptionIds.includes(parseInt(targetId));
+          });
+        }
+        
+        return false;
       });
       console.log(`   → After subscription type filtering: ${filteredUsers.length} users`);
     }
