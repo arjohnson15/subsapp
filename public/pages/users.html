@@ -3,6 +3,21 @@
     <button class="btn" onclick="showUserForm()">Create New User</button>
 </div>
 
+<!-- View Toggle Controls -->
+<div class="view-mode-toggle">
+    <button class="view-toggle-btn active" onclick="CompactUsers.setViewMode('table')">
+        <i class="fas fa-table"></i> Table View
+    </button>
+    <button class="view-toggle-btn" onclick="CompactUsers.setViewMode('compact')">
+        <i class="fas fa-list"></i> Compact View
+    </button>
+</div>
+
+<!-- Total Users Count -->
+<div style="text-align: center; margin-bottom: 15px; color: #4fc3f7; font-size: 1rem;">
+    Total Users: <span id="compactTotalUsers" style="font-weight: bold;">0</span>
+</div>
+
 <!-- Expiring Users Section -->
 <div class="expiring-soon-compact" style="margin-bottom: 15px;">
     <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
@@ -10,6 +25,7 @@
         <div id="expiringUsers" style="flex: 1; min-width: 200px;">Loading expiring users...</div>
     </div>
 </div>
+
 <!-- Search and Filter Controls -->
 <div style="display: grid; grid-template-columns: 1fr auto auto; gap: 15px; margin-bottom: 20px; align-items: end;">
     <div>
@@ -34,31 +50,37 @@
     </div>
 </div>
 
+<!-- Original Table Container -->
 <div class="table-container">
     <table>
-<thead>
-    <tr>
-        <th onclick="Users.sortUsers('name')" style="cursor: pointer;">
-            Name <span id="sort-name" style="color: #666;">v</span>
-        </th>
-        <th onclick="Users.sortUsers('email')" style="cursor: pointer;">
-            Email <span id="sort-email" style="color: #666;">v</span>
-        </th>
-        <th onclick="Users.sortUsers('owner_name')" style="cursor: pointer;">
-            Owner <span id="sort-owner_name" style="color: #666;">v</span>
-        </th>
-        <th>Tags</th>
-        <th onclick="Users.sortUsers('plex_expiration')" style="cursor: pointer;">
-            Plex Expiration <span id="sort-plex_expiration" style="color: #666;">v</span>
-        </th>
-        <th onclick="Users.sortUsers('iptv_expiration')" style="cursor: pointer;">
-            IPTV Expiration <span id="sort-iptv_expiration" style="color: #666;">v</span>
-        </th>
-        <th>Actions</th>
-    </tr>
-</thead>
+        <thead>
+            <tr>
+                <th onclick="Users.sortUsers('name')" style="cursor: pointer;">
+                    Name <span id="sort-name" style="color: #666;">v</span>
+                </th>
+                <th onclick="Users.sortUsers('email')" style="cursor: pointer;">
+                    Email <span id="sort-email" style="color: #666;">v</span>
+                </th>
+                <th onclick="Users.sortUsers('owner_name')" style="cursor: pointer;">
+                    Owner <span id="sort-owner_name" style="color: #666;">v</span>
+                </th>
+                <th>Tags</th>
+                <th onclick="Users.sortUsers('plex_expiration')" style="cursor: pointer;">
+                    Plex Expiration <span id="sort-plex_expiration" style="color: #666;">v</span>
+                </th>
+                <th onclick="Users.sortUsers('iptv_expiration')" style="cursor: pointer;">
+                    IPTV Expiration <span id="sort-iptv_expiration" style="color: #666;">v</span>
+                </th>
+                <th>Actions</th>
+            </tr>
+        </thead>
         <tbody id="usersTableBody">
             <tr><td colspan="8" style="text-align: center;">Loading users...</td></tr>
         </tbody>
     </table>
+</div>
+
+<!-- Compact Users Container (populated by JavaScript) -->
+<div class="compact-users-container" id="compactUsersContainer">
+    <!-- Compact user rows will be populated here -->
 </div>

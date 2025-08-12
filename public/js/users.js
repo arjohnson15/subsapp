@@ -3916,3 +3916,454 @@ window.updatePlexAccessCheckVisibility = function() {
 
 window.regenerateM3UUrl = window.Users.regenerateM3UUrl.bind(window.Users);
 window.copyEditorM3UUrl = window.Users.copyEditorM3UUrl.bind(window.Users);
+
+
+
+// ========================================
+// COMPACT USERS INTEGRATION
+// Add this to the bottom of your existing users.js file
+// ========================================
+
+window.CompactUsers = {
+    currentView: 'table',
+    users: [],
+    filteredUsers: [],
+    
+init() {
+    this.bindEvents();
+    this.checkMobileAndSetDefault();
+    console.log('📱 CompactUsers initialized');
+},
+
+// Add this new method:
+checkMobileAndSetDefault() {
+    if (window.innerWidth <= 768) {
+        // On mobile, default to compact view
+        setTimeout(() => {
+            this.setViewMode('compact');
+        }, 100);
+    }
+},
+    
+    setViewMode(mode) {
+        const buttons = document.querySelectorAll('.view-toggle-btn');
+        const tableContainer = document.querySelector('.table-container');
+        const compactContainer = document.querySelector('.compact-users-container');
+        
+        // Update button states
+        buttons.forEach(btn => btn.classList.remove('active'));
+        
+        this.currentView = mode;
+        
+        if (mode === 'table') {
+            buttons[0].classList.add('active');
+            if (tableContainer) tableContainer.style.display = 'block';
+            if (compactContainer) compactContainer.style.display = 'none';
+        } else if (mode === 'compact') {
+            buttons[1].classList.add('active');
+            if (tableContainer) tableContainer.style.display = 'none';
+            if (compactContainer) compactContainer.style.display = 'block';
+            this.renderCompactUsers();
+            this.collapseAllRows();
+        } else if (mode === 'expanded') {
+            buttons[2].classList.add('active');
+            if (tableContainer) tableContainer.style.display = 'none';
+            if (compactContainer) compactContainer.style.display = 'block';
+            this.renderCompactUsers();
+            this.expandAllRows();
+        }
+    },
+    
+    renderCompactUsers() {
+        const container = document.getElementById('compactUsersContainer');
+        if (!container) return;
+        
+        // Get users from existing data
+        if (window.AppState && window.AppState.users) {
+            this.users = window.AppState.users;
+        }
+        
+        if (this.users.length === 0) {
+            container.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;">No users found</div>';
+            return;
+        }
+        
+        this.updateStats();
+        
+        const usersToShow = this.filteredUsers.length > 0 ? this.filteredUsers : this.users;
+        container.innerHTML = usersToShow.map(user => this.createCompactUserRow(user)).join('');
+    },
+    
+    createCompactUserRow(user) {
+        const initials = this.getUserInitials(user.name);
+        const statusClass = this.getUserStatusClass(user);
+        const serviceTags = this.getUserServiceTags(user);
+        const ownerName = user.owner_name || 'Unknown';
+        
+        return `
+            <div class="compact-user-row" data-user-id="${user.id}" onclick="CompactUsers.toggleUserRow(this)">
+                <div class="user-compact-view">
+                    <div class="user-avatar-compact">${initials}</div>
+                    <div class="user-main-info-compact">
+                        <div class="user-name-compact">${user.name}</div>
+                        <div class="user-email-compact">${user.email}</div>
+                    </div>
+                    <div class="user-quick-info-compact">
+                        <div class="service-tags-compact">
+                            ${serviceTags}
+                        </div>
+                        <div class="status-dot-compact ${statusClass}"></div>
+                        <i class="fas fa-chevron-down expand-indicator-compact"></i>
+                    </div>
+                </div>
+                
+                <div class="user-expanded-details">
+                    <div class="expanded-details-content">
+                        ${ownerName !== 'Unknown' ? `<div class="compact-owner-badge">Owner: ${ownerName}</div>` : ''}
+                        
+                        <div class="expanded-details-grid">
+                            <div class="expanded-detail-section">
+                                <div class="expanded-section-title">
+                                    <i class="fas fa-film"></i>
+                                    Plex Information
+                                </div>
+                                ${this.getPlexDetailsHTML(user)}
+                            </div>
+                            
+                            <div class="expanded-detail-section">
+                                <div class="expanded-section-title">
+                                    <i class="fas fa-tv"></i>
+                                    IPTV Information
+                                </div>
+                                ${this.getIPTVDetailsHTML(user)}
+                            </div>
+                        </div>
+                        
+                        <div class="compact-user-actions">
+                            <button class="compact-action-btn compact-btn-view" onclick="event.stopPropagation(); Users.viewUser(${user.id})">
+                                <i class="fas fa-eye"></i>
+                                View Details
+                            </button>
+                            <button class="compact-action-btn compact-btn-edit" onclick="event.stopPropagation(); Users.editUser(${user.id})">
+                                <i class="fas fa-edit"></i>
+                                Edit User
+                            </button>
+                            <button class="compact-action-btn compact-btn-delete" onclick="event.stopPropagation(); Users.deleteUser(${user.id})">
+                                <i class="fas fa-trash"></i>
+                                Delete
+                            </button>
+                        </div>
+                        
+                        ${user.pending_plex_invite ? '<div class="compact-pending-indicator">Pending Plex Invite</div>' : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+    
+    getUserInitials(name) {
+        if (!name) return '??';
+        return name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().substring(0, 2);
+    },
+    
+    getUserStatusClass(user) {
+        const now = new Date();
+        const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        
+        const plexExp = user.plex_expiration ? new Date(user.plex_expiration) : null;
+        const iptvExp = user.iptv_expiration ? new Date(user.iptv_expiration) : null;
+        
+        // Check if expired
+        if ((plexExp && plexExp < now) || (iptvExp && iptvExp < now)) {
+            return 'status-expired-compact';
+        }
+        
+        // Check if expiring soon
+        if ((plexExp && plexExp > now && plexExp < weekFromNow) || 
+            (iptvExp && iptvExp > now && iptvExp < weekFromNow)) {
+            return 'status-expiring-compact';
+        }
+        
+        // Active
+        if ((plexExp && plexExp > now) || (iptvExp && iptvExp > now)) {
+            return 'status-active-compact';
+        }
+        
+        return 'status-expired-compact';
+    },
+    
+    getUserServiceTags(user) {
+        const tags = [];
+        
+        // Parse user tags
+        let userTags = [];
+        if (user.tags && Array.isArray(user.tags)) {
+            userTags = user.tags;
+        } else if (user.tags && typeof user.tags === 'string') {
+            try {
+                const parsed = JSON.parse(user.tags);
+                if (Array.isArray(parsed)) {
+                    userTags = parsed;
+                }
+            } catch (e) {
+                userTags = [user.tags];
+            }
+        }
+        
+        // Create tag HTML
+        userTags.forEach(tag => {
+            let tagClass = 'tag-default-compact';
+            let shortTag = tag;
+            
+            if (tag.toLowerCase().includes('plex 1')) {
+                tagClass = 'tag-plex1-compact';
+                shortTag = 'P1';
+            } else if (tag.toLowerCase().includes('plex 2')) {
+                tagClass = 'tag-plex2-compact';
+                shortTag = 'P2';
+            } else if (tag.toLowerCase().includes('iptv')) {
+                tagClass = 'tag-iptv-compact';
+                shortTag = 'TV';
+            }
+            
+            tags.push(`<div class="service-tag-compact ${tagClass}">${shortTag}</div>`);
+        });
+        
+        return tags.join('');
+    },
+    
+    getPlexDetailsHTML(user) {
+        const items = [];
+        
+        if (user.plex_email) {
+            items.push(`
+                <div class="expanded-detail-item">
+                    <span class="expanded-detail-label">Plex Email:</span>
+                    <span class="expanded-detail-value">${user.plex_email}</span>
+                </div>
+            `);
+        }
+        
+        if (user.plex_expiration) {
+            const status = this.getExpirationStatus(user.plex_expiration);
+            items.push(`
+                <div class="expanded-detail-item">
+                    <span class="expanded-detail-label">Expiration:</span>
+                    <span class="expanded-detail-value ${status.class}">${status.text}</span>
+                </div>
+            `);
+        }
+        
+        if (items.length === 0) {
+            return '<div class="expanded-detail-item"><span class="expanded-detail-value">No Plex subscription</span></div>';
+        }
+        
+        return items.join('');
+    },
+    
+    getIPTVDetailsHTML(user) {
+        const items = [];
+        
+        if (user.iptv_username) {
+            items.push(`
+                <div class="expanded-detail-item">
+                    <span class="expanded-detail-label">Username:</span>
+                    <span class="expanded-detail-value">${user.iptv_username}</span>
+                </div>
+            `);
+        }
+        
+        if (user.iptv_expiration) {
+            const status = this.getExpirationStatus(user.iptv_expiration);
+            items.push(`
+                <div class="expanded-detail-item">
+                    <span class="expanded-detail-label">Expiration:</span>
+                    <span class="expanded-detail-value ${status.class}">${status.text}</span>
+                </div>
+            `);
+        }
+        
+        if (items.length === 0) {
+            return '<div class="expanded-detail-item"><span class="expanded-detail-value">No IPTV subscription</span></div>';
+        }
+        
+        return items.join('');
+    },
+    
+    getExpirationStatus(expiration) {
+        if (!expiration || expiration === 'FREE') {
+            return { text: expiration || 'N/A', class: '' };
+        }
+        
+        const now = new Date();
+        const expDate = new Date(expiration);
+        const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        
+        if (expDate < now) {
+            return { text: this.formatDate(expDate), class: 'expired' };
+        } else if (expDate < weekFromNow) {
+            return { text: this.formatDate(expDate), class: 'expiring' };
+        } else {
+            return { text: this.formatDate(expDate), class: 'active' };
+        }
+    },
+    
+    formatDate(date) {
+        if (!date) return 'N/A';
+        
+        const options = { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+        };
+        
+        return new Date(date).toLocaleDateString('en-US', options);
+    },
+    
+updateStats() {
+    const totalUsers = this.users.length;
+    this.updateElement('compactTotalUsers', totalUsers);
+},
+    
+    isUserActive(user) {
+        const now = new Date();
+        const plexExp = user.plex_expiration ? new Date(user.plex_expiration) : null;
+        const iptvExp = user.iptv_expiration ? new Date(user.iptv_expiration) : null;
+        
+        return (plexExp && plexExp > now) || (iptvExp && iptvExp > now);
+    },
+    
+    isUserExpiring(user) {
+        const now = new Date();
+        const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const plexExp = user.plex_expiration ? new Date(user.plex_expiration) : null;
+        const iptvExp = user.iptv_expiration ? new Date(user.iptv_expiration) : null;
+        
+        return (plexExp && plexExp > now && plexExp < weekFromNow) ||
+               (iptvExp && iptvExp > now && iptvExp < weekFromNow);
+    },
+    
+    toggleUserRow(row) {
+        row.classList.toggle('expanded');
+    },
+    
+    collapseAllRows() {
+        document.querySelectorAll('.compact-user-row').forEach(row => {
+            row.classList.remove('expanded');
+        });
+    },
+    
+    expandAllRows() {
+        document.querySelectorAll('.compact-user-row').forEach(row => {
+            row.classList.add('expanded');
+        });
+    },
+    
+    filterCompactUsers() {
+        const searchTerm = document.getElementById('userSearch')?.value.toLowerCase() || '';
+        const ownerFilter = document.getElementById('ownerFilter')?.value || '';
+        const tagFilter = document.getElementById('tagFilter')?.value || '';
+        
+        this.filteredUsers = this.users.filter(user => {
+            // Search term filter
+            const matchesSearch = !searchTerm || 
+                user.name.toLowerCase().includes(searchTerm) ||
+                user.email.toLowerCase().includes(searchTerm);
+            
+            // Owner filter
+            const matchesOwner = !ownerFilter || 
+                (user.owner_id && user.owner_id.toString() === ownerFilter);
+            
+            // Tag filter
+            const userTags = this.getUserTags(user);
+            const matchesTag = !tagFilter || userTags.includes(tagFilter);
+            
+            return matchesSearch && matchesOwner && matchesTag;
+        });
+        
+        this.renderCompactUsers();
+    },
+    
+    getUserTags(user) {
+        if (user.tags && Array.isArray(user.tags)) {
+            return user.tags;
+        } else if (user.tags && typeof user.tags === 'string') {
+            try {
+                const parsed = JSON.parse(user.tags);
+                return Array.isArray(parsed) ? parsed : [user.tags];
+            } catch (e) {
+                return [user.tags];
+            }
+        }
+        return [];
+    },
+    
+    bindEvents() {
+        // Hook into existing filter function
+        const originalFilterUsers = window.Users?.filterUsers;
+        if (originalFilterUsers) {
+            window.Users.filterUsers = () => {
+                originalFilterUsers.call(window.Users);
+                
+                // Also filter compact view if active
+                if (this.currentView !== 'table') {
+                    this.filterCompactUsers();
+                }
+            };
+        }
+    },
+    
+    updateElement(id, value) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = value;
+        }
+    }
+};
+
+// Integration with existing Users object
+if (window.Users) {
+    const originalInit = window.Users.init;
+    window.Users.init = async function() {
+        // Call original init
+        if (originalInit) {
+            await originalInit.call(this);
+        }
+        
+        // Initialize compact users
+        CompactUsers.init();
+        
+        // Load users into compact view
+        if (window.AppState && window.AppState.users) {
+            CompactUsers.users = window.AppState.users;
+            CompactUsers.updateStats();
+        }
+    };
+    
+    // Hook into existing user loading
+    const originalLoadUsers = window.Users.loadUsers;
+    window.Users.loadUsers = async function() {
+        const result = originalLoadUsers ? await originalLoadUsers.call(this) : null;
+        
+        // Update compact view
+        if (window.AppState && window.AppState.users) {
+            CompactUsers.users = window.AppState.users;
+            if (CompactUsers.currentView !== 'table') {
+                CompactUsers.renderCompactUsers();
+            }
+        }
+        
+        return result;
+    };
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.location.hash.includes('users') || document.querySelector('#usersTableBody')) {
+        setTimeout(() => {
+            CompactUsers.init();
+        }, 500);
+    }
+});
+
+console.log('📱 CompactUsers integration loaded');
