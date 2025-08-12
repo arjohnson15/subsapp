@@ -963,14 +963,19 @@ async init() {
         }
     }
     
-    // Load all dashboard data in parallel
-    await this.loadStats();
-    await this.loadContentStats();
-    await this.loadServerResources(); // NEW: Load server resources
-    
-    this.debug('🚀 Starting background live data refresh...');
-    await this.preloadLiveData();
-    this.startBackgroundRefresh();
+// Load all dashboard data in parallel
+await Promise.all([
+    this.loadStats(),
+    this.loadContentStats(),
+    this.loadServerResources(),
+    this.preloadLiveData()
+]);
+
+// NEW: Update mobile preview counts immediately after preload
+this.updateMobilePreviewCounts();
+
+this.debug('🚀 Starting background live data refresh...');
+this.startBackgroundRefresh();
     
     this.info('✅ Dashboard fully initialized with server resource monitoring active');
 },
@@ -1414,6 +1419,50 @@ async loadContentStats() {
             }
         }
     },
+	
+	// Mobile preview counts update
+updateMobilePreviewCounts() {
+    try {
+        // Only run on mobile
+        if (window.innerWidth > 768) return;
+        
+        // Update IPTV mobile preview
+        if (this.cachedIPTVData && this.cachedIPTVData.viewers) {
+            const iptvPreview = document.getElementById('iptvViewersPreview');
+            if (iptvPreview) {
+                iptvPreview.textContent = this.cachedIPTVData.viewers.length.toString();
+            }
+        }
+        
+        // Update Plex mobile preview
+        if (this.cachedPlexData && this.cachedPlexData.sessions) {
+            const plexPreview = document.getElementById('plexSessionCountMobile');
+            const bandwidthPreview = document.getElementById('plexBandwidthMobile');
+            
+            if (plexPreview) {
+                plexPreview.textContent = this.cachedPlexData.sessions.length.toString();
+            }
+            
+            if (bandwidthPreview) {
+                if (this.cachedPlexData.sessions.length > 0) {
+                    const summaryStats = this.generateSessionSummary(this.cachedPlexData.sessions);
+                    const bandwidthMatch = summaryStats.match(/Bandwidth:\s*([\d.]+\s*Mbps)/i);
+                    if (bandwidthMatch) {
+                        bandwidthPreview.textContent = bandwidthMatch[1];
+                    } else {
+                        bandwidthPreview.textContent = 'Active';
+                    }
+                } else {
+                    bandwidthPreview.textContent = '0 Mbps';
+                }
+            }
+        }
+        
+        console.log('📱 Mobile preview counts updated by main Dashboard');
+    } catch (error) {
+        console.error('❌ Error updating mobile preview counts:', error);
+    }
+},
         
     // OPTIMIZED: Remove excessive logging from updatePlexSessions
     updatePlexSessions(data) {
@@ -2294,21 +2343,27 @@ startBackgroundRefresh() {
                 fetch('/api/plex/dashboard-resources') // NEW: Server resources
             ]);
             
-            // Update IPTV data (silent unless error)
-            if (iptvResponse.status === 'fulfilled' && iptvResponse.value.ok) {
-                this.cachedIPTVData = await iptvResponse.value.json();
-                
-                const iptvCountElement = document.getElementById('iptvViewerCount');
-                if (iptvCountElement && this.cachedIPTVData.viewers) {
-                    iptvCountElement.textContent = this.cachedIPTVData.viewers.length.toString();
-                }
-                
-                if (this.expandedSections.has('iptv')) {
-                    this.updateIPTVViewers(this.cachedIPTVData);
-                }
-            } else {
-                this.error('❌ IPTV background refresh failed');
-            }
+// Update IPTV data (silent unless error)
+if (iptvResponse.status === 'fulfilled' && iptvResponse.value.ok) {
+    this.cachedIPTVData = await iptvResponse.value.json();
+    
+    const iptvCountElement = document.getElementById('iptvViewerCount');
+    if (iptvCountElement && this.cachedIPTVData.viewers) {
+        iptvCountElement.textContent = this.cachedIPTVData.viewers.length.toString();
+    }
+    
+    // ADD THIS - Update mobile IPTV count too
+    const iptvMobileCountElement = document.getElementById('iptvViewersPreview');
+    if (iptvMobileCountElement && this.cachedIPTVData.viewers) {
+        iptvMobileCountElement.textContent = this.cachedIPTVData.viewers.length.toString();
+    }
+    
+    if (this.expandedSections.has('iptv')) {
+        this.updateIPTVViewers(this.cachedIPTVData);
+    }
+} else {
+    this.error('❌ IPTV background refresh failed');
+}
             
             // Update Plex data (silent unless error)  
             if (plexResponse.status === 'fulfilled' && plexResponse.value.ok) {
@@ -2342,19 +2397,22 @@ updatePlexSessionsSummary() {
     
     const plexCountElement = document.getElementById('plexSessionCount');
     const summaryElement = document.getElementById('plexSessionSummary');
+    const plexMobileCountElement = document.getElementById('plexSessionCountMobile');
+    const bandwidthElement = document.getElementById('plexBandwidthMobile');
     
-    if (!this.cachedPlexData || !this.cachedPlexData.sessions) {
-        if (plexCountElement) plexCountElement.textContent = '0';
-        if (summaryElement) summaryElement.style.display = 'none';
-        return;
-    }
+if (!this.cachedPlexData || !this.cachedPlexData.sessions) {
+    if (plexCountElement) plexCountElement.textContent = '0';
+    if (plexMobileCountElement) plexMobileCountElement.textContent = '0';
+    if (bandwidthElement) bandwidthElement.textContent = '0 Mbps';
+    if (summaryElement) summaryElement.style.display = 'none';
+    return;
+}
     
     const sessionCount = this.cachedPlexData.sessions.length;
     
-    // Update session count
-    if (plexCountElement) {
-        plexCountElement.textContent = sessionCount.toString();
-    }
+// Update ALL session count elements
+if (plexCountElement) plexCountElement.textContent = sessionCount.toString();
+if (plexMobileCountElement) plexMobileCountElement.textContent = sessionCount.toString();
     
     // Update summary if there are sessions
     if (summaryElement) {
@@ -2362,8 +2420,19 @@ updatePlexSessionsSummary() {
             const summaryStats = this.generateSessionSummary(this.cachedPlexData.sessions);
             summaryElement.innerHTML = summaryStats;
             summaryElement.style.display = 'block';
+            
+            // Extract bandwidth for mobile display
+            if (bandwidthElement) {
+                const bandwidthMatch = summaryStats.match(/Bandwidth:\s*([\d.]+\s*Mbps)/i);
+                if (bandwidthMatch) {
+                    bandwidthElement.textContent = bandwidthMatch[1];
+                } else {
+                    bandwidthElement.textContent = 'Active';
+                }
+            }
         } else {
             summaryElement.style.display = 'none';
+            if (bandwidthElement) bandwidthElement.textContent = '0 Mbps';
         }
     }
     

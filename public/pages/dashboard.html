@@ -171,7 +171,7 @@
     </div>
 </div>
 
-<!-- Mobile Plex Header -->
+<!-- Mobile Plex Header (with session info) -->
 <div class="mobile-section-header" onclick="
     const content = document.getElementById('plexStatsContent');
     const icon = document.getElementById('plexStatsIcon');
@@ -183,7 +183,10 @@
         <i class="fas fa-film"></i>
         <span>Plex Content</span>
         <div class="mobile-stats-preview">
-            <span id="plexSessionCountMobile">0</span> sessions
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+                <span><span id="plexSessionCountMobile">0</span> streams</span>
+                <span style="font-size: 0.75rem; opacity: 0.7;" id="plexBandwidthMobile">Loading...</span>
+            </div>
         </div>
     </div>
     <i class="fas fa-chevron-down mobile-expand-icon" id="plexStatsIcon"></i>
@@ -652,18 +655,6 @@
     100% { opacity: 1; }
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-    .plex-sessions-grid,
-    .iptv-viewers-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .session-poster {
-        width: 40px;
-        height: 60px;
-    }
-}
 
 /* Mobile-Only Section Collapsing */
 .mobile-section-header {
@@ -761,13 +752,7 @@
     .mobile-section-header[onclick*="iptvStats"] .mobile-expand-icon {
         color: #ff6b6b;
     }
-    
-    /* Plex specific colors */
-    .mobile-section-header[onclick*="plexStats"] {
-        background: rgba(78, 205, 196, 0.1);
-        border-color: rgba(78, 205, 196, 0.3);
-    }
-    
+       
     .mobile-section-header[onclick*="plexStats"]:hover {
         background: rgba(78, 205, 196, 0.15);
     }
@@ -891,352 +876,6 @@
 </style>
 
 <script>
-// Mobile-Optimized Dashboard Module with Collapsible Sections
-window.Dashboard = {
-    expandedSections: new Set(),
-    
-    async init() {
-        console.log('📊 Initializing mobile-optimized dashboard...');
-        
-        // Load users first if they're not already loaded
-        if (!window.AppState || !window.AppState.users || window.AppState.users.length === 0) {
-            try {
-                const users = await API.User.getAll();
-                if (!window.AppState) window.AppState = {};
-                window.AppState.users = users;
-                window.AppState.allUsers = users;
-                console.log(`📊 Dashboard: Loaded ${users.length} users for stats`);
-            } catch (error) {
-                console.error('📊 Dashboard: Error loading users:', error);
-                if (!window.AppState) window.AppState = {};
-                window.AppState.users = [];
-            }
-        }
-        
-        // Load initial stats
-        await this.loadStats();
-		
-		// Sync mobile counts with desktop
-		this.syncSessionCounts();
-        
-        // Initialize all sections as collapsed by default
-        this.initializeCollapsedSections();
-        
-        console.log('📊 Mobile dashboard initialized successfully');
-    },
-    
-initializeCollapsedSections() {
-    // Collapse all live sections by default
-    const iptvSection = document.getElementById('iptvLiveSection');
-    const plexSection = document.getElementById('plexLiveSection');
-    
-    if (iptvSection) {
-        iptvSection.classList.remove('expanded');
-        const iptvIcon = iptvSection.querySelector('.expand-icon');
-        if (iptvIcon) iptvIcon.style.transform = 'rotate(0deg)';
-    }
-    
-    if (plexSection) {
-        plexSection.classList.remove('expanded');
-        const plexIcon = plexSection.querySelector('.expand-icon');
-        if (plexIcon) plexIcon.style.transform = 'rotate(0deg)';
-    }
-    
-    // NEW: Initialize mobile sections as collapsed
-    if (window.innerWidth <= 768) {
-        const sections = ['userStats', 'iptvStats', 'plexStats'];
-        sections.forEach(sectionId => {
-            const content = document.getElementById(`${sectionId}Content`);
-            const icon = document.getElementById(`${sectionId}Icon`);
-            
-            if (content) content.classList.remove('expanded');
-            if (icon) icon.classList.remove('expanded');
-        });
-    }
-    
-    this.expandedSections.clear();
-},
-    
-    // NEW: Toggle section expand/collapse
-    toggleLiveSection(type) {
-        const section = document.getElementById(type === 'iptv' ? 'iptvLiveSection' : 'plexLiveSection');
-        const isExpanded = this.expandedSections.has(type);
-        
-        if (isExpanded) {
-            // Collapse section
-            section.classList.remove('expanded');
-            this.expandedSections.delete(type);
-        } else {
-            // Expand section
-            section.classList.add('expanded');
-            this.expandedSections.add(type);
-            
-            // Load live data when expanding
-            if (type === 'iptv') {
-                this.loadIPTVViewers();
-            } else if (type === 'plex') {
-                this.loadPlexSessions();
-            }
-        }
-    },
-	
-toggleMobileSection(sectionId) {
-    console.log('🔍 Mobile section clicked:', sectionId, 'Screen width:', window.innerWidth);
-    
-    // Remove the screen width check for now to test
-    // if (window.innerWidth > 768) return;
-    
-    const content = document.getElementById(`${sectionId}Content`);
-    const icon = document.getElementById(`${sectionId}Icon`);
-    
-    console.log('🔍 Found elements:', { content: !!content, icon: !!icon });
-    
-    if (!content || !icon) {
-        console.error('❌ Missing elements for section:', sectionId);
-        return;
-    }
-    
-    const isExpanded = content.classList.contains('expanded');
-    console.log('🔍 Current state expanded:', isExpanded);
-    
-    if (isExpanded) {
-        content.classList.remove('expanded');
-        icon.classList.remove('expanded');
-        console.log('📉 Collapsed section:', sectionId);
-    } else {
-        content.classList.add('expanded');
-        icon.classList.add('expanded');
-        console.log('📈 Expanded section:', sectionId);
-    }
-},
-    
-    // NEW: Load IPTV viewers (placeholder)
-async loadIPTVViewers() {
-    const container = document.getElementById('iptvViewersContainer');
-    if (!container) return;
-    
-    container.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading IPTV viewers...</div>';
-    
-    try {
-        // Make actual API call - replace with your real endpoint
-        const response = await fetch('/api/iptv/viewers');
-        const viewers = await response.json();
-        
-        if (viewers.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-satellite-dish" style="opacity: 0.3;"></i>
-                    <p>No active viewers</p>
-                </div>
-            `;
-            this.updateElement('iptvViewerCount', '0');
-            return;
-        }
-        
-        // Build viewer cards from real data
-        const viewersHTML = viewers.map(viewer => `
-            <div class="iptv-viewer-card">
-                <div class="viewer-header">
-                    <span class="viewer-username">${viewer.username || 'Unknown'}</span>
-                    <span class="viewer-connections">${viewer.connections || 1} conn.</span>
-                </div>
-                <div class="viewer-stream">${viewer.stream || 'Unknown Channel'}</div>
-                <div class="viewer-meta">${viewer.quality || 'Unknown'} • ${viewer.type || 'Live'}</div>
-            </div>
-        `).join('');
-        
-        container.innerHTML = `<div class="iptv-viewers-grid">${viewersHTML}</div>`;
-        this.updateElement('iptvViewerCount', viewers.length.toString());
-        
-    } catch (error) {
-        console.error('❌ Error loading IPTV viewers:', error);
-        container.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-exclamation-triangle" style="color: #f44336;"></i>
-                <p>Error loading viewers</p>
-            </div>
-        `;
-    }
-},
-    
-    // NEW: Load Plex sessions (placeholder) 
-async loadPlexSessions() {
-    const container = document.getElementById('plexSessionsContainer');
-    if (!container) return;
-    
-    container.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading Plex sessions...</div>';
-    
-    try {
-        // Make actual API call - replace with your real endpoint
-        const response = await fetch('/api/plex/sessions');
-        const sessions = await response.json();
-        
-        if (sessions.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-play-circle" style="opacity: 0.3;"></i>
-                    <p>No active sessions</p>
-                </div>
-            `;
-            this.updateElement('plexSessionCount', '0');
-            this.updateElement('plexSessionCountMobile', '0');
-            const detailsElement = document.getElementById('plexSessionDetails');
-            if (detailsElement) {
-                detailsElement.textContent = 'No active streams';
-            }
-            return;
-        }
-        
-        // Build session cards from real data
-        const sessionsHTML = sessions.map(session => `
-            <div class="plex-session-card">
-                <div class="session-poster" style="background-image: url('${session.thumb || ''}');"></div>
-                <div class="session-info">
-                    <div class="session-title">${session.title || 'Unknown Title'}</div>
-                    <div class="session-subtitle">${session.subtitle || session.grandparentTitle || ''}</div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${session.progress || 0}%;"></div>
-                    </div>
-                    <div class="session-meta">
-                        <span>${session.user || 'Unknown User'}</span>
-                        <span>${session.duration || 'Live'}</span>
-                    </div>
-                </div>
-            </div>
-        `).join('');
-        
-        container.innerHTML = `<div class="plex-sessions-grid">${sessionsHTML}</div>`;
-        
-        // Update session counts with real data
-        this.updateElement('plexSessionCount', sessions.length.toString());
-        this.updateElement('plexSessionCountMobile', sessions.length.toString());
-        const detailsElement = document.getElementById('plexSessionDetails');
-        if (detailsElement) {
-            detailsElement.textContent = `${sessions.length} stream${sessions.length !== 1 ? 's' : ''} active`;
-        }
-        
-    } catch (error) {
-        console.error('❌ Error loading Plex sessions:', error);
-        container.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-exclamation-triangle" style="color: #f44336;"></i>
-                <p>Error loading sessions</p>
-            </div>
-        `;
-    }
-},
-
-// Add this function to sync desktop and mobile session counts
-updateMobileSessionCount() {
-    const desktopCount = document.getElementById('plexSessionCount')?.textContent || '0';
-    const mobileCountElement = document.getElementById('plexSessionCountMobile');
-    
-    if (mobileCountElement) {
-        // Update the mobile session count to match desktop
-        mobileCountElement.textContent = desktopCount;
-    }
-    
-    console.log('📱 Synced mobile session count:', desktopCount);
-},
-    
-    // NEW: Refresh functions
-    async refreshIPTVViewers() {
-        console.log('🔄 Refreshing IPTV viewers...');
-        await this.loadIPTVViewers();
-    },
-    
-    async refreshPlexSessions() {
-        console.log('🔄 Refreshing Plex sessions...');
-        const refreshIcon = document.querySelector('.plex-refresh .refresh-icon');
-        const loadingIcon = document.querySelector('.plex-refresh .loading-icon');
-        
-        if (refreshIcon && loadingIcon) {
-            refreshIcon.style.display = 'none';
-            loadingIcon.style.display = 'inline-block';
-            
-            setTimeout(() => {
-                refreshIcon.style.display = 'inline-block';
-                loadingIcon.style.display = 'none';
-            }, 1000);
-        }
-        
-        await this.loadPlexSessions();
-    },
-    
-    // Keep existing functions
-async loadStats() {
-    try {
-        console.log('📊 Loading dashboard statistics...');
-        const response = await fetch('/api/dashboard/stats');
-        const stats = await response.json();
-        
-        if (stats.error) {
-            console.error('Dashboard stats error:', stats.error);
-            return;
-        }
-        
-        this.updateElement('totalUsers', stats.users.total);
-        this.updateElement('plex1Count', stats.users.plex1);
-        this.updateElement('plex2Count', stats.users.plex2);
-        this.updateElement('iptvUsers', stats.users.iptv);
-        
-        this.updateIPTVStats(stats.iptv);
-        this.updatePlexStats(stats.plex);
-        
-        // ADD THIS LINE TO SYNC MOBILE COUNTS
-        this.updateMobileSessionCount();
-        
-        console.log('📊 Dashboard stats loaded successfully');
-    } catch (error) {
-        console.error('Error loading dashboard stats:', error);
-    }
-},
-    
-updateIPTVStats(iptvStats) {
-    this.updateElement('iptvChannels', this.formatNumber(iptvStats.channels));
-    this.updateElement('iptvMovies', this.formatNumber(iptvStats.movies));
-    this.updateElement('iptvSeries', this.formatNumber(iptvStats.series));
-    if (iptvStats.credits !== undefined) {
-        this.updateElement('iptvCredits', this.formatNumber(iptvStats.credits));
-    }
-    
-    // ADD THIS LINE - sync mobile viewer count with desktop
-    const desktopViewerCount = document.getElementById('iptvViewerCount')?.textContent || '0';
-    this.updateElement('iptvViewersPreview', desktopViewerCount);
-},
-    
-updatePlexStats(plexStats) {
-    const totalHDMovies = (plexStats.plex1?.movies || 0) + (plexStats.plex2?.movies || 0);
-    const total4KMovies = (plexStats.plex1?.fourkMovies || 0) + (plexStats.plex2?.fourkMovies || 0);
-    const totalTVShows = (plexStats.plex1?.shows || 0) + (plexStats.plex2?.shows || 0);
-    const totalEpisodes = (plexStats.plex1?.episodes || 0) + (plexStats.plex2?.episodes || 0);
-    
-    this.updateElement('plexHDMovies', this.formatNumber(totalHDMovies));
-    this.updateElement('plex4KMovies', this.formatNumber(total4KMovies));
-    this.updateElement('plexTVShows', this.formatNumber(totalTVShows));
-    this.updateElement('plexTVEpisodes', this.formatNumber(totalEpisodes));
-    this.updateElement('plexAnimeMovies', this.formatNumber(plexStats.animeMovies || 0));
-    this.updateElement('plexAudioBooks', this.formatNumber(plexStats.audioBooks || 0));
-    
-    // Update mobile preview values - ADD THESE LINES
-    this.updateElement('totalUsersPreview', document.getElementById('totalUsers')?.textContent || '0');
-    this.updateElement('iptvChannelsPreview', document.getElementById('iptvChannels')?.textContent || '0');
-},
-    
-    updateElement(id, value) {
-        const element = document.getElementById(id);
-        if (element) {
-            element.textContent = value;
-        }
-    },
-    
-    formatNumber(num) {
-        return new Intl.NumberFormat().format(num || 0);
-    },
-    
-    destroy() {
-        this.expandedSections.clear();
-        console.log('📊 Dashboard destroyed');
-    }
-};
+// Mobile dashboard HTML is loaded, let the main Dashboard handle everything
+console.log('📱 Mobile dashboard HTML loaded');
 </script>
