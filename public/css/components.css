@@ -126,15 +126,14 @@
     margin: 0 15px;
 }
 
-/* Form Components */
 .form-container {
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 12px;
     padding: 30px;
     backdrop-filter: blur(10px);
-    max-width: 800px;
-    margin: 0 auto;
+    max-width: none;  /* Change from 800px to none */
+    margin: 0;        /* Change from "0 auto" to "0" */
 }
 
 .form-grid {

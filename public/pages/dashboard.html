@@ -1,127 +1,169 @@
-<!-- Combined User Stats Section (Unchanged) -->
-<div class="content-section">
-    <div class="content-library-card" style="border: 1px solid rgba(255, 255, 255, 0.2); margin-bottom: 20px; padding: 15px;">
-        <div class="library-header" style="margin-bottom: 10px;">
-            <div class="library-icon" style="background: rgba(79, 195, 247, 0.2); color: #4fc3f7; width: 40px; height: 40px;">
-                <i class="fas fa-users"></i>
-            </div>
-            <div class="library-title">
-                <h3 class="library-name" style="font-size: 1rem;">User Statistics</h3>
-                <p class="library-subtitle" style="font-size: 0.75rem;">Active Subscribers Across All Services</p>
-            </div>
-        </div>
-        <div class="library-stats" style="gap: 10px;">
-            <div class="stat-item" style="padding: 8px;">
-                <div class="stat-value" id="totalUsers" style="color: #4fc3f7; font-size: 1.3rem;">14</div>
-                <div class="stat-label" style="font-size: 0.7rem;">Total Users</div>
-            </div>
-            <div class="stat-item" style="padding: 8px;">
-                <div class="stat-value" id="plex1Count" style="color: #4fc3f7; font-size: 1.3rem;">9</div>
-                <div class="stat-label" style="font-size: 0.7rem;">Plex 1 Users</div>
-            </div>
-            <div class="stat-item" style="padding: 8px;">
-                <div class="stat-value" id="plex2Count" style="color: #4fc3f7; font-size: 1.3rem;">3</div>
-                <div class="stat-label" style="font-size: 0.7rem;">Plex 2 Users</div>
-            </div>
-            <div class="stat-item" style="padding: 8px;">
-                <div class="stat-value" id="iptvUsers" style="color: #4fc3f7; font-size: 1.3rem;">12</div>
-                <div class="stat-label" style="font-size: 0.7rem;">IPTV Users</div>
-            </div>
+<!-- Mobile User Stats Header -->
+<div class="mobile-section-header" onclick="
+    const content = document.getElementById('userStatsContent');
+    const icon = document.getElementById('userStatsIcon');
+    content.classList.toggle('expanded');
+    icon.classList.toggle('expanded');
+    console.log('User stats clicked - expanded:', content.classList.contains('expanded'));
+">
+    <div class="mobile-section-title">
+        <i class="fas fa-users"></i>
+        <span>User Statistics</span>
+        <div class="mobile-stats-preview">
+            <span id="totalUsersPreview">19</span> users
         </div>
     </div>
+    <i class="fas fa-chevron-down mobile-expand-icon" id="userStatsIcon"></i>
 </div>
 
-<!-- IPTV Section with Collapsible Live Viewers -->
-<div class="content-section">
-    <div class="content-library-card" style="border: 1px solid rgba(255, 255, 255, 0.2); margin-bottom: 20px;">
-        <!-- IPTV Header and Stats -->
-        <div style="padding: 15px;">
-            <div class="library-header">
-                <div class="library-icon" style="background: rgba(255, 107, 107, 0.2); color: #ff6b6b;">
-                    <i class="fas fa-tv"></i>
+<!-- User Stats Content -->
+<div class="mobile-section-content" id="userStatsContent">
+    <!-- Combined User Stats Section (Unchanged) -->
+    <div class="content-section">
+        <div class="content-library-card" style="border: 1px solid rgba(255, 255, 255, 0.2); margin-bottom: 20px; padding: 15px;">
+            <div class="library-header" style="margin-bottom: 10px;">
+                <div class="library-icon" style="background: rgba(79, 195, 247, 0.2); color: #4fc3f7; width: 40px; height: 40px;">
+                    <i class="fas fa-users"></i>
                 </div>
                 <div class="library-title">
-                    <h3 class="library-name">IPTV Live Service</h3>
-                    <p class="library-subtitle">Live Channels / Movies / Series</p>
+                    <h3 class="library-name" style="font-size: 1rem;">User Statistics</h3>
+                    <p class="library-subtitle" style="font-size: 0.75rem;">Active Subscribers Across All Services</p>
                 </div>
             </div>
-<div class="library-stats">
-    <div class="stat-item">
-        <div class="stat-value" id="iptvChannels" style="color: #ff6b6b;">5,690</div>
-        <div class="stat-label">Live Channels</div>
-    </div>
-    <div class="stat-item">
-        <div class="stat-value" id="iptvMovies" style="color: #ff6b6b;">19,776</div>
-        <div class="stat-label">VOD Movies</div>
-    </div>
-    <div class="stat-item">
-        <div class="stat-value" id="iptvSeries" style="color: #ff6b6b;">7,395</div>
-        <div class="stat-label">TV Series</div>
-    </div>
-    <div class="stat-item">
-        <div class="stat-value" id="iptvCredits" style="color: #ff6b6b;">-</div>
-        <div class="stat-label">Available Credits</div>
+            <div class="library-stats" style="gap: 10px;">
+                <div class="stat-item" style="padding: 8px;">
+                    <div class="stat-value" id="totalUsers" style="color: #4fc3f7; font-size: 1.3rem;">14</div>
+                    <div class="stat-label" style="font-size: 0.7rem;">Total Users</div>
+                </div>
+                <div class="stat-item" style="padding: 8px;">
+                    <div class="stat-value" id="plex1Count" style="color: #4fc3f7; font-size: 1.3rem;">9</div>
+                    <div class="stat-label" style="font-size: 0.7rem;">Plex 1 Users</div>
+                </div>
+                <div class="stat-item" style="padding: 8px;">
+                    <div class="stat-value" id="plex2Count" style="color: #4fc3f7; font-size: 1.3rem;">3</div>
+                    <div class="stat-label" style="font-size: 0.7rem;">Plex 2 Users</div>
+                </div>
+                <div class="stat-item" style="padding: 8px;">
+                    <div class="stat-value" id="iptvUsers" style="color: #4fc3f7; font-size: 1.3rem;">12</div>
+                    <div class="stat-label" style="font-size: 0.7rem;">IPTV Users</div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
-        </div>
 
-        <!-- IPTV Live Viewers Collapsible Section -->
-        <div class="live-section iptv-live" id="iptvLiveSection">
-            <div class="live-header" onclick="Dashboard.toggleLiveSection('iptv')" style="
-                padding: 12px 15px;
-                border-top: 1px solid rgba(255, 255, 255, 0.1);
-                background: rgba(255, 107, 107, 0.05);
-                cursor: pointer;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                transition: background 0.3s ease;
-            ">
-                <div style="display: flex; align-items: center;">
-                    <i class="fas fa-satellite-dish" style="color: #ff6b6b; margin-right: 8px; font-size: 0.9rem;"></i>
-                    <span style="color: #ff6b6b; font-weight: 600; font-size: 0.9rem;">Live Viewers</span>
+<!-- Mobile IPTV Header -->
+<div class="mobile-section-header" onclick="
+    const content = document.getElementById('iptvStatsContent');
+    const icon = document.getElementById('iptvStatsIcon');
+    content.classList.toggle('expanded');
+    icon.classList.toggle('expanded');
+    console.log('IPTV stats clicked - expanded:', content.classList.contains('expanded'));
+">
+    <div class="mobile-section-title">
+        <i class="fas fa-tv"></i>
+        <span>IPTV Live Service</span>
+<div class="mobile-stats-preview">
+    <span id="iptvViewersPreview">0</span> viewers
+</div>
+    </div>
+    <i class="fas fa-chevron-down mobile-expand-icon" id="iptvStatsIcon"></i>
+</div>
+
+<!-- IPTV Content -->
+<div class="mobile-section-content" id="iptvStatsContent">
+    <!-- IPTV Section with Collapsible Live Viewers -->
+    <div class="content-section">
+        <div class="content-library-card" style="border: 1px solid rgba(255, 255, 255, 0.2); margin-bottom: 20px;">
+            <!-- IPTV Header and Stats -->
+            <div style="padding: 15px;">
+                <div class="library-header">
+                    <div class="library-icon" style="background: rgba(255, 107, 107, 0.2); color: #ff6b6b;">
+                        <i class="fas fa-tv"></i>
+                    </div>
+                    <div class="library-title">
+                        <h3 class="library-name">IPTV Live Service</h3>
+                        <p class="library-subtitle">Live Channels / Movies / Series</p>
+                    </div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span id="iptvViewerCount" style="
-                        background: rgba(255, 107, 107, 0.2);
-                        padding: 4px 8px;
-                        border-radius: 12px;
-                        font-size: 0.7rem;
-                        color: #ff6b6b;
-                        font-weight: 600;
-                    ">0</span>
-                    <button class="refresh-btn iptv-refresh" onclick="event.stopPropagation(); Dashboard.refreshIPTVViewers()" style="
-                        background: none;
-                        border: 1px solid rgba(255, 107, 107, 0.3);
-                        color: #ff6b6b;
-                        padding: 4px 8px;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        font-size: 0.7rem;
-                        opacity: 0;
-                        transform: scale(0.8);
-                        transition: all 0.3s ease;
-                    ">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                    <i class="fas fa-chevron-down expand-icon" style="
-                        color: #ff6b6b;
-                        font-size: 0.8rem;
-                        transition: transform 0.3s ease;
-                    "></i>
+                <div class="library-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="iptvChannels" style="color: #ff6b6b;">5,690</div>
+                        <div class="stat-label">Live Channels</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="iptvMovies" style="color: #ff6b6b;">19,776</div>
+                        <div class="stat-label">VOD Movies</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="iptvSeries" style="color: #ff6b6b;">7,395</div>
+                        <div class="stat-label">TV Series</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="iptvCredits" style="color: #ff6b6b;">-</div>
+                        <div class="stat-label">Available Credits</div>
+                    </div>
                 </div>
             </div>
-            <div class="live-content" style="
-                max-height: 0;
-                overflow: hidden;
-                transition: max-height 0.3s ease, padding 0.3s ease;
-                padding: 0 15px;
-                background: rgba(255, 107, 107, 0.02);
-            ">
-                <div id="iptvViewersContainer" style="padding: 0;">
-                    <div style="text-align: center; padding: 20px; color: #666; font-size: 0.9rem;">
-                        <i class="fas fa-mouse-pointer" style="margin-right: 8px; opacity: 0.5;"></i>
-                        Click to load live IPTV viewers...
+
+            <!-- IPTV Live Viewers Collapsible Section -->
+            <div class="live-section iptv-live" id="iptvLiveSection">
+                <div class="live-header" onclick="Dashboard.toggleLiveSection('iptv')" style="
+                    padding: 12px 15px;
+                    border-top: 1px solid rgba(255, 255, 255, 0.1);
+                    background: rgba(255, 107, 107, 0.05);
+                    cursor: pointer;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    transition: background 0.3s ease;
+                ">
+                    <div style="display: flex; align-items: center;">
+                        <i class="fas fa-satellite-dish" style="color: #ff6b6b; margin-right: 8px; font-size: 0.9rem;"></i>
+                        <span style="color: #ff6b6b; font-weight: 600; font-size: 0.9rem;">Live Viewers</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span id="iptvViewerCount" style="
+                            background: rgba(255, 107, 107, 0.2);
+                            padding: 4px 8px;
+                            border-radius: 12px;
+                            font-size: 0.7rem;
+                            color: #ff6b6b;
+                            font-weight: 600;
+                        ">0</span>
+                        <button class="refresh-btn iptv-refresh" onclick="event.stopPropagation(); Dashboard.refreshIPTVViewers()" style="
+                            background: none;
+                            border: 1px solid rgba(255, 107, 107, 0.3);
+                            color: #ff6b6b;
+                            padding: 4px 8px;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-size: 0.7rem;
+                            opacity: 0;
+                            transform: scale(0.8);
+                            transition: all 0.3s ease;
+                        ">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        <i class="fas fa-chevron-down expand-icon" style="
+                            color: #ff6b6b;
+                            font-size: 0.8rem;
+                            transition: transform 0.3s ease;
+                        "></i>
+                    </div>
+                </div>
+                <div class="live-content" style="
+                    max-height: 0;
+                    overflow: hidden;
+                    transition: max-height 0.3s ease, padding 0.3s ease;
+                    padding: 0 15px;
+                    background: rgba(255, 107, 107, 0.02);
+                ">
+                    <div id="iptvViewersContainer" style="padding: 0;">
+                        <div style="text-align: center; padding: 20px; color: #666; font-size: 0.9rem;">
+                            <i class="fas fa-mouse-pointer" style="margin-right: 8px; opacity: 0.5;"></i>
+                            Click to load live IPTV viewers...
+                        </div>
                     </div>
                 </div>
             </div>
@@ -129,246 +171,267 @@
     </div>
 </div>
 
-<!-- Plex Section with Collapsible Now Playing -->
-<div class="content-section">
-    <div class="content-library-card" style="border: 1px solid rgba(255, 255, 255, 0.2); margin-bottom: 20px;">
-        <!-- Plex Header and Stats -->
-        <div style="padding: 15px;">
-            <div class="library-header">
-                <div class="library-icon" style="background: rgba(78, 205, 196, 0.2); color: #4ecdc4;">
-                    <i class="fas fa-film"></i>
-                </div>
-                <div class="library-title">
-                    <h3 class="library-name">Plex Content</h3>
-                    <p class="library-subtitle">Movies / TV Shows / Anime / Audio Books</p>
-                </div>
-            </div>
-            <div class="library-stats">
-                <div class="stat-item">
-                    <div class="stat-value" id="plexHDMovies" style="color: #4ecdc4;">5,111</div>
-                    <div class="stat-label">HD Movies</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="plex4KMovies" style="color: #4ecdc4;">241</div>
-                    <div class="stat-label">4K Movies</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="plexTVShows" style="color: #4ecdc4;">1,453</div>
-                    <div class="stat-label">TV Shows</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="plexTVEpisodes" style="color: #4ecdc4;">85,907</div>
-                    <div class="stat-label">TV Episodes</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="plexAnimeShows" style="color: #4ecdc4;">-</div>
-                    <div class="stat-label">Anime Shows</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="plexAnimeMovies" style="color: #4ecdc4;">113</div>
-                    <div class="stat-label">Anime Movies</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="plexAudioBooks" style="color: #4ecdc4;">47</div>
-                    <div class="stat-label">Audio Books</div>
-                </div>
-            </div>
-			<!-- Plex Server Resource Usage -->
-<div class="plex-server-resources" style="
-    padding: 15px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(78, 205, 196, 0.03);
-    margin-top: 10px;
+<!-- Mobile Plex Header -->
+<div class="mobile-section-header" onclick="
+    const content = document.getElementById('plexStatsContent');
+    const icon = document.getElementById('plexStatsIcon');
+    content.classList.toggle('expanded');
+    icon.classList.toggle('expanded');
+    console.log('Plex stats clicked - expanded:', content.classList.contains('expanded'));
 ">
-    <div style="
-        display: flex;
-        align-items: center;
-        margin-bottom: 10px;
-    ">
-        <i class="fas fa-server" style="color: #4ecdc4; margin-right: 8px; font-size: 0.8rem;"></i>
-        <span style="color: #4ecdc4; font-weight: 600; font-size: 0.8rem;">Server Resources</span>
+    <div class="mobile-section-title">
+        <i class="fas fa-film"></i>
+        <span>Plex Content</span>
+        <div class="mobile-stats-preview">
+            <span id="plexSessionCountMobile">0</span> sessions
+        </div>
     </div>
-    
-    <div class="server-resources-grid" style="
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-        gap: 10px;
-    ">
-        <!-- Plex 1 Server -->
-        <div class="server-resource-item" style="
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-            padding: 8px;
-            text-align: center;
-        ">
-            <div style="color: #4ecdc4; font-size: 0.7rem; font-weight: 600; margin-bottom: 4px;">
-                Plex 1
+    <i class="fas fa-chevron-down mobile-expand-icon" id="plexStatsIcon"></i>
+</div>
+
+<!-- Plex Content -->
+<div class="mobile-section-content" id="plexStatsContent">
+    <!-- Plex Section with Collapsible Now Playing -->
+    <div class="content-section">
+        <div class="content-library-card" style="border: 1px solid rgba(255, 255, 255, 0.2); margin-bottom: 20px;">
+            <!-- Plex Header and Stats -->
+            <div style="padding: 15px;">
+                <div class="library-header">
+                    <div class="library-icon" style="background: rgba(78, 205, 196, 0.2); color: #4ecdc4;">
+                        <i class="fas fa-film"></i>
+                    </div>
+                    <div class="library-title">
+                        <h3 class="library-name">Plex Content</h3>
+                        <p class="library-subtitle">Movies / TV Shows / Anime / Audio Books</p>
+                    </div>
+                </div>
+                <div class="library-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="plexHDMovies" style="color: #4ecdc4;">5,111</div>
+                        <div class="stat-label">HD Movies</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="plex4KMovies" style="color: #4ecdc4;">241</div>
+                        <div class="stat-label">4K Movies</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="plexTVShows" style="color: #4ecdc4;">1,453</div>
+                        <div class="stat-label">TV Shows</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="plexTVEpisodes" style="color: #4ecdc4;">85,907</div>
+                        <div class="stat-label">TV Episodes</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="plexAnimeShows" style="color: #4ecdc4;">-</div>
+                        <div class="stat-label">Anime Shows</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="plexAnimeMovies" style="color: #4ecdc4;">113</div>
+                        <div class="stat-label">Anime Movies</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="plexAudioBooks" style="color: #4ecdc4;">47</div>
+                        <div class="stat-label">Audio Books</div>
+                    </div>
+                </div>
+                <!-- Plex Server Resource Usage -->
+                <div class="plex-server-resources" style="
+                    padding: 15px;
+                    border-top: 1px solid rgba(255, 255, 255, 0.1);
+                    background: rgba(78, 205, 196, 0.03);
+                    margin-top: 10px;
+                ">
+                    <div style="
+                        display: flex;
+                        align-items: center;
+                        margin-bottom: 10px;
+                    ">
+                        <i class="fas fa-server" style="color: #4ecdc4; margin-right: 8px; font-size: 0.8rem;"></i>
+                        <span style="color: #4ecdc4; font-weight: 600; font-size: 0.8rem;">Server Resources</span>
+                    </div>
+                    
+                    <div class="server-resources-grid" style="
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                        gap: 10px;
+                    ">
+                        <!-- Plex 1 Server -->
+                        <div class="server-resource-item" style="
+                            background: rgba(255, 255, 255, 0.02);
+                            border: 1px solid rgba(255, 255, 255, 0.1);
+                            border-radius: 4px;
+                            padding: 8px;
+                            text-align: center;
+                        ">
+                            <div style="color: #4ecdc4; font-size: 0.7rem; font-weight: 600; margin-bottom: 4px;">
+                                Plex 1
+                            </div>
+                            <div style="
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                gap: 4px;
+                            ">
+                                <i class="fas fa-microchip" style="color: #666; font-size: 0.6rem;"></i>
+                                <span id="plex1Cpu" style="color: #fff; font-size: 0.75rem; font-weight: 500;">
+                                    --
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Plex 1 4K Server -->
+                        <div class="server-resource-item" style="
+                            background: rgba(255, 255, 255, 0.02);
+                            border: 1px solid rgba(255, 255, 255, 0.1);
+                            border-radius: 4px;
+                            padding: 8px;
+                            text-align: center;
+                        ">
+                            <div style="color: #4ecdc4; font-size: 0.7rem; font-weight: 600; margin-bottom: 4px;">
+                                Plex 1 4K
+                            </div>
+                            <div style="
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                gap: 4px;
+                            ">
+                                <i class="fas fa-microchip" style="color: #666; font-size: 0.6rem;"></i>
+                                <span id="plex1FourkCpu" style="color: #fff; font-size: 0.75rem; font-weight: 500;">
+                                    --
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Plex 2 Server -->
+                        <div class="server-resource-item" style="
+                            background: rgba(255, 255, 255, 0.02);
+                            border: 1px solid rgba(255, 255, 255, 0.1);
+                            border-radius: 4px;
+                            padding: 8px;
+                            text-align: center;
+                        ">
+                            <div style="color: #4ecdc4; font-size: 0.7rem; font-weight: 600; margin-bottom: 4px;">
+                                Plex 2
+                            </div>
+                            <div style="
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                gap: 4px;
+                            ">
+                                <i class="fas fa-microchip" style="color: #666; font-size: 0.6rem;"></i>
+                                <span id="plex2Cpu" style="color: #fff; font-size: 0.75rem; font-weight: 500;">
+                                    --
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Plex 2 4K Server -->
+                        <div class="server-resource-item" style="
+                            background: rgba(255, 255, 255, 0.02);
+                            border: 1px solid rgba(255, 255, 255, 0.1);
+                            border-radius: 4px;
+                            padding: 8px;
+                            text-align: center;
+                        ">
+                            <div style="color: #4ecdc4; font-size: 0.7rem; font-weight: 600; margin-bottom: 4px;">
+                                Plex 2 4K
+                            </div>
+                            <div style="
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                gap: 4px;
+                            ">
+                                <i class="fas fa-microchip" style="color: #666; font-size: 0.6rem;"></i>
+                                <span id="plex2FourkCpu" style="color: #fff; font-size: 0.75rem; font-weight: 500;">
+                                    --
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div style="
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 4px;
-            ">
-                <i class="fas fa-microchip" style="color: #666; font-size: 0.6rem;"></i>
-                <span id="plex1Cpu" style="color: #fff; font-size: 0.75rem; font-weight: 500;">
-                    --
-                </span>
-            </div>
-        </div>
-        
-        <!-- Plex 1 4K Server -->
-        <div class="server-resource-item" style="
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-            padding: 8px;
-            text-align: center;
-        ">
-            <div style="color: #4ecdc4; font-size: 0.7rem; font-weight: 600; margin-bottom: 4px;">
-                Plex 1 4K
-            </div>
-            <div style="
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 4px;
-            ">
-                <i class="fas fa-microchip" style="color: #666; font-size: 0.6rem;"></i>
-                <span id="plex1FourkCpu" style="color: #fff; font-size: 0.75rem; font-weight: 500;">
-                    --
-                </span>
-            </div>
-        </div>
-        
-        <!-- Plex 2 Server -->
-        <div class="server-resource-item" style="
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-            padding: 8px;
-            text-align: center;
-        ">
-            <div style="color: #4ecdc4; font-size: 0.7rem; font-weight: 600; margin-bottom: 4px;">
-                Plex 2
-            </div>
-            <div style="
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 4px;
-            ">
-                <i class="fas fa-microchip" style="color: #666; font-size: 0.6rem;"></i>
-                <span id="plex2Cpu" style="color: #fff; font-size: 0.75rem; font-weight: 500;">
-                    --
-                </span>
-            </div>
-        </div>
-        
-        <!-- Plex 2 4K Server -->
-        <div class="server-resource-item" style="
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-            padding: 8px;
-            text-align: center;
-        ">
-            <div style="color: #4ecdc4; font-size: 0.7rem; font-weight: 600; margin-bottom: 4px;">
-                Plex 2 4K
-            </div>
-            <div style="
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 4px;
-            ">
-                <i class="fas fa-microchip" style="color: #666; font-size: 0.6rem;"></i>
-                <span id="plex2FourkCpu" style="color: #fff; font-size: 0.75rem; font-weight: 500;">
-                    --
-                </span>
+
+            <!-- Plex Now Playing Collapsible Section -->
+            <div class="live-section plex-live" id="plexLiveSection">
+                <div class="live-header" onclick="Dashboard.toggleLiveSection('plex')" style="
+                    padding: 12px 15px;
+                    border-top: 1px solid rgba(255, 255, 255, 0.1);
+                    background: rgba(78, 205, 196, 0.05);
+                    cursor: pointer;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    transition: background 0.3s ease;
+                    border-bottom: 1px solid rgba(78, 205, 196, 0.1);
+                ">
+                    <div style="display: flex; align-items: center; flex: 1;">
+                        <i class="fas fa-play" style="color: #4ecdc4; margin-right: 8px; font-size: 0.9rem;"></i>
+                        <span style="color: #4ecdc4; font-weight: 600; font-size: 0.9rem;">Now Playing</span>
+                        <!-- ADD THIS SESSION SUMMARY DIV -->
+                        <div id="plexSessionSummary" style="
+                            margin-left: 15px;
+                            padding: 4px 12px;
+                            background: rgba(78, 205, 196, 0.15);
+                            border-radius: 12px;
+                            font-size: 0.7rem;
+                            color: #4ecdc4;
+                            font-weight: 500;
+                            display: none;
+                        "></div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span id="plexSessionCount" style="
+                            background: rgba(78, 205, 196, 0.2);
+                            padding: 4px 8px;
+                            border-radius: 12px;
+                            font-size: 0.7rem;
+                            color: #4ecdc4;
+                            font-weight: 600;
+                        ">0</span>
+                        <button class="refresh-btn plex-refresh" onclick="event.stopPropagation(); Dashboard.refreshPlexSessions()" style="
+                            background: none;
+                            border: 1px solid rgba(78, 205, 196, 0.3);
+                            color: #4ecdc4;
+                            padding: 4px 8px;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-size: 0.7rem;
+                            opacity: 0;
+                            transform: scale(0.8);
+                            transition: all 0.3s ease;
+                        ">
+                            <i class="fas fa-sync-alt refresh-icon"></i>
+                            <i class="fas fa-spinner fa-spin loading-icon" style="display: none;"></i>
+                        </button>
+                        <i class="fas fa-chevron-down expand-icon" style="
+                            color: #4ecdc4;
+                            font-size: 0.8rem;
+                            transition: transform 0.3s ease;
+                        "></i>
+                    </div>
+                </div>
+                <div class="live-content" style="
+                    max-height: 0;
+                    overflow: hidden;
+                    transition: max-height 0.3s ease, padding 0.3s ease;
+                    padding: 0 15px;
+                    background: rgba(78, 205, 196, 0.02);
+                ">
+                    <div id="plexSessionsContainer" style="padding: 0;">
+                        <div class="empty-state">
+                            <i class="fas fa-mouse-pointer" style="margin-right: 8px; opacity: 0.5;"></i>
+                            <span style="color: #666; font-size: 0.9rem;">Click to load Plex sessions...</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
-        </div>
-
-<!-- Plex Now Playing Collapsible Section -->
-<div class="live-section plex-live" id="plexLiveSection">
-    <div class="live-header" onclick="Dashboard.toggleLiveSection('plex')" style="
-        padding: 12px 15px;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-        background: rgba(78, 205, 196, 0.05);
-        cursor: pointer;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        transition: background 0.3s ease;
-        border-bottom: 1px solid rgba(78, 205, 196, 0.1);
-    ">
-        <div style="display: flex; align-items: center; flex: 1;">
-            <i class="fas fa-play" style="color: #4ecdc4; margin-right: 8px; font-size: 0.9rem;"></i>
-            <span style="color: #4ecdc4; font-weight: 600; font-size: 0.9rem;">Now Playing</span>
-            <!-- ADD THIS SESSION SUMMARY DIV -->
-            <div id="plexSessionSummary" style="
-                margin-left: 15px;
-                padding: 4px 12px;
-                background: rgba(78, 205, 196, 0.15);
-                border-radius: 12px;
-                font-size: 0.7rem;
-                color: #4ecdc4;
-                font-weight: 500;
-                display: none;
-            "></div>
-        </div>
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <span id="plexSessionCount" style="
-                background: rgba(78, 205, 196, 0.2);
-                padding: 4px 8px;
-                border-radius: 12px;
-                font-size: 0.7rem;
-                color: #4ecdc4;
-                font-weight: 600;
-            ">0</span>
-            <button class="refresh-btn plex-refresh" onclick="event.stopPropagation(); Dashboard.refreshPlexSessions()" style="
-                background: none;
-                border: 1px solid rgba(78, 205, 196, 0.3);
-                color: #4ecdc4;
-                padding: 4px 8px;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 0.7rem;
-                opacity: 0;
-                transform: scale(0.8);
-                transition: all 0.3s ease;
-            ">
-                <i class="fas fa-sync-alt refresh-icon"></i>
-                <i class="fas fa-spinner fa-spin loading-icon" style="display: none;"></i>
-            </button>
-            <i class="fas fa-chevron-down expand-icon" style="
-                color: #4ecdc4;
-                font-size: 0.8rem;
-                transition: transform 0.3s ease;
-            "></i>
-        </div>
-    </div>
-    <div class="live-content" style="
-        max-height: 0;
-        overflow: hidden;
-        transition: max-height 0.3s ease, padding 0.3s ease;
-        padding: 0 15px;
-        background: rgba(78, 205, 196, 0.02);
-    ">
-        <div id="plexSessionsContainer" style="padding: 0;">
-            <div class="empty-state">
-                <i class="fas fa-mouse-pointer" style="margin-right: 8px; opacity: 0.5;"></i>
-                <span style="color: #666; font-size: 0.9rem;">Click to load Plex sessions...</span>
-            </div>
-        </div>
-    </div>
-</div>
-
-
 
 <style>
 /* Collapsible section styles */
@@ -601,19 +664,242 @@
         height: 60px;
     }
 }
+
+/* Mobile-Only Section Collapsing */
+.mobile-section-header {
+    display: none; /* Hidden on desktop */
+    background: rgba(79, 195, 247, 0.1);
+    border: 1px solid rgba(79, 195, 247, 0.3);
+    border-radius: 8px;
+    padding: 15px 20px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.mobile-section-header:hover {
+    background: rgba(79, 195, 247, 0.15);
+}
+
+.mobile-section-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.mobile-section-title i {
+    color: #4fc3f7;
+    font-size: 1.1rem;
+    width: 20px;
+}
+
+.mobile-section-title span {
+    font-weight: 600;
+    color: white;
+    flex: 1;
+}
+
+.mobile-stats-preview {
+    color: #4fc3f7;
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+
+.mobile-expand-icon {
+    color: #4fc3f7;
+    font-size: 0.9rem;
+    transition: transform 0.3s ease;
+}
+
+.mobile-expand-icon.expanded {
+    transform: rotate(180deg);
+}
+
+.mobile-section-content {
+    /* Always visible on desktop, collapsible on mobile */
+}
+
+/* Mobile-specific behavior */
+@media (max-width: 768px) {
+    /* Show mobile headers */
+    .mobile-section-header {
+        display: flex !important;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    /* Make content collapsible */
+    .mobile-section-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+    }
+    
+    .mobile-section-content.expanded {
+        max-height: 2000px;
+    }
+    
+    /* IPTV specific colors */
+    .mobile-section-header[onclick*="iptvStats"] {
+        background: rgba(255, 107, 107, 0.1);
+        border-color: rgba(255, 107, 107, 0.3);
+    }
+    
+    .mobile-section-header[onclick*="iptvStats"]:hover {
+        background: rgba(255, 107, 107, 0.15);
+    }
+    
+    .mobile-section-header[onclick*="iptvStats"] .mobile-section-title i {
+        color: #ff6b6b;
+    }
+    
+    .mobile-section-header[onclick*="iptvStats"] .mobile-stats-preview {
+        color: #ff6b6b;
+    }
+    
+    .mobile-section-header[onclick*="iptvStats"] .mobile-expand-icon {
+        color: #ff6b6b;
+    }
+    
+    /* Plex specific colors */
+    .mobile-section-header[onclick*="plexStats"] {
+        background: rgba(78, 205, 196, 0.1);
+        border-color: rgba(78, 205, 196, 0.3);
+    }
+    
+    .mobile-section-header[onclick*="plexStats"]:hover {
+        background: rgba(78, 205, 196, 0.15);
+    }
+    
+    .mobile-section-header[onclick*="plexStats"] .mobile-section-title i {
+        color: #4ecdc4;
+    }
+    
+    .mobile-section-header[onclick*="plexStats"] .mobile-stats-preview {
+        color: #4ecdc4;
+    }
+    
+    .mobile-section-header[onclick*="plexStats"] .mobile-expand-icon {
+        color: #4ecdc4;
+    }
+}
+
+/* Make Plex section thicker on mobile */
+.mobile-section-header[onclick*="plexStats"] {
+    background: rgba(78, 205, 196, 0.1);
+    border-color: rgba(78, 205, 196, 0.3);
+    padding: 20px !important; /* Make it thicker */
+}
+
+/* Mobile optimization for expanded sections */
+@media (max-width: 768px) {
+    /* Make stats grid mobile-friendly */
+    .library-stats {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+    }
+    
+    .stat-item {
+        padding: 12px 8px !important;
+    }
+    
+    .stat-value {
+        font-size: 1.2rem !important;
+    }
+    
+    .stat-label {
+        font-size: 0.7rem !important;
+    }
+    
+    /* Server resources grid mobile-friendly */
+    .server-resources-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+    }
+    
+    .server-resource-item {
+        padding: 10px 6px !important;
+    }
+    
+    /* Make library headers more compact on mobile */
+    .library-header {
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 12px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    .library-icon {
+        width: 35px !important;
+        height: 35px !important;
+    }
+    
+    .library-title h3 {
+        font-size: 0.95rem !important;
+        margin-bottom: 2px !important;
+    }
+    
+    .library-title p {
+        font-size: 0.7rem !important;
+    }
+    
+    /* Plex server resources section mobile */
+    .plex-server-resources {
+        padding: 12px !important;
+        margin-top: 8px !important;
+    }
+    
+    .plex-server-resources > div:first-child {
+        margin-bottom: 8px !important;
+    }
+    
+    .plex-server-resources span {
+        font-size: 0.75rem !important;
+    }
+    
+    /* Content library cards mobile spacing */
+    .content-library-card {
+        padding: 12px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    .content-library-card > div {
+        padding: 12px !important;
+    }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+    .library-stats {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 6px !important;
+    }
+    
+    .stat-item {
+        padding: 10px 6px !important;
+    }
+    
+    .stat-value {
+        font-size: 1.1rem !important;
+    }
+    
+    .server-resources-grid {
+        grid-template-columns: 1fr 1fr !important;
+    }
+}
 </style>
 
 <script>
-// Simplified Dashboard Module - Content Stats Only (No Live Streaming)
+// Mobile-Optimized Dashboard Module with Collapsible Sections
 window.Dashboard = {
     expandedSections: new Set(),
     
     async init() {
-        console.log('📊 Initializing dashboard (content stats only)...');
+        console.log('📊 Initializing mobile-optimized dashboard...');
         
         // Load users first if they're not already loaded
         if (!window.AppState || !window.AppState.users || window.AppState.users.length === 0) {
-            console.log('📊 Dashboard: Loading users for stats...');
             try {
                 const users = await API.User.getAll();
                 if (!window.AppState) window.AppState = {};
@@ -627,71 +913,315 @@ window.Dashboard = {
             }
         }
         
-        // Load initial stats (content counts only)
+        // Load initial stats
         await this.loadStats();
+		
+		// Sync mobile counts with desktop
+		this.syncSessionCounts();
         
-        console.log('📊 Dashboard initialized (content stats only)');
+        // Initialize all sections as collapsed by default
+        this.initializeCollapsedSections();
+        
+        console.log('📊 Mobile dashboard initialized successfully');
     },
     
-    async loadStats() {
-        try {
-            console.log('📊 Loading dashboard statistics...');
-            const response = await fetch('/api/dashboard/stats');
-            const stats = await response.json();
+initializeCollapsedSections() {
+    // Collapse all live sections by default
+    const iptvSection = document.getElementById('iptvLiveSection');
+    const plexSection = document.getElementById('plexLiveSection');
+    
+    if (iptvSection) {
+        iptvSection.classList.remove('expanded');
+        const iptvIcon = iptvSection.querySelector('.expand-icon');
+        if (iptvIcon) iptvIcon.style.transform = 'rotate(0deg)';
+    }
+    
+    if (plexSection) {
+        plexSection.classList.remove('expanded');
+        const plexIcon = plexSection.querySelector('.expand-icon');
+        if (plexIcon) plexIcon.style.transform = 'rotate(0deg)';
+    }
+    
+    // NEW: Initialize mobile sections as collapsed
+    if (window.innerWidth <= 768) {
+        const sections = ['userStats', 'iptvStats', 'plexStats'];
+        sections.forEach(sectionId => {
+            const content = document.getElementById(`${sectionId}Content`);
+            const icon = document.getElementById(`${sectionId}Icon`);
             
-            if (stats.error) {
-                console.error('Dashboard stats error:', stats.error);
-                return;
+            if (content) content.classList.remove('expanded');
+            if (icon) icon.classList.remove('expanded');
+        });
+    }
+    
+    this.expandedSections.clear();
+},
+    
+    // NEW: Toggle section expand/collapse
+    toggleLiveSection(type) {
+        const section = document.getElementById(type === 'iptv' ? 'iptvLiveSection' : 'plexLiveSection');
+        const isExpanded = this.expandedSections.has(type);
+        
+        if (isExpanded) {
+            // Collapse section
+            section.classList.remove('expanded');
+            this.expandedSections.delete(type);
+        } else {
+            // Expand section
+            section.classList.add('expanded');
+            this.expandedSections.add(type);
+            
+            // Load live data when expanding
+            if (type === 'iptv') {
+                this.loadIPTVViewers();
+            } else if (type === 'plex') {
+                this.loadPlexSessions();
             }
-            
-            // Update user statistics
-            this.updateElement('totalUsers', stats.users.total);
-            this.updateElement('plex1Count', stats.users.plex1);
-            this.updateElement('plex2Count', stats.users.plex2);
-            this.updateElement('iptvUsers', stats.users.iptv);
-            
-            // Update content statistics
-            this.updateIPTVStats(stats.iptv);
-            this.updatePlexStats(stats.plex);
-            
-            console.log('📊 Dashboard stats loaded successfully');
-            
-        } catch (error) {
-            console.error('Error loading dashboard stats:', error);
         }
     },
+	
+toggleMobileSection(sectionId) {
+    console.log('🔍 Mobile section clicked:', sectionId, 'Screen width:', window.innerWidth);
     
-    updateIPTVStats(iptvStats) {
-        this.updateElement('iptvChannels', this.formatNumber(iptvStats.channels));
-        this.updateElement('iptvMovies', this.formatNumber(iptvStats.movies));
-        this.updateElement('iptvSeries', this.formatNumber(iptvStats.series));
-    },
+    // Remove the screen width check for now to test
+    // if (window.innerWidth > 768) return;
     
-    updatePlexStats(plexStats) {
-        const totalHDMovies = (plexStats.plex1.movies || 0) + (plexStats.plex2.movies || 0);
-        const total4KMovies = (plexStats.plex1.fourkMovies || 0) + (plexStats.plex2.fourkMovies || 0);
-        const totalTVShows = (plexStats.plex1.shows || 0) + (plexStats.plex2.shows || 0);
-        const totalEpisodes = (plexStats.plex1.episodes || 0) + (plexStats.plex2.episodes || 0);
+    const content = document.getElementById(`${sectionId}Content`);
+    const icon = document.getElementById(`${sectionId}Icon`);
+    
+    console.log('🔍 Found elements:', { content: !!content, icon: !!icon });
+    
+    if (!content || !icon) {
+        console.error('❌ Missing elements for section:', sectionId);
+        return;
+    }
+    
+    const isExpanded = content.classList.contains('expanded');
+    console.log('🔍 Current state expanded:', isExpanded);
+    
+    if (isExpanded) {
+        content.classList.remove('expanded');
+        icon.classList.remove('expanded');
+        console.log('📉 Collapsed section:', sectionId);
+    } else {
+        content.classList.add('expanded');
+        icon.classList.add('expanded');
+        console.log('📈 Expanded section:', sectionId);
+    }
+},
+    
+    // NEW: Load IPTV viewers (placeholder)
+async loadIPTVViewers() {
+    const container = document.getElementById('iptvViewersContainer');
+    if (!container) return;
+    
+    container.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading IPTV viewers...</div>';
+    
+    try {
+        // Make actual API call - replace with your real endpoint
+        const response = await fetch('/api/iptv/viewers');
+        const viewers = await response.json();
         
-        this.updateElement('plexHDMovies', this.formatNumber(totalHDMovies));
-        this.updateElement('plex4KMovies', this.formatNumber(total4KMovies));
-        this.updateElement('plexTVShows', this.formatNumber(totalTVShows));
-        this.updateElement('plexTVEpisodes', this.formatNumber(totalEpisodes));
-        this.updateElement('plexAnimeMovies', this.formatNumber(plexStats.animeMovies || 0));
-        this.updateElement('plexAudioBooks', this.formatNumber(plexStats.audioBooks || 0));
-    },
-    
-    setLiveDataError(type) {
-        const container = document.getElementById(type === 'iptv' ? 'iptvViewersContainer' : 'plexSessionsContainer');
-        if (container) {
+        if (viewers.length === 0) {
             container.innerHTML = `
                 <div class="empty-state">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>Error loading live data</p>
+                    <i class="fas fa-satellite-dish" style="opacity: 0.3;"></i>
+                    <p>No active viewers</p>
                 </div>
             `;
+            this.updateElement('iptvViewerCount', '0');
+            return;
         }
+        
+        // Build viewer cards from real data
+        const viewersHTML = viewers.map(viewer => `
+            <div class="iptv-viewer-card">
+                <div class="viewer-header">
+                    <span class="viewer-username">${viewer.username || 'Unknown'}</span>
+                    <span class="viewer-connections">${viewer.connections || 1} conn.</span>
+                </div>
+                <div class="viewer-stream">${viewer.stream || 'Unknown Channel'}</div>
+                <div class="viewer-meta">${viewer.quality || 'Unknown'} • ${viewer.type || 'Live'}</div>
+            </div>
+        `).join('');
+        
+        container.innerHTML = `<div class="iptv-viewers-grid">${viewersHTML}</div>`;
+        this.updateElement('iptvViewerCount', viewers.length.toString());
+        
+    } catch (error) {
+        console.error('❌ Error loading IPTV viewers:', error);
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-triangle" style="color: #f44336;"></i>
+                <p>Error loading viewers</p>
+            </div>
+        `;
+    }
+},
+    
+    // NEW: Load Plex sessions (placeholder) 
+async loadPlexSessions() {
+    const container = document.getElementById('plexSessionsContainer');
+    if (!container) return;
+    
+    container.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading Plex sessions...</div>';
+    
+    try {
+        // Make actual API call - replace with your real endpoint
+        const response = await fetch('/api/plex/sessions');
+        const sessions = await response.json();
+        
+        if (sessions.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-play-circle" style="opacity: 0.3;"></i>
+                    <p>No active sessions</p>
+                </div>
+            `;
+            this.updateElement('plexSessionCount', '0');
+            this.updateElement('plexSessionCountMobile', '0');
+            const detailsElement = document.getElementById('plexSessionDetails');
+            if (detailsElement) {
+                detailsElement.textContent = 'No active streams';
+            }
+            return;
+        }
+        
+        // Build session cards from real data
+        const sessionsHTML = sessions.map(session => `
+            <div class="plex-session-card">
+                <div class="session-poster" style="background-image: url('${session.thumb || ''}');"></div>
+                <div class="session-info">
+                    <div class="session-title">${session.title || 'Unknown Title'}</div>
+                    <div class="session-subtitle">${session.subtitle || session.grandparentTitle || ''}</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${session.progress || 0}%;"></div>
+                    </div>
+                    <div class="session-meta">
+                        <span>${session.user || 'Unknown User'}</span>
+                        <span>${session.duration || 'Live'}</span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        container.innerHTML = `<div class="plex-sessions-grid">${sessionsHTML}</div>`;
+        
+        // Update session counts with real data
+        this.updateElement('plexSessionCount', sessions.length.toString());
+        this.updateElement('plexSessionCountMobile', sessions.length.toString());
+        const detailsElement = document.getElementById('plexSessionDetails');
+        if (detailsElement) {
+            detailsElement.textContent = `${sessions.length} stream${sessions.length !== 1 ? 's' : ''} active`;
+        }
+        
+    } catch (error) {
+        console.error('❌ Error loading Plex sessions:', error);
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-triangle" style="color: #f44336;"></i>
+                <p>Error loading sessions</p>
+            </div>
+        `;
+    }
+},
+
+// Add this function to sync desktop and mobile session counts
+updateMobileSessionCount() {
+    const desktopCount = document.getElementById('plexSessionCount')?.textContent || '0';
+    const mobileCountElement = document.getElementById('plexSessionCountMobile');
+    
+    if (mobileCountElement) {
+        // Update the mobile session count to match desktop
+        mobileCountElement.textContent = desktopCount;
+    }
+    
+    console.log('📱 Synced mobile session count:', desktopCount);
+},
+    
+    // NEW: Refresh functions
+    async refreshIPTVViewers() {
+        console.log('🔄 Refreshing IPTV viewers...');
+        await this.loadIPTVViewers();
     },
+    
+    async refreshPlexSessions() {
+        console.log('🔄 Refreshing Plex sessions...');
+        const refreshIcon = document.querySelector('.plex-refresh .refresh-icon');
+        const loadingIcon = document.querySelector('.plex-refresh .loading-icon');
+        
+        if (refreshIcon && loadingIcon) {
+            refreshIcon.style.display = 'none';
+            loadingIcon.style.display = 'inline-block';
+            
+            setTimeout(() => {
+                refreshIcon.style.display = 'inline-block';
+                loadingIcon.style.display = 'none';
+            }, 1000);
+        }
+        
+        await this.loadPlexSessions();
+    },
+    
+    // Keep existing functions
+async loadStats() {
+    try {
+        console.log('📊 Loading dashboard statistics...');
+        const response = await fetch('/api/dashboard/stats');
+        const stats = await response.json();
+        
+        if (stats.error) {
+            console.error('Dashboard stats error:', stats.error);
+            return;
+        }
+        
+        this.updateElement('totalUsers', stats.users.total);
+        this.updateElement('plex1Count', stats.users.plex1);
+        this.updateElement('plex2Count', stats.users.plex2);
+        this.updateElement('iptvUsers', stats.users.iptv);
+        
+        this.updateIPTVStats(stats.iptv);
+        this.updatePlexStats(stats.plex);
+        
+        // ADD THIS LINE TO SYNC MOBILE COUNTS
+        this.updateMobileSessionCount();
+        
+        console.log('📊 Dashboard stats loaded successfully');
+    } catch (error) {
+        console.error('Error loading dashboard stats:', error);
+    }
+},
+    
+updateIPTVStats(iptvStats) {
+    this.updateElement('iptvChannels', this.formatNumber(iptvStats.channels));
+    this.updateElement('iptvMovies', this.formatNumber(iptvStats.movies));
+    this.updateElement('iptvSeries', this.formatNumber(iptvStats.series));
+    if (iptvStats.credits !== undefined) {
+        this.updateElement('iptvCredits', this.formatNumber(iptvStats.credits));
+    }
+    
+    // ADD THIS LINE - sync mobile viewer count with desktop
+    const desktopViewerCount = document.getElementById('iptvViewerCount')?.textContent || '0';
+    this.updateElement('iptvViewersPreview', desktopViewerCount);
+},
+    
+updatePlexStats(plexStats) {
+    const totalHDMovies = (plexStats.plex1?.movies || 0) + (plexStats.plex2?.movies || 0);
+    const total4KMovies = (plexStats.plex1?.fourkMovies || 0) + (plexStats.plex2?.fourkMovies || 0);
+    const totalTVShows = (plexStats.plex1?.shows || 0) + (plexStats.plex2?.shows || 0);
+    const totalEpisodes = (plexStats.plex1?.episodes || 0) + (plexStats.plex2?.episodes || 0);
+    
+    this.updateElement('plexHDMovies', this.formatNumber(totalHDMovies));
+    this.updateElement('plex4KMovies', this.formatNumber(total4KMovies));
+    this.updateElement('plexTVShows', this.formatNumber(totalTVShows));
+    this.updateElement('plexTVEpisodes', this.formatNumber(totalEpisodes));
+    this.updateElement('plexAnimeMovies', this.formatNumber(plexStats.animeMovies || 0));
+    this.updateElement('plexAudioBooks', this.formatNumber(plexStats.audioBooks || 0));
+    
+    // Update mobile preview values - ADD THESE LINES
+    this.updateElement('totalUsersPreview', document.getElementById('totalUsers')?.textContent || '0');
+    this.updateElement('iptvChannelsPreview', document.getElementById('iptvChannels')?.textContent || '0');
+},
     
     updateElement(id, value) {
         const element = document.getElementById(id);
@@ -704,26 +1234,9 @@ window.Dashboard = {
         return new Intl.NumberFormat().format(num || 0);
     },
     
-    escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    },
-    
     destroy() {
         this.expandedSections.clear();
         console.log('📊 Dashboard destroyed');
-    }
-	
-Dashboard.updateIPTVStats = function(iptvStats) {
-    this.updateElement('iptvChannels', this.formatNumber(iptvStats.channels));
-    this.updateElement('iptvMovies', this.formatNumber(iptvStats.movies));
-    this.updateElement('iptvSeries', this.formatNumber(iptvStats.series));
-    
-    // NEW: Update IPTV credits display
-    if (iptvStats.credits !== undefined) {
-        this.updateElement('iptvCredits', this.formatNumber(iptvStats.credits));
     }
 };
 </script>
