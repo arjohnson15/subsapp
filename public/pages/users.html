@@ -26,27 +26,31 @@
     </div>
 </div>
 
-<!-- Search and Filter Controls -->
-<div style="display: grid; grid-template-columns: 1fr auto auto; gap: 15px; margin-bottom: 20px; align-items: end;">
-    <div>
+<!-- Search and Filter Controls - Mobile Optimized -->
+<div class="search-filter-container">
+    <!-- Search Bar (Full width on mobile) -->
+    <div class="search-section">
         <input type="text" class="search-bar" id="userSearch" placeholder="Search by name or email..." onkeyup="Users.filterUsers()">
     </div>
     
-    <div class="form-group" style="margin: 0; min-width: 180px;">
-        <label for="ownerFilter" style="margin-bottom: 5px;">Filter by Owner:</label>
-        <select id="ownerFilter" onchange="Users.filterUsers()" style="padding: 8px;">
-            <option value="">All Owners</option>
-        </select>
-    </div>
-    
-    <div class="form-group" style="margin: 0; min-width: 160px;">
-        <label for="tagFilter" style="margin-bottom: 5px;">Filter by Tag:</label>
-        <select id="tagFilter" onchange="Users.filterUsers()" style="padding: 8px;">
-            <option value="">All Tags</option>
-            <option value="Plex 1">Plex 1</option>
-            <option value="Plex 2">Plex 2</option>
-            <option value="IPTV">IPTV</option>
-        </select>
+    <!-- Filters Row -->
+    <div class="filters-row">
+        <div class="form-group">
+            <label for="ownerFilter">Filter by Owner:</label>
+            <select id="ownerFilter" onchange="Users.filterUsers()">
+                <option value="">All Owners</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="tagFilter">Filter by Tag:</label>
+            <select id="tagFilter" onchange="Users.filterUsers()">
+                <option value="">All Tags</option>
+                <option value="Plex 1">Plex 1</option>
+                <option value="Plex 2">Plex 2</option>
+                <option value="IPTV">IPTV</option>
+            </select>
+        </div>
     </div>
 </div>
 

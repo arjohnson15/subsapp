@@ -3016,3 +3016,95 @@ function closeModal(modalId) {
 function openModal(modalId) {
     window.ModalManager.openModal(modalId);
 }
+
+// ==========================================
+// GLOBAL MOBILE NAVIGATION FUNCTIONS
+// ==========================================
+
+// Toggle mobile navigation menu
+function toggleGlobalMobileNav() {
+    const menu = document.getElementById('globalMobileNavMenu');
+    const hamburger = document.querySelector('.hamburger-btn');
+    
+    if (menu.classList.contains('show')) {
+        closeGlobalMobileNav();
+    } else {
+        openGlobalMobileNav();
+    }
+}
+
+// Open mobile navigation
+function openGlobalMobileNav() {
+    const menu = document.getElementById('globalMobileNavMenu');
+    const hamburger = document.querySelector('.hamburger-btn');
+    const body = document.body;
+    
+    menu.classList.add('show');
+    hamburger.classList.add('active');
+    body.classList.add('nav-open');
+    
+    // Prevent body scrolling when menu is open
+    body.style.overflow = 'hidden';
+    
+    // Focus on first menu item for accessibility
+    const firstMenuItem = menu.querySelector('.mobile-nav-item');
+    if (firstMenuItem) {
+        setTimeout(() => firstMenuItem.focus(), 100);
+    }
+}
+
+// Close mobile navigation
+function closeGlobalMobileNav() {
+    const menu = document.getElementById('globalMobileNavMenu');
+    const hamburger = document.querySelector('.hamburger-btn');
+    const body = document.body;
+    
+    menu.classList.remove('show');
+    hamburger.classList.remove('active');
+    body.classList.remove('nav-open');
+    
+    // Restore body scrolling
+    body.style.overflow = '';
+}
+
+// Navigate to page and close mobile menu
+function navigateToPage(pageId) {
+    closeGlobalMobileNav();
+    showPage(pageId);
+}
+
+// Global mobile nav event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Close mobile nav when clicking overlay
+    document.addEventListener('click', function(event) {
+        const mobileNav = document.querySelector('.mobile-nav-global');
+        const menu = document.getElementById('globalMobileNavMenu');
+        
+        // If clicking on overlay (not menu content) and menu is open
+        if (event.target === menu && menu.classList.contains('show')) {
+            closeGlobalMobileNav();
+        }
+    });
+    
+    // Close mobile nav on escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            const menu = document.getElementById('globalMobileNavMenu');
+            if (menu && menu.classList.contains('show')) {
+                closeGlobalMobileNav();
+            }
+        }
+    });
+    
+    // Handle window resize
+    window.addEventListener('resize', function() {
+        if (window.innerWidth > 768) {
+            closeGlobalMobileNav();
+        }
+    });
+});
+
+// Make functions globally available
+window.toggleGlobalMobileNav = toggleGlobalMobileNav;
+window.closeGlobalMobileNav = closeGlobalMobileNav;
+window.navigateToPage = navigateToPage;

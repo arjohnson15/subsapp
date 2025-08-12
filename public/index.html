@@ -25,6 +25,52 @@
             <button class="btn" onclick="showPage('email')">Email Manager</button>
             <button class="btn" onclick="showPage('settings')">Settings</button>
         </nav>
+		
+<!-- Global Mobile Navigation -->
+<div class="mobile-nav-global">
+    <button class="hamburger-btn" onclick="toggleGlobalMobileNav()" aria-label="Toggle navigation menu">
+        <span class="hamburger-icon">
+            <span></span>
+            <span></span>
+            <span></span>
+        </span>
+        <span class="nav-text">Menu</span>
+    </button>
+    
+    <div id="globalMobileNavMenu" class="mobile-nav-overlay">
+        <div class="mobile-nav-menu-content">
+            <div class="mobile-nav-header">
+                <h3>Navigation</h3>
+                <button class="close-nav-btn" onclick="closeGlobalMobileNav()" aria-label="Close navigation">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="mobile-nav-items">
+                <button class="mobile-nav-item" onclick="navigateToPage('dashboard')">
+                    <i class="fas fa-tachometer-alt"></i> 
+                    <span>Dashboard</span>
+                </button>
+                <button class="mobile-nav-item" onclick="navigateToPage('users')">
+                    <i class="fas fa-users"></i> 
+                    <span>Manage Users</span>
+                </button>
+                <button class="mobile-nav-item" onclick="navigateToPage('management')">
+                    <i class="fas fa-cogs"></i> 
+                    <span>Management</span>
+                </button>
+                <button class="mobile-nav-item" onclick="navigateToPage('email')">
+                    <i class="fas fa-envelope"></i> 
+                    <span>Email Manager</span>
+                </button>
+                <button class="mobile-nav-item" onclick="navigateToPage('settings')">
+                    <i class="fas fa-cog"></i> 
+                    <span>Settings</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
         <!-- Page Content Container -->
         <div id="pageContent" class="page-content">

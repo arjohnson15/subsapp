@@ -4731,3 +4731,74 @@ table tbody td:last-child .btn-small:nth-child(4) {
     letter-spacing: 0.5px;
 }
 
+/* ==========================================
+   MOBILE LAYOUT OPTIMIZATIONS
+   ========================================== */
+
+/* Mobile Search and Filter Layout */
+.search-filter-container {
+    margin-bottom: 20px;
+}
+
+.search-section {
+    margin-bottom: 15px;
+}
+
+.filters-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    align-items: end;
+}
+
+/* Desktop Layout */
+@media (min-width: 769px) {
+    .search-filter-container {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        gap: 15px;
+        align-items: end;
+    }
+    
+    .search-section {
+        margin-bottom: 0;
+    }
+    
+    .filters-row {
+        display: contents;
+    }
+    
+    .form-group {
+        min-width: 160px;
+    }
+}
+
+/* Mobile specific adjustments */
+@media (max-width: 768px) {
+    .search-bar {
+        width: 100%;
+        margin-bottom: 0;
+    }
+    
+    .filters-row .form-group {
+        margin: 0;
+    }
+    
+    .filters-row .form-group label {
+        font-size: 0.9rem;
+        margin-bottom: 5px;
+        display: block;
+    }
+    
+    .filters-row .form-group select {
+        width: 100%;
+        padding: 10px 8px;
+        font-size: 0.9rem;
+    }
+    
+    /* Hide view mode toggle completely on mobile */
+    .view-mode-toggle {
+        display: none !important;
+    }
+}
+
