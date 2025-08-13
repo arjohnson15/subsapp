@@ -4066,31 +4066,60 @@ checkMobileAndSetDefault() {
         return name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().substring(0, 2);
     },
     
-    getUserStatusClass(user) {
-        const now = new Date();
-        const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-        
-        const plexExp = user.plex_expiration ? new Date(user.plex_expiration) : null;
-        const iptvExp = user.iptv_expiration ? new Date(user.iptv_expiration) : null;
-        
-        // Check if expired
-        if ((plexExp && plexExp < now) || (iptvExp && iptvExp < now)) {
-            return 'status-expired-compact';
+
+getUserStatusClass(user) {
+    const now = new Date();
+    const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    // Handle Plex expiration
+    let plexStatus = null;
+    if (user.plex_expiration === 'FREE') {
+        plexStatus = 'active'; // FREE is always active
+    } else if (user.plex_expiration) {
+        const plexExp = new Date(user.plex_expiration);
+        if (plexExp < now) {
+            plexStatus = 'expired';
+        } else if (plexExp < weekFromNow) {
+            plexStatus = 'expiring';
+        } else {
+            plexStatus = 'active';
         }
-        
-        // Check if expiring soon
-        if ((plexExp && plexExp > now && plexExp < weekFromNow) || 
-            (iptvExp && iptvExp > now && iptvExp < weekFromNow)) {
-            return 'status-expiring-compact';
+    }
+    
+    // Handle IPTV expiration
+    let iptvStatus = null;
+    if (user.iptv_expiration === 'FREE') {
+        iptvStatus = 'active'; // FREE is always active
+    } else if (user.iptv_expiration) {
+        const iptvExp = new Date(user.iptv_expiration);
+        if (iptvExp < now) {
+            iptvStatus = 'expired';
+        } else if (iptvExp < weekFromNow) {
+            iptvStatus = 'expiring';
+        } else {
+            iptvStatus = 'active';
         }
-        
-        // Active
-        if ((plexExp && plexExp > now) || (iptvExp && iptvExp > now)) {
-            return 'status-active-compact';
-        }
-        
+    }
+    
+    // Determine overall status - prioritize most critical
+    // If ANY service is expired, show expired
+    if (plexStatus === 'expired' || iptvStatus === 'expired') {
         return 'status-expired-compact';
-    },
+    }
+    
+    // If ANY service is expiring, show expiring
+    if (plexStatus === 'expiring' || iptvStatus === 'expiring') {
+        return 'status-expiring-compact';
+    }
+    
+    // If ANY service is active, show active
+    if (plexStatus === 'active' || iptvStatus === 'active') {
+        return 'status-active-compact';
+    }
+    
+    // If user has no subscriptions at all, show expired
+    return 'status-expired-compact';
+},
     
     getUserServiceTags(user) {
         const tags = [];
