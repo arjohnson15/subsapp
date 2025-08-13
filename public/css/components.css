@@ -4801,3 +4801,29 @@ table tbody td:last-child .btn-small:nth-child(4) {
     }
 }
 
+.compact-btn-email {
+    --btn-color-1: #9c27b0;
+    --btn-color-2: #ba68c8;
+}
+
+/* Mobile responsive adjustments for 4 buttons */
+@media (max-width: 768px) {
+    .compact-user-actions {
+        flex-wrap: wrap;
+        gap: 6px; /* Reduce gap slightly */
+    }
+    
+    .compact-action-btn {
+        flex: 1;
+        min-width: calc(50% - 3px); /* Two buttons per row on mobile */
+        padding: 6px 8px; /* Slightly smaller padding */
+        font-size: 0.8rem; /* Slightly smaller text */
+    }
+    
+    /* Stack buttons in 2x2 grid on very small screens */
+    @media (max-width: 480px) {
+        .compact-action-btn {
+            min-width: calc(50% - 3px);
+        }
+    }
+}

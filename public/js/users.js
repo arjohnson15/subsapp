@@ -1129,19 +1129,15 @@ emailUser(userName, userEmail) {
     // Navigate to email page
     window.showPage('email');
     
-    // Prepopulate fields after page loads
+    // Prepopulate ONLY the recipient field after page loads
     setTimeout(() => {
         const recipientField = document.getElementById('emailRecipient');
-        const subjectField = document.getElementById('emailSubject');
         
         if (recipientField) {
             recipientField.value = userEmail;
             console.log('📧 Prepopulated recipient:', userEmail);
         }
-        if (subjectField) {
-            subjectField.value = `Message for ${userName}`;
-            console.log('📧 Prepopulated subject for:', userName);
-        }
+
         
         // Update email preview if Email module is loaded
         if (window.Email && window.Email.updateEmailPreview) {
@@ -4039,20 +4035,24 @@ checkMobileAndSetDefault() {
                             </div>
                         </div>
                         
-                        <div class="compact-user-actions">
-                            <button class="compact-action-btn compact-btn-view" onclick="event.stopPropagation(); Users.viewUser(${user.id})">
-                                <i class="fas fa-eye"></i>
-                                View Details
-                            </button>
-                            <button class="compact-action-btn compact-btn-edit" onclick="event.stopPropagation(); Users.editUser(${user.id})">
-                                <i class="fas fa-edit"></i>
-                                Edit User
-                            </button>
-                            <button class="compact-action-btn compact-btn-delete" onclick="event.stopPropagation(); Users.deleteUser(${user.id})">
-                                <i class="fas fa-trash"></i>
-                                Delete
-                            </button>
-                        </div>
+<div class="compact-user-actions">
+    <button class="compact-action-btn compact-btn-view" onclick="event.stopPropagation(); Users.viewUser(${user.id})">
+        <i class="fas fa-eye"></i>
+        View Details
+    </button>
+    <button class="compact-action-btn compact-btn-email" onclick="event.stopPropagation(); Users.emailUser('${user.name}', '${user.email}')">
+        <i class="fas fa-envelope"></i>
+        Email
+    </button>
+    <button class="compact-action-btn compact-btn-edit" onclick="event.stopPropagation(); Users.editUser(${user.id})">
+        <i class="fas fa-edit"></i>
+        Edit User
+    </button>
+    <button class="compact-action-btn compact-btn-delete" onclick="event.stopPropagation(); Users.deleteUser(${user.id})">
+        <i class="fas fa-trash"></i>
+        Delete
+    </button>
+</div>
                         
                         ${user.pending_plex_invite ? '<div class="compact-pending-indicator">Pending Plex Invite</div>' : ''}
                     </div>

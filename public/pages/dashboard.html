@@ -58,6 +58,16 @@
     const icon = document.getElementById('iptvStatsIcon');
     content.classList.toggle('expanded');
     icon.classList.toggle('expanded');
+    
+    // AUTO-EXPAND nested live section on mobile
+    if (content.classList.contains('expanded')) {
+        setTimeout(() => {
+            if (window.Dashboard && typeof window.Dashboard.toggleLiveSection === 'function') {
+                window.Dashboard.toggleLiveSection('iptv');
+            }
+        }, 300);
+    }
+    
     console.log('IPTV stats clicked - expanded:', content.classList.contains('expanded'));
 ">
     <div class="mobile-section-title">
@@ -177,6 +187,16 @@
     const icon = document.getElementById('plexStatsIcon');
     content.classList.toggle('expanded');
     icon.classList.toggle('expanded');
+    
+    // AUTO-EXPAND nested live section on mobile
+    if (content.classList.contains('expanded')) {
+        setTimeout(() => {
+            if (window.Dashboard && typeof window.Dashboard.toggleLiveSection === 'function') {
+                window.Dashboard.toggleLiveSection('plex');
+            }
+        }, 300);
+    }
+    
     console.log('Plex stats clicked - expanded:', content.classList.contains('expanded'));
 ">
     <div class="mobile-section-title">
@@ -873,6 +893,140 @@
         grid-template-columns: 1fr 1fr !important;
     }
 }
+
+/* Mobile-optimized Plex session cards */
+@media (max-width: 768px) {
+    .tautulli-sessions-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 8px !important;
+    }
+    
+    .tautulli-session-card {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        padding: 12px !important;
+        background: rgba(78, 205, 196, 0.1) !important;
+        border: 1px solid rgba(78, 205, 196, 0.3) !important;
+        border-radius: 8px !important;
+        min-height: auto !important;
+    }
+    
+    .session-poster-large {
+        width: 60px !important;
+        height: 90px !important;
+        border-radius: 6px !important;
+        flex-shrink: 0 !important;
+        margin-right: 12px !important;
+    }
+    
+    .session-details {
+        flex: 1 !important;
+        min-width: 0 !important;
+    }
+    
+    .session-title-row {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin-bottom: 2px !important;
+    }
+    
+    .session-title-large {
+        font-size: 0.9rem !important;
+        font-weight: 600 !important;
+        color: #4ecdc4 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        flex: 1 !important;
+        margin-right: 8px !important;
+    }
+    
+    .session-subtitle-large {
+        font-size: 0.75rem !important;
+        color: #b0bec5 !important;
+        margin-bottom: 4px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+    
+    /* Show compact metadata on mobile */
+    .session-metadata {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+        margin-bottom: 6px !important;
+    }
+    
+    /* Hide most metadata rows, show only important ones */
+    .session-metadata .metadata-row {
+        display: none !important;
+    }
+    
+    /* Show only video, audio, and container */
+    .session-metadata .metadata-row:has(.metadata-label:contains("VIDEO")),
+    .session-metadata .metadata-row:has(.metadata-label:contains("AUDIO")),
+    .session-metadata .metadata-row:has(.metadata-label:contains("CONTAINER")) {
+        display: flex !important;
+        background: rgba(255, 255, 255, 0.05) !important;
+        padding: 2px 6px !important;
+        border-radius: 4px !important;
+        align-items: center !important;
+        gap: 4px !important;
+    }
+    
+    .session-metadata .metadata-label {
+        font-size: 0.6rem !important;
+        color: #78909c !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+    }
+    
+    .session-metadata .metadata-value {
+        font-size: 0.65rem !important;
+        color: #b0bec5 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: 100px !important;
+    }
+    
+    .progress-section {
+        margin-top: 6px !important;
+    }
+    
+    .progress-bar-large {
+        height: 3px !important;
+        background: rgba(255, 255, 255, 0.1) !important;
+        border-radius: 2px !important;
+        margin-bottom: 4px !important;
+    }
+    
+    .progress-fill-large {
+        height: 100% !important;
+        background: #4ecdc4 !important;
+        border-radius: 2px !important;
+    }
+    
+    .progress-text {
+        font-size: 0.65rem !important;
+        color: #78909c !important;
+    }
+    
+    .username-badge {
+        background: rgba(78, 205, 196, 0.2) !important;
+        color: #4ecdc4 !important;
+        padding: 2px 6px !important;
+        border-radius: 8px !important;
+        font-size: 0.65rem !important;
+        font-weight: 500 !important;
+        flex-shrink: 0 !important;
+    }
+}
+
 </style>
 
 <script>

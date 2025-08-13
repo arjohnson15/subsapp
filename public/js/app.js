@@ -1834,12 +1834,9 @@ updateMobilePreviewCounts() {
         
         // REMOVED: All the console.log statements about metadata
         
-        const cardHtml = `
+const cardHtml = `
             <div class="tautulli-session-card" data-type="${session.type || 'unknown'}">
-                <!-- Username Badge - Top Right -->
-                <div class="username-badge">${this.escapeHtml(user)}</div>
-                
-                <!-- Poster Section - NO OTHER BADGES -->
+                <!-- Poster Section -->
                 <div class="session-poster-large">
                     ${posterUrl ? `
                         <img src="${posterUrl}" 
@@ -1854,10 +1851,13 @@ updateMobilePreviewCounts() {
                 
                 <!-- Session Details Section -->
                 <div class="session-details">
-                    <!-- Header with title and subtitle -->
+                    <!-- Header with title, subtitle, and username -->
                     <div class="session-header">
-                        <div class="session-title-large" title="${this.escapeHtml(displayTitle)}">
-                            ${this.escapeHtml(displayTitle)}
+                        <div class="session-title-row">
+                            <div class="session-title-large" title="${this.escapeHtml(displayTitle)}">
+                                ${this.escapeHtml(displayTitle)}
+                            </div>
+                            <div class="username-badge">${this.escapeHtml(user)}</div>
                         </div>
                         ${displaySubtitle ? `
                             <div class="session-subtitle-large" title="${this.escapeHtml(displaySubtitle)}">
@@ -1866,69 +1866,70 @@ updateMobilePreviewCounts() {
                         ` : ''}
                     </div>
                     
-                    <!-- Detailed Metadata Grid - EXACTLY like Tautulli -->
+                    <!-- Detailed Metadata Grid - Desktop and Mobile -->
                     <div class="session-metadata">
-                        <!-- First Column -->
-                        <div class="metadata-row">
+                        <!-- Desktop-only metadata -->
+                        <div class="metadata-row desktop-only">
                             <span class="metadata-label">PRODUCT</span>
                             <span class="metadata-value">${this.escapeHtml(playerProduct)}</span>
                         </div>
                         
-                        <div class="metadata-row">
+                        <div class="metadata-row desktop-only">
                             <span class="metadata-label">PLAYER</span>
                             <span class="metadata-value">${this.escapeHtml(playerTitle)}</span>
                         </div>
                         
-                        <div class="metadata-row">
+                        <div class="metadata-row desktop-only">
                             <span class="metadata-label">QUALITY</span>
                             <span class="metadata-value" title="${this.escapeHtml(qualityDisplay)}">${this.escapeHtml(qualityDisplay)}</span>
                         </div>
                         
-                        <div class="metadata-row">
+                        <div class="metadata-row desktop-only">
                             <span class="metadata-label">STREAM</span>
                             <span class="metadata-value stream-type">${this.escapeHtml(streamDecision)}</span>
                         </div>
                         
-                        <div class="metadata-row">
+                        <!-- Mobile-important metadata -->
+                        <div class="metadata-row mobile-important">
                             <span class="metadata-label">CONTAINER</span>
                             <span class="metadata-value" title="${this.escapeHtml(containerDisplay)}">${this.escapeHtml(containerDisplay)}</span>
                         </div>
                         
-                        <!-- Second Column -->
-                        <div class="metadata-row">
+                        <div class="metadata-row mobile-important">
                             <span class="metadata-label">VIDEO</span>
                             <span class="metadata-value" title="${this.escapeHtml(videoDisplay)}">${this.escapeHtml(videoDisplay)}</span>
                         </div>
                         
-                        <div class="metadata-row">
+                        <div class="metadata-row mobile-important">
                             <span class="metadata-label">AUDIO</span>
                             <span class="metadata-value" title="${this.escapeHtml(audioDisplay)}">${this.escapeHtml(audioDisplay)}</span>
                         </div>
                         
-                        <div class="metadata-row">
+                        <!-- Desktop-only metadata continued -->
+                        <div class="metadata-row desktop-only">
                             <span class="metadata-label">SUBTITLE</span>
                             <span class="metadata-value">${this.escapeHtml(subtitleCodec)}</span>
                         </div>
                         
-                        <div class="metadata-row">
+                        <div class="metadata-row desktop-only">
                             <span class="metadata-label">LOCATION</span>
                             <span class="metadata-value location">${this.escapeHtml(ipAddress)}</span>
                         </div>
                         
-                        <div class="metadata-row">
+                        <div class="metadata-row desktop-only">
                             <span class="metadata-label">BANDWIDTH</span>
                             <span class="metadata-value bandwidth">${this.escapeHtml(bandwidth)}</span>
                         </div>
                     </div>
-                </div>
-                
-                <!-- Progress Bar - MOVED TO BOTTOM OF ENTIRE CARD -->
-                <div class="progress-section">
-                    <div class="progress-bar-large">
-                        <div class="progress-fill-large" style="width: ${progressWidth}%"></div>
-                    </div>
-                    <div class="progress-text">
-                        ${currentTime} / ${totalTime} (${progressPercent}%)
+                    
+                    <!-- Progress Bar -->
+                    <div class="progress-section">
+                        <div class="progress-bar-large">
+                            <div class="progress-fill-large" style="width: ${progressWidth}%"></div>
+                        </div>
+                        <div class="progress-text">
+                            ${currentTime} / ${totalTime} (${progressPercent}%)
+                        </div>
                     </div>
                 </div>
             </div>
