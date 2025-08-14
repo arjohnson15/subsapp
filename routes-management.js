@@ -1,27 +1,19 @@
-// routes-management.js - FIXED VERSION WITH IMPROVED IFRAME PROXY
+// routes-management.js - Debug version with extensive logging
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 
-// Debug middleware
+// Debug middleware - ENHANCED LOGGING
 router.use((req, res, next) => {
-  console.log(`🔍 Management Route: ${req.method} ${req.originalUrl}`);
+  console.log(`🔍 [MANAGEMENT] ${req.method} ${req.originalUrl}`);
+  console.log(`🔍 [MANAGEMENT] Headers:`, Object.keys(req.headers));
+  console.log(`🔍 [MANAGEMENT] User-Agent:`, req.headers['user-agent']?.substring(0, 50));
   next();
-});
-
-// Test route
-router.get('/test', (req, res) => {
-  res.json({ 
-    message: 'Management routes working!', 
-    method: req.method,
-    path: req.path,
-    originalUrl: req.originalUrl,
-    params: req.params
-  });
 });
 
 // Get all management tools
 router.get('/tools', async (req, res) => {
+  console.log('📦 [TOOLS] Getting all tools...');
   try {
     const db = require('./database-config');
     const result = await db.query('SELECT setting_value FROM settings WHERE setting_key = ?', ['management_tools']);
@@ -31,22 +23,27 @@ router.get('/tools', async (req, res) => {
       try {
         const toolsData = JSON.parse(result[0].setting_value);
         tools = Array.isArray(toolsData) ? toolsData : Object.values(toolsData);
+        console.log(`📦 [TOOLS] Found ${tools.length} tools:`, tools.map(t => ({ id: t.id, name: t.name, url: t.url })));
       } catch (parseError) {
-        console.error('Error parsing tools data:', parseError);
+        console.error('❌ [TOOLS] Error parsing tools data:', parseError);
       }
+    } else {
+      console.log('📦 [TOOLS] No tools found in database');
     }
     
     res.json({ tools });
   } catch (error) {
-    console.error('Error fetching management tools:', error);
+    console.error('❌ [TOOLS] Error fetching tools:', error);
     res.status(500).json({ error: 'Failed to fetch management tools' });
   }
 });
 
-// Create or update a management tool
+// Save tools
 router.post('/tools', async (req, res) => {
+  console.log('💾 [TOOLS] Saving tools...');
   try {
     const { tools } = req.body;
+    console.log(`💾 [TOOLS] Saving ${tools?.length} tools`);
     
     if (!Array.isArray(tools)) {
       return res.status(400).json({ error: 'Tools must be an array' });
@@ -59,69 +56,32 @@ router.post('/tools', async (req, res) => {
       ON DUPLICATE KEY UPDATE setting_value = ?, setting_type = 'json'
     `, [JSON.stringify(tools), JSON.stringify(tools)]);
     
+    console.log('✅ [TOOLS] Tools saved successfully');
     res.json({ message: 'Management tools saved successfully' });
   } catch (error) {
-    console.error('Error saving management tools:', error);
+    console.error('❌ [TOOLS] Error saving tools:', error);
     res.status(500).json({ error: 'Failed to save management tools' });
   }
 });
 
-// UNIVERSAL PROXY HANDLER - Catch everything that starts with /tools/*
-router.all('*', async (req, res, next) => {
-  // Check if this is a proxy request by examining the URL
-  const urlPath = req.originalUrl.replace('/api/management', '');
+// PROXY ROUTE - ENHANCED FOR RADARR/SONARR COMPATIBILITY
+router.all('/tools/:toolId/proxy*', async (req, res) => {
+  const toolId = req.params.toolId;
+  const subPath = req.params[0] || '';
   
-  // Match both /proxy and /undefined patterns (to catch the webpack issue)
-  const proxyMatch = urlPath.match(/^\/tools\/([^\/]+)\/(proxy|undefined)(.*)$/);
-  
-  if (!proxyMatch) {
-    // Not a proxy request, continue to next handler
-    return next();
-  }
-  
-  // Handle the undefined route issue by treating it as proxy
-  if (proxyMatch[2] === 'undefined') {
-    console.log(`⚠️  WARNING: Intercepted 'undefined' route - converting to proxy`);
-  }
-  
-  console.log(`🔗 UNIVERSAL PROXY: ${req.method} ${req.originalUrl}`);
+  console.log('🔗 [PROXY] =====================================');
+  console.log(`🔗 [PROXY] Request: ${req.method} ${req.originalUrl}`);
+  console.log(`🔗 [PROXY] Tool ID: ${toolId}`);
+  console.log(`🔗 [PROXY] Sub Path: "${subPath}"`);
+  console.log(`🔗 [PROXY] Query: ${JSON.stringify(req.query)}`);
   
   try {
-    const toolId = proxyMatch[1];
-    let subPath = proxyMatch[3] || '';
-    const routeType = proxyMatch[2]; // 'proxy' or 'undefined'
-    
-    // Handle undefined routes - these are webpack chunks that lost their base path
-    if (routeType === 'undefined') {
-      console.log(`🔧 FIXING UNDEFINED ROUTE: Original subPath: "${subPath}"`);
-      // For undefined routes, the subPath is actually the correct relative path
-      // No modification needed - just log it
-    }
-    
-    // Extract query string properly to avoid duplication
-    let queryString = '';
-    const questionMarkIndex = req.originalUrl.indexOf('?');
-    if (questionMarkIndex !== -1) {
-      queryString = req.originalUrl.substring(questionMarkIndex + 1);
-      // Remove query string from subPath if it's there
-      if (subPath.includes('?')) {
-        subPath = subPath.split('?')[0];
-      }
-    }
-    
-    console.log(`🎯 Proxying to tool: ${toolId}, path: "${subPath}", routeType: "${routeType}"`);
-    
-    if (!toolId) {
-      console.error('❌ No toolId extracted from URL');
-      return res.status(400).json({ error: 'Tool ID is required' });
-    }
-    
     // Get tool configuration
     const db = require('./database-config');
     const result = await db.query('SELECT setting_value FROM settings WHERE setting_key = ?', ['management_tools']);
     
     if (result.length === 0) {
-      console.error('❌ No management tools configured in database');
+      console.error('❌ [PROXY] No management tools in database');
       return res.status(404).json({ error: 'No management tools configured' });
     }
     
@@ -129,613 +89,306 @@ router.all('*', async (req, res, next) => {
     try {
       const toolsData = JSON.parse(result[0].setting_value);
       tools = Array.isArray(toolsData) ? toolsData : Object.values(toolsData);
-      console.log(`🔍 Found ${tools.length} tools in database`);
+      console.log(`🔍 [PROXY] Found ${tools.length} tools in database`);
+      console.log(`🔍 [PROXY] Available tool IDs:`, tools.map(t => t.id));
     } catch (parseError) {
-      console.error('❌ Error parsing tools data:', parseError);
+      console.error('❌ [PROXY] Error parsing tools data:', parseError);
       return res.status(500).json({ error: 'Invalid tools configuration' });
     }
     
     const tool = tools.find(t => t.id === toolId);
     if (!tool) {
-      console.error(`❌ Tool with ID ${toolId} not found. Available tools:`, tools.map(t => ({ id: t.id, name: t.name })));
-      return res.status(404).json({ error: 'Tool not found', toolId, availableTools: tools.map(t => ({ id: t.id, name: t.name })) });
+      console.error(`❌ [PROXY] Tool '${toolId}' not found`);
+      console.error(`❌ [PROXY] Available tools:`, tools.map(t => ({ id: t.id, name: t.name })));
+      return res.status(404).json({ 
+        error: 'Tool not found', 
+        toolId, 
+        availableTools: tools.map(t => ({ id: t.id, name: t.name }))
+      });
     }
     
-    console.log(`✅ Found tool: ${tool.name} - ${tool.url}`);
+    console.log(`✅ [PROXY] Found tool: ${tool.name}`);
+    console.log(`✅ [PROXY] Tool URL: ${tool.url}`);
     
-    // Check if tool supports iframe access
-    if (tool.access_type !== 'iframe' && tool.access_type !== 'both') {
-      console.error(`❌ Tool ${tool.name} does not support iframe access (${tool.access_type})`);
-      return res.status(403).json({ error: 'Tool does not support iframe access' });
+    // Build target URL
+    let targetUrl = tool.url;
+    if (targetUrl.endsWith('/')) {
+      targetUrl = targetUrl.slice(0, -1);
     }
     
-    // Build target URL correctly
-    let targetUrl = tool.url.replace(/\/$/, ''); // Remove trailing slash from base URL
     if (subPath) {
-      // Clean subPath - remove leading slash if present
-      const cleanSubPath = subPath.startsWith('/') ? subPath.substring(1) : subPath;
-      if (cleanSubPath) {
-        targetUrl = targetUrl + '/' + cleanSubPath;
+      if (!subPath.startsWith('/')) {
+        targetUrl += '/';
       }
+      targetUrl += subPath;
     }
     
-    // Add query parameters if they exist (avoid duplication)
+    // Add query parameters
+    const queryString = new URLSearchParams(req.query).toString();
     if (queryString) {
-      targetUrl += '?' + queryString;
+      targetUrl += (targetUrl.includes('?') ? '&' : '?') + queryString;
     }
     
-    console.log(`🎯 Proxying to: ${targetUrl}`);
+    console.log(`🎯 [PROXY] Target URL: ${targetUrl}`);
     
-    // Forward cookies and headers from the original request
-    const headers = {};
+    // Get original host and protocol
+    const originalHost = req.get('host');
+    const originalProto = req.get('x-forwarded-proto') || req.protocol;
+    const proxyBase = `/api/management/tools/${toolId}/proxy`;
     
-    // Copy important headers
-    ['user-agent', 'accept', 'accept-language', 'accept-encoding', 'cache-control', 'pragma'].forEach(header => {
-      if (req.headers[header]) {
-        headers[header] = req.headers[header];
-      }
-    });
-    
-    // Forward cookies if they exist
-    if (req.headers.cookie) {
-      headers.cookie = req.headers.cookie;
-      console.log(`🍪 Forwarding cookies from browser: ${req.headers.cookie.substring(0, 100)}...`);
-    }
-    
-    // Add authentication if configured for the tool
-    if (tool.username && tool.password) {
-      console.log(`🔐 Using authentication for ${tool.username}`);
-      const auth = Buffer.from(`${tool.username}:${tool.password}`).toString('base64');
-      headers.authorization = `Basic ${auth}`;
-    }
-    
-    // Set up axios request configuration
-    const axiosConfig = {
-      method: req.method.toLowerCase(),
-      url: targetUrl,
-      headers: headers,
-      responseType: 'stream', // Important for binary content
-      validateStatus: () => true, // Don't throw on HTTP errors
-      timeout: 30000, // 30 second timeout
-      maxRedirects: 0 // Handle redirects manually
+    // Prepare headers with proper reverse proxy headers for *arr apps
+    const headers = {
+      'Host': originalHost, // Critical for *arr apps
+      'X-Real-IP': req.ip || req.connection.remoteAddress,
+      'X-Forwarded-For': req.get('x-forwarded-for') || req.ip || req.connection.remoteAddress,
+      'X-Forwarded-Proto': originalProto,
+      'X-Forwarded-Host': originalHost,
+      'X-Forwarded-Port': originalProto === 'https' ? '443' : '80',
+      'User-Agent': req.headers['user-agent'] || 'JohnsonFlix-Management-Proxy',
+      'Accept': req.headers['accept'] || '*/*',
+      'Accept-Language': req.headers['accept-language'] || 'en-US,en;q=0.9',
+      'Accept-Encoding': 'identity', // Disable compression for easier processing
     };
     
-    // Forward request body for POST, PUT, PATCH requests
-    if (['post', 'put', 'patch'].includes(req.method.toLowerCase()) && req.body) {
-      if (req.headers['content-type'] && req.headers['content-type'].includes('application/json')) {
-        axiosConfig.data = req.body;
-        headers['content-type'] = 'application/json';
-      } else {
-        axiosConfig.data = req.body;
-        if (req.headers['content-type']) {
-          headers['content-type'] = req.headers['content-type'];
-        }
-      }
+    // Add authentication if configured
+    if (tool.username && tool.password) {
+      const auth = Buffer.from(`${tool.username}:${tool.password}`).toString('base64');
+      headers['Authorization'] = `Basic ${auth}`;
+      console.log(`🔐 [PROXY] Added basic auth for ${tool.username}`);
     }
     
-    console.log(`🚀 Making request to ${targetUrl}...`);
+    if (tool.api_key) {
+      headers['X-API-Key'] = tool.api_key;
+      console.log(`🔑 [PROXY] Added API key`);
+    }
+    
+    console.log(`📤 [PROXY] Request headers:`, Object.keys(headers));
     
     // Make the request
-    const response = await axios(axiosConfig);
+    const axiosConfig = {
+      method: req.method,
+      url: targetUrl,
+      headers: headers,
+      timeout: 30000,
+      validateStatus: () => true, // Don't throw on any status code
+      responseType: 'stream'
+    };
     
-    console.log(`📡 Response: ${response.status} ${response.statusText}`);
-    console.log(`📋 Content-Type: ${response.headers['content-type']}`);
-    
-    // Handle redirects
-    if (response.status >= 300 && response.status < 400 && response.headers.location) {
-      console.log(`🔄 Handling redirect to: ${response.headers.location}`);
-      
-      // Forward cookies from redirect response
-      if (response.headers['set-cookie']) {
-        const cookieStrings = Array.isArray(response.headers['set-cookie']) 
-          ? response.headers['set-cookie'] 
-          : [response.headers['set-cookie']];
-        
-        cookieStrings.forEach(cookie => {
-          res.append('Set-Cookie', cookie);
-        });
-        console.log('🍪 Forwarded Set-Cookie headers from redirect');
-      }
-      
-      // Return redirect to browser with proxy path
-      let redirectLocation = response.headers.location;
-      if (redirectLocation.startsWith('/')) {
-        redirectLocation = `/api/management/tools/${toolId}/proxy${redirectLocation}`;
-      } else if (redirectLocation.startsWith(new URL(tool.url).origin)) {
-        redirectLocation = redirectLocation.replace(new URL(tool.url).origin, `/api/management/tools/${toolId}/proxy`);
-      }
-      
-      res.status(response.status);
-      res.set('Location', redirectLocation);
-      return res.end();
+    // Add body for POST/PUT requests
+    if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
+      axiosConfig.data = req.body;
+      headers['Content-Type'] = req.headers['content-type'] || 'application/json';
     }
     
-    // Handle the response
-    const contentType = response.headers['content-type'] || '';
+    console.log(`🚀 [PROXY] Making ${req.method} request to ${targetUrl}`);
     
-    // Copy all response headers except problematic ones
+    const response = await axios(axiosConfig);
+    
+    console.log(`📥 [PROXY] Response status: ${response.status} ${response.statusText}`);
+    console.log(`📥 [PROXY] Response headers:`, Object.keys(response.headers));
+    console.log(`📥 [PROXY] Content-Type: ${response.headers['content-type']}`);
+    
+    // Set response status
+    res.status(response.status);
+    
+    // Copy headers (except problematic ones)
     Object.keys(response.headers).forEach(key => {
       const lowerKey = key.toLowerCase();
-      if (!['connection', 'content-encoding', 'transfer-encoding', 'content-length', 'x-frame-options', 'content-security-policy'].includes(lowerKey)) {
+      if (!['connection', 'content-encoding', 'transfer-encoding', 'content-length'].includes(lowerKey)) {
         res.set(key, response.headers[key]);
       }
     });
     
-    // CRITICAL: Preserve Set-Cookie headers for session management
-    if (response.headers['set-cookie']) {
-      const cookieStrings = Array.isArray(response.headers['set-cookie']) 
-        ? response.headers['set-cookie'] 
-        : [response.headers['set-cookie']];
-      
-      cookieStrings.forEach(cookie => {
-        res.append('Set-Cookie', cookie);
-      });
-      console.log('🍪 Forwarded Set-Cookie headers to browser');
-    }
+    // Critical: Remove iframe blocking headers
+    res.removeHeader('x-frame-options');
+    res.removeHeader('X-Frame-Options');
+    res.removeHeader('content-security-policy');
+    res.removeHeader('Content-Security-Policy');
     
     // Add iframe-friendly headers
     res.set('X-Frame-Options', 'ALLOWALL');
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Cookie');
-    res.set('Access-Control-Allow-Credentials', 'true');
     
+    // If this is an HTML response, we need to rewrite URLs
+    const contentType = response.headers['content-type'] || '';
     if (contentType.includes('text/html')) {
-      console.log('📄 Processing HTML...');
+      console.log(`📄 [PROXY] Processing HTML response for URL rewriting...`);
       
-      // Convert stream to string for HTML processing
       let htmlContent = '';
       response.data.on('data', chunk => {
         htmlContent += chunk.toString();
       });
       
       response.data.on('end', () => {
-        console.log(`📝 HTML Content length: ${htmlContent.length} chars`);
+        console.log(`📝 [PROXY] HTML Content length: ${htmlContent.length} chars`);
         
-        // URL rewriting for iframe compatibility
-        const baseProxyPath = `/api/management/tools/${toolId}/proxy`;
+        // Rewrite URLs in HTML for *arr apps
+        const proxyBasePath = `/api/management/tools/${toolId}/proxy`;
         const toolOrigin = new URL(tool.url).origin;
         
-        console.log(`🔧 Rewriting URLs with base: ${baseProxyPath}`);
-        console.log(`🔧 Tool origin: ${toolOrigin}`);
+        console.log(`🔧 [PROXY] Rewriting URLs with base: ${proxyBasePath}`);
         
-        // More comprehensive URL rewriting
+        // Enhanced URL rewriting for *arr applications
         htmlContent = htmlContent
-          // Rewrite relative URLs
-          .replace(/href="\/([^"]*?)"/g, `href="${baseProxyPath}/$1"`)
-          .replace(/src="\/([^"]*?)"/g, `src="${baseProxyPath}/$1"`)
-          .replace(/href='\/([^']*?)'/g, `href='${baseProxyPath}/$1'`)
-          .replace(/src='\/([^']*?)'/g, `src='${baseProxyPath}/$1'`)
+          // Fix absolute URLs that start with /
+          .replace(/href="\/([^"]*?)"/g, `href="${proxyBasePath}/$1"`)
+          .replace(/src="\/([^"]*?)"/g, `src="${proxyBasePath}/$1"`)
+          .replace(/action="\/([^"]*?)"/g, `action="${proxyBasePath}/$1"`)
           
-          // Rewrite CSS url() references
-          .replace(/url\(\/([^)]*?)\)/g, `url(${baseProxyPath}/$1)`)
-          .replace(/url\("\/([^"]*?)"\)/g, `url("${baseProxyPath}/$1")`)
-          .replace(/url\('\/([^']*?)'\)/g, `url('${baseProxyPath}/$1')`)
+          // Fix URLs in CSS
+          .replace(/url\(\/([^)]*?)\)/g, `url(${proxyBasePath}/$1)`)
+          .replace(/url\("\/([^"]*?)"\)/g, `url("${proxyBasePath}/$1")`)
+          .replace(/url\('\/([^']*?)'\)/g, `url('${proxyBasePath}/$1')`)
           
-          // Rewrite absolute URLs that match the tool's origin
-          .replace(new RegExp(`href="${toolOrigin}([^"]*?)"`, 'g'), `href="${baseProxyPath}$1"`)
-          .replace(new RegExp(`src="${toolOrigin}([^"]*?)"`, 'g'), `src="${baseProxyPath}$1"`)
-          .replace(new RegExp(`href='${toolOrigin}([^']*?)'`, 'g'), `href='${baseProxyPath}$1'`)
-          .replace(new RegExp(`src='${toolOrigin}([^']*?)'`, 'g'), `src='${baseProxyPath}$1'`)
-          
-          // Rewrite JavaScript fetch/XMLHttpRequest URLs
-          .replace(/fetch\s*\(\s*['"`]\/([^'"`]*?)['"`]/g, `fetch('${baseProxyPath}/$1'`)
+          // Fix JavaScript URLs
+          .replace(/fetch\s*\(\s*['"`]\/([^'"`]*?)['"`]/g, `fetch('${proxyBasePath}/$1'`)
+          .replace(/ajax\s*\(\s*['"`]\/([^'"`]*?)['"`]/g, `ajax('${proxyBasePath}/$1'`)
           .replace(/XMLHttpRequest.*open\s*\(\s*['"`]GET['"`]\s*,\s*['"`]\/([^'"`]*?)['"`]/g, 
-            `XMLHttpRequest().open('GET', '${baseProxyPath}/$1'`)
+            `XMLHttpRequest().open('GET', '${proxyBasePath}/$1'`)
           
-          // Rewrite location and window.location references
-          .replace(/window\.location\s*=\s*['"`]\/([^'"`]*?)['"`]/g, `window.location = '${baseProxyPath}/$1'`)
-          .replace(/location\.href\s*=\s*['"`]\/([^'"`]*?)['"`]/g, `location.href = '${baseProxyPath}/$1'`)
+          // Fix location changes
+          .replace(/window\.location\s*=\s*['"`]\/([^'"`]*?)['"`]/g, `window.location = '${proxyBasePath}/$1'`)
+          .replace(/location\.href\s*=\s*['"`]\/([^'"`]*?)['"`]/g, `location.href = '${proxyBasePath}/$1'`)
           
-          // Rewrite base tag if it exists
-          .replace(/<base\s+href\s*=\s*['"`]([^'"`]*?)['"`]/gi, `<base href="${baseProxyPath}/"`)
+          // Fix base tag if present
+          .replace(/<base\s+href\s*=\s*['"`]([^'"`]*?)['"`]/gi, `<base href="${proxyBasePath}/"`)
           
-          // Add iframe compatibility script
+          // Add script to fix *arr app URLs dynamically
           .replace(/<head>/gi, `<head>
             <script>
-              // Early webpack override - run before any other scripts
+              // Fix *arr app base URL for proxy
               (function() {
-                const PROXY_BASE = '${baseProxyPath}';
-                console.log('🔧 Early webpack override - setting public path to:', PROXY_BASE + '/');
+                console.log('🔧 Fixing ${tool.name} URLs for proxy mode...');
                 
-                // Set webpack public path as early as possible
-                if (typeof __webpack_public_path__ !== 'undefined') {
-                  __webpack_public_path__ = PROXY_BASE + '/';
+                // Override common *arr functions that build URLs
+                const originalLocation = window.location;
+                const proxyBase = '${proxyBasePath}';
+                
+                // Fix any hardcoded URL builders
+                if (window.Sonarr || window.Radarr || window.Lidarr || window.Prowlarr) {
+                  const app = window.Sonarr || window.Radarr || window.Lidarr || window.Prowlarr;
+                  if (app && app.Config) {
+                    app.Config.urlBase = proxyBase;
+                    console.log('🔧 Set urlBase to:', proxyBase);
+                  }
                 }
                 
-                // Create a global override function
-                window.__setWebpackPublicPath = function() {
-                  if (typeof __webpack_require__ !== 'undefined') {
-                    if (__webpack_require__.p !== undefined) {
-                      console.log('🔧 Setting webpack require.p to:', PROXY_BASE + '/');
-                      __webpack_require__.p = PROXY_BASE + '/';
-                    }
-                  }
-                  
-                  if (typeof __webpack_public_path__ !== 'undefined') {
-                    console.log('🔧 Setting webpack public path to:', PROXY_BASE + '/');
-                    __webpack_public_path__ = PROXY_BASE + '/';
-                  }
-                };
-                
-                // Call it immediately
-                window.__setWebpackPublicPath();
-                
-                // Set up interval to keep overriding in case webpack resets it
-                setInterval(window.__setWebpackPublicPath, 500);
-              })();
-            </script>`)
-          .replace(/<\/head>/gi, `
-            <script>
-              console.log("🔗 JohnsonFlix iframe proxy loaded for ${tool.name}");
-              
-              // Store original functions and setup proxy environment
-              (function() {
-                const PROXY_BASE = '${baseProxyPath}';
-                const TOOL_ORIGIN = '${toolOrigin}';
-                
-                // Override fetch to use proxy URLs
+                // Override fetch to fix relative URLs
                 const originalFetch = window.fetch;
-                window.fetch = function(url, options = {}) {
-                  if (typeof url === 'string') {
-                    if (url.startsWith('/') && !url.includes('/api/management/tools/')) {
-                      url = PROXY_BASE + url;
-                      console.log('🔗 Proxying fetch request to:', url);
-                    } else if (url.startsWith(TOOL_ORIGIN)) {
-                      url = url.replace(TOOL_ORIGIN, PROXY_BASE);
-                      console.log('🔗 Proxying absolute fetch request to:', url);
-                    }
+                window.fetch = function(url, options) {
+                  if (typeof url === 'string' && url.startsWith('/') && !url.startsWith(proxyBase)) {
+                    url = proxyBase + url;
+                    console.log('🔧 Fixed fetch URL to:', url);
                   }
-                  
-                  // Ensure credentials are included for cross-origin requests
-                  options.credentials = options.credentials || 'include';
-                  options.mode = options.mode || 'cors';
-                  
                   return originalFetch.call(this, url, options);
                 };
                 
-                // Override XMLHttpRequest
-                const OriginalXMLHttpRequest = window.XMLHttpRequest;
-                window.XMLHttpRequest = function() {
-                  const xhr = new OriginalXMLHttpRequest();
-                  const originalOpen = xhr.open;
-                  
-                  xhr.open = function(method, url, ...args) {
-                    if (typeof url === 'string') {
-                      if (url.startsWith('/') && !url.includes('/api/management/tools/')) {
-                        url = PROXY_BASE + url;
-                        console.log('🔗 Proxying XHR request to:', url);
-                      } else if (url.startsWith(TOOL_ORIGIN)) {
-                        url = url.replace(TOOL_ORIGIN, PROXY_BASE);
-                        console.log('🔗 Proxying absolute XHR request to:', url);
-                      }
-                    }
-                    return originalOpen.call(this, method, url, ...args);
-                  };
-                  
-                  // Include credentials
-                  xhr.withCredentials = true;
-                  
-                  return xhr;
-                };
-                
-                // Override document.createElement for dynamic script/link loading
-                const originalCreateElement = document.createElement;
-                document.createElement = function(tagName) {
-                  const element = originalCreateElement.call(this, tagName);
-                  
-                  if (tagName.toLowerCase() === 'script') {
-                    const originalSetAttribute = element.setAttribute;
-                    element.setAttribute = function(name, value) {
-                      if (name === 'src' && typeof value === 'string') {
-                        if (value.startsWith('/') && !value.includes('/api/management/tools/')) {
-                          value = PROXY_BASE + value;
-                          console.log('🔗 Proxying script src to:', value);
-                        } else if (value.startsWith(TOOL_ORIGIN)) {
-                          value = value.replace(TOOL_ORIGIN, PROXY_BASE);
-                          console.log('🔗 Proxying absolute script src to:', value);
-                        }
-                      }
-                      return originalSetAttribute.call(this, name, value);
-                    };
-                    
-                    // Also handle direct src assignment
-                    Object.defineProperty(element, 'src', {
-                      set: function(value) {
-                        if (typeof value === 'string') {
-                          if (value.startsWith('/') && !value.includes('/api/management/tools/')) {
-                            value = PROXY_BASE + value;
-                            console.log('🔗 Proxying script src assignment to:', value);
-                          } else if (value.startsWith(TOOL_ORIGIN)) {
-                            value = value.replace(TOOL_ORIGIN, PROXY_BASE);
-                            console.log('🔗 Proxying absolute script src assignment to:', value);
-                          }
-                        }
-                        this.setAttribute('src', value);
-                      },
-                      get: function() {
-                        return this.getAttribute('src');
-                      }
-                    });
-                  } else if (tagName.toLowerCase() === 'link') {
-                    // Handle CSS links
-                    const originalSetAttribute = element.setAttribute;
-                    element.setAttribute = function(name, value) {
-                      if (name === 'href' && typeof value === 'string') {
-                        if (value.startsWith('/') && !value.includes('/api/management/tools/')) {
-                          value = PROXY_BASE + value;
-                          console.log('🔗 Proxying link href to:', value);
-                        } else if (value.startsWith(TOOL_ORIGIN)) {
-                          value = value.replace(TOOL_ORIGIN, PROXY_BASE);
-                          console.log('🔗 Proxying absolute link href to:', value);
-                        }
-                      }
-                      return originalSetAttribute.call(this, name, value);
-                    };
-                  }
-                  
-                  return element;
-                };
-                
-                // Override webpack's __webpack_public_path__ if it exists
-                if (typeof __webpack_public_path__ !== 'undefined') {
-                  console.log('🔧 Original webpack public path:', __webpack_public_path__);
-                  __webpack_public_path__ = PROXY_BASE + '/';
-                  console.log('🔗 Set webpack public path to:', __webpack_public_path__);
-                }
-                
-                // Override webpack's require.p if it exists (for chunk loading)
-                if (typeof __webpack_require__ !== 'undefined' && __webpack_require__.p !== undefined) {
-                  console.log('🔧 Original webpack require.p:', __webpack_require__.p);
-                  __webpack_require__.p = PROXY_BASE + '/';
-                  console.log('🔗 Set webpack require.p to:', __webpack_require__.p);
-                }
-                
-                // Try to override the public path at window level too
-                if (window.__webpack_public_path__) {
-                  window.__webpack_public_path__ = PROXY_BASE + '/';
-                }
-                
-                // Additional webpack runtime override
-                setTimeout(() => {
-                  // Try to find and override webpack runtime after it loads
-                  if (window.webpackJsonp || window.__webpack_require__) {
-                    console.log('🔧 Applying late webpack overrides...');
-                    
-                    if (window.__webpack_require__ && window.__webpack_require__.p !== undefined) {
-                      console.log('🔧 Late override webpack require.p:', window.__webpack_require__.p);
-                      window.__webpack_require__.p = PROXY_BASE + '/';
-                    }
-                    
-                    // Override chunk loading if it exists
-                    if (window.__webpack_require__ && window.__webpack_require__.e) {
-                      const originalChunkLoad = window.__webpack_require__.e;
-                      window.__webpack_require__.e = function(chunkId) {
-                        console.log('🔗 Loading webpack chunk:', chunkId);
-                        
-                        // Call the global override before loading
-                        if (window.__setWebpackPublicPath) {
-                          window.__setWebpackPublicPath();
-                        }
-                        
-                        return originalChunkLoad.call(this, chunkId);
-                      };
-                    }
-                    
-                    // Override jsonp chunk loading if available
-                    if (window.__webpack_require__ && window.__webpack_require__.f && window.__webpack_require__.f.j) {
-                      const originalJsonpLoad = window.__webpack_require__.f.j;
-                      window.__webpack_require__.f.j = function(chunkId, promises) {
-                        console.log('🔗 JSONP loading chunk:', chunkId);
-                        
-                        // Force public path override
-                        if (window.__setWebpackPublicPath) {
-                          window.__setWebpackPublicPath();
-                        }
-                        
-                        return originalJsonpLoad.call(this, chunkId, promises);
-                      };
-                    }
-                  }
-                }, 100);
-                
-                // Continue checking for webpack and overriding
-                const webpackChecker = setInterval(() => {
-                  if (window.__webpack_require__) {
-                    if (window.__setWebpackPublicPath) {
-                      window.__setWebpackPublicPath();
-                    }
-                    
-                    // After 10 seconds, we can stop checking so frequently
-                    setTimeout(() => clearInterval(webpackChecker), 10000);
-                  }
-                }, 200);
-                
-                // Check if we're in an iframe
-                const isInIframe = window !== window.top;
-                
-                if (isInIframe) {
-                  console.log("🖼️ Running inside iframe - special handling enabled");
-                  
-                  // Add an option to break out of iframe if needed
-                  setTimeout(() => {
-                    const breakoutDiv = document.createElement('div');
-                    breakoutDiv.style.cssText = \`
-                      position: fixed;
-                      top: 10px;
-                      right: 10px;
-                      background: rgba(244, 67, 54, 0.9);
-                      color: white;
-                      padding: 8px 12px;
-                      border-radius: 4px;
-                      z-index: 9999;
-                      font-size: 12px;
-                      cursor: pointer;
-                      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                      border: 1px solid #f44336;
-                      backdrop-filter: blur(5px);
-                      font-family: monospace;
-                    \`;
-                    breakoutDiv.innerHTML = '🚪 Open in New Tab';
-                    breakoutDiv.title = 'Open this tool in a new browser tab for full functionality';
-                    breakoutDiv.onclick = () => {
-                      window.top.postMessage({
-                        type: 'OPEN_IN_NEW_TAB',
-                        url: '${tool.url}'
-                      }, '*');
-                    };
-                    document.body.appendChild(breakoutDiv);
-                  }, 1000);
-                }
+                // Set a global variable that *arr apps can use
+                window.__proxyBase = proxyBase;
               })();
-            </script>
-          </head>`)
+            </script>`)
           
+          // Add final script at end of body
           .replace(/<\/body>/gi, `
             <script>
-              // Final cleanup and iframe communication
-              console.log("✅ ${tool.name} iframe proxy setup complete");
-              
-              // Monitor and fix any dynamic URL changes
-              const observer = new MutationObserver(function(mutations) {
-                mutations.forEach(function(mutation) {
-                  if (mutation.type === 'childList') {
-                    mutation.addedNodes.forEach(function(node) {
-                      if (node.nodeType === Node.ELEMENT_NODE) {
-                        // Fix any newly added script tags
-                        if (node.tagName === 'SCRIPT' && node.src && node.src.startsWith('/') && !node.src.includes('/api/management/tools/')) {
-                          console.log('🔧 Fixing dynamically added script:', node.src);
-                          node.src = '${baseProxyPath}' + node.src;
-                        }
-                        
-                        // Fix any newly added link tags
-                        if (node.tagName === 'LINK' && node.href && node.href.startsWith('/') && !node.href.includes('/api/management/tools/')) {
-                          console.log('🔧 Fixing dynamically added link:', node.href);
-                          node.href = '${baseProxyPath}' + node.href;
-                        }
-                        
-                        // Recursively check child elements
-                        const scripts = node.querySelectorAll && node.querySelectorAll('script[src^="/"]');
-                        if (scripts) {
-                          scripts.forEach(script => {
-                            if (!script.src.includes('/api/management/tools/')) {
-                              console.log('🔧 Fixing nested script:', script.src);
-                              script.src = '${baseProxyPath}' + script.src;
-                            }
-                          });
-                        }
-                        
-                        const links = node.querySelectorAll && node.querySelectorAll('link[href^="/"]');
-                        if (links) {
-                          links.forEach(link => {
-                            if (!link.href.includes('/api/management/tools/')) {
-                              console.log('🔧 Fixing nested link:', link.href);
-                              link.href = '${baseProxyPath}' + link.href;
-                            }
-                          });
-                        }
-                      }
-                    });
-                  }
-                });
-              });
-              
-              // Start observing
-              observer.observe(document.body, {
-                childList: true,
-                subtree: true
-              });
-              
-              // Handle form submissions for iframe compatibility
-              document.addEventListener('DOMContentLoaded', function() {
-                // Fix existing forms
-                const forms = document.querySelectorAll('form');
-                forms.forEach(form => {
-                  const originalAction = form.getAttribute('action') || form.action;
-                  if (originalAction && originalAction.startsWith('/') && !originalAction.includes('/api/management/tools/')) {
-                    form.setAttribute('action', '${baseProxyPath}' + originalAction);
-                    console.log('🔗 Fixed form action to:', form.getAttribute('action'));
-                  }
-                });
-                
-                // Fix any existing relative-path scripts and links that might have been missed
-                const scripts = document.querySelectorAll('script[src^="/"]');
-                scripts.forEach(script => {
-                  if (!script.src.includes('/api/management/tools/')) {
-                    console.log('🔧 Fixing existing script:', script.src);
-                    script.src = '${baseProxyPath}' + script.src.substring(script.src.indexOf('/', 1));
-                  }
-                });
-                
-                const links = document.querySelectorAll('link[href^="/"]');
-                links.forEach(link => {
-                  if (!link.href.includes('/api/management/tools/')) {
-                    console.log('🔧 Fixing existing link:', link.href);
-                    link.href = '${baseProxyPath}' + link.href.substring(link.href.indexOf('/', 1));
-                  }
-                });
-              });
-              
-              // Override history API to handle SPA navigation
-              if (window.history && window.history.pushState) {
-                const originalPushState = window.history.pushState;
-                const originalReplaceState = window.history.replaceState;
-                
-                window.history.pushState = function(state, title, url) {
-                  if (typeof url === 'string' && url.startsWith('/') && !url.includes('/api/management/tools/')) {
-                    url = '${baseProxyPath}' + url;
-                    console.log('🔗 Proxying history.pushState to:', url);
-                  }
-                  return originalPushState.call(this, state, title, url);
-                };
-                
-                window.history.replaceState = function(state, title, url) {
-                  if (typeof url === 'string' && url.startsWith('/') && !url.includes('/api/management/tools/')) {
-                    url = '${baseProxyPath}' + url;
-                    console.log('🔗 Proxying history.replaceState to:', url);
-                  }
-                  return originalReplaceState.call(this, state, title, url);
-                };
-              }
+              console.log('✅ ${tool.name} proxy setup complete');
+              console.log('🔧 Proxy base path:', '${proxyBasePath}');
             </script>
           </body>`);
         
-        console.log('✅ HTML sent (' + htmlContent.length + ' chars)');
         res.send(htmlContent);
+        console.log(`✅ [PROXY] HTML response processed and sent`);
       });
       
       response.data.on('error', (error) => {
-        console.error('❌ Stream error:', error);
-        res.status(500).send('Proxy stream error');
+        console.error(`❌ [PROXY] HTML processing error:`, error.message);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'HTML processing error' });
+        }
+      });
+    } else {
+      console.log(`✅ [PROXY] Streaming non-HTML response...`);
+      
+      // Stream the response for non-HTML content
+      response.data.pipe(res);
+      
+      response.data.on('end', () => {
+        console.log(`✅ [PROXY] Response completed for ${tool.name}`);
       });
       
-    } else {
-      // For non-HTML content (CSS, JS, images, etc.), stream directly
-      console.log(`📦 Streaming ${contentType} content...`);
-      response.data.pipe(res);
+      response.data.on('error', (error) => {
+        console.error(`❌ [PROXY] Stream error:`, error.message);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Proxy stream error' });
+        }
+      });
     }
     
   } catch (error) {
-    console.error('❌ Proxy error:', error.message);
+    console.error(`❌ [PROXY] Error:`, error.message);
+    console.error(`❌ [PROXY] Error details:`, {
+      code: error.code,
+      response: error.response?.status,
+      responseData: error.response?.data?.toString?.().substring(0, 200)
+    });
     
-    if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
-      return res.status(502).json({ 
-        error: 'Unable to connect to the target service',
-        details: 'The service may be down or unreachable'
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        error: 'Proxy request failed',
+        details: error.message,
+        code: error.code,
+        suggestion: error.code === 'ECONNREFUSED' ? 'Check if the tool is running and accessible' : 'Check tool configuration'
       });
     }
+  }
+});
+
+// Test proxy connectivity
+router.get('/tools/:toolId/test', async (req, res) => {
+  const toolId = req.params.toolId;
+  console.log(`🧪 [TEST] Testing connectivity to tool: ${toolId}`);
+  
+  try {
+    const db = require('./database-config');
+    const result = await db.query('SELECT setting_value FROM settings WHERE setting_key = ?', ['management_tools']);
     
-    if (error.response) {
-      // Forward error response from target server
-      return res.status(error.response.status).json({
-        error: `Target server error: ${error.response.status}`,
-        message: error.message
-      });
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'No tools configured' });
     }
     
-    res.status(500).json({ 
-      error: 'Proxy server error',
-      message: error.message 
+    const tools = JSON.parse(result[0].setting_value);
+    const tool = (Array.isArray(tools) ? tools : Object.values(tools)).find(t => t.id === toolId);
+    
+    if (!tool) {
+      return res.status(404).json({ error: 'Tool not found' });
+    }
+    
+    console.log(`🧪 [TEST] Testing ${tool.name} at ${tool.url}`);
+    
+    const startTime = Date.now();
+    const testResponse = await axios.get(tool.url, {
+      timeout: 5000,
+      validateStatus: () => true
+    });
+    const responseTime = Date.now() - startTime;
+    
+    console.log(`🧪 [TEST] Response: ${testResponse.status} in ${responseTime}ms`);
+    
+    res.json({
+      tool: { id: tool.id, name: tool.name, url: tool.url },
+      status: testResponse.status,
+      statusText: testResponse.statusText,
+      responseTime: responseTime,
+      reachable: testResponse.status < 500,
+      headers: Object.keys(testResponse.headers)
+    });
+    
+  } catch (error) {
+    console.error(`❌ [TEST] Test failed:`, error.message);
+    res.json({
+      tool: { id: toolId },
+      error: error.message,
+      code: error.code,
+      reachable: false
     });
   }
 });
