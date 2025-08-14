@@ -3757,13 +3757,13 @@ table tbody td:last-child .btn-small:nth-child(4) {
         padding: 10px 0;
     }
     
-    .tautulli-session-card {
-        min-height: 160px; /* Smaller minimum on mobile */
-        margin: 0 5px;
-    }
+.tautulli-session-card {
+    min-height: 160px; 
+    margin: 0; 
+}
     
     .tautulli-content-area {
-        min-height: 140px; /* Adjusted for mobile */
+        min-height: 140px; 
     }
     
     .session-poster-large {

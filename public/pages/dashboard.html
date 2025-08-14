@@ -748,8 +748,8 @@
     }
     
     .mobile-section-content.expanded {
-        max-height: 2000px;
-    }
+    max-height: none; 
+}
     
     /* IPTV specific colors */
     .mobile-section-header[onclick*="iptvStats"] {
@@ -913,13 +913,14 @@
         min-height: auto !important;
     }
     
-    .session-poster-large {
-        width: 60px !important;
-        height: 90px !important;
-        border-radius: 6px !important;
-        flex-shrink: 0 !important;
-        margin-right: 12px !important;
-    }
+.session-poster-large {
+    width: 65px !important;
+    height: calc(100% - 24px) !important; /* Use full card height minus padding */
+    border-radius: 6px !important;
+    flex-shrink: 0 !important;
+    margin-right: 12px !important;
+    align-self: stretch !important; /* Make poster stretch to fill card height */
+}
     
     .session-details {
         flex: 1 !important;
@@ -961,22 +962,20 @@
         margin-bottom: 6px !important;
     }
     
-    /* Hide most metadata rows, show only important ones */
-    .session-metadata .metadata-row {
-        display: none !important;
-    }
-    
-    /* Show only video, audio, and container */
-    .session-metadata .metadata-row:has(.metadata-label:contains("VIDEO")),
-    .session-metadata .metadata-row:has(.metadata-label:contains("AUDIO")),
-    .session-metadata .metadata-row:has(.metadata-label:contains("CONTAINER")) {
-        display: flex !important;
-        background: rgba(255, 255, 255, 0.05) !important;
-        padding: 2px 6px !important;
-        border-radius: 4px !important;
-        align-items: center !important;
-        gap: 4px !important;
-    }
+/* Hide desktop-only metadata rows on mobile */
+.session-metadata .metadata-row.desktop-only {
+    display: none !important;
+}
+
+/* Show mobile-important metadata rows */
+.session-metadata .metadata-row.mobile-important {
+    display: flex !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    align-items: center !important;
+    gap: 4px !important;
+}
     
     .session-metadata .metadata-label {
         font-size: 0.6rem !important;
@@ -1024,6 +1023,16 @@
         font-size: 0.65rem !important;
         font-weight: 500 !important;
         flex-shrink: 0 !important;
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        overflow-y: auto !important; /* Force vertical scrolling on mobile */
+    }
+    
+    body.nav-open {
+        overflow: hidden !important; /* Only block scrolling when nav is open */
     }
 }
 

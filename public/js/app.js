@@ -1884,26 +1884,26 @@ const cardHtml = `
                             <span class="metadata-value" title="${this.escapeHtml(qualityDisplay)}">${this.escapeHtml(qualityDisplay)}</span>
                         </div>
                         
-                        <div class="metadata-row desktop-only">
-                            <span class="metadata-label">STREAM</span>
-                            <span class="metadata-value stream-type">${this.escapeHtml(streamDecision)}</span>
-                        </div>
-                        
-                        <!-- Mobile-important metadata -->
                         <div class="metadata-row mobile-important">
-                            <span class="metadata-label">CONTAINER</span>
-                            <span class="metadata-value" title="${this.escapeHtml(containerDisplay)}">${this.escapeHtml(containerDisplay)}</span>
-                        </div>
+							<span class="metadata-label">STREAM</span>
+							<span class="metadata-value stream-type">${this.escapeHtml(streamDecision)}</span>
+						</div>
                         
-                        <div class="metadata-row mobile-important">
-                            <span class="metadata-label">VIDEO</span>
-                            <span class="metadata-value" title="${this.escapeHtml(videoDisplay)}">${this.escapeHtml(videoDisplay)}</span>
-                        </div>
-                        
-                        <div class="metadata-row mobile-important">
-                            <span class="metadata-label">AUDIO</span>
-                            <span class="metadata-value" title="${this.escapeHtml(audioDisplay)}">${this.escapeHtml(audioDisplay)}</span>
-                        </div>
+<!-- Mobile-important metadata -->
+<div class="metadata-row desktop-only">
+    <span class="metadata-label">CONTAINER</span>
+    <span class="metadata-value" title="${this.escapeHtml(containerDisplay)}">${this.escapeHtml(containerDisplay)}</span>
+</div>
+
+<div class="metadata-row desktop-only">
+    <span class="metadata-label">VIDEO</span>
+    <span class="metadata-value" title="${this.escapeHtml(videoDisplay)}">${this.escapeHtml(videoDisplay)}</span>
+</div>
+
+<div class="metadata-row desktop-only">
+    <span class="metadata-label">AUDIO</span>
+    <span class="metadata-value" title="${this.escapeHtml(audioDisplay)}">${this.escapeHtml(audioDisplay)}</span>
+</div>
                         
                         <!-- Desktop-only metadata continued -->
                         <div class="metadata-row desktop-only">
