@@ -316,6 +316,7 @@ renderUsersTableBasic() {
         const searchTerm = document.getElementById('userSearch')?.value.toLowerCase() || '';
         const ownerFilter = document.getElementById('ownerFilter')?.value || '';
         const tagFilter = document.getElementById('tagFilter')?.value || '';
+		const inactivityFilter = document.getElementById('inactivityFilter')?.value; // ADD THIS LINE
         
         console.log('🔍 Filtering users:', { searchTerm, ownerFilter, tagFilter });
         
@@ -339,7 +340,12 @@ const matchesSearch = !searchTerm ||
             const matchesTag = !tagFilter || 
                 (user.tags && Array.isArray(user.tags) && user.tags.includes(tagFilter));
             
-            return matchesSearch && matchesOwner && matchesTag;
+            // NEW: Add inactivity filter
+const matchesInactivity = !inactivityFilter || 
+    (user.days_since_last_watch !== null && user.days_since_last_watch >= parseInt(inactivityFilter)) ||
+    (user.days_since_last_watch === null); // Include "never watched" users
+
+return matchesSearch && matchesOwner && matchesTag && matchesInactivity;
         });
         
         console.log(`📊 Filtered ${filteredUsers.length} out of ${window.AppState.allUsers.length} users`);
@@ -528,6 +534,13 @@ showUserModal(user) {
         Plex Username
     </div>
     <div class="info-value">${user.plex_username || 'Not found'}</div>
+</div>
+<div class="info-item">
+    <div class="info-label">
+        <i class="fas fa-clock"></i>
+        Plex Activity
+    </div>
+    <div class="info-value">${user.activity_display || 'Loading...'}</div>
 </div>
                     <div class="info-item">
                         <div class="info-label">
@@ -4292,6 +4305,8 @@ updateStats() {
         const searchTerm = document.getElementById('userSearch')?.value.toLowerCase() || '';
         const ownerFilter = document.getElementById('ownerFilter')?.value || '';
         const tagFilter = document.getElementById('tagFilter')?.value || '';
+		const inactivityFilter = document.getElementById('inactivityFilter')?.value; // ADD THIS LINE
+
         
         this.filteredUsers = this.users.filter(user => {
             // Search term filter
@@ -4307,7 +4322,12 @@ updateStats() {
             const userTags = this.getUserTags(user);
             const matchesTag = !tagFilter || userTags.includes(tagFilter);
             
-            return matchesSearch && matchesOwner && matchesTag;
+            // NEW: Add inactivity filter
+const matchesInactivity = !inactivityFilter || 
+    (user.days_since_last_watch !== null && user.days_since_last_watch >= parseInt(inactivityFilter)) ||
+    (user.days_since_last_watch === null); // Include "never watched" users
+
+return matchesSearch && matchesOwner && matchesTag && matchesInactivity;
         });
         
         this.renderCompactUsers();

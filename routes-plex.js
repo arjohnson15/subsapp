@@ -1086,6 +1086,8 @@ await db.query('DELETE FROM plex_statistics WHERE stat_key IN (?, ?, ?, ?, ?, ?,
   });
 }
 
+// In routes-plex.js, update the syncPlexUserActivity function:
+
 async function syncPlexUserActivity() {
   return new Promise((resolve, reject) => {
     console.log('🔄 Executing Python script for Plex user activity...');
@@ -1121,33 +1123,38 @@ async function syncPlexUserActivity() {
         await db.query('DELETE FROM plex_user_activity');
         
         for (const record of activityData) {
-          await db.query(`
-            INSERT INTO plex_user_activity 
-            (plex_account_id, plex_account_name, server_name, days_since_last_watch, 
-             last_watched_date, last_watched_title, has_recent_activity, sync_timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          `, [
-            record.plex_account_id,
-            record.plex_account_name,
-            record.server,
-            record.days_since_last_watch,
-            record.last_watched_date,
-            record.last_watched_title,
-            record.has_recent_activity,
-            record.sync_timestamp
-          ]);
+await db.query(`
+  INSERT INTO plex_user_activity 
+  (plex_account_id, plex_account_name, plex_account_username, plex_account_email,
+   server_name, days_since_last_watch, last_watched_date, last_watched_title, 
+   has_recent_activity, sync_timestamp)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`, [
+  record.plex_account_id,
+  record.plex_account_name,
+  record.plex_account_username,
+  record.plex_account_email,  // NEW: Add this line
+  record.server,
+  record.days_since_last_watch,
+  record.last_watched_date,
+  record.last_watched_title,
+  record.has_recent_activity,
+  record.sync_timestamp
+]);
         }
         
-        resolve({
-          success: true,
-          recordsProcessed: activityData.length,
-          timestamp: new Date().toISOString()
-        });
+        console.log('✅ Plex user activity synced to database');
+        resolve();
         
       } catch (parseError) {
-        console.error('❌ Error parsing activity data:', parseError);
+        console.error('❌ Error parsing Python output:', parseError);
         reject(parseError);
       }
+    });
+    
+    python.on('error', (err) => {
+      console.error('❌ Failed to spawn Python process:', err);
+      reject(err);
     });
   });
 }

@@ -106,14 +106,24 @@ function processTagsForUpdate(plexLibraries, currentTags = []) {
 // Get all users with their subscriptions
 router.get('/', async (req, res) => {
   try {
-    const users = await db.query(`
-      SELECT u.*, 
-        o.name as owner_name,
-        o.email as owner_email
-      FROM users u
-      LEFT JOIN owners o ON u.owner_id = o.id
-      ORDER BY u.name
-    `);
+const users = await db.query(`
+  SELECT u.*, 
+    o.name as owner_name,
+    o.email as owner_email,
+    pua.days_since_last_watch,
+    pua.last_watched_date,
+    pua.last_watched_title,
+    pua.has_recent_activity,
+    pua.server_name as plex_server_name
+  FROM users u
+  LEFT JOIN owners o ON u.owner_id = o.id
+  LEFT JOIN plex_user_activity pua ON (
+    pua.plex_account_email = u.plex_email OR 
+    pua.plex_account_username = u.plex_username OR 
+    pua.plex_account_name = u.plex_username
+  )
+  ORDER BY u.name
+`);
 
     // Process each user to include subscription information
     const processedUsers = await Promise.all(users.map(async (user) => {
@@ -171,16 +181,25 @@ for (const sub of subscriptions) {
   }
 }
 
+// Add activity formatting
+let activityDisplay = 'Unknown';
+if (user.days_since_last_watch !== null && user.days_since_last_watch !== undefined) {
+  activityDisplay = `${user.days_since_last_watch} days ago`;
+} else {
+  activityDisplay = 'Never';
+}
+
 return {
   ...user,
   tags,
   plex_libraries: plexLibraries,
   pending_plex_invites: pendingPlexInvites,
   subscriptions,
-  plex_subscription: plexSubscription,  // ADD THIS
-  iptv_subscription: iptvSubscription,  // ADD THIS
+  plex_subscription: plexSubscription,
+  iptv_subscription: iptvSubscription,
   plex_expiration: plexExpiration,
-  iptv_expiration: iptvExpiration
+  iptv_expiration: iptvExpiration,
+  activity_display: activityDisplay  // ADD THIS LINE
 };
     }));
 

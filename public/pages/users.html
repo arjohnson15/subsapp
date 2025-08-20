@@ -31,9 +31,21 @@
     <!-- Search Bar (Full width on mobile) -->
     <div class="search-section">
         <input type="text" class="search-bar" id="userSearch" placeholder="Search by name or email..." onkeyup="Users.filterUsers()">
+        
+        <!-- Add Plex Inactivity Filter next to search -->
+        <div class="form-group" style="display: inline-block; margin-left: 15px;">
+            <label for="inactivityFilter">Plex Inactivity Days:</label>
+            <input type="number" 
+                   id="inactivityFilter" 
+                   placeholder="e.g., 30"
+                   min="0"
+                   style="width: 160px;"
+                   onchange="Users.filterUsers()"
+                   oninput="Users.filterUsers()">
+        </div>
     </div>
     
-    <!-- Filters Row -->
+    <!-- Filters Row - Move Tag filter back up here -->
     <div class="filters-row">
         <div class="form-group">
             <label for="ownerFilter">Filter by Owner:</label>
