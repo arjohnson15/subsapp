@@ -228,6 +228,49 @@ cron.schedule('0 3 * * *', async () => {
  }
 });
 
+// Daily Plex activity sync (runs at 3 AM UTC daily) - Last 3 days
+cron.schedule('0 3 * * *', async () => {
+  const timestamp = new Date().toLocaleString();
+  console.log('');
+  console.log('📊='.repeat(50));
+  console.log(`📊 DAILY PLEX ACTIVITY SYNC STARTED: ${timestamp}`);
+  console.log('📊='.repeat(50));
+  
+  try {
+    // Check if sync is already running
+    const runningSyncs = await db.query(
+      "SELECT * FROM plex_sync_status WHERE sync_type = 'user_activity' AND status = 'running'"
+    );
+    
+    if (runningSyncs && runningSyncs.length > 0) {
+      console.log('⚠️ Plex activity sync already running, skipping...');
+      return;
+    }
+    
+    // Create sync status record
+    const syncRecord = await db.query(
+      "INSERT INTO plex_sync_status (sync_type, status) VALUES (?, ?)",
+      ['user_activity', 'running']
+    );
+    const syncId = syncRecord.insertId;
+    
+    console.log(`🔄 Starting scheduled Plex activity sync (ID: ${syncId}) - Last 3 days...`);
+    
+    // Just update the existing function to use 3 days
+    await syncPlexUserActivityWithStatus(syncId, 3);
+    
+    console.log('📊='.repeat(50));
+    console.log(`📊 DAILY PLEX ACTIVITY SYNC COMPLETED: ${new Date().toLocaleString()}`);
+    console.log('📊='.repeat(50));
+    console.log('');
+  } catch (error) {
+    console.error('❌ ERROR IN DAILY PLEX ACTIVITY SYNC:', error);
+    console.log('📊='.repeat(50));
+    console.log('');
+  }
+});
+console.log('✅ Daily Plex activity sync scheduler activated (3 AM UTC - Last 3 days)');
+
 // Initialize IPTV service on startup with token caching
 iptvService.initialize().catch(console.error);
 iptvService.initializeTokenCache().catch(error => {

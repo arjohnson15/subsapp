@@ -655,6 +655,117 @@ router.get('/server-resources', async (req, res) => {
   }
 });
 
+// Sync Plex user activity (manual trigger)
+router.post('/sync-user-activity', async (req, res) => {
+  try {
+    console.log('🔄 Starting Plex user activity sync...');
+    const result = await syncPlexUserActivity();
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Error syncing Plex user activity:', error);
+    res.status(500).json({ error: 'Failed to sync user activity' });
+  }
+});
+
+// Start async sync
+router.post('/sync-user-activity-async', async (req, res) => {
+  try {
+// Check if sync is already running
+const runningSyncs = await db.query(
+  "SELECT * FROM plex_sync_status WHERE sync_type = 'user_activity' AND status = 'running'"
+);
+
+if (runningSyncs.length > 0) {
+      return res.json({ 
+        success: false, 
+        message: 'Activity sync already in progress',
+        started_at: runningSyncs[0].started_at
+      });
+    }
+    
+// Create sync status record
+const syncRecord = await db.query(
+  "INSERT INTO plex_sync_status (sync_type, status) VALUES ('user_activity', 'running')"
+);
+const syncId = syncRecord.insertId;
+    
+    console.log(`🔄 Starting async Plex user activity sync (ID: ${syncId})...`);
+    
+    // Respond immediately
+    res.json({ 
+      success: true, 
+      message: 'Activity sync started in background',
+      syncId: syncId,
+      timestamp: new Date().toISOString(),
+      estimatedDuration: '10-30 minutes'
+    });
+    
+    // Run sync in background (don't await)
+    syncPlexUserActivityWithStatus(syncId, req.body.days || 30)
+      .then(result => {
+        console.log(`✅ Background sync ${syncId} completed:`, result);
+      })
+      .catch(error => {
+        console.error(`❌ Background sync ${syncId} failed:`, error);
+      });
+    
+  } catch (error) {
+    console.error('❌ Error starting async sync:', error);
+    res.status(500).json({ error: 'Failed to start sync' });
+  }
+});
+
+// Get sync status
+router.get('/sync-status/:syncId?', async (req, res) => {
+  try {
+    const { syncId } = req.params;
+    
+    let query, params;
+    if (syncId) {
+      query = "SELECT * FROM plex_sync_status WHERE id = ?";
+      params = [syncId];
+    } else {
+      // Get latest sync status
+      query = "SELECT * FROM plex_sync_status WHERE sync_type = 'user_activity' ORDER BY started_at DESC LIMIT 1";
+      params = [];
+    }
+    
+const syncStatus = await db.query(query, params);
+
+if (syncStatus.length === 0) {
+      return res.json({ success: false, message: 'No sync found' });
+    }
+    
+    const status = syncStatus[0];
+    const response = {
+      success: true,
+      syncId: status.id,
+      status: status.status,
+      started_at: status.started_at,
+      completed_at: status.completed_at,
+      records_processed: status.records_processed,
+      error_message: status.error_message
+    };
+    
+    // Calculate duration if completed
+    if (status.completed_at) {
+      const duration = new Date(status.completed_at) - new Date(status.started_at);
+      response.duration_seconds = Math.round(duration / 1000);
+      response.duration_minutes = Math.round(duration / 60000);
+    } else if (status.status === 'running') {
+      const elapsed = new Date() - new Date(status.started_at);
+      response.elapsed_seconds = Math.round(elapsed / 1000);
+      response.elapsed_minutes = Math.round(elapsed / 60000);
+    }
+    
+    res.json(response);
+    
+  } catch (error) {
+    console.error('❌ Error getting sync status:', error);
+    res.status(500).json({ error: 'Failed to get sync status' });
+  }
+});
+
 // POST /api/plex/refresh-resources - Force refresh server resources
 router.post('/refresh-resources', async (req, res) => {
   try {
@@ -973,6 +1084,163 @@ await db.query('DELETE FROM plex_statistics WHERE stat_key IN (?, ?, ?, ?, ?, ?,
       reject(err);
     });
   });
+}
+
+async function syncPlexUserActivity() {
+  return new Promise((resolve, reject) => {
+    console.log('🔄 Executing Python script for Plex user activity...');
+    
+    const python = spawn('python3', ['plex_last_watched_script.py', '--approach', 'bulk', '--output', 'database'], {
+      cwd: __dirname,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    let dataString = '';
+    let errorString = '';
+    
+    python.stdout.on('data', (data) => {
+      dataString += data.toString();
+    });
+    
+    python.stderr.on('data', (data) => {
+      errorString += data.toString();
+    });
+    
+    python.on('close', async (code) => {
+      if (code !== 0) {
+        console.error('❌ Python activity script failed:', errorString);
+        reject(new Error(`Python script failed: ${errorString}`));
+        return;
+      }
+      
+      try {
+        const activityData = JSON.parse(dataString);
+        console.log(`📊 Processing ${activityData.length} user activity records`);
+        
+        // Clear old data and insert new
+        await db.query('DELETE FROM plex_user_activity');
+        
+        for (const record of activityData) {
+          await db.query(`
+            INSERT INTO plex_user_activity 
+            (plex_account_id, plex_account_name, server_name, days_since_last_watch, 
+             last_watched_date, last_watched_title, has_recent_activity, sync_timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+            record.plex_account_id,
+            record.plex_account_name,
+            record.server,
+            record.days_since_last_watch,
+            record.last_watched_date,
+            record.last_watched_title,
+            record.has_recent_activity,
+            record.sync_timestamp
+          ]);
+        }
+        
+        resolve({
+          success: true,
+          recordsProcessed: activityData.length,
+          timestamp: new Date().toISOString()
+        });
+        
+      } catch (parseError) {
+        console.error('❌ Error parsing activity data:', parseError);
+        reject(parseError);
+      }
+    });
+  });
+}
+
+// Enhanced sync function with status tracking
+async function syncPlexUserActivityWithStatus(syncId, daysBack = 30) {
+  try {
+    console.log(`🔄 Starting tracked sync ${syncId} for last ${daysBack} days...`);
+    
+    const result = await new Promise((resolve, reject) => {
+      const python = spawn('python3', ['plex_last_watched_script.py', '--approach', 'bulk', '--days', daysBack.toString(), '--output', 'database'], {
+        cwd: __dirname,
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+      
+      let dataString = '';
+      let errorString = '';
+      
+      python.stdout.on('data', (data) => {
+        dataString += data.toString();
+      });
+      
+      python.stderr.on('data', (data) => {
+        errorString += data.toString();
+        console.log(`🐍 Sync ${syncId} (${daysBack} days) progress:`, data.toString().trim());
+      });
+      
+      python.on('close', async (code) => {
+        if (code !== 0) {
+          reject(new Error(`Python script failed with code ${code}: ${errorString}`));
+          return;
+        }
+        
+        try {
+          const activityData = JSON.parse(dataString);
+          console.log(`📊 Sync ${syncId}: Processing ${activityData.length} records for last ${daysBack} days`);
+          
+          // Clear old data and insert new
+          await db.query('DELETE FROM plex_user_activity');
+          
+          for (const record of activityData) {
+            await db.query(`
+              INSERT INTO plex_user_activity 
+              (plex_account_id, plex_account_name, server_name, days_since_last_watch, 
+               last_watched_date, last_watched_title, has_recent_activity, sync_timestamp)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+              record.plex_account_id,
+              record.plex_account_name,
+              record.server,
+              record.days_since_last_watch,
+              record.last_watched_date,
+              record.last_watched_title,
+              record.has_recent_activity,
+              record.sync_timestamp
+            ]);
+          }
+          
+          resolve({
+            success: true,
+            recordsProcessed: activityData.length
+          });
+          
+        } catch (parseError) {
+          reject(parseError);
+        }
+      });
+      
+      python.on('error', (err) => {
+        reject(err);
+      });
+    });
+    
+    // Update status as completed
+    await db.query(
+      "UPDATE plex_sync_status SET status = 'completed', completed_at = NOW(), records_processed = ? WHERE id = ?",
+      [result.recordsProcessed, syncId]
+    );
+    
+    console.log(`✅ Sync ${syncId} completed successfully for last ${daysBack} days`);
+    return result;
+    
+  } catch (error) {
+    console.error(`❌ Sync ${syncId} failed:`, error);
+    
+    // Update status as failed
+    await db.query(
+      "UPDATE plex_sync_status SET status = 'failed', completed_at = NOW(), error_message = ? WHERE id = ?",
+      [error.message, syncId]
+    );
+    
+    throw error;
+  }
 }
 
 // Helper function to build stats response
