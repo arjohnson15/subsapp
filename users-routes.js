@@ -119,8 +119,7 @@ const users = await db.query(`
   LEFT JOIN owners o ON u.owner_id = o.id
   LEFT JOIN plex_user_activity pua ON (
     pua.plex_account_email = u.plex_email OR 
-    pua.plex_account_username = u.plex_username OR 
-    pua.plex_account_name = u.plex_username
+    pua.plex_account_username = u.plex_username
   )
   ORDER BY u.name
 `);

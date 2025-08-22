@@ -1092,7 +1092,8 @@ async function syncPlexUserActivity() {
   return new Promise((resolve, reject) => {
     console.log('🔄 Executing Python script for Plex user activity...');
     
-    const python = spawn('python3', ['plex_last_watched_script.py', '--approach', 'bulk', '--output', 'database'], {
+    // UPDATED: Use new script name and parameters
+    const python = spawn('python3', ['plex_users_api_script.py', '--format', 'json'], {
       cwd: __dirname,
       stdio: ['pipe', 'pipe', 'pipe']
     });
@@ -1123,24 +1124,25 @@ async function syncPlexUserActivity() {
         await db.query('DELETE FROM plex_user_activity');
         
         for (const record of activityData) {
-await db.query(`
-  INSERT INTO plex_user_activity 
-  (plex_account_id, plex_account_name, plex_account_username, plex_account_email,
-   server_name, days_since_last_watch, last_watched_date, last_watched_title, 
-   has_recent_activity, sync_timestamp)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-`, [
-  record.plex_account_id,
-  record.plex_account_name,
-  record.plex_account_username,
-  record.plex_account_email,  // NEW: Add this line
-  record.server,
-  record.days_since_last_watch,
-  record.last_watched_date,
-  record.last_watched_title,
-  record.has_recent_activity,
-  record.sync_timestamp
-]);
+          // UPDATED: Map new script output to database fields
+          await db.query(`
+            INSERT INTO plex_user_activity 
+            (plex_account_id, plex_account_name, plex_account_username, plex_account_email,
+             server_name, days_since_last_watch, last_watched_date, last_watched_title, 
+             has_recent_activity, sync_timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+            record.plex_account_id,
+            record.username,                    // CHANGED: new script uses 'username'
+            record.username,                    // CHANGED: new script uses 'username'
+            record.email,                       // CHANGED: new script uses 'email'
+            record.server,                      // CHANGED: new script uses 'server'
+            record.days_since_last_watch,
+            record.last_watched_date,
+            record.last_watched_title,
+            record.days_since_last_watch !== null, // CALCULATED: has_recent_activity
+            record.sync_timestamp
+          ]);
         }
         
         console.log('✅ Plex user activity synced to database');
@@ -1159,13 +1161,13 @@ await db.query(`
   });
 }
 
-// Enhanced sync function with status tracking
 async function syncPlexUserActivityWithStatus(syncId, daysBack = 30) {
   try {
-    console.log(`🔄 Starting tracked sync ${syncId} for last ${daysBack} days...`);
+    console.log(`🔄 Starting tracked sync ${syncId}...`);
     
     const result = await new Promise((resolve, reject) => {
-      const python = spawn('python3', ['plex_last_watched_script.py', '--approach', 'bulk', '--days', daysBack.toString(), '--output', 'database'], {
+      // UPDATED: Use new script name (no --days parameter needed since it gets all history)
+      const python = spawn('python3', ['plex_users_api_script.py', '--format', 'json'], {
         cwd: __dirname,
         stdio: ['pipe', 'pipe', 'pipe']
       });
@@ -1179,7 +1181,7 @@ async function syncPlexUserActivityWithStatus(syncId, daysBack = 30) {
       
       python.stderr.on('data', (data) => {
         errorString += data.toString();
-        console.log(`🐍 Sync ${syncId} (${daysBack} days) progress:`, data.toString().trim());
+        console.log(`🐍 Sync ${syncId} progress:`, data.toString().trim());
       });
       
       python.on('close', async (code) => {
@@ -1190,25 +1192,29 @@ async function syncPlexUserActivityWithStatus(syncId, daysBack = 30) {
         
         try {
           const activityData = JSON.parse(dataString);
-          console.log(`📊 Sync ${syncId}: Processing ${activityData.length} records for last ${daysBack} days`);
+          console.log(`📊 Sync ${syncId}: Processing ${activityData.length} records`);
           
           // Clear old data and insert new
           await db.query('DELETE FROM plex_user_activity');
           
           for (const record of activityData) {
+            // UPDATED: Map new script output to database fields
             await db.query(`
               INSERT INTO plex_user_activity 
-              (plex_account_id, plex_account_name, server_name, days_since_last_watch, 
-               last_watched_date, last_watched_title, has_recent_activity, sync_timestamp)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              (plex_account_id, plex_account_name, plex_account_username, plex_account_email,
+               server_name, days_since_last_watch, last_watched_date, last_watched_title, 
+               has_recent_activity, sync_timestamp)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
               record.plex_account_id,
-              record.plex_account_name,
-              record.server,
+              record.username,                    // CHANGED
+              record.username,                    // CHANGED 
+              record.email,                       // CHANGED
+              record.server,                      // CHANGED
               record.days_since_last_watch,
               record.last_watched_date,
               record.last_watched_title,
-              record.has_recent_activity,
+              record.days_since_last_watch !== null, // CALCULATED
               record.sync_timestamp
             ]);
           }
@@ -1234,7 +1240,7 @@ async function syncPlexUserActivityWithStatus(syncId, daysBack = 30) {
       [result.recordsProcessed, syncId]
     );
     
-    console.log(`✅ Sync ${syncId} completed successfully for last ${daysBack} days`);
+    console.log(`✅ Sync ${syncId} completed successfully`);
     return result;
     
   } catch (error) {
