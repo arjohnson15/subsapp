@@ -701,7 +701,7 @@ const syncId = syncRecord.insertId;
     });
     
     // Run sync in background (don't await)
-    syncPlexUserActivityWithStatus(syncId, req.body.days || 30)
+    syncPlexUserActivityWithStatus(syncId)
       .then(result => {
         console.log(`✅ Background sync ${syncId} completed:`, result);
       })
@@ -763,6 +763,25 @@ if (syncStatus.length === 0) {
   } catch (error) {
     console.error('❌ Error getting sync status:', error);
     res.status(500).json({ error: 'Failed to get sync status' });
+  }
+});
+
+router.post('/cancel-sync', async (req, res) => {
+  try {
+    const result = await db.query(`
+      UPDATE plex_sync_status 
+      SET status = 'cancelled', completed_at = NOW(), error_message = 'Manually cancelled'
+      WHERE sync_type = 'user_activity' AND status = 'running'
+    `);
+    
+    res.json({ 
+      success: true, 
+      message: `Cancelled ${result.affectedRows} running sync(s)`,
+      cancelled_count: result.affectedRows
+    });
+  } catch (error) {
+    console.error('Error cancelling sync:', error);
+    res.status(500).json({ error: 'Failed to cancel sync' });
   }
 });
 
@@ -1093,7 +1112,7 @@ async function syncPlexUserActivity() {
     console.log('🔄 Executing Python script for Plex user activity...');
     
     // UPDATED: Use new script name and parameters
-    const python = spawn('python3', ['plex_users_api_script.py', '--format', 'json'], {
+    const python = spawn('python3', ['plex_last_watched_script.py', '--format', 'json'], {
       cwd: __dirname,
       stdio: ['pipe', 'pipe', 'pipe']
     });
@@ -1123,27 +1142,68 @@ async function syncPlexUserActivity() {
         // Clear old data and insert new
         await db.query('DELETE FROM plex_user_activity');
         
-        for (const record of activityData) {
-          // UPDATED: Map new script output to database fields
-          await db.query(`
-            INSERT INTO plex_user_activity 
-            (plex_account_id, plex_account_name, plex_account_username, plex_account_email,
-             server_name, days_since_last_watch, last_watched_date, last_watched_title, 
-             has_recent_activity, sync_timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `, [
-            record.plex_account_id,
-            record.username,                    // CHANGED: new script uses 'username'
-            record.username,                    // CHANGED: new script uses 'username'
-            record.email,                       // CHANGED: new script uses 'email'
-            record.server,                      // CHANGED: new script uses 'server'
-            record.days_since_last_watch,
-            record.last_watched_date,
-            record.last_watched_title,
-            record.days_since_last_watch !== null, // CALCULATED: has_recent_activity
-            record.sync_timestamp
-          ]);
-        }
+for (const record of activityData) {
+  // Find the user in our database to check their tags
+  const [user] = await db.query(`
+    SELECT id, name, tags FROM users 
+    WHERE plex_email = ? OR plex_username = ?
+  `, [record.email, record.username]);
+  
+  if (!user) {
+    console.log(`⚠️ No user found for ${record.email}/${record.username}, skipping...`);
+    continue;
+  }
+  
+  // Parse user tags
+  let userTags = [];
+  try {
+    userTags = JSON.parse(user.tags || '[]');
+  } catch (e) {
+    console.log(`⚠️ Could not parse tags for ${user.name}, treating as no tags`);
+  }
+  
+  // Check if this server record should be saved for this user
+  const serverName = record.server;
+  const hasPlex1Tag = userTags.includes('Plex 1');
+  const hasPlex2Tag = userTags.includes('Plex 2');
+  const hasNoPlexTags = !hasPlex1Tag && !hasPlex2Tag;
+  
+  let shouldSave = false;
+  
+  if (serverName.includes('Plex 1') && hasPlex1Tag) {
+    shouldSave = true;
+  } else if (serverName.includes('Plex 2') && hasPlex2Tag) {
+    shouldSave = true;
+  } else if (hasNoPlexTags) {
+    shouldSave = true; // Users with no Plex tags get data from any server
+  }
+  
+  if (!shouldSave) {
+    console.log(`🚫 Skipping ${serverName} activity for ${user.name} (has tags: ${userTags.join(', ')})`);
+    continue;
+  }
+  
+  console.log(`✅ Saving ${serverName} activity for ${user.name} (${record.days_since_last_watch} days ago)`);
+  
+  await db.query(`
+    INSERT INTO plex_user_activity 
+    (plex_account_id, plex_account_name, plex_account_username, plex_account_email,
+     server_name, days_since_last_watch, last_watched_date, last_watched_title, 
+     has_recent_activity, sync_timestamp)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    record.plex_account_id,
+    record.username,
+    record.username,
+    record.email,
+    record.server,
+    record.days_since_last_watch,
+    record.last_watched_date,
+    record.last_watched_title,
+    record.days_since_last_watch !== null,
+    record.sync_timestamp
+  ]);
+}
         
         console.log('✅ Plex user activity synced to database');
         resolve();
@@ -1161,13 +1221,13 @@ async function syncPlexUserActivity() {
   });
 }
 
-async function syncPlexUserActivityWithStatus(syncId, daysBack = 30) {
+async function syncPlexUserActivityWithStatus(syncId) {
   try {
     console.log(`🔄 Starting tracked sync ${syncId}...`);
     
     const result = await new Promise((resolve, reject) => {
       // UPDATED: Use new script name (no --days parameter needed since it gets all history)
-      const python = spawn('python3', ['plex_users_api_script.py', '--format', 'json'], {
+      const python = spawn('python3', ['plex_last_watched_script.py', '--format', 'json'], {
         cwd: __dirname,
         stdio: ['pipe', 'pipe', 'pipe']
       });
@@ -1197,27 +1257,68 @@ async function syncPlexUserActivityWithStatus(syncId, daysBack = 30) {
           // Clear old data and insert new
           await db.query('DELETE FROM plex_user_activity');
           
-          for (const record of activityData) {
-            // UPDATED: Map new script output to database fields
-            await db.query(`
-              INSERT INTO plex_user_activity 
-              (plex_account_id, plex_account_name, plex_account_username, plex_account_email,
-               server_name, days_since_last_watch, last_watched_date, last_watched_title, 
-               has_recent_activity, sync_timestamp)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, [
-              record.plex_account_id,
-              record.username,                    // CHANGED
-              record.username,                    // CHANGED 
-              record.email,                       // CHANGED
-              record.server,                      // CHANGED
-              record.days_since_last_watch,
-              record.last_watched_date,
-              record.last_watched_title,
-              record.days_since_last_watch !== null, // CALCULATED
-              record.sync_timestamp
-            ]);
-          }
+for (const record of activityData) {
+  // Find the user in our database to check their tags
+  const [user] = await db.query(`
+    SELECT id, name, tags FROM users 
+    WHERE plex_email = ? OR plex_username = ?
+  `, [record.email, record.username]);
+  
+  if (!user) {
+    console.log(`⚠️ No user found for ${record.email}/${record.username}, skipping...`);
+    continue;
+  }
+  
+  // Parse user tags
+  let userTags = [];
+  try {
+    userTags = JSON.parse(user.tags || '[]');
+  } catch (e) {
+    console.log(`⚠️ Could not parse tags for ${user.name}, treating as no tags`);
+  }
+  
+  // Check if this server record should be saved for this user
+  const serverName = record.server;
+  const hasPlex1Tag = userTags.includes('Plex 1');
+  const hasPlex2Tag = userTags.includes('Plex 2');
+  const hasNoPlexTags = !hasPlex1Tag && !hasPlex2Tag;
+  
+  let shouldSave = false;
+  
+  if (serverName.includes('Plex 1') && hasPlex1Tag) {
+    shouldSave = true;
+  } else if (serverName.includes('Plex 2') && hasPlex2Tag) {
+    shouldSave = true;
+  } else if (hasNoPlexTags) {
+    shouldSave = true; // Users with no Plex tags get data from any server
+  }
+  
+  if (!shouldSave) {
+    console.log(`🚫 Skipping ${serverName} activity for ${user.name} (has tags: ${userTags.join(', ')})`);
+    continue;
+  }
+  
+  console.log(`✅ Saving ${serverName} activity for ${user.name} (${record.days_since_last_watch} days ago)`);
+  
+  await db.query(`
+    INSERT INTO plex_user_activity 
+    (plex_account_id, plex_account_name, plex_account_username, plex_account_email,
+     server_name, days_since_last_watch, last_watched_date, last_watched_title, 
+     has_recent_activity, sync_timestamp)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    record.plex_account_id,
+    record.username,
+    record.username,
+    record.email,
+    record.server,
+    record.days_since_last_watch,
+    record.last_watched_date,
+    record.last_watched_title,
+    record.days_since_last_watch !== null,
+    record.sync_timestamp
+  ]);
+}
           
           resolve({
             success: true,

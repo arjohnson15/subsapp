@@ -107,21 +107,27 @@ function processTagsForUpdate(plexLibraries, currentTags = []) {
 router.get('/', async (req, res) => {
   try {
 const users = await db.query(`
-  SELECT u.*, 
-    o.name as owner_name,
-    o.email as owner_email,
-    pua.days_since_last_watch,
-    pua.last_watched_date,
-    pua.last_watched_title,
-    pua.has_recent_activity,
-    pua.server_name as plex_server_name
-  FROM users u
-  LEFT JOIN owners o ON u.owner_id = o.id
-  LEFT JOIN plex_user_activity pua ON (
-    pua.plex_account_email = u.plex_email OR 
-    pua.plex_account_username = u.plex_username
+SELECT u.*, 
+  o.name as owner_name,
+  o.email as owner_email,
+  pua.days_since_last_watch,
+  pua.last_watched_date,
+  pua.last_watched_title,
+  pua.has_recent_activity,
+  pua.server_name as plex_server_name
+FROM users u
+LEFT JOIN owners o ON u.owner_id = o.id
+LEFT JOIN plex_user_activity pua ON (
+  (pua.plex_account_email = u.plex_email OR pua.plex_account_username = u.plex_username)
+  AND (
+    -- Match server based on user's tags
+    (JSON_CONTAINS(u.tags, '"Plex 1"') AND pua.server_name LIKE '%Plex 1%') OR
+    (JSON_CONTAINS(u.tags, '"Plex 2"') AND pua.server_name LIKE '%Plex 2%') OR
+    -- Fallback: if user has no Plex tags, allow any server
+    (NOT JSON_CONTAINS(u.tags, '"Plex 1"') AND NOT JSON_CONTAINS(u.tags, '"Plex 2"'))
   )
-  ORDER BY u.name
+)
+ORDER BY u.name
 `);
 
     // Process each user to include subscription information

@@ -228,7 +228,7 @@ cron.schedule('0 3 * * *', async () => {
  }
 });
 
-// Daily Plex activity sync (runs at 3 AM UTC daily) - Last 3 days
+// Daily Plex activity sync (runs at 3 AM UTC daily)
 cron.schedule('0 3 * * *', async () => {
   const timestamp = new Date().toLocaleString();
   console.log('');
@@ -254,10 +254,8 @@ cron.schedule('0 3 * * *', async () => {
     );
     const syncId = syncRecord.insertId;
     
-    console.log(`🔄 Starting scheduled Plex activity sync (ID: ${syncId}) - Last 3 days...`);
-    
-    // Just update the existing function to use 3 days
-    await syncPlexUserActivityWithStatus(syncId, 3);
+console.log(`🔄 Starting scheduled Plex activity sync (ID: ${syncId})...`);
+await syncPlexUserActivityWithStatus(syncId);
     
     console.log('📊='.repeat(50));
     console.log(`📊 DAILY PLEX ACTIVITY SYNC COMPLETED: ${new Date().toLocaleString()}`);
@@ -269,7 +267,7 @@ cron.schedule('0 3 * * *', async () => {
     console.log('');
   }
 });
-console.log('✅ Daily Plex activity sync scheduler activated (3 AM UTC - Last 3 days)');
+console.log('✅ Daily Plex activity sync scheduler activated (3 AM UTC)');
 
 // Initialize IPTV service on startup with token caching
 iptvService.initialize().catch(console.error);
