@@ -1154,13 +1154,34 @@ for (const record of activityData) {
     continue;
   }
   
+  // Add this debug code right after finding the user
+console.log(`🔍 Raw tags for ${user.name}:`, user.tags);
+console.log(`🔍 Tags type:`, typeof user.tags);
+console.log(`🔍 Tags length:`, user.tags ? user.tags.length : 'null');
+  
   // Parse user tags
-  let userTags = [];
-  try {
-    userTags = JSON.parse(user.tags || '[]');
-  } catch (e) {
-    console.log(`⚠️ Could not parse tags for ${user.name}, treating as no tags`);
+let userTags = [];
+try {
+  if (user.tags === null || user.tags === undefined) {
+    userTags = [];
+  } else if (Array.isArray(user.tags)) {
+    // Already parsed by MySQL
+    userTags = user.tags;
+  } else if (typeof user.tags === 'string') {
+    // String that needs parsing
+    userTags = JSON.parse(user.tags);
+  } else {
+    console.log(`⚠️ Unexpected tags type for ${user.name}:`, typeof user.tags);
+    userTags = [];
   }
+  
+  console.log(`🏷️ Parsed tags for ${user.name}:`, userTags);
+  
+} catch (e) {
+  console.log(`❌ Error parsing tags for ${user.name}:`, e.message);
+  console.log(`🔍 Raw value was:`, user.tags);
+  userTags = [];
+}
   
   // Check if this server record should be saved for this user
   const serverName = record.server;
@@ -1268,14 +1289,34 @@ for (const record of activityData) {
     console.log(`⚠️ No user found for ${record.email}/${record.username}, skipping...`);
     continue;
   }
-  
+  // Add this debug code right after finding the user
+console.log(`🔍 Raw tags for ${user.name}:`, user.tags);
+console.log(`🔍 Tags type:`, typeof user.tags);
+console.log(`🔍 Tags length:`, user.tags ? user.tags.length : 'null');
   // Parse user tags
-  let userTags = [];
-  try {
-    userTags = JSON.parse(user.tags || '[]');
-  } catch (e) {
-    console.log(`⚠️ Could not parse tags for ${user.name}, treating as no tags`);
+
+let userTags = [];
+try {
+  if (user.tags === null || user.tags === undefined) {
+    userTags = [];
+  } else if (Array.isArray(user.tags)) {
+    // Already parsed by MySQL
+    userTags = user.tags;
+  } else if (typeof user.tags === 'string') {
+    // String that needs parsing
+    userTags = JSON.parse(user.tags);
+  } else {
+    console.log(`⚠️ Unexpected tags type for ${user.name}:`, typeof user.tags);
+    userTags = [];
   }
+  
+  console.log(`🏷️ Parsed tags for ${user.name}:`, userTags);
+  
+} catch (e) {
+  console.log(`❌ Error parsing tags for ${user.name}:`, e.message);
+  console.log(`🔍 Raw value was:`, user.tags);
+  userTags = [];
+}
   
   // Check if this server record should be saved for this user
   const serverName = record.server;
