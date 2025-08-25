@@ -913,7 +913,57 @@ function togglePreviewSize() {
         .replace(/\{\{venmo_link\}\}/g, 'https://venmo.com/johnsonflix')
         .replace(/\{\{cashapp_link\}\}/g, 'https://cash.app/$johnsonflix');
     
-    const fullHTML = EmailPreview.getEmailClientHTML(processedContent);
+// Process dynamic fields before showing in full size (same as small preview)
+let processedEmailBody = emailBody;
+
+// Use the same dynamic field processing as the small preview
+if (Email && Email.currentUserData) {
+    const userData = Email.currentUserData;
+    
+    // Process dynamic fields with actual user data
+    processedEmailBody = emailBody
+        .replace(/\{\{name\}\}/g, userData.name || '')
+        .replace(/\{\{email\}\}/g, userData.email || '')
+        .replace(/\{\{username\}\}/g, userData.username || userData.name || '')
+        .replace(/\{\{owner_name\}\}/g, userData.owner_name || '')
+        .replace(/\{\{owner_email\}\}/g, userData.owner_email || '')
+        .replace(/\{\{plex_email\}\}/g, userData.plex_email || userData.email || '')
+        .replace(/\{\{plex_expiration\}\}/g, formatDate(userData.plex_expiration || userData.expiration_date))
+        .replace(/\{\{plex_subscription_type\}\}/g, userData.plex_subscription_type || userData.subscription_type || 'FREE Plex Access')
+        .replace(/\{\{plex_days_until_expiration\}\}/g, calculateDaysUntilExpiration(userData.plex_expiration || userData.expiration_date))
+        .replace(/\{\{plex_renewal_price\}\}/g, userData.subscriptions?.find(s => s.type === 'plex' && s.status === 'active')?.price ? `$${userData.subscriptions.find(s => s.type === 'plex' && s.status === 'active').price}` : '$0.00')
+        .replace(/\{\{iptv_username\}\}/g, userData.iptv_username || '')
+        .replace(/\{\{iptv_password\}\}/g, userData.iptv_password || '')
+        .replace(/\{\{iptv_expiration\}\}/g, formatDate(userData.iptv_expiration || userData.expiration_date))
+        .replace(/\{\{iptv_subscription_type\}\}/g, userData.iptv_subscription_type || userData.subscription_type || '')
+        .replace(/\{\{iptv_days_until_expiration\}\}/g, calculateDaysUntilExpiration(userData.iptv_expiration || userData.expiration_date))
+        .replace(/\{\{iptv_renewal_price\}\}/g, userData.subscriptions?.find(s => s.type === 'iptv' && s.status === 'active')?.price ? `$${userData.subscriptions.find(s => s.type === 'iptv' && s.status === 'active').price}` : '$0.00')
+        .replace(/\{\{implayer_code\}\}/g, userData.implayer_code || '')
+        .replace(/\{\{device_count\}\}/g, userData.device_count || '')
+        .replace(/\{\{subscription_name\}\}/g, userData.subscription_name || userData.subscription_type || 'FREE Plex Access')
+        .replace(/\{\{subscription_type\}\}/g, userData.subscription_type || 'FREE Plex Access')
+        .replace(/\{\{expiration_date\}\}/g, formatDate(userData.expiration_date))
+        .replace(/\{\{days_until_expiration\}\}/g, calculateDaysUntilExpiration(userData.expiration_date))
+        .replace(/\{\{renewal_price\}\}/g, userData.renewal_price ? `$${userData.renewal_price}` : '$0.00')
+        .replace(/\{\{paypal_link\}\}/g, '#')
+        .replace(/\{\{venmo_link\}\}/g, '#')
+        .replace(/\{\{cashapp_link\}\}/g, '#');
+} else {
+    // Use sample data if no user is selected
+    processedEmailBody = emailBody
+        .replace(/\{\{name\}\}/g, 'Sample User')
+        .replace(/\{\{email\}\}/g, 'user@example.com')
+        .replace(/\{\{plex_days_until_expiration\}\}/g, '7')
+        .replace(/\{\{plex_renewal_price\}\}/g, '$120.00')
+        .replace(/\{\{iptv_renewal_price\}\}/g, '$40.00')
+        .replace(/\{\{days_until_expiration\}\}/g, '7')
+        .replace(/\{\{renewal_price\}\}/g, '$120.00')
+        .replace(/\{\{paypal_link\}\}/g, '#')
+        .replace(/\{\{venmo_link\}\}/g, '#')
+        .replace(/\{\{cashapp_link\}\}/g, '#');
+}
+
+const fullHTML = EmailPreview.getEmailClientHTML(processedEmailBody);
     
     iframe.onload = () => {
         try {
