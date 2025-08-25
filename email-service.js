@@ -637,6 +637,57 @@ async getExpiringUsers(daysBefore, subscriptionType, targetTags = null, targetOw
     }
     
     console.log(`?? === END FILTERING PROCESS ===\n`);
+	
+	// STEP 4: Enhance filtered users with complete subscription data for dynamic fields
+console.log(`\n✅ STEP 4: Enhancing users with complete subscription data for dynamic fields...`);
+
+for (let i = 0; i < filteredUsers.length; i++) {
+  const user = filteredUsers[i];
+  
+  try {
+    // Get complete subscription data for this user's expiring subscription
+    const completeUserData = await db.query(`
+      SELECT DISTINCT u.*,
+        o.name as owner_name, o.email as owner_email,
+        s.expiration_date,
+        st.name as subscription_type,
+        st.name as subscription_name,
+        st.price as renewal_price,
+        st.type as subscription_category,
+        DATEDIFF(s.expiration_date, CURDATE()) as days_until_expiration,
+        -- Plex specific fields
+        CASE WHEN st.type = 'plex' THEN COALESCE(u.plex_email, u.email) ELSE u.email END as plex_email,
+        CASE WHEN st.type = 'plex' THEN s.expiration_date ELSE NULL END as plex_expiration,
+        CASE WHEN st.type = 'plex' THEN st.name ELSE NULL END as plex_subscription_type,
+        CASE WHEN st.type = 'plex' THEN DATEDIFF(s.expiration_date, CURDATE()) ELSE NULL END as plex_days_until_expiration,
+        CASE WHEN st.type = 'plex' THEN st.price ELSE NULL END as plex_renewal_price,
+        -- IPTV specific fields
+        CASE WHEN st.type = 'iptv' THEN u.iptv_username ELSE NULL END as iptv_username,
+        CASE WHEN st.type = 'iptv' THEN u.iptv_password ELSE NULL END as iptv_password,
+        CASE WHEN st.type = 'iptv' THEN s.expiration_date ELSE NULL END as iptv_expiration,
+        CASE WHEN st.type = 'iptv' THEN st.name ELSE NULL END as iptv_subscription_type,
+        CASE WHEN st.type = 'iptv' THEN DATEDIFF(s.expiration_date, CURDATE()) ELSE NULL END as iptv_days_until_expiration,
+        CASE WHEN st.type = 'iptv' THEN st.price ELSE NULL END as iptv_renewal_price
+      FROM users u
+      LEFT JOIN owners o ON u.owner_id = o.id
+      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active' AND DATE(s.expiration_date) = ?
+      LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
+      WHERE u.id = ?
+      ORDER BY s.expiration_date DESC
+      LIMIT 1
+    `, [targetDateStr, user.id]);
+    
+    if (completeUserData.length > 0) {
+      // Merge the complete subscription data into the user object
+      filteredUsers[i] = { ...user, ...completeUserData[0] };
+      console.log(`   ✅ Enhanced ${user.name} with complete subscription data`);
+    }
+  } catch (error) {
+    console.error(`   ❌ Error enhancing user ${user.name}:`, error);
+  }
+}
+
+console.log(`✅ All ${filteredUsers.length} users enhanced with complete data for dynamic field replacement`);
     
     return filteredUsers;
     

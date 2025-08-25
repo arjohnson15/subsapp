@@ -1,5 +1,5 @@
 // Enhanced User Management Functions with Background Task System and Fixed Baseline Updates
-console.log('👥 Loading Users.js...');
+console.log('?? Loading Users.js...');
 
 window.Users = {
     currentSortField: 'name',
@@ -49,7 +49,7 @@ populateOwnerFilter(users) {
         ownerFilter.appendChild(option);
     });
     
-    console.log(`✅ Populated owner filter with ${owners.length} unique owners:`, owners);
+    console.log(`? Populated owner filter with ${owners.length} unique owners:`, owners);
 },
     
     // Background task monitoring system
@@ -59,7 +59,7 @@ populateOwnerFilter(users) {
             this.checkBackgroundTasks();
         }, 2000);
         
-        console.log('🔄 Background task monitor started');
+        console.log('?? Background task monitor started');
     },
     
     async checkBackgroundTasks() {
@@ -81,7 +81,7 @@ populateOwnerFilter(users) {
     
     // FIXED: Updated handleTaskCompletion with baseline update
     handleTaskCompletion(taskId, task, result) {
-        console.log(`✅ Background task completed: ${taskId}`, result);
+        console.log(`? Background task completed: ${taskId}`, result);
         
         // Show success notification with details
         let message = `${task.description} completed successfully!`;
@@ -102,7 +102,7 @@ populateOwnerFilter(users) {
     },
     
     handleTaskFailure(taskId, task, result) {
-        console.error(`❌ Background task failed: ${taskId}`, result);
+        console.error(`? Background task failed: ${taskId}`, result);
         
         let message = `${task.description} failed: ${result.error || 'Unknown error'}`;
         Utils.showNotification(message, 'error');
@@ -139,7 +139,7 @@ async loadExpiringUsers() {
             expiringDiv.innerHTML = userList;
         }
         
-        console.log(`📅 Loaded ${expiringUsers.length} expiring users (compact)`);
+        console.log(`?? Loaded ${expiringUsers.length} expiring users (compact)`);
         
     } catch (error) {
         console.error('Error loading expiring users:', error);
@@ -153,10 +153,10 @@ async loadExpiringUsers() {
     // NEW: Update user baselines after successful Plex operations
     async updateUserBaselinesAfterPlexOperation(taskData) {
         try {
-            console.log('🔄 Updating user baselines after successful Plex operation...');
+            console.log('?? Updating user baselines after successful Plex operation...');
             
             if (!taskData || !taskData.userEmail) {
-                console.log('⚠️ No task data available for baseline update');
+                console.log('?? No task data available for baseline update');
                 return;
             }
             
@@ -165,7 +165,7 @@ async loadExpiringUsers() {
             const user = users.find(u => u.plex_email === taskData.userEmail);
             
             if (!user) {
-                console.log('⚠️ User not found for baseline update');
+                console.log('?? User not found for baseline update');
                 return;
             }
             
@@ -174,7 +174,7 @@ async loadExpiringUsers() {
                 window.AppState.editingUserId == user.id && 
                 window.AppState.currentUserData) {
                 
-                console.log(`📋 Updating baselines for currently edited user: ${user.name}`);
+                console.log(`?? Updating baselines for currently edited user: ${user.name}`);
                 
                 // Update the current user data with fresh info from database
                 const freshUserData = await API.User.getById(user.id);
@@ -184,15 +184,15 @@ async loadExpiringUsers() {
                 this.originalLibraryBaseline = this.deepClone(freshUserData.plex_libraries || {});
                 this.originalTagsBaseline = [...(freshUserData.tags || [])];
                 
-                console.log('✅ Updated library baseline:', this.originalLibraryBaseline);
-                console.log('✅ Updated tags baseline:', this.originalTagsBaseline);
+                console.log('? Updated library baseline:', this.originalLibraryBaseline);
+                console.log('? Updated tags baseline:', this.originalTagsBaseline);
                 
             } else {
-                console.log('💡 User not currently being edited - no baseline update needed');
+                console.log('?? User not currently being edited - no baseline update needed');
             }
             
         } catch (error) {
-            console.error('❌ Error updating user baselines:', error);
+            console.error('? Error updating user baselines:', error);
             // Don't throw - this is not critical enough to break the flow
         }
     },
@@ -200,7 +200,7 @@ async loadExpiringUsers() {
     // NEW: Reload user data with fresh baselines for editing
     async reloadUserDataForEditing(userId) {
         try {
-            console.log(`🔄 Reloading fresh user data for editing user ${userId}...`);
+            console.log(`?? Reloading fresh user data for editing user ${userId}...`);
             
             // Always get fresh data from database
             const freshUser = await API.User.getById(userId);
@@ -212,7 +212,7 @@ async loadExpiringUsers() {
             this.originalLibraryBaseline = this.deepClone(freshUser.plex_libraries || {});
             this.originalTagsBaseline = [...(freshUser.tags || [])];
             
-            console.log('✅ Fresh baselines set:', {
+            console.log('? Fresh baselines set:', {
                 libraries: this.originalLibraryBaseline,
                 tags: this.originalTagsBaseline
             });
@@ -220,7 +220,7 @@ async loadExpiringUsers() {
             return freshUser;
             
         } catch (error) {
-            console.error('❌ Error reloading user data:', error);
+            console.error('? Error reloading user data:', error);
             throw error;
         }
     },
@@ -236,13 +236,13 @@ async loadExpiringUsers() {
             startTime: new Date()
         });
         
-        console.log(`🚀 Created background task: ${taskId} - ${description}`);
+        console.log(`?? Created background task: ${taskId} - ${description}`);
         return taskId;
     },
     
     async loadUsers() {
         try {
-            console.log('🔄 Loading users...');
+            console.log('?? Loading users...');
             const users = await API.User.getAll();
             window.AppState.users = users;
             window.AppState.allUsers = users; // Store for filtering
@@ -253,9 +253,9 @@ async loadExpiringUsers() {
             // Initial render
             this.renderUsersTable();
             
-            console.log(`✅ Loaded ${users.length} users`);
+            console.log(`? Loaded ${users.length} users`);
         } catch (error) {
-            console.error('❌ Error loading users:', error);
+            console.error('? Error loading users:', error);
             Utils.handleError(error, 'Loading users');
         }
     },
@@ -272,7 +272,7 @@ async renderUsersTable() {
     }
 
     // PERFORMANCE FIX: Always use basic rendering - no API calls
-    console.log('📋 Rendering users table (super fast mode)...');
+    console.log('?? Rendering users table (super fast mode)...');
     this.renderUsersTableBasic();
 },
 
@@ -308,7 +308,7 @@ renderUsersTableBasic() {
         </tr>
     `).join('');
     
-    console.log(`✅ Basic users table rendered with ${users.length} users`);
+    console.log(`? Basic users table rendered with ${users.length} users`);
 },
 
     
@@ -318,7 +318,7 @@ renderUsersTableBasic() {
         const tagFilter = document.getElementById('tagFilter')?.value || '';
 		const inactivityFilter = document.getElementById('inactivityFilter')?.value; // ADD THIS LINE
         
-        console.log('🔍 Filtering users:', { searchTerm, ownerFilter, tagFilter });
+        console.log('?? Filtering users:', { searchTerm, ownerFilter, tagFilter });
         
         if (!window.AppState.allUsers) {
             console.warn('No users data available for filtering');
@@ -348,7 +348,7 @@ const matchesInactivity = !inactivityFilter ||
 return matchesSearch && matchesOwner && matchesTag && matchesInactivity;
         });
         
-        console.log(`📊 Filtered ${filteredUsers.length} out of ${window.AppState.allUsers.length} users`);
+        console.log(`?? Filtered ${filteredUsers.length} out of ${window.AppState.allUsers.length} users`);
         
         // Temporarily update displayed users for rendering
         const originalUsers = window.AppState.users;
@@ -386,10 +386,10 @@ return matchesSearch && matchesOwner && matchesTag && matchesInactivity;
             const indicator = document.getElementById(`sort-${field}`);
             if (indicator) {
                 if (field === activeField) {
-                    indicator.textContent = direction === 'asc' ? '▲' : '▼';
+                    indicator.textContent = direction === 'asc' ? '?' : '?';
                     indicator.style.color = '#4fc3f7'; // Highlight active sort
                 } else {
-                    indicator.textContent = '▼';
+                    indicator.textContent = '?';
                     indicator.style.color = '#666'; // Dim inactive sorts
                 }
             }
@@ -813,12 +813,12 @@ showUserModal(user) {
 async ensureSubscriptionTypesLoaded() {
     if (!window.AppState?.subscriptionTypes || window.AppState.subscriptionTypes.length === 0) {
         try {
-            console.log('📊 Loading subscription types for modal...');
+            console.log('?? Loading subscription types for modal...');
             const subscriptionTypes = await API.call('/subscriptions');
             window.AppState.subscriptionTypes = subscriptionTypes;
-            console.log('✅ Subscription types loaded:', subscriptionTypes.length);
+            console.log('? Subscription types loaded:', subscriptionTypes.length);
         } catch (error) {
-            console.error('❌ Error loading subscription types:', error);
+            console.error('? Error loading subscription types:', error);
             window.AppState.subscriptionTypes = [];
         }
     }
@@ -1011,8 +1011,8 @@ displayEnhancedLibraryAccess(user) {
         accessHtml += `<div class="library-group">
             <h5>${serverGroup.toUpperCase()} 
                 ${hasPendingForServer ? 
-                    `<span style="color: #ff9800; font-size: 0.8em;">⏳ Pending</span>` : 
-                    `<span style="color: #4caf50; font-size: 0.8em;">✓ Active</span>`
+                    `<span style="color: #ff9800; font-size: 0.8em;">? Pending</span>` : 
+                    `<span style="color: #4caf50; font-size: 0.8em;">? Active</span>`
                 }
             </h5>
             <div class="library-list">`;
@@ -1086,7 +1086,7 @@ displayEnhancedLibraryAccess(user) {
     
 async editUser(userId) {
     try {
-        console.log(`📝 Starting edit for user ID: ${userId}`);
+        console.log(`?? Starting edit for user ID: ${userId}`);
         
         // Set editing state
         window.AppState.editingUserId = userId;
@@ -1097,7 +1097,7 @@ async editUser(userId) {
             throw new Error('User not found');
         }
         
-        console.log(`👤 Loaded user: ${user.name} (${user.email})`);
+        console.log(`?? Loaded user: ${user.name} (${user.email})`);
         
         // Store initial user data
         window.AppState.currentUserData = user;
@@ -1106,7 +1106,7 @@ async editUser(userId) {
         this.originalLibraryBaseline = this.deepClone(user.plex_libraries || {});
         this.originalTagsBaseline = [...(user.tags || [])];
         
-        console.log('✅ Set baselines from database:', {
+        console.log('? Set baselines from database:', {
             libraries: this.originalLibraryBaseline,
             tags: this.originalTagsBaseline
         });
@@ -1119,7 +1119,7 @@ async editUser(userId) {
         
         // Populate form with database data only
 setTimeout(async () => {
-    console.log(`🔧 Populating form for editing user: ${user.name}`);
+    console.log(`?? Populating form for editing user: ${user.name}`);
     window.populateFormForEditing(user);
     
     // Load IPTV Editor status
@@ -1148,7 +1148,7 @@ emailUser(userName, userEmail) {
         
         if (recipientField) {
             recipientField.value = userEmail;
-            console.log('📧 Prepopulated recipient:', userEmail);
+            console.log('?? Prepopulated recipient:', userEmail);
         }
 
         
@@ -1270,7 +1270,7 @@ userHasPendingInvites(user) {
 
 async saveUser(event) {
     event.preventDefault();
-    console.log('🎯 Form submission triggered - starting save process');
+    console.log('?? Form submission triggered - starting save process');
     
     try {
         // Check if this is a new user without basic info saved
@@ -1296,7 +1296,7 @@ async saveUser(event) {
         }
         
         // Continue with existing saveUser logic...
-        console.log('💾 Starting optimized user save with smart change detection...');
+        console.log('?? Starting optimized user save with smart change detection...');
         
         // Collect form data properly
         const formData = new FormData(event.target);
@@ -1319,7 +1319,7 @@ async saveUser(event) {
         userData.plex_expiration = formData.get('plex_expiration') || '';
         userData.iptv_expiration = formData.get('iptv_expiration') || '';
         
-        console.log('🗓️ Manual expiration dates collected (fixed):', {
+        console.log('??? Manual expiration dates collected (fixed):', {
             plex_expiration: userData.plex_expiration,
             iptv_expiration: userData.iptv_expiration
         });
@@ -1339,7 +1339,7 @@ async saveUser(event) {
         const iptvSubscription = document.getElementById('iptvSubscription')?.value;
         
         // FIXED: Handle Plex subscription with proper "remove" case
-        console.log('🔍 Raw subscription values:', {
+        console.log('?? Raw subscription values:', {
             plexSubscription, 
             iptvSubscription,
             plex_expiration: userData.plex_expiration,
@@ -1385,20 +1385,20 @@ async saveUser(event) {
             // Keep manual expiration if provided
         }
 
-        console.log('🔍 Processed subscription data:', {
+        console.log('?? Processed subscription data:', {
             plex_subscription: userData.plex_subscription,
             plex_expiration: userData.plex_expiration,
             iptv_subscription: userData.iptv_subscription,
             iptv_expiration: userData.iptv_expiration
         });
         
-        console.log('🔍 Current form data with subscriptions:', userData);
+        console.log('?? Current form data with subscriptions:', userData);
         
         // FIXED CHANGE DETECTION - Only trigger Plex updates for actual Plex changes
         let shouldUpdatePlexAccess = false;
         const isEditing = window.AppState?.editingUserId;
         
-        console.log('🔍 Change detection debug:', {
+        console.log('?? Change detection debug:', {
             isEditing: isEditing,
             hasOriginalLibraryBaseline: !!this.originalLibraryBaseline,
             hasOriginalTagsBaseline: !!this.originalTagsBaseline,
@@ -1423,30 +1423,30 @@ async saveUser(event) {
             const originalPlexTags = this.originalTagsBaseline.filter(tag => tag === 'Plex 1' || tag === 'Plex 2').sort();
             const plexTagsChanged = !this.deepEqual(currentPlexTags, originalPlexTags);
             
-console.log('🔍 ENHANCED DETAILED CHANGE ANALYSIS:');
-console.log('📚 Raw current libraries:', JSON.stringify(currentPlexLibraries, null, 2));
-console.log('📚 Raw original baseline:', JSON.stringify(this.originalLibraryBaseline, null, 2));
-console.log('📚 Normalized current:', JSON.stringify(normalizedCurrent, null, 2));
-console.log('📚 Normalized original:', JSON.stringify(normalizedOriginal, null, 2));
-console.log('🔍 Library comparison result:', librarySelectionsChanged);
-console.log('📧 Plex email comparison:', {
+console.log('?? ENHANCED DETAILED CHANGE ANALYSIS:');
+console.log('?? Raw current libraries:', JSON.stringify(currentPlexLibraries, null, 2));
+console.log('?? Raw original baseline:', JSON.stringify(this.originalLibraryBaseline, null, 2));
+console.log('?? Normalized current:', JSON.stringify(normalizedCurrent, null, 2));
+console.log('?? Normalized original:', JSON.stringify(normalizedOriginal, null, 2));
+console.log('?? Library comparison result:', librarySelectionsChanged);
+console.log('?? Plex email comparison:', {
     current: userData.plex_email,
     original: originalUserData.plex_email || '',
     changed: plexEmailChanged
 });
-console.log('🏷️ Plex tags comparison:', {
+console.log('??? Plex tags comparison:', {
     current: currentPlexTags,
     original: originalPlexTags,
     changed: plexTagsChanged
 });
 
 // CRITICAL: Let's also see what deepEqual is comparing
-console.log('🔍 DEEP EQUAL DEBUG:');
+console.log('?? DEEP EQUAL DEBUG:');
 console.log('Current keys:', Object.keys(normalizedCurrent));
 console.log('Original keys:', Object.keys(normalizedOriginal));
 for (const key of Object.keys(normalizedCurrent)) {
     if (normalizedOriginal[key]) {
-        console.log(`🔍 ${key} comparison:`, {
+        console.log(`?? ${key} comparison:`, {
             current: normalizedCurrent[key],
             original: normalizedOriginal[key],
             equal: this.deepEqual(normalizedCurrent[key], normalizedOriginal[key])
@@ -1456,7 +1456,7 @@ for (const key of Object.keys(normalizedCurrent)) {
             
             // Only trigger API calls for actual Plex access changes
             if (librarySelectionsChanged || plexEmailChanged || plexTagsChanged) {
-                console.log('🔄 Plex access changes detected - API calls needed:');
+                console.log('?? Plex access changes detected - API calls needed:');
                 if (librarySelectionsChanged) {
                     console.log('   - Library selections changed');
                 }
@@ -1468,7 +1468,7 @@ for (const key of Object.keys(normalizedCurrent)) {
                 }
                 shouldUpdatePlexAccess = true;
             } else {
-                console.log('✅ NO Plex access changes detected - SKIPPING all API calls');
+                console.log('? NO Plex access changes detected - SKIPPING all API calls');
                 shouldUpdatePlexAccess = false;
             }
             
@@ -1476,7 +1476,7 @@ for (const key of Object.keys(normalizedCurrent)) {
             userData._skipTagProcessing = true;
         } else if (isEditing) {
             // If we don't have baselines, something went wrong - don't make API calls
-            console.log('⚠️ Missing baselines for editing user - skipping Plex API calls');
+            console.log('?? Missing baselines for editing user - skipping Plex API calls');
             shouldUpdatePlexAccess = false;
             userData._skipTagProcessing = true;
         } else {
@@ -1484,14 +1484,14 @@ for (const key of Object.keys(normalizedCurrent)) {
             const hasPlexTags = userData.tags.some(tag => tag === 'Plex 1' || tag === 'Plex 2');
             const hasPlexLibraries = Object.keys(currentPlexLibraries).length > 0;
             shouldUpdatePlexAccess = hasPlexTags && hasPlexLibraries && userData.plex_email;
-            console.log('👤 New user - will update Plex access:', shouldUpdatePlexAccess);
+            console.log('?? New user - will update Plex access:', shouldUpdatePlexAccess);
         }
         
         const method = isEditing ? 'PUT' : 'POST';
         const endpoint = isEditing ? `/users/${window.AppState.editingUserId}` : '/users';
         
         // Save user data to database FIRST
-        console.log('💾 Saving user to database...');
+        console.log('?? Saving user to database...');
         await API.call(endpoint, {
             method,
             body: JSON.stringify(userData)
@@ -1511,7 +1511,7 @@ for (const key of Object.keys(normalizedCurrent)) {
         }
 
         // CRITICAL: Navigate away IMMEDIATELY after database save - before Plex operations
-        console.log('🚀 Navigating back to users page immediately...');
+        console.log('?? Navigating back to users page immediately...');
         setTimeout(async () => {
             // FIXED: Use window.showPage
             await window.showPage('users');
@@ -1535,7 +1535,7 @@ for (const key of Object.keys(normalizedCurrent)) {
             this.processPlexLibrariesInBackground(taskId, userData.plex_email, userData.plex_libraries, !isEditing);
             
         } else if (!shouldUpdatePlexAccess && isEditing) {
-            console.log('⏭️ Skipping Plex API calls - no Plex access changes detected');
+            console.log('?? Skipping Plex API calls - no Plex access changes detected');
         }
 		
 		        // Clear baselines after successful save
@@ -1582,10 +1582,10 @@ async saveBasicUserInfo() {
             body: JSON.stringify(basicUserData)
         });
         
-console.log('🔍 Full response:', response);
-console.log('🔍 response.success:', response.success);
-console.log('🔍 response.success type:', typeof response.success);
-console.log('🔍 response.message:', response.message);
+console.log('?? Full response:', response);
+console.log('?? response.success:', response.success);
+console.log('?? response.success type:', typeof response.success);
+console.log('?? response.message:', response.message);
 
 // Check for success based on the actual response format
 if (response.id && response.message === 'User created successfully') {
@@ -1596,7 +1596,7 @@ if (response.id && response.message === 'User created successfully') {
     
     // Get user ID directly from response (we know it's there now)
     const userId = response.id;
-    console.log(`✅ Got user ID from response: ${userId}`);
+    console.log(`? Got user ID from response: ${userId}`);
     
     if (userId) {
         this.updateFormToEditMode(userId);
@@ -1604,12 +1604,12 @@ if (response.id && response.message === 'User created successfully') {
         // Update page title
         document.querySelector('h2').textContent = 'Edit User';
     } else {
-        console.warn('⚠️ Could not determine user ID, but user was created successfully');
+        console.warn('?? Could not determine user ID, but user was created successfully');
         Utils.showNotification('User created but could not switch to edit mode. Please refresh the page.', 'warning');
     }
     
 } else {
-    console.error('❌ Response indicates failure:', response);
+    console.error('? Response indicates failure:', response);
     throw new Error(response.message || 'Failed to save user');
 }
         
@@ -1646,7 +1646,7 @@ updateFormToEditMode(userId) {
         }
     }, 500);
     
-    console.log(`✅ Form updated to edit mode with user ID: ${userId}`);
+    console.log(`? Form updated to edit mode with user ID: ${userId}`);
 },
 
 /**
@@ -1664,7 +1664,7 @@ toggleBasicSaveButton() {
     // Background task processing for Plex operations
     async processPlexLibrariesInBackground(taskId, userEmail, plexLibraries, isNewUser) {
         try {
-            console.log(`🔄 Background task ${taskId}: Processing Plex libraries...`);
+            console.log(`?? Background task ${taskId}: Processing Plex libraries...`);
             
             const result = await this.sharePlexLibrariesWithUser(userEmail, plexLibraries);
             
@@ -1675,10 +1675,10 @@ toggleBasicSaveButton() {
                 error: null
             });
             
-            console.log(`✅ Background task ${taskId}: Completed`, result);
+            console.log(`? Background task ${taskId}: Completed`, result);
             
         } catch (error) {
-            console.error(`❌ Background task ${taskId}: Failed`, error);
+            console.error(`? Background task ${taskId}: Failed`, error);
             
             await this.storeBackgroundTaskResult(taskId, {
                 status: 'failed',
@@ -1769,7 +1769,7 @@ toggleBasicSaveButton() {
 
     async sharePlexLibrariesWithUser(userEmail, plexLibraries) {
         try {
-            console.log('🤝 Sharing Plex libraries with user:', userEmail, plexLibraries);
+            console.log('?? Sharing Plex libraries with user:', userEmail, plexLibraries);
             
             const result = await API.call('/plex/share-user-libraries', {
                 method: 'POST',
@@ -1783,11 +1783,11 @@ toggleBasicSaveButton() {
                 throw new Error(result.error || 'Failed to share Plex libraries');
             }
             
-            console.log('✅ Plex libraries shared successfully');
+            console.log('? Plex libraries shared successfully');
             return result;
             
         } catch (error) {
-            console.error('❌ Error sharing Plex libraries:', error);
+            console.error('? Error sharing Plex libraries:', error);
             throw error;
         }
     },
@@ -1801,14 +1801,14 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
         const cached = this.inviteStatusCache?.get(cacheKey);
         
         if (cached && (Date.now() - cached.timestamp) < 30000) { // 30 second cache
-            console.log(`📋 Using cached invite status for ${userEmail}`);
+            console.log(`?? Using cached invite status for ${userEmail}`);
             plexTags.forEach(serverGroup => {
                 this.displayInviteStatusForServer(serverGroup, cached.data, userEmail);
             });
             return;
         }
         
-        console.log(`🔍 Checking invite status for ${userEmail} on servers:`, plexTags);
+        console.log(`?? Checking invite status for ${userEmail} on servers:`, plexTags);
         
         const response = await API.call(`/plex/invite-status/${encodeURIComponent(userEmail)}`);
         
@@ -1833,11 +1833,11 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
                 this.displayInviteStatusForServer(serverGroup, response, userEmail);
             });
         } else {
-            console.warn(`⚠️ Could not check invite status:`, response.error);
+            console.warn(`?? Could not check invite status:`, response.error);
         }
         
     } catch (error) {
-        console.error('❌ Error checking invite status:', error);
+        console.error('? Error checking invite status:', error);
     }
 },
 
@@ -1918,10 +1918,10 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
                         <span>Partial Access</span>
                     </div>
                     <div style="font-size: 0.8em; color: #ffb74d;">
-                        ✓ Access: ${accessServers.join(', ')}
+                        ? Access: ${accessServers.join(', ')}
                     </div>
                     <div style="font-size: 0.8em; color: #ff9800;">
-                        ⏳ Pending: ${pendingServers.join(', ')}
+                        ? Pending: ${pendingServers.join(', ')}
                     </div>
                 </div>
             `;
@@ -1964,7 +1964,7 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
         
         statusContainer.innerHTML = statusHtml;
         
-        console.log(`📊 ${serverGroup} status: pending=${hasPendingInvites}, access=${hasAccess}, partial=${hasPartialAccess}`);
+        console.log(`?? ${serverGroup} status: pending=${hasPendingInvites}, access=${hasAccess}, partial=${hasPartialAccess}`);
     },
 
     // Enhanced warning message for library sections with different types
@@ -2038,7 +2038,7 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
         
         try {
             Utils.showLoading();
-            console.log(`🗑️ Removing all Plex access for user ID: ${userId}`);
+            console.log(`??? Removing all Plex access for user ID: ${userId}`);
             
             const result = await API.call(`/users/${userId}/remove-plex-access`, {
                 method: 'POST'
@@ -2064,7 +2064,7 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
             }
             
         } catch (error) {
-            console.error('❌ Error removing Plex access:', error);
+            console.error('? Error removing Plex access:', error);
             Utils.handleError(error, 'Removing Plex access');
         } finally {
             Utils.hideLoading();
@@ -2087,7 +2087,7 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
         
         try {
             Utils.showLoading();
-            console.log(`🗑️ Removing ${serverGroup} access for user ID: ${userId}`);
+            console.log(`??? Removing ${serverGroup} access for user ID: ${userId}`);
             
             const userEmail = userData.plex_email || userData.email;
             if (!userEmail) {
@@ -2129,7 +2129,7 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
             }
             
         } catch (error) {
-            console.error('❌ Error removing server group access:', error);
+            console.error('? Error removing server group access:', error);
             Utils.handleError(error, 'Removing server group access');
         } finally {
             Utils.hideLoading();
@@ -2150,7 +2150,7 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
         const tagCheckbox = document.querySelector(`input[name="tags"][value="Plex ${serverGroup === 'plex1' ? '1' : '2'}"]`);
         if (tagCheckbox) tagCheckbox.checked = false;
         
-        console.log(`🧹 Cleared ${serverGroup} checkboxes`);
+        console.log(`?? Cleared ${serverGroup} checkboxes`);
     },
 
     // Refresh form after complete Plex removal
@@ -2176,7 +2176,7 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
         if (plex1Group) plex1Group.style.display = 'none';
         if (plex2Group) plex2Group.style.display = 'none';
         
-        console.log(`🔄 Form refreshed after Plex removal`);
+        console.log(`?? Form refreshed after Plex removal`);
     },
     
     // Update form after specific server removal
@@ -2202,7 +2202,7 @@ async checkAndDisplayInviteStatus(userEmail, plexTags) {
             managementSection.style.display = 'none';
         }
         
-        console.log(`✅ Form updated after ${serverGroup} removal`);
+        console.log(`? Form updated after ${serverGroup} removal`);
     },
     
     // Reset form state
@@ -2317,7 +2317,7 @@ extractLibraryIds(libraryArray) {
             }
         }
         
-        console.log('📋 Collected library selections (sorted):', plexLibraries);
+        console.log('?? Collected library selections (sorted):', plexLibraries);
         return plexLibraries;
     },
 	
@@ -2332,10 +2332,10 @@ extractLibraryIds(libraryArray) {
     // DEBUG: Test user's current Plex access
     async debugUserAccess(userEmail) {
         try {
-            console.log(`🐛 Debug: Testing access for ${userEmail}`);
+            console.log(`?? Debug: Testing access for ${userEmail}`);
             
             const debugResult = await API.call(`/plex/debug/user/${encodeURIComponent(userEmail)}`);
-            console.log('🐛 Debug result:', debugResult);
+            console.log('?? Debug result:', debugResult);
             
             Utils.showNotification(
                 `Debug complete for ${userEmail}. Check console for detailed results.`,
@@ -2344,7 +2344,7 @@ extractLibraryIds(libraryArray) {
             
             return debugResult;
         } catch (error) {
-            console.error('❌ Debug failed:', error);
+            console.error('? Debug failed:', error);
             Utils.handleError(error, 'Debug user access');
         }
     },
@@ -2352,15 +2352,15 @@ extractLibraryIds(libraryArray) {
 	// Check for Plex Access Methods - NEW FUNCTIONALITY
     checkExistingPlexAccess: async function(email) {
         try {
-            console.log('🔍 Checking existing Plex access for:', email);
+            console.log('?? Checking existing Plex access for:', email);
             
             const response = await API.call(`/plex/user-access/${encodeURIComponent(email)}`);
             
-            console.log('📊 Received access data:', response);
+            console.log('?? Received access data:', response);
             return response;
             
         } catch (error) {
-            console.error('❌ Error checking Plex access:', error);
+            console.error('? Error checking Plex access:', error);
             throw error;
         }
     },
@@ -2369,7 +2369,7 @@ extractLibraryIds(libraryArray) {
         const resultsDiv = document.getElementById('plexAccessResults');
         
         if (!resultsDiv) {
-            console.warn('⚠️ Results div not found');
+            console.warn('?? Results div not found');
             return;
         }
         
@@ -2403,7 +2403,7 @@ extractLibraryIds(libraryArray) {
         if (hasAnyAccess) {
             html += `
                 <div class="plex-access-success">
-                    <h5>✅ Found Existing Plex Access!</h5>
+                    <h5>? Found Existing Plex Access!</h5>
                     <p>User <strong>${email}</strong> has access to <strong>${totalLibraries}</strong> libraries across <strong>${serverGroups.length}</strong> server group(s).</p>
                 </div>
             `;
@@ -2433,13 +2433,13 @@ extractLibraryIds(libraryArray) {
             
             html += `
                 <div class="plex-access-info">
-                    <p>💡 <strong>Auto-Selection:</strong> The detected libraries have been automatically selected below. You can modify the selection as needed.</p>
+                    <p>?? <strong>Auto-Selection:</strong> The detected libraries have been automatically selected below. You can modify the selection as needed.</p>
                 </div>
             `;
         } else {
             html += `
                 <div class="plex-access-warning">
-                    <h5>⚠️ No Plex Access Found</h5>
+                    <h5>?? No Plex Access Found</h5>
                     <p>User <strong>${email}</strong> doesn't appear to have access to any Plex libraries yet. You can manually select libraries below to invite them.</p>
                 </div>
             `;
@@ -2450,14 +2450,14 @@ extractLibraryIds(libraryArray) {
     },
 
     autoSelectDetectedLibraries: function(accessData) {
-        console.log('🎯 Auto-selecting detected libraries...');
+        console.log('?? Auto-selecting detected libraries...');
         
         for (const [serverGroup, groupData] of Object.entries(accessData)) {
             const regularLibs = groupData.regular || [];
             const fourkLibs = groupData.fourk || [];
             
             if (regularLibs.length > 0 || fourkLibs.length > 0) {
-                console.log(`📚 Auto-selecting libraries for ${serverGroup}:`, { regular: regularLibs.length, fourk: fourkLibs.length });
+                console.log(`?? Auto-selecting libraries for ${serverGroup}:`, { regular: regularLibs.length, fourk: fourkLibs.length });
                 
                 // Make sure the library section is visible
                 const libraryGroup = document.getElementById(`${serverGroup}LibraryGroup`);
@@ -2479,7 +2479,7 @@ extractLibraryIds(libraryArray) {
     },
 
     selectLibrariesById: function(serverGroup, regularLibs, fourkLibs) {
-        console.log(`🎯 Selecting libraries for ${serverGroup}:`, { regularLibs, fourkLibs });
+        console.log(`?? Selecting libraries for ${serverGroup}:`, { regularLibs, fourkLibs });
         
         let selectedCount = 0;
         
@@ -2502,9 +2502,9 @@ extractLibraryIds(libraryArray) {
             if (checkbox) {
                 checkbox.checked = true;
                 selectedCount++;
-                console.log(`✅ Selected regular library: ${lib.title || lib.id}`);
+                console.log(`? Selected regular library: ${lib.title || lib.id}`);
             } else {
-                console.log(`⚠️ Regular library checkbox not found for: ${lib.title || lib.id} (ID: ${lib.id})`);
+                console.log(`?? Regular library checkbox not found for: ${lib.title || lib.id} (ID: ${lib.id})`);
             }
         });
         
@@ -2527,13 +2527,13 @@ extractLibraryIds(libraryArray) {
             if (checkbox) {
                 checkbox.checked = true;
                 selectedCount++;
-                console.log(`✅ Selected 4K library: ${lib.title || lib.id}`);
+                console.log(`? Selected 4K library: ${lib.title || lib.id}`);
             } else {
-                console.log(`⚠️ 4K library checkbox not found for: ${lib.title || lib.id} (ID: ${lib.id})`);
+                console.log(`?? 4K library checkbox not found for: ${lib.title || lib.id} (ID: ${lib.id})`);
             }
         });
         
-        console.log(`📊 Auto-selected ${selectedCount} libraries for ${serverGroup}`);
+        console.log(`?? Auto-selected ${selectedCount} libraries for ${serverGroup}`);
         
         return selectedCount;
     }
@@ -2543,7 +2543,7 @@ extractLibraryIds(libraryArray) {
 
 // Override the global showUserForm function to fix new user pre-population
 window.showUserForm = function() {
-    console.log('🆕 Creating NEW user - clearing all state...');
+    console.log('?? Creating NEW user - clearing all state...');
     
     // CRITICAL: Clear editing state completely
     window.AppState.editingUserId = null;
@@ -2562,7 +2562,7 @@ window.showUserForm = function() {
     
     // Wait for page load, then ensure completely clean form
     setTimeout(() => {
-        console.log('🧹 Initializing clean form for new user...');
+        console.log('?? Initializing clean form for new user...');
         
         // Reset the entire form
         const form = document.getElementById('userFormData');
@@ -2625,13 +2625,13 @@ window.showUserForm = function() {
             window.Users.toggleBasicSaveButton();
         }
         
-        console.log('✅ Clean form initialized for new user');
+        console.log('? Clean form initialized for new user');
     }, 700);
 };
 
 // Enhanced form population function - MOVED TO GLOBAL SCOPE AND MADE ASYNC
 window.populateFormForEditing = async function(user) {
-    console.log(`📝 Populating form with user data:`, user);
+    console.log(`?? Populating form with user data:`, user);
     
     // Fill basic fields
     const fieldMappings = {
@@ -2649,7 +2649,7 @@ window.populateFormForEditing = async function(user) {
         const element = document.getElementById(fieldId);
         if (element) {
             element.value = fieldMappings[fieldId];
-            console.log(`📝 Set ${fieldId} = ${fieldMappings[fieldId]}`);
+            console.log(`?? Set ${fieldId} = ${fieldMappings[fieldId]}`);
         }
     });
 	
@@ -2666,7 +2666,7 @@ document.getElementById('excludeBulkEmails').checked = user.exclude_bulk_emails 
 document.getElementById('excludeAutomatedEmails').checked = user.exclude_automated_emails || false;
     
     // Clear all tags first, then set user's tags
-    console.log(`🏷️ Setting tags:`, user.tags);
+    console.log(`??? Setting tags:`, user.tags);
     document.querySelectorAll('input[name="tags"]').forEach(cb => cb.checked = false);
     
     // Show Plex Access Management section if user has Plex access
@@ -2713,7 +2713,7 @@ document.getElementById('excludeAutomatedEmails').checked = user.exclude_automat
     
     // CRITICAL: If user has IPTV tag, initialize IPTV functionality
     if (hasIPTVTag) {
-        console.log('📺 User has IPTV tag - initializing IPTV functionality...');
+        console.log('?? User has IPTV tag - initializing IPTV functionality...');
         
         // Initialize IPTV module for this user
         if (window.IPTV && typeof window.IPTV.showIPTVSection === 'function') {
@@ -2725,10 +2725,10 @@ document.getElementById('excludeAutomatedEmails').checked = user.exclude_automat
         // CRITICAL: Initialize the always-visible IPTV check button
         setTimeout(() => {
             if (window.initializeIPTVCheck) {
-                console.log('🔧 Initializing IPTV check button for editing user...');
+                console.log('?? Initializing IPTV check button for editing user...');
                 window.initializeIPTVCheck();
             } else {
-                console.error('❌ initializeIPTVCheck function not found during form population');
+                console.error('? initializeIPTVCheck function not found during form population');
             }
         }, 500);
     }
@@ -2738,7 +2738,7 @@ document.getElementById('excludeAutomatedEmails').checked = user.exclude_automat
         await window.Users.checkAndDisplayInviteStatus(user.plex_email, plexTags);
     }
     
-    console.log(`✅ Form population completed for ${user.name}`);
+    console.log(`? Form population completed for ${user.name}`);
 	
 };
 
@@ -2747,7 +2747,7 @@ function populateIPTVEditorM3UUrl(userData) {
     const urlField = document.getElementById('iptvEditorM3UUrl');
     const m3uSection = document.getElementById('iptvEditorM3USection');
     
-    console.log('🔍 Checking IPTV Editor M3U data:', {
+    console.log('?? Checking IPTV Editor M3U data:', {
         iptv_editor_enabled: userData.iptv_editor_enabled,
         iptv_editor_m3u_url: userData.iptv_editor_m3u_url,
         include_in_iptv_editor: userData.include_in_iptv_editor,
@@ -2768,7 +2768,7 @@ function populateIPTVEditorM3UUrl(userData) {
                 urlField.style.fontStyle = 'normal';
                 urlField.style.color = '#fff';
             }
-            console.log('✅ Populated IPTV Editor M3U URL:', userData.iptv_editor_m3u_url);
+            console.log('? Populated IPTV Editor M3U URL:', userData.iptv_editor_m3u_url);
         } else {
             // No URL but should have one - show regenerate option
             if (urlField) {
@@ -2776,14 +2776,14 @@ function populateIPTVEditorM3UUrl(userData) {
                 urlField.style.fontStyle = 'italic';
                 urlField.style.color = '#ff9800';
             }
-            console.log('⚠️ IPTV Editor enabled but M3U URL missing - showing regenerate option');
+            console.log('?? IPTV Editor enabled but M3U URL missing - showing regenerate option');
         }
     } else {
         // Hide the section
         if (m3uSection) {
             m3uSection.style.display = 'none';
         }
-        console.log('ℹ️ IPTV Editor M3U section hidden - no credentials or not enabled');
+        console.log('?? IPTV Editor M3U section hidden - no credentials or not enabled');
     }
     
     // Store current user ID for regeneration
@@ -2792,7 +2792,7 @@ function populateIPTVEditorM3UUrl(userData) {
 
 // Show Plex libraries and pre-select user's current access - FIXED MODULE REFERENCE
 window.showPlexLibrariesAndPreSelect = function(serverGroup, user) {
-    console.log(`📚 Showing ${serverGroup} libraries for editing...`);
+    console.log(`?? Showing ${serverGroup} libraries for editing...`);
     
     const libraryGroup = document.getElementById(`${serverGroup}LibraryGroup`);
     if (libraryGroup) {
@@ -2804,17 +2804,17 @@ window.showPlexLibrariesAndPreSelect = function(serverGroup, user) {
             window.loadPlexLibrariesForGroup(serverGroup).then(() => {
                 // Multiple attempts at different intervals to ensure checkboxes are rendered
                 setTimeout(() => {
-                    console.log(`🎯 First pre-selection attempt for ${serverGroup}`);
+                    console.log(`?? First pre-selection attempt for ${serverGroup}`);
                     window.preSelectUserLibraries(serverGroup, user);
                 }, 500);
                 
                 setTimeout(() => {
-                    console.log(`🎯 Second pre-selection attempt for ${serverGroup}`);
+                    console.log(`?? Second pre-selection attempt for ${serverGroup}`);
                     window.preSelectUserLibraries(serverGroup, user);
                 }, 1200);
                 
                 setTimeout(() => {
-					console.log(`🎯 Final pre-selection attempt for ${serverGroup}`);
+					console.log(`?? Final pre-selection attempt for ${serverGroup}`);
 					window.preSelectUserLibraries(serverGroup, user);
 				}, 2500);
                 
@@ -2843,7 +2843,7 @@ window.showPlexLibrariesAndPreSelect = function(serverGroup, user) {
 
 // Pre-select user's current library access - COMPLETE ENHANCED VERSION
 window.preSelectUserLibraries = function(serverGroup, user = null) {
-    console.log(`🔧 Pre-selecting libraries for ${serverGroup}...`);
+    console.log(`?? Pre-selecting libraries for ${serverGroup}...`);
     
     // Get user data - prefer passed parameter, fall back to global state
     let currentUserData = user;
@@ -2852,12 +2852,12 @@ window.preSelectUserLibraries = function(serverGroup, user = null) {
     }
     
     if (!currentUserData) {
-        console.log('❌ No user data available for pre-selection');
+        console.log('? No user data available for pre-selection');
         return;
     }
     
     if (!currentUserData.plex_libraries || !currentUserData.plex_libraries[serverGroup]) {
-        console.log(`ℹ️ No library data for ${serverGroup}`);
+        console.log(`?? No library data for ${serverGroup}`);
         return;
     }
     
@@ -2865,7 +2865,7 @@ window.preSelectUserLibraries = function(serverGroup, user = null) {
     let selectedCount = 0;
     let notFoundCount = 0;
     
-    console.log(`📋 User libraries for ${serverGroup}:`, userLibraries);
+    console.log(`?? User libraries for ${serverGroup}:`, userLibraries);
     
     // Helper function to extract library ID from various formats
     const extractLibraryId = (lib) => {
@@ -2895,32 +2895,32 @@ window.preSelectUserLibraries = function(serverGroup, user = null) {
     
     // Pre-select regular libraries
     if (userLibraries.regular && Array.isArray(userLibraries.regular)) {
-        console.log(`🔄 Processing ${userLibraries.regular.length} regular libraries...`);
+        console.log(`?? Processing ${userLibraries.regular.length} regular libraries...`);
         
         userLibraries.regular.forEach((lib, index) => {
             const libId = extractLibraryId(lib);
             
             if (!libId) {
-                console.log(`⚠️ Could not extract ID from regular library at index ${index}:`, lib);
+                console.log(`?? Could not extract ID from regular library at index ${index}:`, lib);
                 notFoundCount++;
                 return;
             }
             
-            console.log(`🔍 Looking for regular library checkbox with ID: ${libId} (type: ${typeof libId})`);
+            console.log(`?? Looking for regular library checkbox with ID: ${libId} (type: ${typeof libId})`);
             
             const checkbox = findCheckbox(serverGroup, 'regular', libId);
             
             if (checkbox) {
                 checkbox.checked = true;
                 selectedCount++;
-                console.log(`✅ Pre-selected regular library: ${libId}`);
+                console.log(`? Pre-selected regular library: ${libId}`);
             } else {
                 notFoundCount++;
-                console.log(`❌ Regular library checkbox NOT FOUND for ID: ${libId}`);
+                console.log(`? Regular library checkbox NOT FOUND for ID: ${libId}`);
                 
                 // Debug: show what checkboxes are actually available
                 const allRegularBoxes = document.querySelectorAll(`input[name="${serverGroup}_regular"]`);
-                console.log(`🔍 Available regular checkboxes for ${serverGroup}:`, 
+                console.log(`?? Available regular checkboxes for ${serverGroup}:`, 
                     Array.from(allRegularBoxes).map(cb => ({
                         value: cb.value, 
                         id: cb.id,
@@ -2933,32 +2933,32 @@ window.preSelectUserLibraries = function(serverGroup, user = null) {
     
     // Pre-select 4K libraries
     if (userLibraries.fourk && Array.isArray(userLibraries.fourk)) {
-        console.log(`🔄 Processing ${userLibraries.fourk.length} 4K libraries...`);
+        console.log(`?? Processing ${userLibraries.fourk.length} 4K libraries...`);
         
         userLibraries.fourk.forEach((lib, index) => {
             const libId = extractLibraryId(lib);
             
             if (!libId) {
-                console.log(`⚠️ Could not extract ID from 4K library at index ${index}:`, lib);
+                console.log(`?? Could not extract ID from 4K library at index ${index}:`, lib);
                 notFoundCount++;
                 return;
             }
             
-            console.log(`🔍 Looking for 4K library checkbox with ID: ${libId} (type: ${typeof libId})`);
+            console.log(`?? Looking for 4K library checkbox with ID: ${libId} (type: ${typeof libId})`);
             
             const checkbox = findCheckbox(serverGroup, 'fourk', libId);
             
             if (checkbox) {
                 checkbox.checked = true;
                 selectedCount++;
-                console.log(`✅ Pre-selected 4K library: ${libId}`);
+                console.log(`? Pre-selected 4K library: ${libId}`);
             } else {
                 notFoundCount++;
-                console.log(`❌ 4K library checkbox NOT FOUND for ID: ${libId}`);
+                console.log(`? 4K library checkbox NOT FOUND for ID: ${libId}`);
                 
                 // Debug: show what checkboxes are actually available
                 const allFourkBoxes = document.querySelectorAll(`input[name="${serverGroup}_fourk"]`);
-                console.log(`🔍 Available 4K checkboxes for ${serverGroup}:`, 
+                console.log(`?? Available 4K checkboxes for ${serverGroup}:`, 
                     Array.from(allFourkBoxes).map(cb => ({
                         value: cb.value, 
                         id: cb.id,
@@ -2969,11 +2969,11 @@ window.preSelectUserLibraries = function(serverGroup, user = null) {
         });
     }
     
-    console.log(`📊 Pre-selection completed for ${serverGroup}: ${selectedCount} selected, ${notFoundCount} not found`);
+    console.log(`?? Pre-selection completed for ${serverGroup}: ${selectedCount} selected, ${notFoundCount} not found`);
     
     // If some checkboxes weren't found, try again after DOM settles
     if (notFoundCount > 0) {
-        console.log(`🔄 ${notFoundCount} checkboxes not found, retrying in 1 second...`);
+        console.log(`?? ${notFoundCount} checkboxes not found, retrying in 1 second...`);
         setTimeout(() => {
             retryPreSelection(serverGroup, userLibraries, extractLibraryId, findCheckbox);
         }, 1000);
@@ -2989,7 +2989,7 @@ window.preSelectUserLibraries = function(serverGroup, user = null) {
 
 // Helper function for retry logic
 function retryPreSelection(serverGroup, userLibraries, extractLibraryId, findCheckbox) {
-    console.log(`🔄 RETRY: Attempting pre-selection again for ${serverGroup}...`);
+    console.log(`?? RETRY: Attempting pre-selection again for ${serverGroup}...`);
     let retrySelected = 0;
     
     // Retry regular libraries
@@ -3002,7 +3002,7 @@ function retryPreSelection(serverGroup, userLibraries, extractLibraryId, findChe
             if (checkbox && !checkbox.checked) {
                 checkbox.checked = true;
                 retrySelected++;
-                console.log(`🔄 RETRY SUCCESS: Pre-selected regular library: ${libId}`);
+                console.log(`?? RETRY SUCCESS: Pre-selected regular library: ${libId}`);
             }
         });
     }
@@ -3017,23 +3017,23 @@ function retryPreSelection(serverGroup, userLibraries, extractLibraryId, findChe
             if (checkbox && !checkbox.checked) {
                 checkbox.checked = true;
                 retrySelected++;
-                console.log(`🔄 RETRY SUCCESS: Pre-selected 4K library: ${libId}`);
+                console.log(`?? RETRY SUCCESS: Pre-selected 4K library: ${libId}`);
             }
         });
     }
     
-    console.log(`🔄 Retry completed for ${serverGroup}: ${retrySelected} additional libraries selected`);
+    console.log(`?? Retry completed for ${serverGroup}: ${retrySelected} additional libraries selected`);
     
     // Final debug if still having issues
     if (retrySelected === 0) {
-        console.log(`⚠️ RETRY FAILED: Still unable to select libraries for ${serverGroup}`);
-        console.log(`🔍 Final debug - checking DOM state...`);
+        console.log(`?? RETRY FAILED: Still unable to select libraries for ${serverGroup}`);
+        console.log(`?? Final debug - checking DOM state...`);
         
         // Show current state of DOM
         const regularBoxes = document.querySelectorAll(`input[name="${serverGroup}_regular"]`);
         const fourkBoxes = document.querySelectorAll(`input[name="${serverGroup}_fourk"]`);
         
-        console.log(`📋 Current DOM state for ${serverGroup}:`);
+        console.log(`?? Current DOM state for ${serverGroup}:`);
         console.log(`   Regular checkboxes (${regularBoxes.length}):`, Array.from(regularBoxes).map(cb => cb.value));
         console.log(`   4K checkboxes (${fourkBoxes.length}):`, Array.from(fourkBoxes).map(cb => cb.value));
         console.log(`   User library IDs:`, {
@@ -3071,7 +3071,7 @@ window.saveUser = function(event) {
     return window.Users.saveUser(event);
 };
 
-console.log('👥 Users module loaded successfully');
+console.log('?? Users module loaded successfully');
 
 // Make saveBasicUserInfo globally available
 window.saveBasicUserInfo = function() {
@@ -3299,7 +3299,7 @@ function getUserId() {
     let userId = urlParams.get('id') || urlParams.get('edit');
     
     if (userId) {
-        console.log('📋 Found user ID from URL:', userId);
+        console.log('?? Found user ID from URL:', userId);
         return userId;
     }
     
@@ -3307,18 +3307,18 @@ function getUserId() {
     const userIdField = document.getElementById('userId');
     if (userIdField && userIdField.value) {
         userId = userIdField.value;
-        console.log('📋 Found user ID from form field:', userId);
+        console.log('?? Found user ID from form field:', userId);
         return userId;
     }
     
     // Method 3: Check app state
     if (window.AppState && window.AppState.editingUserId) {
         userId = window.AppState.editingUserId;
-        console.log('📋 Found user ID from AppState:', userId);
+        console.log('?? Found user ID from AppState:', userId);
         return userId;
     }
     
-    console.warn('⚠️ No user ID found using any method');
+    console.warn('?? No user ID found using any method');
     return null;
 }
 
@@ -3343,7 +3343,7 @@ async function createIPTVEditorAccountNow(username) {
         
         Utils.showNotification('Creating IPTV Editor account...', 'info');
         
-        console.log('📤 Sending create request with data:', {
+        console.log('?? Sending create request with data:', {
             user_id: parseInt(userId),
             username: username
         });
@@ -3360,10 +3360,10 @@ async function createIPTVEditorAccountNow(username) {
         });
         
         // Log the response for debugging
-        console.log('📥 Response status:', response.status);
+        console.log('?? Response status:', response.status);
         
         const data = await response.json();
-        console.log('📥 Response data:', data);
+        console.log('?? Response data:', data);
         
         if (data.success) {
             Utils.showNotification('IPTV Editor account created successfully', 'success');
@@ -3541,7 +3541,7 @@ async function deleteIPTVSubscription() {
     }
     
     // Build confirmation message
-    let confirmMessage = '⚠️ WARNING: This will permanently delete:\n\n';
+    let confirmMessage = '?? WARNING: This will permanently delete:\n\n';
     if (hasRegularIPTV) {
         confirmMessage += `• Regular IPTV subscription (Line ID: ${document.getElementById('iptvLineId').textContent})\n`;
     }
@@ -3614,7 +3614,7 @@ async function cleanupIPTVEditor(userId) {
       throw new Error('User ID is required for IPTV Editor cleanup');
     }
     
-    console.log(`🧹 Attempting IPTV Editor cleanup for user ${userId}`);
+    console.log(`?? Attempting IPTV Editor cleanup for user ${userId}`);
     
     // Show loading state
     const cleanupBtn = document.getElementById('cleanupIPTVEditorBtn');
@@ -3654,7 +3654,7 @@ async function cleanupIPTVEditor(userId) {
     }
     
   } catch (error) {
-    console.error('❌ IPTV Editor cleanup failed:', error);
+    console.error('? IPTV Editor cleanup failed:', error);
     
     if (window.Utils && window.Utils.showNotification) {
       window.Utils.showNotification(`Cleanup failed: ${error.message}`, 'error');
@@ -3754,7 +3754,7 @@ async function deleteSubscriptionEnhanced() {
     }
     
   } catch (error) {
-    console.error('❌ Enhanced deletion failed:', error);
+    console.error('? Enhanced deletion failed:', error);
     
     if (window.Utils && window.Utils.showNotification) {
       window.Utils.showNotification(`Deletion failed: ${error.message}`, 'error');
@@ -3778,7 +3778,7 @@ function checkForOrphanedIPTVEditor(userData) {
     // Show cleanup section ONLY if has IPTV Editor but NO regular IPTV
     if (hasIPTVEditor && !hasRegularIPTV) {
       cleanupSection.style.display = 'block';
-      console.log('🔍 Orphaned IPTV Editor account detected - showing cleanup option');
+      console.log('?? Orphaned IPTV Editor account detected - showing cleanup option');
     } else {
       cleanupSection.style.display = 'none';
     }
@@ -3795,7 +3795,7 @@ window.initializeIPTVCheck = function() {
     const checkBtn = document.getElementById('checkAccessBtn');
     
     if (usernameInput && checkBtn) {
-        console.log('🔧 Initializing IPTV check button (always-visible version)...');
+        console.log('?? Initializing IPTV check button (always-visible version)...');
         
         // CRITICAL: Remove any existing event listeners first to prevent duplicates
         if (usernameInput._iptvInputHandler) {
@@ -3817,7 +3817,7 @@ window.initializeIPTVCheck = function() {
             if (window.IPTV && window.IPTV.checkExistingAccess) {
                 window.IPTV.checkExistingAccess();
             } else {
-                console.error('❌ IPTV.checkExistingAccess not found');
+                console.error('? IPTV.checkExistingAccess not found');
                 if (window.Utils && window.Utils.showNotification) {
                     window.Utils.showNotification('IPTV module not properly loaded. Please refresh the page.', 'error');
                 }
@@ -3836,16 +3836,16 @@ window.initializeIPTVCheck = function() {
         const initialUsername = usernameInput.value.trim();
         checkBtn.disabled = initialUsername.length === 0;
         
-        console.log('✅ IPTV check button initialized successfully (always-visible version)');
+        console.log('? IPTV check button initialized successfully (always-visible version)');
     } else {
-        console.warn('⚠️ IPTV check button elements not found:', {
+        console.warn('?? IPTV check button elements not found:', {
             usernameInput: !!usernameInput,
             checkBtn: !!checkBtn
         });
     }
 };
 
-console.log('👥 Users module loaded successfully');
+console.log('?? Users module loaded successfully');
 
 // Global function that can be called from the HTML
 window.checkExistingPlexAccess = async function() {
@@ -3863,15 +3863,15 @@ window.checkExistingPlexAccess = async function() {
     }
     
     // Update button state
-    btnText.innerHTML = '🔄 Checking...';
+    btnText.innerHTML = '?? Checking...';
     
     try {
-        console.log('🔍 Checking existing Plex access for:', emailToCheck);
+        console.log('?? Checking existing Plex access for:', emailToCheck);
         
         // Use the Users method
         const accessData = await window.Users.checkExistingPlexAccess(emailToCheck);
         
-        console.log('📊 Received access data:', accessData);
+        console.log('?? Received access data:', accessData);
         
         // Show results
         window.Users.displayPlexAccessResults(accessData, emailToCheck);
@@ -3882,21 +3882,21 @@ window.checkExistingPlexAccess = async function() {
         Utils.showNotification('Plex access check completed!', 'success');
         
     } catch (error) {
-        console.error('❌ Error checking Plex access:', error);
+        console.error('? Error checking Plex access:', error);
         Utils.showNotification('Error checking Plex access: ' + error.message, 'error');
         
         // Show error in results
         if (resultsDiv) {
             resultsDiv.innerHTML = `
                 <div class="plex-access-error">
-                    <p>❌ Error: ${error.message}</p>
+                    <p>? Error: ${error.message}</p>
                 </div>
             `;
             resultsDiv.style.display = 'block';
         }
     } finally {
         // Reset button
-        btnText.innerHTML = '🔍 Check for Plex Access';
+        btnText.innerHTML = '?? Check for Plex Access';
     }
 };
 
@@ -3941,7 +3941,7 @@ window.CompactUsers = {
 init() {
     this.bindEvents();
     this.checkMobileAndSetDefault();
-    console.log('📱 CompactUsers initialized');
+    console.log('?? CompactUsers initialized');
 },
 
 // Add this new method:
@@ -4078,6 +4078,60 @@ checkMobileAndSetDefault() {
         if (!name) return '??';
         return name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().substring(0, 2);
     },
+	
+getPlexDetailsHTML(user) {
+    const formatDate = (dateStr) => {
+        if (!dateStr) return 'Never';
+        try {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric'
+            });
+        } catch (error) {
+            return 'Invalid date';
+        }
+    };
+
+    let activityHtml = '';
+    if (user.days_since_last_watch !== null && user.days_since_last_watch !== undefined) {
+        activityHtml = `
+            <div class="info-item">
+                <span class="info-label">Last Watched:</span>
+                <span class="info-value">${user.last_watched_title || 'Unknown'}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">When:</span>
+                <span class="info-value">${user.activity_display || user.days_since_last_watch + ' days ago'}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Server:</span>
+                <span class="info-value">${user.plex_server_name || 'Unknown'}</span>
+            </div>
+        `;
+    } else {
+        activityHtml = `
+            <div class="info-item">
+                <span class="info-label">Activity:</span>
+                <span class="info-value" style="color: #888;">No recent activity</span>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="info-item">
+            <span class="info-label">Plex Email:</span>
+            <span class="info-value">${user.plex_email || 'N/A'}</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">Plex Username:</span>
+            <span class="info-value">${user.plex_username || 'N/A'}</span>
+        </div>
+        <h4 style="color: #4fc3f7; margin: 15px 0 10px 0;">Plex Activity</h4>
+        ${activityHtml}
+    `;
+},	
     
 
 getUserStatusClass(user) {
@@ -4415,4 +4469,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-console.log('📱 CompactUsers integration loaded');
+console.log('?? CompactUsers integration loaded');
