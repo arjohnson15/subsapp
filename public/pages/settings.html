@@ -684,23 +684,38 @@
                 </div>
             </div>
 
-            <!-- Specific Date Fields -->
-            <div id="specificDateFields" style="display: none; margin: 20px 0; padding: 20px; background: rgba(255, 193, 7, 0.1); border-left: 3px solid #ffc107; border-radius: 4px;">
-                <h5 style="color: #f57c00; margin: 0 0 15px 0; font-size: 14px; font-weight: 600;">SPECIFIC DATE/TIME SETTINGS</h5>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="scheduledDate">Date:</label>
-                        <input type="date" id="scheduledDate" name="scheduled_date" class="clean-date-input">
-                    </div>
-                    <div class="form-group">
-                        <label for="scheduledTime">Time:</label>
-                        <input type="time" id="scheduledTime" name="scheduled_time" class="clean-time-input">
-                        <small style="color: #888; font-size: 0.85em; display: block; margin-top: 5px;">
-                            ⏰ Enter time in Central Time (CT/CDT)
-                        </small>
-                    </div>
-                </div>
-            </div>
+<!-- Specific Date Fields -->
+<div id="specificDateFields" style="display: none; margin: 20px 0; padding: 20px; background: rgba(255, 193, 7, 0.1); border-left: 3px solid #ffc107; border-radius: 4px;">
+    <h5 style="color: #f57c00; margin: 0 0 15px 0; font-size: 14px; font-weight: 600;">SPECIFIC DATE/TIME SETTINGS</h5>
+    <div class="form-grid">
+        <div class="form-group">
+            <label for="scheduledDate">Date:</label>
+            <input type="date" id="scheduledDate" name="scheduled_date" class="clean-date-input">
+        </div>
+        <div class="form-group">
+            <label for="scheduledTime">Time:</label>
+            <input type="time" id="scheduledTime" name="scheduled_time" class="clean-time-input">
+            <small style="color: #888; font-size: 0.85em; display: block; margin-top: 5px;">
+                Enter time in Central Time (CT/CDT)
+            </small>
+        </div>
+    </div>
+    
+    <!-- Dynamic Fields Disclaimer -->
+    <div style="margin-top: 20px; padding: 15px; background: rgba(255, 87, 34, 0.1); border: 1px solid #ff5722; border-radius: 6px;">
+        <div style="display: flex; align-items: center; gap: 8px; color: #d84315; font-weight: 600; margin-bottom: 8px; font-size: 13px;">
+            <span></span>
+            <span>DYNAMIC FIELDS WARNING</span>
+        </div>
+        <p style="color: #666; font-size: 0.85em; margin: 0; line-height: 1.5;">
+            <strong>Scheduled date/time emails</strong> are sent as bulk messages for performance reasons. 
+            Dynamic fields like <code style="background: rgba(0,0,0,0.1); padding: 2px 4px; border-radius: 3px; font-size: 0.8em;">{{name}}</code>, 
+            <code style="background: rgba(0,0,0,0.1); padding: 2px 4px; border-radius: 3px; font-size: 0.8em;">{{expiration_date}}</code>, 
+            <code style="background: rgba(0,0,0,0.1); padding: 2px 4px; border-radius: 3px; font-size: 0.8em;">{{renewal_price}}</code>, etc. 
+            <strong>will not be populated</strong> and will appear as blank in the email.
+        </p>
+    </div>
+</div>
 
             <div class="form-group">
                 <label for="emailTemplate">Email Template:</label>
