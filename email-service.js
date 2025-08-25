@@ -375,25 +375,20 @@ async processIndividualSchedule(schedule) {
       
       let sentCount = 0;
       
-      if (schedule.schedule_type === 'specific_date') {
-        // For specific date emails, send as bulk with BCC to all owners
-        const allOwnerEmails = [...new Set(targetUsers
-          .filter(user => user.owner_email)
-          .map(user => user.owner_email)
-        )];
-        
-        const processedBody = await this.replacePlaceholders(schedule.body, {});
-        const processedSubject = await this.replacePlaceholders(schedule.subject, {});
-        
-        const result = await this.sendEmail(
-          targetUsers.map(user => user.email), 
-          processedSubject, 
-          processedBody,
-          {
-            bcc: allOwnerEmails,
-            templateName: schedule.template_name
-          }
-        );
+if (schedule.schedule_type === 'specific_date') {
+  // For specific date emails, send as bulk without dynamic fields (performance reasons)
+  const processedBody = await this.replacePlaceholders(schedule.body, {});
+  const processedSubject = await this.replacePlaceholders(schedule.subject, {});
+  
+  const result = await this.sendEmail(
+    targetUsers.map(user => user.email), 
+    processedSubject, 
+    processedBody,
+    {
+      // No automatic BCC for scheduled date emails
+      templateName: schedule.template_name
+    }
+  );
         
         if (result.success) {
           sentCount = targetUsers.length;
@@ -790,21 +785,50 @@ async getAllUsersWithSubscriptionType(subscriptionType, targetTags = null, targe
     console.log(`   ? Target owners: ${targetOwners ? JSON.stringify(targetOwners) : 'none'}`);
     console.log(`   ? Target subscription types: ${targetSubscriptionTypes ? JSON.stringify(targetSubscriptionTypes) : 'none'}`);
     
-    let query = `
-      SELECT DISTINCT u.id, u.name, u.email, u.tags, u.owner_id,
-             s.subscription_type_id,
-             CASE 
-               WHEN s.subscription_type_id IS NULL THEN 'FREE Plex Access'
-               ELSE st.name 
-             END as subscription_name,
-             o.name as owner_name, o.email as owner_email,
-             u.bcc_owner_renewal
-      FROM users u
-      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
-      LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
-      LEFT JOIN owners o ON u.owner_id = o.id
-      WHERE 1=1
-    `;
+let query = `
+  SELECT DISTINCT u.id, u.name, u.email, u.tags, u.owner_id,
+         u.plex_email, u.iptv_username, u.iptv_password, u.implayer_code, u.device_count,
+         o.name as owner_name, o.email as owner_email, u.bcc_owner_renewal,
+         s.subscription_type_id,
+         s.expiration_date,
+         st.name as subscription_type,
+         st.name as subscription_name,
+         st.price as renewal_price,
+         st.type as subscription_category,
+         CASE WHEN s.expiration_date IS NOT NULL 
+           THEN DATEDIFF(s.expiration_date, CURDATE()) 
+           ELSE NULL 
+         END as days_until_expiration,
+         -- Plex specific fields
+         CASE WHEN st.type = 'plex' OR s.subscription_type_id IS NULL 
+           THEN COALESCE(u.plex_email, u.email) 
+           ELSE u.email 
+         END as plex_email,
+         CASE WHEN st.type = 'plex' THEN s.expiration_date ELSE NULL END as plex_expiration,
+         CASE WHEN st.type = 'plex' THEN st.name 
+              WHEN s.subscription_type_id IS NULL THEN 'FREE Plex Access'
+              ELSE NULL 
+         END as plex_subscription_type,
+         CASE WHEN st.type = 'plex' THEN DATEDIFF(s.expiration_date, CURDATE()) ELSE NULL END as plex_days_until_expiration,
+         CASE WHEN st.type = 'plex' THEN st.price ELSE NULL END as plex_renewal_price,
+         -- IPTV specific fields
+         CASE WHEN st.type = 'iptv' THEN u.iptv_username ELSE NULL END as iptv_username,
+         CASE WHEN st.type = 'iptv' THEN u.iptv_password ELSE NULL END as iptv_password,
+         CASE WHEN st.type = 'iptv' THEN s.expiration_date ELSE NULL END as iptv_expiration,
+         CASE WHEN st.type = 'iptv' THEN st.name ELSE NULL END as iptv_subscription_type,
+         CASE WHEN st.type = 'iptv' THEN DATEDIFF(s.expiration_date, CURDATE()) ELSE NULL END as iptv_days_until_expiration,
+         CASE WHEN st.type = 'iptv' THEN st.price ELSE NULL END as iptv_renewal_price,
+         -- Legacy compatibility
+         CASE 
+           WHEN s.subscription_type_id IS NULL THEN 'FREE Plex Access'
+           ELSE st.name 
+         END as subscription_name
+  FROM users u
+  LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
+  LEFT JOIN subscription_types st ON s.subscription_type_id = st.id
+  LEFT JOIN owners o ON u.owner_id = o.id
+  WHERE 1=1
+`;
 
     const params = [];
 
