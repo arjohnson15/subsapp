@@ -211,15 +211,41 @@ def verify_library_change_after_404(server_config, user_email, expected_library_
         return False
 
 def share_libraries_with_user_on_server(server_config, user_email, library_ids):
-    """CORRECTED library sharing with proper API usage and 404 error handling"""
+    """FIXED: Properly handles cross-server sharing for same account"""
     try:
         log_info(f"Processing {user_email} on {server_config['name']} with libraries: {library_ids}")
         
         # Get account and server with 60 second timeout
         account, server = get_account_and_server_with_timeout(server_config)
         
-        # Get user object and status - CRITICAL for updateFriend()
-        user_status, user_obj = get_user_object_and_status(account, user_email)
+        # CRITICAL FIX: First check if user exists anywhere on this account
+        # This handles cases where user exists on regular server but not 4K server
+        log_info(f"Checking if {user_email} exists on main account...")
+        account_user = None
+        user_status = "not_found"
+        
+        try:
+            signal.alarm(60)  # 60 second timeout
+            # First check if user is already a friend on the main account
+            friends = account.myPlexAccount().users()
+            for friend in friends:
+                if friend.email and friend.email.lower() == user_email.lower():
+                    account_user = friend
+                    user_status = "existing_account_user"
+                    log_info(f"Found existing account user: {friend.username} (ID: {friend.id})")
+                    break
+            signal.alarm(0)
+        except Exception as e:
+            signal.alarm(0)
+            log_error(f"Error checking account users: {str(e)}")
+        
+        # If not found in account users, check server-specific status
+        if user_status == "not_found":
+            user_status, user_obj = get_user_object_and_status(account, user_email)
+            if user_status == "existing":
+                account_user = user_obj
+        
+        log_info(f"User status: {user_status}")
         
         if user_status == "error":
             return {
@@ -228,7 +254,7 @@ def share_libraries_with_user_on_server(server_config, user_email, library_ids):
                 "server": server_config['name']
             }
         
-        # Get current access with 60 second timeout
+        # Get current access on THIS specific server
         current_libs = get_current_library_access_with_timeout(account, server_config, user_email)
         current_set = set(current_libs)
         target_set = set(library_ids)
@@ -255,11 +281,11 @@ def share_libraries_with_user_on_server(server_config, user_email, library_ids):
                 "message": "User has pending invite - cannot update library access"
             }
         
-        # Get library objects with 60 second timeout
+        # Get library objects
         if len(library_ids) > 0:
             libraries_to_share = []
             
-            signal.alarm(60)  # 60 second timeout for library lookup
+            signal.alarm(60)
             all_libraries = server.library.sections()
             signal.alarm(0)
             
@@ -285,18 +311,36 @@ def share_libraries_with_user_on_server(server_config, user_email, library_ids):
         else:
             libraries_to_share = []
         
-        # CORRECTED: Use the right method for the right scenario
+        # MAIN FIX: Handle the sharing based on user status
         error_was_404 = False
         action = "unknown"
         
-        if user_status == "existing":
-            # For existing users, use updateFriend() with the user OBJECT (not email)
-            log_info(f"Updating existing user {user_obj.username} (ID: {user_obj.id}) with {len(libraries_to_share)} libraries")
-            
-            try:
-                signal.alarm(60)  # 60 second timeout
+        try:
+            if user_status in ["existing", "existing_account_user"] and account_user:
+                # User exists on account - update their server access
+                log_info(f"User exists on account, updating server access...")
+                log_info(f"Updating {account_user.username} (ID: {account_user.id}) with {len(libraries_to_share)} libraries on {server_config['name']}")
+                
+                signal.alarm(60)
                 account.updateFriend(
-                    user_obj,  # Pass the USER OBJECT, not email string
+                    account_user,  # Use the account user object
+                    server,        # The specific server (regular or 4K)
+                    sections=libraries_to_share,
+                    allowSync=True,
+                    allowCameraUpload=False,
+                    allowChannels=False
+                )
+                signal.alarm(0)
+                action = "updated_existing_account_user"
+                log_info(f"✅ Successfully updated account user's server access")
+                
+            elif user_status == "not_found":
+                # User doesn't exist on account - create new invitation
+                log_info(f"User not found on account, creating new invitation...")
+                
+                signal.alarm(60)
+                account.inviteFriend(
+                    user_email,
                     server,
                     sections=libraries_to_share,
                     allowSync=True,
@@ -304,61 +348,61 @@ def share_libraries_with_user_on_server(server_config, user_email, library_ids):
                     allowChannels=False
                 )
                 signal.alarm(0)
-                action = "updated_existing_user"
-                log_info(f"? updateFriend() completed successfully")
+                action = "invited_new_user"
+                log_info(f"✅ Successfully invited new user")
                 
-            except PlexApiException as e:
-                signal.alarm(0)
-                error_str = str(e).lower()
+            else:
+                return {
+                    "success": False,
+                    "error": f"Unknown user status: {user_status}",
+                    "server": server_config['name']
+                }
                 
-                # FIXED: Check for the specific 404 sharing error that we know still works
-                if "404" in error_str and ("sharing" in error_str or "not_found" in error_str):
-                    log_info(f"?? Got expected 404 error from updateFriend() - verifying if changes took effect...")
+        except Exception as api_error:
+            signal.alarm(0)
+            error_msg = str(api_error).lower()
+            log_error(f"Plex API error: {str(api_error)}")
+            
+            # Handle the specific "already sharing" error
+            if "400" in error_msg and "already sharing this server" in error_msg:
+                log_info(f"Got 'already sharing' error - this shouldn't happen with our new approach")
+                log_error(f"The user check may have failed - user exists but wasn't found in account.users()")
+                
+                return {
+                    "success": False,
+                    "error": f"Cross-server sharing failed: {str(api_error)}",
+                    "server": server_config['name']
+                }
+            
+            # Handle 404 errors that might actually work
+            elif "404" in error_msg and ("not found" in error_msg or "does not exist" in error_msg):
+                log_info(f"Got 404 error - checking if operation actually succeeded...")
+                
+                # Verify if the change worked despite 404
+                time.sleep(2)  # Brief delay for Plex to update
+                new_libs = get_current_library_access_with_timeout(account, server_config, user_email)
+                new_set = set(new_libs)
+                
+                if new_set == target_set:
+                    log_info(f"✅ 404 error ignored - operation actually succeeded!")
+                    action = "updated_despite_404"
                     error_was_404 = True
-                    action = "updated_existing_user_with_404"
-                    
-                    # Verify the changes actually happened despite the 404 error
-                    if verify_library_change_after_404(server_config, user_email, library_ids, current_libs):
-                        log_info(f"? 404 error ignored - updateFriend() actually worked!")
-                    else:
-                        log_error(f"? 404 error was a real failure")
-                        return {
-                            "success": False,
-                            "error": f"updateFriend failed with 404 and no changes detected: {str(e)[:200]}",
-                            "server": server_config['name']
-                        }
                 else:
-                    # Real error, not the ignorable 404
-                    log_error(f"Real Plex API error (not ignorable 404): {str(e)}")
+                    log_error(f"❌ 404 error was real - operation failed")
                     return {
                         "success": False,
-                        "error": f"Plex API error: {str(e)[:200]}",
+                        "error": f"Real API error: {str(api_error)}",
                         "server": server_config['name']
                     }
-            
-        elif user_status == "new":
-            # For new users, use inviteFriend() with email
-            log_info(f"Inviting new user {user_email} with {len(libraries_to_share)} libraries")
-            
-            signal.alarm(60)  # 60 second timeout
-            account.inviteFriend(
-                user_email,  # Email is fine for new users
-                server,
-                sections=libraries_to_share,
-                allowSync=True,
-                allowCameraUpload=False,
-                allowChannels=False
-            )
-            signal.alarm(0)
-            action = "invited_new_user"
+            else:
+                # Other real errors
+                return {
+                    "success": False,
+                    "error": f"Plex API error: {str(api_error)}",
+                    "server": server_config['name']
+                }
         
-        else:
-            return {
-                "success": False,
-                "error": f"Unexpected user status: {user_status}",
-                "server": server_config['name']
-            }
-        
+        # Success
         shared_library_names = [lib.title for lib in libraries_to_share]
         result_message = f"Successfully processed {user_email}: {shared_library_names}"
         
@@ -382,15 +426,9 @@ def share_libraries_with_user_on_server(server_config, user_email, library_ids):
             "error": "Operation timed out after 60 seconds",
             "server": server_config['name']
         }
-    except PlexApiException as e:
-        log_error(f"Plex API error on {server_config['name']}: {str(e)}")
-        return {
-            "success": False,
-            "error": f"Plex API error: {str(e)[:200]}...",
-            "server": server_config['name']
-        }
     except Exception as e:
-        log_error(f"Error on {server_config['name']}: {str(e)}")
+        signal.alarm(0)
+        log_error(f"Unexpected error: {str(e)}")
         return {
             "success": False,
             "error": str(e)[:200] + "..." if len(str(e)) > 200 else str(e),
