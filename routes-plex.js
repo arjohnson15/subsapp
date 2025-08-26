@@ -1450,4 +1450,66 @@ function buildStatsResponse(dbRows) {
   return stats;
 }
 
+// ENHANCED: Remove user from specific server groups with invite cancellation
+router.post('/remove-access-enhanced', async (req, res) => {
+  try {
+    const { userEmail, serverGroups } = req.body;
+    
+    if (!userEmail || !serverGroups || !Array.isArray(serverGroups)) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: userEmail, serverGroups (array)' 
+      });
+    }
+    
+    // Validate server groups
+    const validGroups = serverGroups.filter(group => ['plex1', 'plex2'].includes(group));
+    if (validGroups.length === 0) {
+      return res.status(400).json({ 
+        error: 'No valid server groups provided. Use plex1 and/or plex2' 
+      });
+    }
+    
+    console.log(`🗑️ API: Enhanced removal for ${userEmail} from groups:`, validGroups);
+    
+    // Use Python service for complete removal
+    const pythonPlexService = require('./python-plex-wrapper');
+    const result = await pythonPlexService.removeUserCompletely(userEmail, validGroups);
+    
+    if (result.success) {
+      console.log(`✅ Enhanced removal successful:`, result.summary);
+      
+      res.json({
+        success: true,
+        message: `Successfully removed ${userEmail} from ${validGroups.join(', ')}`,
+        userEmail: userEmail,
+        serverGroups: validGroups,
+        summary: {
+          invites_cancelled: result.summary?.invites_cancelled || 0,
+          users_removed: result.summary?.users_removed || 0,
+          servers_processed: result.summary?.servers_processed || 0
+        },
+        details: result.details || {},
+        note: 'Enhanced removal with invite cancellation and user removal'
+      });
+    } else {
+      console.log(`❌ Enhanced removal failed:`, result.error);
+      
+      res.status(500).json({
+        success: false,
+        error: result.error || 'Failed to remove user from server groups',
+        userEmail: userEmail,
+        serverGroups: validGroups,
+        details: result.details || {}
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Error in enhanced removal endpoint:', error);
+    res.status(500).json({ 
+      error: 'Failed to remove user from server groups',
+      details: error.message 
+    });
+  }
+});
+
 module.exports = router;

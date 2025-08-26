@@ -4827,3 +4827,60 @@ table tbody td:last-child .btn-small:nth-child(4) {
         }
     }
 }
+
+/* Clean Checkbox List Styles */
+.checkbox-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 15px;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1.4;
+    margin: 0;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-right: 12px;
+    margin-top: 0;
+    margin-bottom: 0;
+    accent-color: #4fc3f7;
+    cursor: pointer;
+}
+
+.checkbox-text {
+    color: #e0e0e0;
+    user-select: none;
+}
+
+.checkbox-label:hover .checkbox-text {
+    color: #4fc3f7;
+}
+
+/* Form Section Styling */
+.form-section {
+    margin-bottom: 25px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(79, 195, 247, 0.2);
+    border-radius: 8px;
+}
+
+.form-section h4 {
+    color: #4fc3f7;
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    font-weight: 500;
+}

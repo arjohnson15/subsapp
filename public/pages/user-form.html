@@ -481,29 +481,41 @@
             </div>
         </div>
 
-        <div class="form-group">
-            <label>Email & Owner Settings:</label>
-            <div class="checkbox-group">
-                <div class="checkbox-item">
-                    <input type="checkbox" id="bccOwnerRenewal" name="bcc_owner_renewal">
-                    <label for="bccOwnerRenewal">BCC Owner on Renewal Reminders</label>
-                </div>
-				<div class="form-group">
-					<label>
-						<input type="checkbox" id="replyToOwnerAlso" style="margin-right: 8px;">
-						Reply-To owner also (when sending emails to this user, set reply-to to include owner's email)
-					</label>
-				</div>
-                <div class="checkbox-item">
-                    <input type="checkbox" id="excludeBulkEmails" name="exclude_bulk_emails">
-                    <label for="excludeBulkEmails">Exclude from Bulk Emails</label>
-                </div>
-                <div class="checkbox-item">
-                    <input type="checkbox" id="excludeAutomatedEmails" name="exclude_automated_emails">
-                    <label for="excludeAutomatedEmails">Exclude from Automated Emails</label>
-                </div>
-            </div>
+
+<!-- Email & Owner Settings Section -->
+<div class="form-section">
+    <h4>Email & Owner Settings</h4>
+    
+    <div class="checkbox-list">
+        <div class="checkbox-item">
+            <label class="checkbox-label">
+                <input type="checkbox" id="bccOwnerRenewal">
+                <span class="checkbox-text">BCC Owner on Renewal Reminders</span>
+            </label>
         </div>
+        
+        <div class="checkbox-item">
+            <label class="checkbox-label">
+                <input type="checkbox" id="replyToOwnerAlso">
+                <span class="checkbox-text">Reply-To owner also (replies include owner's email)</span>
+            </label>
+        </div>
+        
+        <div class="checkbox-item">
+            <label class="checkbox-label">
+                <input type="checkbox" id="excludeBulkEmails">
+                <span class="checkbox-text">Exclude from Bulk Emails</span>
+            </label>
+        </div>
+        
+        <div class="checkbox-item">
+            <label class="checkbox-label">
+                <input type="checkbox" id="excludeAutomatedEmails">
+                <span class="checkbox-text">Exclude from Automated Emails</span>
+            </label>
+        </div>
+    </div>
+</div>
 
         <div style="text-align: center; margin-top: 30px;">
             <button type="submit" class="btn">Save User</button>
