@@ -204,7 +204,7 @@ return {
   iptv_subscription: iptvSubscription,
   plex_expiration: plexExpiration,
   iptv_expiration: iptvExpiration,
-  activity_display: activityDisplay  // ADD THIS LINE
+  activity_display: activityDisplay
 };
     }));
 
@@ -224,10 +224,25 @@ const [user] = await db.query(`
     o.email as owner_email,
     ie.iptv_editor_id, ie.iptv_editor_username, ie.iptv_editor_password,
     ie.m3u_code, ie.epg_code, ie.sync_status, ie.last_sync_time,
-    ie.max_connections as iptv_editor_max_connections
+    ie.max_connections as iptv_editor_max_connections,
+    pua.days_since_last_watch,
+    pua.last_watched_date,
+    pua.last_watched_title,
+    pua.has_recent_activity,
+    pua.server_name as plex_server_name
   FROM users u
   LEFT JOIN owners o ON u.owner_id = o.id
   LEFT JOIN iptv_editor_users ie ON u.id = ie.user_id
+  LEFT JOIN plex_user_activity pua ON (
+    (pua.plex_account_email = u.plex_email OR pua.plex_account_username = u.plex_username)
+    AND (
+      -- Match server based on user's tags
+      (JSON_CONTAINS(u.tags, '"Plex 1"') AND pua.server_name LIKE '%Plex 1%') OR
+      (JSON_CONTAINS(u.tags, '"Plex 2"') AND pua.server_name LIKE '%Plex 2%') OR
+      -- Fallback: if user has no Plex tags, allow any server
+      (NOT JSON_CONTAINS(u.tags, '"Plex 1"') AND NOT JSON_CONTAINS(u.tags, '"Plex 2"'))
+    )
+  )
   WHERE u.id = ?
 `, [req.params.id]);
 
@@ -235,8 +250,6 @@ const [user] = await db.query(`
       return res.status(404).json({ error: 'User not found' });
     }
 
-// Get user's subscriptions - FIXED to include FREE subscriptions
-// Get user's subscriptions - ENHANCED to include subscription type names
 const subscriptions = await db.query(`
   SELECT s.*, 
          CASE 
@@ -287,6 +300,15 @@ subscriptions.forEach(sub => {
       null;
   }
 });
+
+// **ADD THIS MISSING ACTIVITY FORMATTING**
+let activityDisplay = 'Unknown';
+if (user.days_since_last_watch !== null && user.days_since_last_watch !== undefined) {
+  activityDisplay = `${user.days_since_last_watch} days ago`;
+} else {
+  activityDisplay = 'Never';
+}
+user.activity_display = activityDisplay;
 
 // Set default values if no subscriptions found
 if (user.plex_subscription === null) {

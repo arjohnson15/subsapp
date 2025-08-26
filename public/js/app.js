@@ -1425,6 +1425,20 @@ updateMobilePreviewCounts() {
     try {
         // Only run on mobile
         if (window.innerWidth > 768) return;
+		
+		// Update USER STATISTICS mobile preview
+if (window.AppState && window.AppState.users) {
+    const users = window.AppState.users;
+    const uniqueUsers = users.filter(u => {
+        if (!u.tags || !Array.isArray(u.tags)) return false;
+        return u.tags.some(tag => tag === 'Plex 1' || tag === 'Plex 2' || tag === 'IPTV');
+    });
+    
+    const totalUsersPreview = document.getElementById('totalUsersPreview');
+    if (totalUsersPreview) {
+        totalUsersPreview.textContent = uniqueUsers.length.toString();
+    }
+}
         
         // Update IPTV mobile preview
         if (this.cachedIPTVData && this.cachedIPTVData.viewers) {

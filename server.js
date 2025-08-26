@@ -229,6 +229,7 @@ cron.schedule('0 3 * * *', async () => {
 });
 
 // Daily Plex activity sync (runs at 3 AM UTC daily)
+// Daily Plex activity sync (runs at 3 AM UTC daily)
 cron.schedule('0 3 * * *', async () => {
   const timestamp = new Date().toLocaleString();
   console.log('');
@@ -237,7 +238,23 @@ cron.schedule('0 3 * * *', async () => {
   console.log('📊='.repeat(50));
   
   try {
-    // Check if sync is already running
+    // Clean up any syncs older than 1 hour first
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const timeoutResult = await db.query(`
+      UPDATE plex_sync_status 
+      SET status = 'failed', 
+          completed_at = NOW(), 
+          error_message = 'Sync timed out after 1 hour'
+      WHERE sync_type = 'user_activity' 
+        AND status = 'running' 
+        AND started_at < ?
+    `, [oneHourAgo]);
+    
+    if (timeoutResult.affectedRows > 0) {
+      console.log(`⏰ Cleaned up ${timeoutResult.affectedRows} timed-out sync(s)`);
+    }
+    
+    // Check if sync is still running after cleanup
     const runningSyncs = await db.query(
       "SELECT * FROM plex_sync_status WHERE sync_type = 'user_activity' AND status = 'running'"
     );
