@@ -299,12 +299,12 @@ renderUsersTableBasic() {
             <td style="color: ${user.iptv_expiration === 'FREE' ? '#4fc3f7' : (user.iptv_expiration ? Utils.isDateExpired(user.iptv_expiration) ? '#f44336' : '#4caf50' : '#666')}">
                 ${user.iptv_expiration === 'FREE' ? 'FREE' : (user.iptv_expiration ? Utils.formatDate(user.iptv_expiration) : '')}
             </td>
-            <td>
-                <button class="btn btn-small btn-view" onclick="Users.viewUser(${user.id})">View</button>
-                <a href="#user-form?id=${user.id}" class="btn btn-small btn-edit" onclick="event.preventDefault(); Users.editUser(${user.id})">Edit</a>
-                <a href="#email?name=${encodeURIComponent(user.name)}&email=${encodeURIComponent(user.email)}" class="btn btn-small btn-email" onclick="event.preventDefault(); Users.emailUser('${user.name}', '${user.email}')">Email</a>
-                <button class="btn btn-small btn-delete" onclick="Users.deleteUser(${user.id})">Delete</button>
-            </td>
+<td>
+    <button class="btn btn-small btn-view" onclick="Users.viewUser(${user.id})">View</button>
+    <a href="#user-form?edit=${user.id}" class="btn btn-small btn-edit" onclick="event.preventDefault(); Users.editUser(${user.id})">Edit</a>
+    <a href="#email?name=${encodeURIComponent(user.name)}&email=${encodeURIComponent(user.email)}" class="btn btn-small btn-email" onclick="event.preventDefault(); Users.emailUser('${user.name}', '${user.email}')">Email</a>
+    <button class="btn btn-small btn-delete" onclick="Users.deleteUser(${user.id})">Delete</button>
+</td>
         </tr>
     `).join('');
     
@@ -357,25 +357,59 @@ return matchesSearch && matchesOwner && matchesTag && matchesInactivity;
         window.AppState.users = originalUsers; // Restore original for other functions
     },
     
-    sortUsers(field) {
-        if (this.currentSortField === field) {
-            this.currentSortDirection = this.currentSortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            this.currentSortField = field;
-            this.currentSortDirection = 'asc';
-        }
-        
-        window.AppState.users = Utils.sortArray(
-            window.AppState.users, 
-            field, 
-            this.currentSortDirection
-        );
-        
-        // Update sort indicators
-        this.updateSortIndicators(field, this.currentSortDirection);
-        
-        this.renderUsersTable();
-    },
+sortUsers(field) {
+    if (this.currentSortField === field) {
+        this.currentSortDirection = this.currentSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        this.currentSortField = field;
+        this.currentSortDirection = 'asc';
+    }
+    
+    // Get current filter values
+    const searchTerm = document.getElementById('userSearch')?.value.toLowerCase() || '';
+    const ownerFilter = document.getElementById('ownerFilter')?.value || '';
+    const tagFilter = document.getElementById('tagFilter')?.value || '';
+    const inactivityFilter = document.getElementById('inactivityFilter')?.value;
+    
+    // Start with all users, not the currently displayed ones
+    let usersToSort = window.AppState.allUsers || window.AppState.users || [];
+    
+    // Apply filters first if any are active
+    if (searchTerm || ownerFilter || tagFilter || inactivityFilter) {
+        usersToSort = usersToSort.filter(user => {
+            const matchesSearch = !searchTerm || 
+                user.name.toLowerCase().includes(searchTerm) ||
+                user.email.toLowerCase().includes(searchTerm) ||
+                (user.plex_username && user.plex_username.toLowerCase().includes(searchTerm));
+            
+            const matchesOwner = !ownerFilter || 
+                (user.owner_id && user.owner_id.toString() === ownerFilter);
+            
+            const matchesTag = !tagFilter || 
+                (user.tags && Array.isArray(user.tags) && user.tags.includes(tagFilter));
+            
+            const matchesInactivity = !inactivityFilter || 
+                (user.days_since_last_watch !== null && user.days_since_last_watch >= parseInt(inactivityFilter)) ||
+                (user.days_since_last_watch === null);
+
+            return matchesSearch && matchesOwner && matchesTag && matchesInactivity;
+        });
+    }
+    
+    // Sort the filtered results
+    const sortedUsers = Utils.sortArray(usersToSort, field, this.currentSortDirection);
+    
+    // Update displayed users
+    window.AppState.users = sortedUsers;
+    
+    // Update sort indicators
+    this.updateSortIndicators(field, this.currentSortDirection);
+    
+    // Render the sorted and filtered results
+    this.renderUsersTable();
+    
+    console.log(`🔄 Sorted ${sortedUsers.length} users by ${field} (${this.currentSortDirection})`);
+},
 
     // Update visual sort indicators in table headers
      updateSortIndicators(activeField, direction) {
@@ -4056,11 +4090,11 @@ checkMobileAndSetDefault() {
     <a href="#email?name=${encodeURIComponent(user.name)}&email=${encodeURIComponent(user.email)}" class="compact-action-btn compact-btn-email" onclick="event.stopPropagation(); event.preventDefault(); Users.emailUser('${user.name}', '${user.email}')">
         <i class="fas fa-envelope"></i>
         Email
-    </button>
-    <a href="#user-form?id=${user.id}" class="compact-action-btn compact-btn-edit" onclick="event.stopPropagation(); event.preventDefault(); Users.editUser(${user.id})">
+    </a>
+    <a href="#user-form?edit=${user.id}" class="compact-action-btn compact-btn-edit" onclick="event.stopPropagation(); event.preventDefault(); Users.editUser(${user.id})">
         <i class="fas fa-edit"></i>
         Edit User
-    </button>
+    </a>
     <button class="compact-action-btn compact-btn-delete" onclick="event.stopPropagation(); Users.deleteUser(${user.id})">
         <i class="fas fa-trash"></i>
         Delete

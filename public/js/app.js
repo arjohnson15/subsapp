@@ -145,31 +145,38 @@ function updateGlobalFavicon(faviconUrl) {
 
 async function showPage(pageId) {
     try {
-        AppDebug.log(`📄 Navigating to page: ${pageId}`);
-        
-        // Parse URL parameters if present
+        // Parse page ID and parameters
         let actualPageId = pageId;
-        let urlParams = {};
+        let pageParams = null;
         
         if (pageId.includes('?')) {
-            const [page, paramString] = pageId.split('?');
-            actualPageId = page;
-            const searchParams = new URLSearchParams(paramString);
-            urlParams = Object.fromEntries(searchParams.entries());
+            const parts = pageId.split('?');
+            actualPageId = parts[0];
+            const paramString = parts[1];
+            
+            // Parse parameters
+            pageParams = {};
+            const pairs = paramString.split('&');
+            for (const pair of pairs) {
+                const [key, value] = pair.split('=');
+                pageParams[decodeURIComponent(key)] = decodeURIComponent(value || '');
+            }
         }
+        
+        AppDebug.log(`📄 Navigating to page: ${actualPageId}`, pageParams ? `with params: ${JSON.stringify(pageParams)}` : '');
         
         if (window.AppState.currentPage === 'dashboard' && actualPageId !== 'dashboard' && window.Dashboard) {
             AppDebug.log('📊 Leaving dashboard - stopping background refresh');
             window.Dashboard.destroy();
         }
         
-        Utils.updateUrlHash(pageId);
+        Utils.updateUrlHash(pageId); // Keep original pageId for URL
         
-        const loaded = await Utils.loadPageContent(actualPageId);
+        const loaded = await Utils.loadPageContent(actualPageId); // Use actualPageId for loading
         if (!loaded) return;
 
         window.AppState.currentPage = actualPageId;
-        window.AppState.currentPageParams = urlParams; // Store URL parameters
+        window.AppState.currentPageParams = pageParams; // Store params in AppState
         
         await initializePage(actualPageId);
         
@@ -268,76 +275,108 @@ async function initUserFormPage() {
     try {
         console.log('🔧 Setting up user form page...');
         
-        // Wait a bit for the HTML to be fully loaded
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Check if we have a user ID from URL parameters
-        const userId = window.AppState.currentPageParams?.id;
-        
-        if (userId) {
-            console.log(`🔧 URL parameter detected - editing user ${userId}`);
+        // Check for edit parameter from URL
+        if (window.AppState.currentPageParams && window.AppState.currentPageParams.edit) {
+            const userId = window.AppState.currentPageParams.edit;
+            console.log(`🔧 Edit mode detected for user ID: ${userId}`);
             
-            // Set the editing state
-            window.AppState.editingUserId = parseInt(userId);
+            // Set editing state
+            window.AppState.editingUserId = userId;
             
+            // Load user data
             try {
-                // Load the user data and populate the form
                 const user = await API.User.getById(userId);
-                if (user) {
-                    window.AppState.currentUserData = user;
-                    
-                    // Set baselines for change detection
-                    if (window.Users) {
-                        window.Users.originalLibraryBaseline = window.Users.deepClone(user.plex_libraries || {});
-                        window.Users.originalTagsBaseline = [...(user.tags || [])];
-                    }
-                    
-                    // Populate the form
-                    setTimeout(() => {
-                        console.log(`🔧 Populating form for editing user: ${user.name}`);
-                        window.populateFormForEditing(user);
-                        
-                        // Update page title
-                        const titleElement = document.querySelector('h2');
-                        if (titleElement) {
-                            titleElement.textContent = 'Edit User';
-                        }
-                        
-                        // Load IPTV Editor status if available
-                        if (window.loadIPTVEditorStatus) {
-                            window.loadIPTVEditorStatus(user.id);
-                        }
-                    }, 1200);
-                } else {
-                    console.error('❌ User not found');
-                    Utils.showNotification('User not found', 'error');
-                    window.showPage('users');
+                window.AppState.currentUserData = user;
+                
+                // Set baselines for change detection
+                if (window.Users) {
+                    window.Users.originalLibraryBaseline = window.Users.deepClone(user.plex_libraries || {});
+                    window.Users.originalTagsBaseline = [...(user.tags || [])];
                 }
             } catch (error) {
-                console.error('❌ Error loading user for editing:', error);
+                console.error('Error loading user for editing:', error);
                 Utils.showNotification('Error loading user: ' + error.message, 'error');
-                window.showPage('users');
-            }
-        } else {
-            console.log('🔧 No user ID in URL - setting up for new user');
-            // Clear editing state for new user
-            window.AppState.editingUserId = null;
-            window.AppState.currentUserData = null;
-            
-            if (window.Users) {
-                window.Users.originalLibraryBaseline = null;
-                window.Users.originalTagsBaseline = null;
-                if (window.Users.resetFormState) {
-                    window.Users.resetFormState();
-                }
             }
         }
         
-        // Continue with the rest of your existing initUserFormPage code...
+        // Wait a bit for the HTML to be fully loaded
+        await new Promise(resolve => setTimeout(resolve, 100));
         
+        // DEBUG: Check what IPTV objects are available
+        console.log('🔍 Available IPTV objects:', {
+            'window.IPTV': !!window.IPTV,
+            'window.IPTVUser': !!window.IPTVUser,
+            'window.UserFormIPTV': !!window.UserFormIPTV,
+            'IPTV_functions': window.IPTV ? Object.keys(window.IPTV).filter(k => typeof window.IPTV[k] === 'function') : []
+        });
+        
+        // CRITICAL: Initialize IPTV module for user form page
+        if (window.IPTV && typeof window.IPTV.init === 'function') {
+            console.log('📺 Initializing IPTV module for user form...');
+            await window.IPTV.init();
+        } else {
+            console.warn('⚠️ IPTV module not available during user form initialization');
+            // Try to wait for it to load
+            let attempts = 0;
+            const maxAttempts = 10;
+            while (!window.IPTV && attempts < maxAttempts) {
+                console.log(`⏳ Waiting for IPTV module... attempt ${attempts + 1}`);
+                await new Promise(resolve => setTimeout(resolve, 200));
+                attempts++;
+            }
+            
+            if (window.IPTV) {
+                console.log('✅ IPTV module loaded after waiting');
+                if (typeof window.IPTV.init === 'function') {
+                    await window.IPTV.init();
+                }
+            } else {
+                console.error('❌ IPTV module never loaded');
+            }
+        }
+        
+        // Setup form event listeners
+        setupUserFormEventListeners();
+        
+        // Load form data
+        await loadUserFormData();
+        
+        // Load Plex libraries
+        await loadPlexLibrariesForUserForm();
+        
+        // ENHANCED: Load IPTV status for existing user
+        if (window.AppState.editingUserId && window.IPTV && typeof window.IPTV.loadCurrentUserIPTVStatus === 'function') {
+            console.log('📺 Loading IPTV status for existing user...');
+            setTimeout(() => {
+                window.IPTV.loadCurrentUserIPTVStatus();
+            }, 800);
+        }
+        
+        // Load IPTV credits from database
+        if (window.UserFormIPTV && typeof window.UserFormIPTV.loadCreditBalance === 'function') {
+            console.log('💳 Loading credits for user form...');
+            setTimeout(() => {
+                window.UserFormIPTV.loadCreditBalance();
+            }, 500);
+        }
+        
+        // If editing a user, populate the form
+        if (window.AppState.editingUserId && window.AppState.currentUserData) {
+            setTimeout(async () => {
+                console.log(`🔧 Populating form for editing user: ${window.AppState.currentUserData.name}`);
+                window.populateFormForEditing(window.AppState.currentUserData);
+                
+                // Load IPTV Editor status
+                if (window.loadIPTVEditorStatus) {
+                    await window.loadIPTVEditorStatus(window.AppState.editingUserId);
+                }
+            }, 1200);
+        }
+        
+        console.log('✅ User form page setup complete');
     } catch (error) {
-        console.error('❌ Error initializing user form page:', error);
-        Utils.handleError(error, 'Initializing user form page');
+        console.error('❌ Error setting up user form:', error);
+        Utils.handleError(error, 'Setting up user form');
     }
 }
 
