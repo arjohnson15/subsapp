@@ -145,25 +145,37 @@ function updateGlobalFavicon(faviconUrl) {
 
 async function showPage(pageId) {
     try {
-        AppDebug.log(`📄 Navigating to page: ${pageId}`); // Debug only
+        AppDebug.log(`📄 Navigating to page: ${pageId}`);
         
-        if (window.AppState.currentPage === 'dashboard' && pageId !== 'dashboard' && window.Dashboard) {
-            AppDebug.log('📊 Leaving dashboard - stopping background refresh'); // Debug only
+        // Parse URL parameters if present
+        let actualPageId = pageId;
+        let urlParams = {};
+        
+        if (pageId.includes('?')) {
+            const [page, paramString] = pageId.split('?');
+            actualPageId = page;
+            const searchParams = new URLSearchParams(paramString);
+            urlParams = Object.fromEntries(searchParams.entries());
+        }
+        
+        if (window.AppState.currentPage === 'dashboard' && actualPageId !== 'dashboard' && window.Dashboard) {
+            AppDebug.log('📊 Leaving dashboard - stopping background refresh');
             window.Dashboard.destroy();
         }
         
         Utils.updateUrlHash(pageId);
         
-        const loaded = await Utils.loadPageContent(pageId);
+        const loaded = await Utils.loadPageContent(actualPageId);
         if (!loaded) return;
 
-        window.AppState.currentPage = pageId;
+        window.AppState.currentPage = actualPageId;
+        window.AppState.currentPageParams = urlParams; // Store URL parameters
         
-        await initializePage(pageId);
+        await initializePage(actualPageId);
         
-        AppDebug.log(`✅ Loaded page: ${pageId}`); // Debug only
+        AppDebug.log(`✅ Loaded page: ${actualPageId}`);
     } catch (error) {
-        AppDebug.error(`Error loading page ${pageId}:`, error); // Always log errors
+        AppDebug.error(`Error loading page ${pageId}:`, error);
         Utils.handleError(error, `Loading ${pageId} page`);
     }
 }
@@ -192,11 +204,45 @@ async function initializePage(pageId) {
             await initUserFormPage();
             break;
             
-        case 'email':
-            if (window.Email && window.Email.init) {
-                await window.Email.init();
+case 'email':
+    if (window.Email && window.Email.init) {
+        await window.Email.init();
+    }
+    
+    // Handle URL parameters for pre-populating recipient
+    const emailParams = window.AppState.currentPageParams;
+    if (emailParams?.name && emailParams?.email) {
+        console.log('🔧 URL parameters detected - pre-populating email recipient');
+        
+        // Store the recipient info for the email page (existing pattern)
+        window.AppState = window.AppState || {};
+        window.AppState.emailRecipient = {
+            name: decodeURIComponent(emailParams.name),
+            email: decodeURIComponent(emailParams.email)
+        };
+        
+        // Prepopulate the recipient field and lookup user data
+        setTimeout(async () => {
+            const recipientField = document.getElementById('emailRecipient');
+            
+            if (recipientField) {
+                recipientField.value = decodeURIComponent(emailParams.email);
+                console.log('🔧 Pre-populated recipient from URL:', decodeURIComponent(emailParams.email));
+                
+                // IMPORTANT: Trigger the user lookup to load dynamic field data
+                if (window.Email && window.Email.lookupUserByEmail) {
+                    console.log('🔧 Looking up user data for dynamic fields...');
+                    await window.Email.lookupUserByEmail();
+                }
             }
-            break;
+            
+            // Update email preview if Email module is loaded
+            if (window.Email && window.Email.updateEmailPreview) {
+                window.Email.updateEmailPreview();
+            }
+        }, 400); // Increased timeout to ensure Email module is fully loaded
+    }
+    break;
             
         case 'management':
             console.log('?? Initializing management page...');
@@ -225,78 +271,73 @@ async function initUserFormPage() {
         // Wait a bit for the HTML to be fully loaded
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        // DEBUG: Check what IPTV objects are available
-        console.log('🔍 Available IPTV objects:', {
-            'window.IPTV': !!window.IPTV,
-            'window.IPTVUser': !!window.IPTVUser,
-            'window.UserFormIPTV': !!window.UserFormIPTV,
-            'IPTV_functions': window.IPTV ? Object.keys(window.IPTV).filter(k => typeof window.IPTV[k] === 'function') : []
-        });
+        // Check if we have a user ID from URL parameters
+        const userId = window.AppState.currentPageParams?.id;
         
-        // CRITICAL: Initialize IPTV module for user form page
-        if (window.IPTV && typeof window.IPTV.init === 'function') {
-            console.log('📺 Initializing IPTV module for user form...');
-            await window.IPTV.init();
-        } else {
-            console.warn('⚠️ IPTV module not available during user form initialization');
-            // Try to wait for it to load
-            let attempts = 0;
-            const maxAttempts = 10;
-            while (!window.IPTV && attempts < maxAttempts) {
-                console.log(`⏳ Waiting for IPTV module... attempt ${attempts + 1}`);
-                await new Promise(resolve => setTimeout(resolve, 200));
-                attempts++;
-            }
+        if (userId) {
+            console.log(`🔧 URL parameter detected - editing user ${userId}`);
             
-            if (window.IPTV) {
-                console.log('✅ IPTV module loaded after waiting');
-                if (typeof window.IPTV.init === 'function') {
-                    await window.IPTV.init();
+            // Set the editing state
+            window.AppState.editingUserId = parseInt(userId);
+            
+            try {
+                // Load the user data and populate the form
+                const user = await API.User.getById(userId);
+                if (user) {
+                    window.AppState.currentUserData = user;
+                    
+                    // Set baselines for change detection
+                    if (window.Users) {
+                        window.Users.originalLibraryBaseline = window.Users.deepClone(user.plex_libraries || {});
+                        window.Users.originalTagsBaseline = [...(user.tags || [])];
+                    }
+                    
+                    // Populate the form
+                    setTimeout(() => {
+                        console.log(`🔧 Populating form for editing user: ${user.name}`);
+                        window.populateFormForEditing(user);
+                        
+                        // Update page title
+                        const titleElement = document.querySelector('h2');
+                        if (titleElement) {
+                            titleElement.textContent = 'Edit User';
+                        }
+                        
+                        // Load IPTV Editor status if available
+                        if (window.loadIPTVEditorStatus) {
+                            window.loadIPTVEditorStatus(user.id);
+                        }
+                    }, 1200);
+                } else {
+                    console.error('❌ User not found');
+                    Utils.showNotification('User not found', 'error');
+                    window.showPage('users');
                 }
-            } else {
-                console.error('❌ IPTV module never loaded');
+            } catch (error) {
+                console.error('❌ Error loading user for editing:', error);
+                Utils.showNotification('Error loading user: ' + error.message, 'error');
+                window.showPage('users');
+            }
+        } else {
+            console.log('🔧 No user ID in URL - setting up for new user');
+            // Clear editing state for new user
+            window.AppState.editingUserId = null;
+            window.AppState.currentUserData = null;
+            
+            if (window.Users) {
+                window.Users.originalLibraryBaseline = null;
+                window.Users.originalTagsBaseline = null;
+                if (window.Users.resetFormState) {
+                    window.Users.resetFormState();
+                }
             }
         }
         
-        // Setup form event listeners
-        setupUserFormEventListeners();
+        // Continue with the rest of your existing initUserFormPage code...
         
-        // Load form data
-        await loadUserFormData();
-        
-        // Load Plex libraries
-        await loadPlexLibrariesForUserForm();
-        
-        // ENHANCED: Load IPTV status for existing user
-        const urlParams = new URLSearchParams(window.location.search);
-        const userId = urlParams.get('id');
-        
-        if (userId && window.IPTV && typeof window.IPTV.loadCurrentUserIPTVStatus === 'function') {
-            console.log('📺 Loading IPTV status for existing user...');
-            setTimeout(() => {
-                window.IPTV.loadCurrentUserIPTVStatus();
-            }, 800);
-        }
-        
-        // Load IPTV credits from database
-        if (window.UserFormIPTV && typeof window.UserFormIPTV.loadCreditBalance === 'function') {
-            console.log('💳 Loading credits for user form...');
-            setTimeout(() => {
-                window.UserFormIPTV.loadCreditBalance();
-            }, 500);
-        }
-        
-        // If editing a user, populate the form
-        if (window.AppState.editingUserId) {
-            setTimeout(async () => {
-                await loadAndPopulateUser(window.AppState.editingUserId);
-            }, 500);
-        }
-        
-        console.log('✅ User form page setup complete');
     } catch (error) {
-        console.error('❌ Error setting up user form:', error);
-        Utils.handleError(error, 'Setting up user form');
+        console.error('❌ Error initializing user form page:', error);
+        Utils.handleError(error, 'Initializing user form page');
     }
 }
 

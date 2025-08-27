@@ -301,8 +301,8 @@ renderUsersTableBasic() {
             </td>
             <td>
                 <button class="btn btn-small btn-view" onclick="Users.viewUser(${user.id})">View</button>
-                <button class="btn btn-small btn-edit" onclick="Users.editUser(${user.id})">Edit</button>
-                <button class="btn btn-small btn-email" onclick="Users.emailUser('${user.name}', '${user.email}')">Email</button>
+                <a href="#user-form?id=${user.id}" class="btn btn-small btn-edit" onclick="event.preventDefault(); Users.editUser(${user.id})">Edit</a>
+                <a href="#email?name=${encodeURIComponent(user.name)}&email=${encodeURIComponent(user.email)}" class="btn btn-small btn-email" onclick="event.preventDefault(); Users.emailUser('${user.name}', '${user.email}')">Email</a>
                 <button class="btn btn-small btn-delete" onclick="Users.deleteUser(${user.id})">Delete</button>
             </td>
         </tr>
@@ -4053,11 +4053,11 @@ checkMobileAndSetDefault() {
         <i class="fas fa-eye"></i>
         View Details
     </button>
-    <button class="compact-action-btn compact-btn-email" onclick="event.stopPropagation(); Users.emailUser('${user.name}', '${user.email}')">
+    <a href="#email?name=${encodeURIComponent(user.name)}&email=${encodeURIComponent(user.email)}" class="compact-action-btn compact-btn-email" onclick="event.stopPropagation(); event.preventDefault(); Users.emailUser('${user.name}', '${user.email}')">
         <i class="fas fa-envelope"></i>
         Email
     </button>
-    <button class="compact-action-btn compact-btn-edit" onclick="event.stopPropagation(); Users.editUser(${user.id})">
+    <a href="#user-form?id=${user.id}" class="compact-action-btn compact-btn-edit" onclick="event.stopPropagation(); event.preventDefault(); Users.editUser(${user.id})">
         <i class="fas fa-edit"></i>
         Edit User
     </button>
